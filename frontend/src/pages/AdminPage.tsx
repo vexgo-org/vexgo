@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { 
   Users, FileText, MessageSquare, Tag, 
-  Plus, Trash2, BarChart3
+  Plus, Trash2, BarChart3, Edit
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -25,6 +25,7 @@ export function AdminPage() {
     tags: 0
   });
   const [posts, setPosts] = useState<Post[]>([]);
+  const [draftPosts, setDraftPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDesc, setNewCategoryDesc] = useState('');
@@ -43,14 +44,16 @@ export function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsRes, postsRes, categoriesRes] = await Promise.all([
+      const [statsRes, postsRes, draftPostsRes, categoriesRes] = await Promise.all([
         statsApi.getStats(),
         postsApi.getPosts({ limit: 10 }),
+        postsApi.getDraftPosts({ limit: 10 }),
         categoriesApi.getCategories()
       ]);
 
       setStats(statsRes.data.stats);
       setPosts(postsRes.data.posts);
+      setDraftPosts(draftPostsRes.data.posts);
       setCategories(categoriesRes.data.categories);
     } catch (error) {
       console.error('加载数据失败:', error);
@@ -82,6 +85,10 @@ export function AdminPage() {
     } catch (error) {
       console.error('删除文章失败:', error);
     }
+  };
+
+  const handleEditPost = (postId: string) => {
+    navigate(`/write/${postId}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -178,8 +185,9 @@ export function AdminPage() {
 
       {/* 管理标签页 */}
       <Tabs defaultValue="posts" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
           <TabsTrigger value="posts">文章管理</TabsTrigger>
+          <TabsTrigger value="drafts">草稿管理</TabsTrigger>
           <TabsTrigger value="categories">分类管理</TabsTrigger>
         </TabsList>
 
@@ -209,15 +217,75 @@ export function AdminPage() {
                         作者: {post.author?.username}
                       </p>
                     </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeletePost(post.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditPost(post.id)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeletePost(post.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="drafts" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>草稿文章</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {draftPosts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">暂无草稿文章</p>
+                ) : (
+                  draftPosts.map((post) => (
+                    <div 
+                      key={post.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="secondary">草稿</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {formatDate(post.createdAt)}
+                          </span>
+                        </div>
+                        <h3 className="font-medium">{post.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          作者: {post.author?.username}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditPost(post.id)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeletePost(post.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

@@ -56,6 +56,7 @@ func main() {
 		// 文章操作（需登录）
 		api.POST("/posts", middleware.JWTAuth(), handler.CreatePost)              // POST /api/posts（创建文章）
 		api.GET("/posts/user/my-posts", middleware.JWTAuth(), handler.GetMyPosts) // GET /api/posts/user/my-posts（我的文章）
+		api.GET("/posts/drafts", middleware.JWTAuth(), handler.GetDraftPosts)     // GET /api/posts/drafts（草稿文章）
 		api.PUT("/posts/:id", middleware.JWTAuth(), handler.UpdatePost)           // PUT /api/posts/:id（更新文章）
 		api.DELETE("/posts/:id", middleware.JWTAuth(), handler.DeletePost)        // DELETE /api/posts/:id（删除文章）
 

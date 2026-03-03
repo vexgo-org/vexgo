@@ -239,3 +239,39 @@ func GetMyPosts(c *gin.Context) {
 		},
 	})
 }
+
+// Get all draft articles for admin
+func GetDraftPosts(c *gin.Context) {
+	var posts []model.Post
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	query := db.Model(&model.Post{}).
+		Preload("Author").
+		Preload("Tags").
+		Where("status = ?", "draft")
+
+	var total int64
+	query.Count(&total)
+
+	query.Order("created_at DESC").
+		Offset((page - 1) * limit).
+		Limit(limit).
+		Find(&posts)
+
+	totalPages := (int(total) + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"posts": posts,
+		"pagination": gin.H{
+			"total":      total,
+			"page":       page,
+			"limit":      limit,
+			"totalPages": totalPages,
+		},
+	})
+}

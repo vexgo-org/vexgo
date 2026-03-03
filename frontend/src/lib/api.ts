@@ -95,7 +95,10 @@ export const postsApi = {
     api.delete<{ message: string }>(`/posts/${id}`),
   
   getMyPosts: (params?: { page?: number; limit?: number; status?: string }) =>
-    api.get<PostsResponse>('/posts/user/my-posts', { params })
+    api.get<PostsResponse>('/posts/user/my-posts', { params }),
+  
+  getDraftPosts: (params?: { page?: number; limit?: number }) =>
+    api.get<PostsResponse>('/posts/drafts', { params })
 };
 
 // 分类相关API
