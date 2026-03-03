@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"os"
 )
@@ -12,10 +14,14 @@ var JWTSecret []byte
 func Init() {
 	s := os.Getenv("JWT_SECRET")
 	if s == "" {
-		// 在开发环境允许使用一个弱默认密钥，但会记录警告。
-		// 强烈建议在生产环境中通过环境变量注入一个安全的密钥。
-		log.Println("WARNING: JWT_SECRET not set — using insecure default for development")
-		s = "dev-secret-do-not-use-in-production"
+		// Generate a secure random key in the development environment.
+		log.Println("WARNING: JWT_SECRET not set — generating a random secret for development")
+		key := make([]byte, 32) // 256 bits
+		if _, err := rand.Read(key); err != nil {
+			log.Fatalf("failed to generate random JWT secret: %v", err)
+		}
+		s = hex.EncodeToString(key)
 	}
 	JWTSecret = []byte(s)
+	log.Printf("JWT secret initialized with length: %d bytes", len(JWTSecret))
 }
