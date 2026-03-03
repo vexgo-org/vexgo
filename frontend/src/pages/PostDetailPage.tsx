@@ -49,12 +49,24 @@ export function PostDetailPage() {
 
   const loadPost = async () => {
     try {
+      console.log('正在加载文章，ID:', id);
       const response = await postsApi.getPost(id!);
+      console.log('文章加载成功:', response.data);
       setPost(response.data.post);
       setLikesCount(response.data.post.likesCount || 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载文章失败:', error);
-      navigate('/');
+      console.error('错误详情:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      // Only redirect back to the homepage if you truly cannot find the article.
+      if (error.response?.status === 404) {
+        navigate('/');
+      }
+      // For other errors, still set loading to false so that users can see the error message.
     } finally {
       setLoading(false);
     }

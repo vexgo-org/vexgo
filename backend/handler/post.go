@@ -87,8 +87,12 @@ func GetPost(c *gin.Context) {
 	id := c.Param("id")
 	var post model.Post
 
+	// 添加日志来诊断问题
+	fmt.Printf("Attempting to fetch post with ID: %s\n", id)
+
 	if err := db.Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		fmt.Printf("Error fetching post with ID %s: %v\n", id, err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在", "postId": id, "details": err.Error()})
 		return
 	}
 
@@ -96,6 +100,7 @@ func GetPost(c *gin.Context) {
 	db.Model(&post).UpdateColumn("view_count", gorm.Expr("view_count + ?", 1))
 
 	c.JSON(http.StatusOK, post)
+	fmt.Printf("Successfully fetched post: %+v\n", post)
 }
 
 // 封装前端请求的数据结构，和 model.Post 不完全一致
@@ -181,7 +186,13 @@ func CreatePost(c *gin.Context) {
 		}
 	}
 
-	db.Create(&post)
+	result := db.Create(&post)
+	
+	// 添加日志来诊断问题
+	fmt.Printf("Creating post: %+v\n", post)
+	fmt.Printf("Create result: %+v\n", result)
+	fmt.Printf("Created post ID: %d\n", post.ID)
+	
 	c.JSON(http.StatusCreated, gin.H{"message": "文章创建成功", "post": post})
 }
 
