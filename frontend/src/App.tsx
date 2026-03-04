@@ -10,6 +10,7 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { MyPostsPage } from '@/pages/MyPostsPage';
 import { AdminPage } from '@/pages/AdminPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { Toaster } from '@/components/ui/sonner';
 
 function App() {
@@ -54,6 +55,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <MyPostsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
                 </ProtectedRoute>
               }
             />
