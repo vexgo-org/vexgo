@@ -48,7 +48,11 @@ func PermissionMiddleware(requiredRoles ...string) gin.HandlerFunc {
 		}
 
 		// 将用户信息存储到上下文中供后续使用
-		c.Set("user", user)
+		c.Set("user", map[string]interface{}{
+			"id":       user.ID,
+			"username": user.Username,
+			"role":     user.Role,
+		})
 		c.Next()
 	}
 }

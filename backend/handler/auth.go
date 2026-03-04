@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"net/http"
-	"time"
 	"fmt"
+	"net/http"
 	"strconv"
+	"time"
 
 	"blog-system/backend/config"
 	"blog-system/backend/model"
@@ -42,6 +42,7 @@ func Login(c *gin.Context) {
 	claims := jwt.MapClaims{
 		"user_id":  user.ID,
 		"username": user.Username,
+		"role":     user.Role,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 		"iat":      time.Now().Unix(),                                                  // Timestamp
 		"jti":      fmt.Sprintf("%d-%s", user.ID, time.Now().Format(time.RFC3339Nano)), // Unique identifier

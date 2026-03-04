@@ -42,6 +42,21 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set("userID", uint(claims["user_id"].(float64)))
 		c.Set("username", claims["username"].(string))
 
+		// 获取用户完整信息并设置到上下文中
+		userInfo := map[string]interface{}{
+			"id":       uint(claims["user_id"].(float64)),
+			"username": claims["username"].(string),
+		}
+
+		// 安全地获取角色信息
+		if role, ok := claims["role"].(string); ok {
+			userInfo["role"] = role
+		} else {
+			userInfo["role"] = ""
+		}
+
+		c.Set("user", userInfo)
+
 		c.Next()
 	}
 }

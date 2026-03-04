@@ -28,21 +28,55 @@ func GetPosts(c *gin.Context) {
 		limit = 10 // 限制limit范围，避免性能问题
 	}
 
-	// 2. 筛选条件（关键修正）
-	categoryID := c.Query("category") // 字段名改为categoryID，对应表的category_id
-	status := c.Query("status")       // 去掉默认值，前端不传则不筛选所有状态
+	// 2. 筛选条件
+	categoryID := c.Query("category")
+	status := c.Query("status")
 	search := c.Query("search")
 
-	// Initial query: Preload associations, only display published articles
+	// 获取当前用户角色（如果已登录）
+	var userRole string
+	var userID uint
+	if userContext, exists := c.Get("user"); exists {
+		if userMap, ok := userContext.(map[string]interface{}); ok {
+			if role, ok := userMap["role"].(string); ok {
+				userRole = role
+			}
+			if id, ok := userMap["id"].(float64); ok {
+				userID = uint(id)
+			}
+		}
+	}
+
+	// 构建查询
 	query := db.Model(&model.Post{}).
 		Preload("Author").
-		Preload("Tags").
-		Where("status = ?", "published")
+		Preload("Tags")
+
+	// 根据用户角色决定可见的文章
+	if userRole == "" {
+		// 未登录用户只能看到已发布的文章
+		query = query.Where("status = ?", "published")
+	} else if userRole == model.RoleGuest {
+		// 访客角色只能看到已发布的文章
+		query = query.Where("status = ?", "published")
+	} else if userRole == model.RoleContributor {
+		// 投稿者可以看到自己所有的文章（包括待审核、草稿等）和别人已发布的文章
+		query = query.Where(
+			db.Where("status = ?", "published").Or("author_id = ?", userID),
+		)
+	} else if userRole == model.RoleAuthor || userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin {
+		// 作者、管理员、超级管理员可以看到所有文章
+		// 不需要添加额外的过滤条件
+	} else {
+		// 默认情况只显示已发布的文章
+		query = query.Where("status = ?", "published")
+	}
 
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-	// 分类筛选：修正为category_id（核心！）
+
+	// 分类筛选
 	if categoryID != "" {
 		// 先转成数字，避免SQL注入/非法值
 		cid, err := strconv.Atoi(categoryID)
@@ -50,7 +84,8 @@ func GetPosts(c *gin.Context) {
 			query = query.Where("category_id = ?", cid)
 		}
 	}
-	// 搜索筛选（保留原有逻辑）
+
+	// 搜索筛选
 	if search != "" {
 		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
@@ -64,13 +99,13 @@ func GetPosts(c *gin.Context) {
 		Limit(limit).
 		Find(&posts)
 
-	// 4. 计算总页数（保留原有逻辑）
+	// 4. 计算总页数
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
 		totalPages = 1
 	}
 
-	// 5. 返回响应（格式匹配前端）
+	// 5. 返回响应
 	c.JSON(http.StatusOK, gin.H{
 		"posts": posts,
 		"pagination": gin.H{
@@ -143,10 +178,24 @@ func resolveTags(names []string) ([]model.Tag, error) {
 func CreatePost(c *gin.Context) {
 	userID, _ := c.Get("userID") // 从 JWT 中获取
 
-	// 获取用户信息以确定角色
-	var user model.User
-	if uid, ok := userID.(uint); ok {
-		db.First(&user, uid)
+	// 从上下文获取用户角色信息
+	var userRole string
+	if userContext, exists := c.Get("user"); exists {
+		if userMap, ok := userContext.(map[string]interface{}); ok {
+			if role, ok := userMap["role"].(string); ok {
+				userRole = role
+			}
+		}
+	}
+
+	// 如果从上下文获取不到角色信息，则从数据库查询
+	if userRole == "" {
+		var user model.User
+		if uid, ok := userID.(uint); ok {
+			if err := db.First(&user, uid).Error; err == nil {
+				userRole = user.Role
+			}
+		}
 	}
 
 	var req postRequest
@@ -174,10 +223,10 @@ func CreatePost(c *gin.Context) {
 	initialStatus := req.Status
 	if initialStatus == "" {
 		// 投稿者需要审核
-		if user.Role == "contributor" {
+		if userRole == "contributor" {
 			initialStatus = "pending"
 			// 作者可以直接发布
-		} else if user.Role == "author" || user.Role == "admin" || user.Role == "super_admin" {
+		} else if userRole == "author" || userRole == "admin" || userRole == "super_admin" {
 			initialStatus = "published"
 		} else {
 			initialStatus = "draft"
@@ -265,10 +314,36 @@ func GetDraftPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
+	// 获取当前用户角色
+	var userRole string
+	var userID uint
+	if userContext, exists := c.Get("user"); exists {
+		if userMap, ok := userContext.(map[string]interface{}); ok {
+			if role, ok := userMap["role"].(string); ok {
+				userRole = role
+			}
+			if id, ok := userMap["id"].(float64); ok {
+				userID = uint(id)
+			}
+		}
+	}
+
 	query := db.Model(&model.Post{}).
 		Preload("Author").
-		Preload("Tags").
-		Where("status = ?", "draft")
+		Preload("Tags")
+
+	// 根据用户角色决定可见的草稿文章
+	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
+		// 管理员和超级管理员可以看到所有草稿文章
+		query = query.Where("status = ?", "draft")
+	} else {
+		// 其他用户只能看到自己的草稿文章
+		userIDFromContext, _ := c.Get("userID")
+		if uid, ok := userIDFromContext.(uint); ok {
+			userID = uid
+		}
+		query = query.Where("author_id = ? AND status = ?", userID, "draft")
+	}
 
 	var total int64
 	query.Count(&total)
