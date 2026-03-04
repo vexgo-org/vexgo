@@ -32,7 +32,7 @@ func InitDB() {
 		log.Fatalf("auto migrate failed: %v", err)
 	}
 
-	// 创建一个默认管理员（如果不存在），使用 bcrypt 存储密码
+	// 创建一个默认超级管理员（如果不存在），使用 bcrypt 存储密码
 	var u model.User
 	if err := db.Where("username = ?", "admin").First(&u).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -40,7 +40,7 @@ func InitDB() {
 			if err != nil {
 				log.Printf("failed to hash default admin password: %v", err)
 			} else {
-				u = model.User{Username: "admin", Email: "admin@example.com", Password: string(pwHash), Role: "admin"}
+				u = model.User{Username: "admin", Email: "admin@example.com", Password: string(pwHash), Role: "super_admin"}
 				if err := db.Create(&u).Error; err != nil {
 					log.Printf("failed to create default admin: %v", err)
 				}
