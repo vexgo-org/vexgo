@@ -51,6 +51,10 @@ export function Layout({ children }: LayoutProps) {
     if (path === '/') {
       return location.pathname === '/';
     }
+    // 对于管理后台的特定路由，需要精确匹配
+    if (path === '/admin') {
+      return location.pathname === '/admin';
+    }
     return location.pathname.startsWith(path);
   };
 
