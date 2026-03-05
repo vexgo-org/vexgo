@@ -97,6 +97,7 @@ func main() {
 		// SMTP 配置相关API（需要管理员权限）
 		api.GET("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetSMTPConfig)    // GET /api/config/smtp（获取SMTP配置）
 		api.PUT("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateSMTPConfig) // PUT /api/config/smtp（更新SMTP配置）
+		api.POST("/config/smtp/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestSMTP)   // POST /api/config/smtp/test（测试SMTP配置）
 	}
 
 	// ===================== 静态文件托管（必须在API路由之后） =====================

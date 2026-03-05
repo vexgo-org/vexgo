@@ -205,7 +205,10 @@ export const configApi = {
     api.get<SMTPConfig>('/config/smtp'),
   
   updateSMTPConfig: (data: Partial<SMTPConfig>) =>
-    api.put<{ message: string; smtpConfig: SMTPConfig }>('/config/smtp', data)
+    api.put<{ message: string; smtpConfig: SMTPConfig }>('/config/smtp', data),
+  
+  testSMTP: () =>
+    api.post<{ message: string; to: string }>('/config/smtp/test')
 };
 
 export default api;

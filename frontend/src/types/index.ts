@@ -19,6 +19,7 @@ export interface SMTPConfig {
   password: string; // 仅用于设置，获取时不返回
   fromEmail: string;
   fromName: string;
+  testEmail: string; // 测试邮件收件人邮箱
   createdAt: string;
   updatedAt: string;
 }

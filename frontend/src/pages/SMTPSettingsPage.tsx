@@ -24,6 +24,7 @@ export function SMTPSettingsPage() {
     password: '',
     fromEmail: '',
     fromName: 'Blog System',
+    testEmail: '',
     createdAt: '',
     updatedAt: ''
   });
@@ -90,10 +91,8 @@ export function SMTPSettingsPage() {
 
     setTesting(true);
     try {
-      // 这里可以调用一个测试邮件的 API
-      // 暂时用 toast 提示
-      toast.info('测试邮件功能需要后端实现测试接口');
-      // TODO: 实现测试邮件发送 API
+      const response = await configApi.testSMTP();
+      toast.success(response.data.message);
     } catch (error: any) {
       console.error('测试邮件失败:', error);
       toast.error('测试失败: ' + (error.response?.data?.error || '未知错误'));
@@ -246,6 +245,22 @@ export function SMTPSettingsPage() {
               placeholder="Blog System"
               disabled={saving}
             />
+          </div>
+
+          {/* 测试邮箱 */}
+          <div className="space-y-2">
+            <Label htmlFor="testEmail">测试邮件收件人</Label>
+            <Input
+              id="testEmail"
+              type="email"
+              value={config.testEmail}
+              onChange={(e) => setConfig({ ...config, testEmail: e.target.value })}
+              placeholder="输入测试邮箱地址"
+              disabled={saving}
+            />
+            <p className="text-xs text-muted-foreground">
+              用于发送测试邮件，验证 SMTP 配置是否正确
+            </p>
           </div>
 
           {/* 操作按钮 */}
