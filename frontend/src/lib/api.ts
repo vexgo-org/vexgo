@@ -75,7 +75,13 @@ export const authApi = {
     api.post<{ message: string }>('/auth/resend-verification'),
 
   verifyEmail: (token: string) =>
-    api.get<{ message: string }>(`/verify-email?token=${token}`)
+    api.get<{ message: string }>(`/verify-email?token=${token}`),
+
+  requestPasswordReset: (data: { email: string }) =>
+    api.post<{ message: string }>('/auth/request-password-reset', data),
+
+  resetPassword: (data: { token: string; password: string }) =>
+    api.post<{ message: string }>('/auth/reset-password', data),
 };
 
 // 文章相关API

@@ -7,6 +7,7 @@ import { PostDetailPage } from '@/pages/PostDetailPage';
 import { WritePostPage } from '@/pages/WritePostPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { MyPostsPage } from '@/pages/MyPostsPage';
 import { AdminPage } from '@/pages/AdminPage';
@@ -28,6 +29,7 @@ function App() {
             <Route path="/post/:id" element={<PostDetailPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
 
             {/* 需要登录的路由 */}

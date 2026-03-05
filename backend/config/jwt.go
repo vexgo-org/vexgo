@@ -10,6 +10,9 @@ import (
 // JWTSecret holds the HMAC secret used to sign tokens.
 var JWTSecret []byte
 
+// FrontendURL holds the frontend application URL for constructing links.
+var FrontendURL string
+
 // Init loads config values from environment and validates them.
 func Init() {
 	s := os.Getenv("JWT_SECRET")
@@ -24,4 +27,13 @@ func Init() {
 	}
 	JWTSecret = []byte(s)
 	log.Printf("JWT secret initialized with length: %d bytes", len(JWTSecret))
+
+	// 加载前端 URL
+	FrontendURL = os.Getenv("FRONTEND_URL")
+	if FrontendURL == "" {
+		FrontendURL = "http://localhost:5173" // 默认开发环境地址
+		log.Printf("WARNING: FRONTEND_URL not set — using default: %s", FrontendURL)
+	} else {
+		log.Printf("Frontend URL set to: %s", FrontendURL)
+	}
 }

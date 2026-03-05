@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // 登录：根据邮箱密码签发 JWT
@@ -258,4 +259,104 @@ func ChangePassword(c *gin.Context) {
 	user.Password = string(hashed)
 	db.Save(&user)
 	c.JSON(http.StatusOK, gin.H{"message": "密码已修改"})
+}
+
+// 请求密码重置
+func RequestPasswordReset(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 查找用户
+	var user model.User
+	if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		// 出于安全考虑，即使用户不存在也返回成功，避免信息泄露
+		c.JSON(http.StatusOK, gin.H{"message": "如果邮箱存在，重置链接已发送"})
+		return
+	}
+
+	// 检查是否启用了 SMTP
+	mailer := utils.NewMailer(db)
+	enabled, err := mailer.IsEmailEnabled()
+	if err != nil || !enabled {
+		c.JSON(http.StatusOK, gin.H{"message": "如果邮箱存在，重置链接已发送"})
+		return
+	}
+
+	// 生成密码重置令牌
+	token, err := mailer.GeneratePasswordResetToken(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成重置令牌失败"})
+		return
+	}
+
+	// 构建重置链接 - 使用请求的协议和主机名
+	protocol := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		protocol = "https"
+	}
+	host := c.Request.Host
+	resetLink := fmt.Sprintf("%s://%s/reset-password?token=%s", protocol, host, token)
+
+	// 发送邮件
+	if err := mailer.SendPasswordResetEmail(user.Email, user.Username, resetLink); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "发送邮件失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "如果邮箱存在，重置链接已发送"})
+}
+
+// 重置密码
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Token    string `json:"token" binding:"required"`
+		Password string `json:"password" binding:"required,min=6"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 查找具有该令牌的用户
+	var user model.User
+	if err := db.Where("verification_token = ?", req.Token).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的重置令牌"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		return
+	}
+
+	// 检查令牌是否过期
+	if user.TokenExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "重置令牌已过期"})
+		return
+	}
+
+	// 生成新密码的哈希值
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+		return
+	}
+
+	// 更新密码并清除重置令牌
+	if err := db.Model(&user).Updates(map[string]interface{}{
+		"password":           string(hashed),
+		"verification_token": "",
+		"token_expires_at":   time.Time{},
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新密码失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "密码已重置成功"})
 }

@@ -53,6 +53,8 @@ func main() {
 			auth.GET("/user", middleware.JWTAuth(), handler.GetCurrentUser)                          // 向后兼容：/api/auth/user
 			auth.PUT("/profile", middleware.JWTAuth(), handler.UpdateProfile)                        // PUT /api/auth/profile（更新个人信息）
 			auth.PUT("/password", middleware.JWTAuth(), handler.ChangePassword)                      // PUT /api/auth/password（修改密码）
+			auth.POST("/request-password-reset", handler.RequestPasswordReset)                       // POST /api/auth/request-password-reset（请求密码重置）
+			auth.POST("/reset-password", handler.ResetPassword)                                      // POST /api/auth/reset-password（重置密码）
 			auth.GET("/verification-status", middleware.JWTAuth(), handler.GetVerificationStatus)    // GET /api/auth/verification-status（获取验证状态）
 			auth.POST("/resend-verification", middleware.JWTAuth(), handler.ResendVerificationEmail) // POST /api/auth/resend-verification（重新发送验证邮件）
 		}
