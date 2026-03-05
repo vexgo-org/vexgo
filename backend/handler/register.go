@@ -61,8 +61,13 @@ func Register(c *gin.Context) {
 		if err != nil {
 			log.Printf("生成验证令牌失败: %v", err)
 		} else {
-			// 构建验证链接
-			verificationLink := fmt.Sprintf("%s/verify-email?token=%s", c.Request.Host, token)
+			// 构建验证链接 - 使用请求的协议和主机名
+			protocol := "http"
+			if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+				protocol = "https"
+			}
+			host := c.Request.Host
+			verificationLink := fmt.Sprintf("%s://%s/verify-email?token=%s", protocol, host, token)
 
 			// 发送验证邮件
 			if err := mailer.SendVerificationEmail(newUser.Email, newUser.Username, verificationLink); err != nil {
