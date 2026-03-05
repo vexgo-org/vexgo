@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,14 +17,59 @@ import (
 	"gorm.io/gorm"
 )
 
+// 验证滑动拼图验证码的公共函数
+func verifyCaptcha(captchaID, captchaToken string, captchaX int, markAsUsed bool) (*model.Captcha, error) {
+	// 查询验证码
+	var captcha model.Captcha
+	if err := db.Where("id = ? AND token = ?", captchaID, captchaToken).First(&captcha).Error; err != nil {
+		return nil, fmt.Errorf("验证码无效")
+	}
+
+	// 检查验证码是否已使用
+	if captcha.Used {
+		return nil, fmt.Errorf("验证码已使用")
+	}
+
+	// 检查验证码是否过期
+	if time.Now().After(captcha.ExpiresAt) {
+		return nil, fmt.Errorf("验证码已过期")
+	}
+
+	// 验证位置（允许一定误差范围）
+	tolerance := 5 // 允许5像素的误差
+	if math.Abs(float64(captchaX-captcha.X)) > float64(tolerance) {
+		return nil, fmt.Errorf("验证失败，请重试")
+	}
+
+	// 如果需要标记为已使用
+	if markAsUsed {
+		captcha.Used = true
+		if err := db.Save(&captcha).Error; err != nil {
+			return nil, fmt.Errorf("验证码验证失败")
+		}
+	}
+
+	return &captcha, nil
+}
+
 // 登录：根据邮箱密码签发 JWT
 func Login(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Email        string `json:"email" binding:"required"`
+		Password     string `json:"password" binding:"required"`
+		CaptchaID    string `json:"captcha_id" binding:"required"`
+		CaptchaToken string `json:"captcha_token" binding:"required"`
+		CaptchaX     int    `json:"captcha_x" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 验证滑动拼图验证码
+	_, err := verifyCaptcha(req.CaptchaID, req.CaptchaToken, req.CaptchaX, true)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

@@ -14,12 +14,22 @@ import (
 
 func Register(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required"`
-		Username string `json:"username" binding:"required"`
+		Email        string `json:"email" binding:"required,email"`
+		Password     string `json:"password" binding:"required"`
+		Username     string `json:"username" binding:"required"`
+		CaptchaID    string `json:"captcha_id" binding:"required"`
+		CaptchaToken string `json:"captcha_token" binding:"required"`
+		CaptchaX     int    `json:"captcha_x" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 验证滑动拼图验证码
+	_, err := verifyCaptcha(req.CaptchaID, req.CaptchaToken, req.CaptchaX, true)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

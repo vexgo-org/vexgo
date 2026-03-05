@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SliderCaptcha } from '@/components/ui/slider-captcha';
 import { Loader2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 export function RegisterPage() {
@@ -18,6 +19,42 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaData, setCaptchaData] = useState<{ id: string; token: string; x: number } | null>(null);
+  const [isCaptchaModalOpen, setIsCaptchaModalOpen] = useState(false);
+
+  // 验证码验证成功回调
+  const handleCaptchaSuccess = (data: { id: string; token: string; x: number }) => {
+    setCaptchaData(data);
+    // 验证码验证成功后，直接执行注册
+    performRegister();
+  };
+
+  const performRegister = async () => {
+    if (!captchaData) return;
+
+    setLoading(true);
+
+    try {
+      // 传递验证码数据到注册函数
+      await register(username, email, password, captchaData);
+      // 注册成功后关闭验证码弹窗
+      setIsCaptchaModalOpen(false);
+      // 注册成功且不需要验证，跳转到首页
+      navigate('/');
+    } catch (err: any) {
+      // 如果需要邮箱验证，显示提示信息但不跳转
+      if (err.requiresVerification) {
+        setError(err.message || '请先验证您的邮箱地址才能登录');
+      } else {
+        setError(err.response?.data?.message || '注册失败，请重试');
+      }
+      
+      // 注册失败后重置验证码状态
+      setCaptchaData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,23 +75,15 @@ export function RegisterPage() {
       setError('两次输入的密码不一致');
       return;
     }
-
-    setLoading(true);
-
-    try {
-      await register(username, email, password);
-      // 注册成功且不需要验证，跳转到首页
-      navigate('/');
-    } catch (err: any) {
-      // 如果需要邮箱验证，显示提示信息但不跳转
-      if (err.requiresVerification) {
-        setError(err.message || '请先验证您的邮箱地址才能登录');
-      } else {
-        setError(err.response?.data?.message || '注册失败，请重试');
-      }
-    } finally {
-      setLoading(false);
+    
+    // 如果已经有验证码数据，直接执行注册
+    if (captchaData) {
+      performRegister();
+      return;
     }
+    
+    // 打开验证码弹窗
+    setIsCaptchaModalOpen(true);
   };
 
   return (
@@ -149,7 +178,7 @@ export function RegisterPage() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full mt-4"
               disabled={loading}
             >
               {loading ? (
@@ -171,6 +200,13 @@ export function RegisterPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 验证码弹窗 */}
+      <SliderCaptcha
+        isOpen={isCaptchaModalOpen}
+        onClose={() => setIsCaptchaModalOpen(false)}
+        onSuccess={handleCaptchaSuccess}
+      />
     </div>
   );
 }

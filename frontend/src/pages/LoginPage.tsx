@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SliderCaptcha } from '@/components/ui/slider-captcha';
 import { Loader2, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 export function LoginPage() {
@@ -19,17 +20,29 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  const [captchaData, setCaptchaData] = useState<{ id: string; token: string; x: number } | null>(null);
+  const [isCaptchaModalOpen, setIsCaptchaModalOpen] = useState(false);
 
   // 获取重定向地址
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  // 验证码验证成功回调
+  const handleCaptchaSuccess = (data: { id: string; token: string; x: number }) => {
+    setCaptchaData(data);
+    // 验证码验证成功后，直接执行登录
+    performLogin();
+  };
+
+  const performLogin = async () => {
+    if (!captchaData) return;
+    
     setLoading(true);
 
     try {
-      await login(email, password);
+      // 传递验证码数据到登录函数
+      await login(email, password, captchaData);
+      // 登录成功后关闭验证码弹窗
+      setIsCaptchaModalOpen(false);
       navigate(from, { replace: true });
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || '登录失败，请检查邮箱和密码';
@@ -39,9 +52,36 @@ export function LoginPage() {
       if (err.response?.data?.email_verified === false) {
         setEmailVerified(false);
       }
+      
+      // 登录失败后不重置验证码状态，允许用户重试登录
+      // setCaptchaData(null);
     } finally {
       setLoading(false);
     }
+  };
+
+
+
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    // 表单验证
+    if (!email || !password) {
+      setError('请填写所有必填字段');
+      return;
+    }
+    
+    // 如果已经有验证码数据，直接执行登录
+    if (captchaData) {
+      performLogin();
+      return;
+    }
+    
+    // 打开验证码弹窗
+    setIsCaptchaModalOpen(true);
   };
 
   const handleResendVerification = async () => {
@@ -138,7 +178,7 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full mt-4"
               disabled={loading}
             >
               {loading ? (
@@ -176,6 +216,13 @@ export function LoginPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 验证码弹窗 */}
+      <SliderCaptcha
+        isOpen={isCaptchaModalOpen}
+        onClose={() => setIsCaptchaModalOpen(false)}
+        onSuccess={handleCaptchaSuccess}
+      />
     </div>
   );
 }

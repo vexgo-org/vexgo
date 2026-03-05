@@ -6,8 +6,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, captchaData?: { id: string; token: string; x: number }) => Promise<void>;
+  register: (username: string, email: string, password: string, captchaData?: { id: string; token: string; x: number }) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -45,8 +45,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const response = await authApi.login({ email, password });
+  const login = async (email: string, password: string, captchaData?: { id: string; token: string; x: number }) => {
+    const requestData: any = { email, password };
+    
+    // 如果提供了验证码数据，添加到请求中
+    if (captchaData) {
+      requestData.captcha_id = captchaData.id;
+      requestData.captcha_token = captchaData.token;
+      requestData.captcha_x = captchaData.x;
+    }
+    
+    const response = await authApi.login(requestData);
     const { user, token } = response.data;
     
     if (token) {
@@ -56,8 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (username: string, email: string, password: string) => {
-    const response = await authApi.register({ username, email, password });
+  const register = async (username: string, email: string, password: string, captchaData?: { id: string; token: string; x: number }) => {
+    const requestData: any = { username, email, password };
+    
+    // 如果提供了验证码数据，添加到请求中
+    if (captchaData) {
+      requestData.captcha_id = captchaData.id;
+      requestData.captcha_token = captchaData.token;
+      requestData.captcha_x = captchaData.x;
+    }
+    
+    const response = await authApi.register(requestData);
     const { user, token, requires_verification, email_verified } = response.data;
     
     // 如果 SMTP 启用且需要验证，则不自动登录，只保存用户信息到状态（但不设置 token）

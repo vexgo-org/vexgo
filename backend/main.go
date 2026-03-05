@@ -30,6 +30,10 @@ func main() {
 		// 邮箱验证公开接口
 		api.GET("/verify-email", handler.VerifyEmail) // GET /api/verify-email（验证邮箱）
 
+		// 滑动拼图验证公开接口
+		api.GET("/captcha", handler.GenerateCaptcha)       // GET /api/captcha（生成滑动拼图验证码）
+		api.POST("/captcha/verify", handler.VerifyCaptcha) // POST /api/captcha/verify（验证滑动拼图）
+
 		// 分类/标签公开接口
 		api.GET("/categories", handler.GetCategories) // GET /api/categories（获取分类列表）
 		api.GET("/tags", handler.GetTags)             // GET /api/tags（获取标签列表）

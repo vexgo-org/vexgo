@@ -30,6 +30,7 @@ func InitDB() {
 		&model.Like{},
 		&model.MediaFile{},
 		&model.SMTPConfig{},
+		&model.Captcha{},
 	); err != nil {
 		log.Fatalf("auto migrate failed: %v", err)
 	}
