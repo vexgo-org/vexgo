@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { postsApi, categoriesApi, uploadApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { Category } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
-import { 
+import {
   Loader2, Save, Send, X, Image as ImageIcon,
   Plus, ArrowLeft
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import {
 export function WritePostPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const isEditMode = !!id;
 
   const [title, setTitle] = useState('');
@@ -36,6 +38,9 @@ export function WritePostPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // 判断用户角色
+  const isContributor = user?.role === 'contributor';
 
   useEffect(() => {
     loadCategories();
@@ -101,7 +106,7 @@ export function WritePostPage() {
     }
   };
 
-  const handleSubmit = async (status: 'published' | 'draft') => {
+  const handleSubmit = async (status: 'published' | 'draft' | 'pending') => {
     if (!title.trim()) {
       alert('请输入文章标题');
       return;
@@ -159,17 +164,32 @@ export function WritePostPage() {
             <Save className="w-4 h-4 mr-2" />
             保存草稿
           </Button>
-          <Button
-            onClick={() => handleSubmit('published')}
-            disabled={saving}
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4 mr-2" />
-            )}
-            {isEditMode ? '更新' : '发布'}
-          </Button>
+          {/* 投稿者只能提交待审核文章，不能直接发布 */}
+          {isContributor ? (
+            <Button
+              onClick={() => handleSubmit('pending')}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              提交审核
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleSubmit('published')}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              {isEditMode ? '更新' : '发布'}
+            </Button>
+          )}
         </div>
       </div>
 

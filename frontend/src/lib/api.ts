@@ -84,7 +84,7 @@ export const postsApi = {
     tags?: string[];
     excerpt?: string;
     coverImage?: string;
-    status?: 'published' | 'draft';
+    status?: 'published' | 'draft' | 'pending';
   }) =>
     api.post<{ message: string; post: Post }>('/posts', data),
   
