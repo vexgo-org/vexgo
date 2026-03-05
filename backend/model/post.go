@@ -14,7 +14,7 @@ type Post struct {
 	Author     User      `json:"author" gorm:"foreignKey:AuthorID"`
 	Category   string    `json:"category"`
 	Tags       []Tag     `json:"tags" gorm:"many2many:post_tags;"`
-	Status     string    `json:"status"` // draft/published/pending
+	Status     string    `json:"status"` // draft/published/pending/rejected
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

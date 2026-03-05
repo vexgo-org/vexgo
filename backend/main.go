@@ -78,9 +78,12 @@ func main() {
 		api.DELETE("/upload/:id", middleware.JWTAuth(), handler.DeleteFile)   // DELETE /api/upload/:id（删除文件）
 
 		// 文章审核相关API（需要管理员权限）
-		api.GET("/moderation/pending", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetPendingPosts) // GET /api/moderation/pending（获取待审核文章）
-		api.PUT("/moderation/approve/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ApprovePost) // PUT /api/moderation/approve/:id（审核通过文章）
-		api.PUT("/moderation/reject/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.RejectPost)   // PUT /api/moderation/reject/:id（拒绝文章）
+		api.GET("/moderation/pending", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetPendingPosts)   // GET /api/moderation/pending（获取待审核文章）
+		api.GET("/moderation/approved", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetApprovedPosts) // GET /api/moderation/approved（获取已通过文章）
+		api.GET("/moderation/rejected", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetRejectedPosts) // GET /api/moderation/rejected（获取已拒绝文章）
+		api.PUT("/moderation/approve/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ApprovePost)   // PUT /api/moderation/approve/:id（审核通过文章）
+		api.PUT("/moderation/reject/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.RejectPost)     // PUT /api/moderation/reject/:id（拒绝文章）
+		api.PUT("/moderation/resubmit/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ResubmitPost) // PUT /api/moderation/resubmit/:id（重新提交审核文章）
 
 		// 用户管理相关API（需要管理员权限）
 		api.GET("/users", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetUserList)             // GET /api/users（获取用户列表）

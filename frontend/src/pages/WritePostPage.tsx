@@ -129,7 +129,7 @@ export function WritePostPage() {
         tags,
         excerpt: excerpt.trim() || content.substring(0, 200) + '...',
         coverImage: coverImage || undefined,
-        status
+        status: isContributor && status === 'published' ? 'pending' : status
       };
 
       if (isEditMode) {

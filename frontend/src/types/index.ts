@@ -18,7 +18,7 @@ export interface Post {
   categoryInfo?: Category;
   tags: string[];
   coverImage: string | null;
-  status: 'published' | 'draft' | 'pending';
+  status: 'published' | 'draft' | 'pending' | 'rejected';
   authorId: string;
   author?: User;
   createdAt: string;
