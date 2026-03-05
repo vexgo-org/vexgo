@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import {
   Search, PenLine, Menu, X, Home, User, Settings,
-  LogOut, FileText, BarChart3, Users
+  LogOut, FileText, BarChart3
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -42,9 +42,8 @@ export function Layout({ children }: LayoutProps) {
   const navItems = [
     { path: '/', label: '首页', icon: Home },
     ...(isAuthenticated ? [{ path: '/write', label: '写文章', icon: PenLine }] : []),
+    ...(isAuthenticated ? [{ path: '/my-posts', label: '我的文章', icon: FileText }] : []),
     ...(user?.role === 'admin' || user?.role === 'super_admin' ? [{ path: '/admin', label: '管理后台', icon: BarChart3 }] : []),
-    ...(user?.role === 'admin' || user?.role === 'super_admin' ? [{ path: '/admin/moderation', label: '内容审核', icon: FileText }] : []),
-    ...(user?.role === 'admin' || user?.role === 'super_admin' ? [{ path: '/admin/users', label: '用户管理', icon: Users }] : []),
   ];
 
   const isActive = (path: string) => {
@@ -132,10 +131,6 @@ export function Layout({ children }: LayoutProps) {
                     <DropdownMenuItem onClick={() => navigate('/profile')}>
                       <User className="mr-2 h-4 w-4" />
                       个人中心
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/my-posts')}>
-                      <FileText className="mr-2 h-4 w-4" />
-                      我的文章
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/settings')}>
                       <Settings className="mr-2 h-4 w-4" />

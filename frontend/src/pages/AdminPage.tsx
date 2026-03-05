@@ -184,13 +184,41 @@ export function AdminPage() {
       </div>
 
       {/* 管理标签页 */}
-      <Tabs defaultValue="posts" className="w-full">
+      <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4 max-w-md">
+          <TabsTrigger value="overview">概览</TabsTrigger>
           <TabsTrigger value="posts">文章管理</TabsTrigger>
           <TabsTrigger value="drafts">草稿管理</TabsTrigger>
-          <TabsTrigger value="moderation">内容审核</TabsTrigger>
           <TabsTrigger value="categories">分类管理</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="overview" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/admin/moderation')}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  内容审核
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">管理待审核的文章内容</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/admin/users')}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  用户管理
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">管理系统用户和权限</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="posts" className="mt-6">
           <Card>
@@ -289,29 +317,9 @@ export function AdminPage() {
                 )}
               </div>
             </CardContent>
-            </Card>
-            </TabsContent>
-            
-            <TabsContent value="moderation" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    内容审核
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">管理待审核的文章内容</p>
-                    <Button onClick={() => navigate('/admin/moderation')}>
-                      进入审核页面
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="categories" className="mt-6">
           <Card>
             <CardHeader>
