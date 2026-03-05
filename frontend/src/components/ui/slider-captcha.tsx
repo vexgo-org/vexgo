@@ -282,7 +282,7 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
                 {isVerified ? (
                   <CheckCircle className="h-5 w-5 text-white" />
                 ) : (
-                  <div className="w-0 h-0 border-t-4 border-t-transparent border-b-4 border-b-transparent border-l-4 border-l-gray-600" />
+                  <div className="w-0 h-0 border-t-0 border-b-4 border-l-4 border-r-4 border-b-transparent border-l-gray-600 border-r-gray-600" />
                 )}
               </div>
             </div>
