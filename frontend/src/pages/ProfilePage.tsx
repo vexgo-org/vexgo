@@ -81,8 +81,16 @@ export function ProfilePage() {
           </div>
           <CardTitle className="text-2xl">{user?.username}</CardTitle>
           <CardDescription>{user?.email}</CardDescription>
-          <Badge variant={user?.role === 'admin' ? 'default' : 'secondary'} className="mt-2">
-            {user?.role === 'admin' ? '管理员' : '普通用户'}
+          <Badge variant={user?.role === 'admin' || user?.role === 'super_admin' ? 'default' : 'secondary'} className="mt-2">
+            {user?.role === 'super_admin'
+              ? '超级管理员'
+              : user?.role === 'admin'
+              ? '管理员'
+              : user?.role === 'author'
+              ? '作者'
+              : user?.role === 'contributor'
+              ? '贡献者'
+              : '访客'}
           </Badge>
         </CardHeader>
         <CardContent>
