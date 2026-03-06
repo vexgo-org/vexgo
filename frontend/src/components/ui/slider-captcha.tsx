@@ -59,43 +59,69 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
   }, [isOpen]);
 
   // 验证拼图
-  const verifyCaptcha = async (x: number) => {
-    if (!captchaData) return;
-
-    try {
-      setIsVerifying(true);
-      setError('');
-
-      // 计算实际的x坐标（基于后端背景图片宽度320px，拼图块80px）
-      // 前端轨道宽度可能与后端背景图片宽度不同，需要进行比例转换
-      const trackWidth = trackRef.current?.offsetWidth || 320;
-      const sliderWidth = 40;
-      const maxPosition = trackWidth - sliderWidth;
-      const ratio = maxPosition > 0 ? x / maxPosition : 0;
-      // 后端拼图块的最大位置是220（320-80-20），最小位置是20
-      const actualX = Math.round(20 + ratio * 200); // 20是最小位置，200是可移动范围（220-20）
-      console.log('滑块位置:', x, '轨道宽度:', trackWidth, '最大位置:', maxPosition, '比例:', ratio, '实际X坐标:', actualX);
-
-      // 直接返回位置数据，不在滑块验证时调用验证接口
-      setIsVerified(true);
-      onSuccess({
-        id: captchaData.id,
-        token: captchaData.token,
-        x: actualX,
-      });
-      // 验证成功后关闭弹窗
-      setTimeout(() => {
-        onClose();
-      }, 500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '验证失败，请重试');
-      setTimeout(() => {
-        generateCaptcha();
-      }, 1000);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+    const verifyCaptcha = async (x: number) => {
+      if (!captchaData) return;
+  
+      try {
+        setIsVerifying(true);
+        setError('');
+  
+        // 计算实际的x坐标（基于后端背景图片宽度320px，拼图块80px）
+        // 前端轨道宽度可能与后端背景图片宽度不同，需要进行比例转换
+        const trackWidth = trackRef.current?.offsetWidth || 320;
+        const sliderWidth = 40;
+        const maxPosition = trackWidth - sliderWidth;
+        const ratio = maxPosition > 0 ? x / maxPosition : 0;
+        // 后端拼图块的最大位置是220（320-80-20），最小位置是20
+        const actualX = Math.round(20 + ratio * 200); // 20是最小位置，200是可移动范围（220-20）
+        console.log('滑块位置:', x, '轨道宽度:', trackWidth, '最大位置:', maxPosition, '比例:', ratio, '实际X坐标:', actualX);
+  
+        // 调用后端验证接口
+        const response = await fetch('/api/captcha/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: captchaData.id,
+            token: captchaData.token,
+            x: actualX,
+          }),
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '验证失败，请重试');
+        }
+  
+        const data = await response.json();
+        
+        if (data.success) {
+          // 验证成功
+          setIsVerified(true);
+          onSuccess({
+            id: captchaData.id,
+            token: captchaData.token,
+            x: actualX,
+          });
+          // 验证成功后关闭弹窗
+          setTimeout(() => {
+            onClose();
+          }, 500);
+        } else {
+          // 验证失败
+          throw new Error(data.message || '验证失败，请重试');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '验证失败，请重试');
+        // 验证失败后刷新验证码
+        setTimeout(() => {
+          generateCaptcha();
+        }, 1000);
+      } finally {
+        setIsVerifying(false);
+      }
+    };
 
   // 处理滑块拖动
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -220,7 +246,7 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
           </Button>
         </div>
 
-        {error && (
+        {error && !isVerified && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">
             {error}
           </div>
@@ -230,12 +256,6 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-600 flex items-center">
             <CheckCircle className="h-4 w-4 mr-2" />
             验证成功
-          </div>
-        )}
-
-        {!isVerified && error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">
-            {error}
           </div>
         )}
 
@@ -258,7 +278,7 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
                     // 计算拼图块的实际位置，基于后端背景图片宽度320px，拼图块80px
                     // 确保拼图块位置与滑块位置匹配
                     // 后端拼图块的最大位置是220（320-80-20），最小位置是20
-                    left: `${20 + ((sliderPosition / Math.max(1, (trackRef.current?.offsetWidth || 320) - 40)) * 200)}px`,
+                    left: `${20 + ((sliderPosition / Math.max(1, (trackRef.current?.offsetWidth || 320) - 80)) * 200)}px`,
                     top: `${captchaData.y}px`,
                   }}
                 >
