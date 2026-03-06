@@ -46,6 +46,7 @@ export function HomePage() {
         const d = e.detail || {};
         const postId = String(d.postId);
         setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, isLiked: d.isLiked, likesCount: d.likesCount } : p));
+        setPopularPosts((prev) => prev.map((p) => p.id === postId ? { ...p, isLiked: d.isLiked, likesCount: d.likesCount } : p));
       } catch (err) {
         // ignore
       }
@@ -142,6 +143,7 @@ export function HomePage() {
       const response = await likesApi.toggleLike(postId);
       const { isLiked, likesCount } = response.data;
       setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, isLiked, likesCount } : p));
+      setPopularPosts((prev) => prev.map((p) => p.id === postId ? { ...p, isLiked, likesCount } : p));
     } catch (error) {
       console.error('切换点赞失败:', error);
     }
