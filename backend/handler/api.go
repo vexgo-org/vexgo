@@ -3,6 +3,7 @@ package handler
 import (
 	"blog-system/backend/model"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -34,12 +35,31 @@ func GetPopularPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 	var posts []model.Post
 
+	// 先获取所有已发布文章（带关联），再在应用层统计点赞数并按点赞数排序
 	db.Where("status = ?", "published").
-		Order("created_at DESC").
-		Limit(limit).
 		Preload("Author").
 		Preload("Tags").
 		Find(&posts)
+
+	// 为每篇文章计算点赞数
+	for i := range posts {
+		var count int64
+		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
+		posts[i].LikesCount = int(count)
+	}
+
+	// 按 LikesCount 降序排序，创建时间作为次级排序
+	sort.SliceStable(posts, func(i, j int) bool {
+		if posts[i].LikesCount == posts[j].LikesCount {
+			return posts[i].CreatedAt.After(posts[j].CreatedAt)
+		}
+		return posts[i].LikesCount > posts[j].LikesCount
+	})
+
+	// 截取 limit
+	if len(posts) > limit {
+		posts = posts[:limit]
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"posts": posts,

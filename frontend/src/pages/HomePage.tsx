@@ -68,6 +68,18 @@ export function HomePage() {
     };
   }, []);
 
+  // 标准化后端返回的文章对象，确保 id/authorId 为字符串，时间为 ISO 字符串
+  const normalizePost = (raw: any): Post => {
+    if (!raw) return raw;
+    return {
+      ...raw,
+      id: String(raw.id),
+      authorId: raw.authorId !== undefined && raw.authorId !== null ? String(raw.authorId) : raw.authorId,
+      createdAt: raw.createdAt ? new Date(raw.createdAt).toISOString() : raw.createdAt,
+      updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : raw.updatedAt,
+    } as Post;
+  };
+
   useEffect(() => {
     loadPosts();
   }, [currentPage, searchQuery, selectedCategory]);
@@ -84,7 +96,7 @@ export function HomePage() {
   const loadPopularPosts = async () => {
     try {
       const response = await statsApi.getPopularPosts(5);
-      setPopularPosts(response.data.posts);
+      setPopularPosts(response.data.posts.map((p: any) => normalizePost(p)));
     } catch (error) {
       console.error('加载热门文章失败:', error);
     }
@@ -99,7 +111,7 @@ export function HomePage() {
         search: searchQuery || undefined,
         category: selectedCategory || undefined
       });
-      setPosts(response.data.posts);
+      setPosts(response.data.posts.map((p: any) => normalizePost(p)));
       setPagination(response.data.pagination);
     } catch (error) {
       console.error('加载文章失败:', error);
