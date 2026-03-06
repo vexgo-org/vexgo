@@ -21,6 +21,8 @@ func main() {
 	// ===================== 核心API路由分组（所有接口都在/api下） =====================
 	// 匹配前端Axios的baseURL: /api，确保所有前端API请求都能命中
 	api := r.Group("/api")
+	// 可选 JWT 中间件：公开接口在收到 Authorization 时能识别登录用户
+	api.Use(middleware.OptionalJWTAuth())
 	{
 		// -------------------- 公开API（无需JWT认证） --------------------
 		// 文章相关公开接口

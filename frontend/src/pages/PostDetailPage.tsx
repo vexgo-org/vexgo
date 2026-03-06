@@ -82,10 +82,10 @@ export function PostDetailPage() {
   };
 
   const loadLikeStatus = async () => {
-    if (!isAuthenticated) return;
     try {
       const response = await likesApi.getLikeStatus(id!);
       setIsLiked(response.data.isLiked);
+      setLikesCount(response.data.likesCount);
     } catch (error) {
       console.error('加载点赞状态失败:', error);
     }
@@ -101,6 +101,12 @@ export function PostDetailPage() {
       const response = await likesApi.toggleLike(id!);
       setIsLiked(response.data.isLiked);
       setLikesCount(response.data.likesCount);
+      // 通知其他页面（例如首页）更新对应文章的点赞状态
+      try {
+        window.dispatchEvent(new CustomEvent('like-changed', { detail: { postId: id, isLiked: response.data.isLiked, likesCount: response.data.likesCount } }));
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       console.error('点赞失败:', error);
     }

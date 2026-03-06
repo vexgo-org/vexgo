@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { postsApi, categoriesApi, statsApi } from '@/lib/api';
+import { postsApi, categoriesApi, statsApi, likesApi } from '@/lib/api';
 import type { Post, Category } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,18 @@ export function HomePage() {
   useEffect(() => {
     loadCategories();
     loadPopularPosts();
+    // 监听来自文章详情页的点赞事件，保持首页与详情页同步
+    const handler = (e: any) => {
+      try {
+        const d = e.detail || {};
+        const postId = String(d.postId);
+        setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, isLiked: d.isLiked, likesCount: d.likesCount } : p));
+      } catch (err) {
+        // ignore
+      }
+    };
+    window.addEventListener('like-changed', handler as EventListener);
+    return () => window.removeEventListener('like-changed', handler as EventListener);
   }, []);
 
   useEffect(() => {
@@ -110,6 +122,16 @@ export function HomePage() {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleToggleLike = async (postId: string) => {
+    try {
+      const response = await likesApi.toggleLike(postId);
+      const { isLiked, likesCount } = response.data;
+      setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, isLiked, likesCount } : p));
+    } catch (error) {
+      console.error('切换点赞失败:', error);
+    }
   };
 
   if (loading && posts.length === 0) {
@@ -237,12 +259,15 @@ export function HomePage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Heart className="w-4 h-4" />
-                            {post.likesCount || 0}
-                          </span>
-                          <span className="flex items-center gap-1">
+                        <div className="flex items-center gap-4 text-sm">
+                          <button
+                            onClick={() => handleToggleLike(post.id)}
+                            className={`flex items-center gap-1 ${post.isLiked ? 'text-red-500' : 'text-muted-foreground'}`}
+                          >
+                            <Heart className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
+                            <span>{post.likesCount || 0}</span>
+                          </button>
+                          <span className="flex items-center gap-1 text-muted-foreground">
                             <MessageCircle className="w-4 h-4" />
                             {post.commentsCount || 0}
                           </span>

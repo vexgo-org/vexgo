@@ -17,7 +17,11 @@ type Post struct {
 	Status     string    `json:"status"` // draft/published/pending/rejected
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+	// 非数据库字段：用于在 API 返回中包含点赞计数与当前用户是否已点赞
+	LikesCount int  `json:"likesCount" gorm:"-"`
+	IsLiked    bool `json:"isLiked" gorm:"-"`
 }
+
 
 type User struct {
 	ID                uint      `json:"id" gorm:"primaryKey"`

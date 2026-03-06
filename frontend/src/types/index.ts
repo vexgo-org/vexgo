@@ -52,6 +52,7 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   likesCount?: number;
+  isLiked?: boolean;
   commentsCount?: number;
 }
 

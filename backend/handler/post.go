@@ -33,16 +33,33 @@ func GetPosts(c *gin.Context) {
 	status := c.Query("status")
 	search := c.Query("search")
 
-	// 获取当前用户角色（如果已登录）
+	// 获取当前用户角色和 ID（如果已登录）——支持多种存储类型
 	var userRole string
 	var userID uint
+
+	if uidVal, exists := c.Get("userID"); exists {
+		switch v := uidVal.(type) {
+		case uint:
+			userID = v
+		case int:
+			userID = uint(v)
+		case float64:
+			userID = uint(v)
+		}
+	}
+
 	if userContext, exists := c.Get("user"); exists {
 		if userMap, ok := userContext.(map[string]interface{}); ok {
 			if role, ok := userMap["role"].(string); ok {
 				userRole = role
 			}
-			if id, ok := userMap["id"].(float64); ok {
-				userID = uint(id)
+			// 尝试多种类型以获取 id
+			if idf, ok := userMap["id"].(float64); ok {
+				userID = uint(idf)
+			} else if idu, ok := userMap["id"].(uint); ok {
+				userID = idu
+			} else if idi, ok := userMap["id"].(int); ok {
+				userID = uint(idi)
 			}
 		}
 	}
@@ -99,6 +116,20 @@ func GetPosts(c *gin.Context) {
 		Limit(limit).
 		Find(&posts)
 
+	// 为列表中的每篇文章填充点赞计数和当前登录用户的点赞状态（如果有登录）
+	for i := range posts {
+		var count int64
+		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
+		posts[i].LikesCount = int(count)
+		posts[i].IsLiked = false
+		if userID != 0 {
+			var like model.Like
+			if db.Where("post_id = ? AND user_id = ?", posts[i].ID, userID).First(&like).Error == nil {
+				posts[i].IsLiked = true
+			}
+		}
+	}
+
 	// 4. 计算总页数
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
@@ -133,6 +164,31 @@ func GetPost(c *gin.Context) {
 
 	// 增加浏览量（可选）
 	db.Model(&post).UpdateColumn("view_count", gorm.Expr("view_count + ?", 1))
+
+	// 填充点赞计数和当前登录用户的点赞状态
+	var count int64
+	db.Model(&model.Like{}).Where("post_id = ?", post.ID).Count(&count)
+	post.LikesCount = int(count)
+	post.IsLiked = false
+	if uid, exists := c.Get("userID"); exists {
+		switch v := uid.(type) {
+		case uint:
+			var like model.Like
+			if db.Where("post_id = ? AND user_id = ?", post.ID, v).First(&like).Error == nil {
+				post.IsLiked = true
+			}
+		case int:
+			var like model.Like
+			if db.Where("post_id = ? AND user_id = ?", post.ID, uint(v)).First(&like).Error == nil {
+				post.IsLiked = true
+			}
+		case float64:
+			var like model.Like
+			if db.Where("post_id = ? AND user_id = ?", post.ID, uint(v)).First(&like).Error == nil {
+				post.IsLiked = true
+			}
+		}
+	}
 
 	fmt.Printf("Successfully fetched post: %+v\n", post)
 	c.JSON(http.StatusOK, gin.H{"post": post})
