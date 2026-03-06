@@ -236,7 +236,7 @@ export function HomePage() {
                             <img
                               src={post.coverImage}
                               alt={post.title}
-                              className="w-full h-48 object-fill group-hover:scale-105 transition-transform duration-300"
+                              className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           </div>
                         </Link>

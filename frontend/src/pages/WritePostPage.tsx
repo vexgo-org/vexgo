@@ -17,6 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
+import ImageCropper from '@/components/image/ImageCropper';
 import {
   Loader2, Save, Send, X, Image as ImageIcon,
   Plus, ArrowLeft
@@ -35,6 +36,8 @@ export function WritePostPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [coverImage, setCoverImage] = useState('');
+  const [showCropper, setShowCropper] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -94,63 +97,23 @@ export function WritePostPage() {
       return;
     }
 
+    // 不再压缩原图：打开裁剪器，让用户选取封面区域
+    setSelectedFile(file);
+    setShowCropper(true);
+  };
+
+  const handleCropConfirm = async (croppedFile: File) => {
+    setShowCropper(false);
     setUploadingImage(true);
     try {
-      // 按比例压缩图片到封面尺寸上限，保持宽高比
-      // 生成固定尺寸的封面图，保持原图完整可见：缩放原图至目标尺寸内并居中，周围填充白色背景（letterbox）
-      const resizeImageFile = (file: File, targetWidth = 1200, targetHeight = 630, quality = 0.85) => {
-        return new Promise<File>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            // 强制拉伸原图到目标尺寸（允许不按比例缩放），以便在封面区域完整显示
-            const drawW = targetWidth;
-            const drawH = targetHeight;
-
-            // 创建目标画布，填充白色背景以避免透明区域在部分浏览器显示异常
-            const canvas = document.createElement('canvas');
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              reject(new Error('无法获取 canvas 上下文'));
-              return;
-            }
-            // 背景色（可改为透明或其它颜色）
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, targetWidth, targetHeight);
-            // 直接拉伸绘制到画布上，填满目标尺寸
-            ctx.drawImage(img, 0, 0, drawW, drawH);
-
-            canvas.toBlob((blob) => {
-              if (!blob) {
-                reject(new Error('压缩失败'));
-                return;
-              }
-              const newFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-              resolve(newFile);
-            }, 'image/jpeg', quality);
-          };
-          img.onerror = (err) => reject(err);
-          img.src = URL.createObjectURL(file);
-        });
-      };
-
-      let uploadFile = file;
-      try {
-        uploadFile = await resizeImageFile(file);
-      } catch (err) {
-        // 如果压缩失败，回退使用原始文件
-        console.warn('图片压缩失败，使用原始文件上传', err);
-        uploadFile = file;
-      }
-
-      const response = await uploadApi.uploadFile(uploadFile);
+      const response = await uploadApi.uploadFile(croppedFile);
       setCoverImage(response.data.file!.url);
-    } catch (error) {
-      console.error('上传封面图失败:', error);
-      alert('上传封面图失败，请重试');
+    } catch (err) {
+      console.error('上传裁剪后图片失败:', err);
+      alert('上传裁剪后图片失败，请重试');
     } finally {
       setUploadingImage(false);
+      setSelectedFile(null);
     }
   };
 
@@ -383,6 +346,13 @@ export function WritePostPage() {
             placeholder="开始写作..."
           />
         </div>
+        {showCropper && selectedFile && (
+          <ImageCropper
+            file={selectedFile}
+            onCancel={() => { setShowCropper(false); setSelectedFile(null); }}
+            onCrop={handleCropConfirm}
+          />
+        )}
       </div>
     </div>
   );
