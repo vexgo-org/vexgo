@@ -61,3 +61,15 @@ type CommentModerationConfig struct {
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
 }
+
+// AIConfig 存储大模型API配置
+type AIConfig struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	Enabled     bool      `json:"enabled" gorm:"default:false"`             // 是否启用大模型
+	Provider    string    `json:"provider" gorm:"default:'openai'"`         // 提供商 (openai, azure, etc.)
+	ApiEndpoint string    `json:"apiEndpoint" gorm:"default:''"`            // API端点URL
+	ApiKey      string    `json:"apiKey" gorm:"default:''"`                 // API密钥
+	ModelName   string    `json:"modelName" gorm:"default:'gpt-3.5-turbo'"` // 模型名称
+	CreatedAt   time.Time `json:"created_at"`                               // 创建时间
+	UpdatedAt   time.Time `json:"updated_at"`                               // 更新时间
+}

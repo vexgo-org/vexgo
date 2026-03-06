@@ -33,6 +33,7 @@ func InitDB() {
 		&model.Captcha{},
 		&model.GeneralSettings{},
 		&model.CommentModerationConfig{},
+		&model.AIConfig{},
 	); err != nil {
 		log.Fatalf("auto migrate failed: %v", err)
 	}
@@ -97,6 +98,25 @@ func InitDB() {
 						log.Println("default general settings created")
 					}
 				}
+			}
+		}
+	}
+
+	// 创建默认 AI 配置（如果不存在）
+	var aiConfig model.AIConfig
+	if err := db.First(&aiConfig).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			aiConfig = model.AIConfig{
+				Enabled:     false,
+				Provider:    "openai",
+				ApiEndpoint: "",
+				ApiKey:      "",
+				ModelName:   "gpt-3.5-turbo",
+			}
+			if err := db.Create(&aiConfig).Error; err != nil {
+				log.Printf("failed to create default ai config: %v", err)
+			} else {
+				log.Println("default ai config created")
 			}
 		}
 	}

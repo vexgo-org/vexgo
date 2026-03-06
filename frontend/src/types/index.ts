@@ -100,6 +100,26 @@ export interface CommentModerationConfig {
   updatedAt: string;
 }
 
+// AI 模型信息类型
+export interface AIModel {
+  id: string;
+  object: string;
+  created: number;
+  owned_by: string;
+}
+
+// AI 配置类型
+export interface AIConfig {
+  id: string;
+  enabled: boolean;
+  provider: string;       // 提供商 (openai, azure, etc.)
+  apiEndpoint: string;    // API端点URL
+  apiKey: string;         // API密钥（仅用于设置，获取时不返回）
+  modelName: string;      // 模型名称
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 媒体文件类型
 export interface MediaFile {
   id: string;

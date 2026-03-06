@@ -19,6 +19,7 @@ import { GeneralSettingsPage } from '@/pages/GeneralSettingsPage';
 import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { CommentModerationPage } from '@/pages/CommentModerationPage';
 import { CommentConfigPage } from '@/pages/CommentConfigPage';
+import { AISettingsPage } from '@/pages/AISettingsPage';
 import { Toaster } from '@/components/ui/sonner';
 
 function App() {
@@ -132,6 +133,14 @@ function App() {
               element={
                 <ProtectedRoute requireAdmin>
                   <CommentConfigPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/ai-settings"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AISettingsPage />
                 </ProtectedRoute>
               }
             />

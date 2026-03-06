@@ -116,6 +116,12 @@ func main() {
 		api.PUT("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateSMTPConfig) // PUT /api/config/smtp（更新SMTP配置）
 		api.POST("/config/smtp/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestSMTP)   // POST /api/config/smtp/test（测试SMTP配置）
 
+		// AI 配置相关API（需要管理员权限）
+		api.GET("/config/ai", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetAIConfig)        // GET /api/config/ai（获取AI配置）
+		api.PUT("/config/ai", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateAIConfig)     // PUT /api/config/ai（更新AI配置）
+		api.POST("/config/ai/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestAI)       // POST /api/config/ai/test（测试AI配置）
+		api.GET("/config/ai/models", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetAIModels) // GET /api/config/ai/models（获取模型列表）
+
 		// 通用设置相关API（GET公开，PUT需要管理员权限）
 		api.GET("/config/general", handler.GetGeneralSettings)                                                                                   // GET /api/config/general（获取通用设置，公开）
 		api.PUT("/config/general", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateGeneralSettings) // PUT /api/config/general（更新通用设置，需要管理员权限）

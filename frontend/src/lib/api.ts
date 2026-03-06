@@ -3,7 +3,7 @@ import type {
   User, Post, Category, Tag, Comment, MediaFile,
   AuthResponse, PostsResponse, CommentsResponse,
   LikeResponse, UploadResponse, StatsResponse,
-  SMTPConfig, GeneralSettings, CommentModerationConfig
+  SMTPConfig, GeneralSettings, CommentModerationConfig, AIConfig, AIModel
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -233,11 +233,25 @@ export const configApi = {
     api.put<{ message: string; generalSettings: GeneralSettings }>('/config/general', data),
 
   // 评论审核配置相关API
-  getCommentModerationConfig: () =>
-    api.get<CommentModerationConfig>('/moderation/comments/config'),
-  
-  updateCommentModerationConfig: (data: Partial<CommentModerationConfig>) =>
-    api.put<{ message: string; config: CommentModerationConfig }>('/moderation/comments/config', data)
-};
+   getCommentModerationConfig: () =>
+     api.get<CommentModerationConfig>('/moderation/comments/config'),
+   
+   updateCommentModerationConfig: (data: Partial<CommentModerationConfig>) =>
+     api.put<{ message: string; config: CommentModerationConfig }>('/moderation/comments/config', data),
+ 
+   // AI 配置相关API
+   getAIConfig: () =>
+     api.get<AIConfig>('/config/ai'),
+   
+   updateAIConfig: (data: Partial<AIConfig>) =>
+     api.put<{ message: string; aiConfig: AIConfig }>('/config/ai', data),
+   
+   testAI: () =>
+     api.post<{ message: string; response: string }>('/config/ai/test'),
+ 
+   // AI 模型相关API
+   getAIModels: () =>
+     api.get<{ message: string; models: AIModel[] }>('/config/ai/models')
+ };
 
 export default api;

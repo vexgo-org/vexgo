@@ -13,7 +13,7 @@ import {
   Users, FileText, MessageSquare, Tag,
   Plus, Trash2, BarChart3, Edit, Shield,
   CheckCircle, XCircle, Clock, AlertCircle, FileX,
-  Mail, Settings
+  Mail, Settings, Cpu
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -293,6 +293,18 @@ export function AdminPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">配置邮件服务器，启用注册验证</p>
+              </CardContent>
+            </Card>
+
+            <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/admin/ai-settings')}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Cpu className="w-5 h-5" />
+                  大模型设置
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">配置 AI 大模型 API，启用智能功能</p>
               </CardContent>
             </Card>
           </div>
