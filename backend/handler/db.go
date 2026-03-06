@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"blog-system/backend/model"
 	"log"
 	"time"
+	"vexgo/backend/model"
 
 	"golang.org/x/crypto/bcrypt"
 

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"blog-system/backend/config"
-	"blog-system/backend/model"
-	"blog-system/backend/utils"
+	"vexgo/backend/config"
+	"vexgo/backend/model"
+	"vexgo/backend/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

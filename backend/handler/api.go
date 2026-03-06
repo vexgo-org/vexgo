@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"blog-system/backend/model"
 	"net/http"
 	"strconv"
+	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
 )

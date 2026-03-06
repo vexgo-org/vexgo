@@ -1,9 +1,9 @@
 package main
 
 import (
-	"blog-system/backend/config"
-	"blog-system/backend/handler"
-	"blog-system/backend/middleware"
+	"vexgo/backend/config"
+	"vexgo/backend/handler"
+	"vexgo/backend/middleware"
 
 	"github.com/gin-gonic/gin"
 )

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"blog-system/backend/model"
+	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
 )

@@ -4,7 +4,7 @@
 frontend/node_modules
 frontend/dist
 backend/blog.exe
-backend/blog-system
+backend/vexgo
 backend/blog.db
 
 .DS_Store

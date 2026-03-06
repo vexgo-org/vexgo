@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"blog-system/backend/handler"
-	"blog-system/backend/model"
+	"vexgo/backend/handler"
+	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
 )

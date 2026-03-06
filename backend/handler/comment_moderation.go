@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"blog-system/backend/model"
+	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"blog-system/backend/model"
+	"vexgo/backend/model"
 
 	"gorm.io/gorm"
 )

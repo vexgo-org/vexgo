@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"time"
 
-	"blog-system/backend/model"
-	"blog-system/backend/utils"
+	"vexgo/backend/model"
+	"vexgo/backend/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

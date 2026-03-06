@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"blog-system/backend/model"
 	"fmt"
 	"net/http"
 	"strconv"
+	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

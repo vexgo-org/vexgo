@@ -1,4 +1,4 @@
-# Blog-System
+# VexGo
 This is a blog built on React, Go, Gin, JWT, and SQLite, which implements features such as user registration and article management.
 
 ## How to run
@@ -10,8 +10,8 @@ This is a blog built on React, Go, Gin, JWT, and SQLite, which implements featur
 
 ### Steps
 ```
-git clone https://github.com/weimm16/blog-system.git
-cd blog-system/frontend
+git clone https://github.com/weimm16/vexgo.git
+cd vexgo/frontend
 pnpm install
 pnpm run build
 cd ../backend

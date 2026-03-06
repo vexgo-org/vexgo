@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"blog-system/backend/model"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
 )

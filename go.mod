@@ -1,4 +1,4 @@
-module blog-system
+module vexgo
 
 go 1.25.0
 
