@@ -66,14 +66,14 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
         setIsVerifying(true);
         setError('');
   
-        // 计算实际的x坐标（基于后端背景图片宽度320px，拼图块80px）
+        // 计算实际的x坐标（基于后端背景图片宽度320px，拼图块60px）
         // 前端轨道宽度可能与后端背景图片宽度不同，需要进行比例转换
         const trackWidth = trackRef.current?.offsetWidth || 320;
         const sliderWidth = 40;
         const maxPosition = trackWidth - sliderWidth;
         const ratio = maxPosition > 0 ? x / maxPosition : 0;
-        // 后端拼图块的最大位置是220（320-80-20），最小位置是20
-        const actualX = Math.round(20 + ratio * 200); // 20是最小位置，200是可移动范围（220-20）
+        // 后端拼图块的最大位置是240（320-60-20），最小位置是20
+        const actualX = Math.round(20 + ratio * 220); // 20是最小位置，220是可移动范围（240-20）
         console.log('滑块位置:', x, '轨道宽度:', trackWidth, '最大位置:', maxPosition, '比例:', ratio, '实际X坐标:', actualX);
   
         // 调用后端验证接口
@@ -275,18 +275,18 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
                 <div
                   className="absolute pointer-events-none"
                   style={{
-                    // 计算拼图块的实际位置，基于后端背景图片宽度320px，拼图块80px
+                    // 计算拼图块的实际位置，基于后端背景图片宽度320px，拼图块60px
                     // 确保拼图块位置与滑块位置匹配
-                    // 后端拼图块的最大位置是220（320-80-20），最小位置是20
-                    left: `${20 + ((sliderPosition / Math.max(1, (trackRef.current?.offsetWidth || 320) - 80)) * 200)}px`,
+                    // 后端拼图块的最大位置是240（320-60-20），最小位置是20
+                    left: `${20 + ((sliderPosition / Math.max(1, (trackRef.current?.offsetWidth || 320) - 60)) * 220)}px`,
                     top: `${captchaData.y}px`,
                   }}
                 >
                   <img
                     src={captchaData.puzzle_img}
                     alt="拼图块"
-                    className="h-20 w-20"
-                    style={{ width: '80px', height: '80px' }}
+                    className="h-15 w-15"
+                    style={{ width: '60px', height: '60px' }}
                   />
                 </div>
               </div>

@@ -72,15 +72,27 @@ func GenerateCaptcha(c *gin.Context) {
 	captchaID := uuid.New().String()
 	token := uuid.New().String()
 
-	// 设置拼图大小（只放大拼图：从40px改为80px）
-	puzzleWidth := 80
-	puzzleHeight := 80
+	// 设置拼图大小
+	puzzleWidth := 60
+	puzzleHeight := 60
 	bgWidth := 320
 	bgHeight := 160
 
 	// 随机生成拼图位置（确保拼图完全在图片内）
-	maxX := bgWidth - puzzleWidth - 20 // 留出20像素的边距
-	minX := 20
+	// 左边距:右边距 = 3:2，拼图偏向右侧
+	totalWidth := bgWidth - puzzleWidth
+	targetLeft := totalWidth * 3 / 5 // 目标左边距（占总宽度的60%）
+	// 在目标值附近随机波动（±20%）
+	randomRange := totalWidth / 5
+	minX := targetLeft - randomRange
+	maxX := targetLeft + randomRange
+	// 确保最小边距至少20像素
+	if minX < 20 {
+		minX = 20
+	}
+	if maxX > bgWidth-puzzleWidth-20 {
+		maxX = bgWidth - puzzleWidth - 20
+	}
 	x := minX + randInt(maxX-minX)
 	y := 20 + randInt(bgHeight-puzzleHeight-40) // Y轴位置在20-80之间
 
