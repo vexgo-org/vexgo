@@ -223,7 +223,7 @@ export function AISettingsPage() {
               disabled={saving}
             />
             <p className="text-xs text-muted-foreground">
-              OpenAI 官方端点: https://api.openai.com/v1/chat/completions
+              OpenAI 官方 Base Url: https://api.openai.com/v1
             </p>
           </div>
 
@@ -353,7 +353,7 @@ export function AISettingsPage() {
           <div>
             <strong>OpenAI 官方 API:</strong>
             <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-              <li>API 端点: https://api.openai.com/v1/chat/completions</li>
+              <li>Base Url: https://api.openai.com/v1</li>
               <li>需要有效的 API 密钥（从 OpenAI 平台获取）</li>
               <li>支持的模型: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview 等</li>
             </ul>
