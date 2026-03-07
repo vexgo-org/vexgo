@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 	"vexgo/backend/model"
 
 	dmsql "github.com/go-sql-driver/mysql"
@@ -109,7 +108,7 @@ func InitDB(dataDir string) {
 					Role:              "super_admin",
 					EmailVerified:     true,
 					VerificationToken: "",
-					TokenExpiresAt:    time.Time{},
+					TokenExpiresAt:    nil,
 				}
 				if err := db.Create(&u).Error; err != nil {
 					log.Printf("failed to create default admin: %v", err)

@@ -5,16 +5,16 @@ import "time"
 
 type Post struct {
 	ID              uint      `json:"id" gorm:"primaryKey"`
-	Title           string    `json:"title" binding:"required"`
+	Title           string    `json:"title" binding:"required" gorm:"size:255"`
 	Content         string    `json:"content" binding:"required" gorm:"type:text"`
 	Excerpt         string    `json:"excerpt" gorm:"type:text"`
-	CoverImage      string    `json:"coverImage"`
+	CoverImage      string    `json:"coverImage" gorm:"size:500"`
 	ViewCount       int       `json:"viewCount" gorm:"default:0"`
 	AuthorID        uint      `json:"authorId"`
 	Author          User      `json:"author" gorm:"foreignKey:AuthorID"`
-	Category        string    `json:"category"`
+	Category        string    `json:"category" gorm:"size:100"`
 	Tags            []Tag     `json:"tags" gorm:"many2many:post_tags;"`
-	Status          string    `json:"status"`                           // draft/published/pending/rejected
+	Status          string    `json:"status" gorm:"size:50"`            // draft/published/pending/rejected
 	RejectionReason string    `json:"rejectionReason" gorm:"type:text"` // 拒绝原因
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
@@ -26,25 +26,25 @@ type Post struct {
 }
 
 type User struct {
-	ID                uint      `json:"id" gorm:"primaryKey"`
-	Username          string    `json:"username" binding:"required"`
-	Email             string    `json:"email" binding:"required,email"`
-	Password          string    `json:"-"`                  // 不序列化
-	Role              string    `json:"role"`               // super_admin/admin/author/contributor/guest
-	Avatar            string    `json:"avatar,omitempty"`   // 头像 URL
-	EmailVerified     bool      `json:"email_verified"`     // 邮箱是否已验证
-	VerificationToken string    `json:"verification_token"` // 验证令牌
-	TokenExpiresAt    time.Time `json:"token_expires_at"`   // 令牌过期时间
+	ID                uint       `json:"id" gorm:"primaryKey"`
+	Username          string     `json:"username" binding:"required" gorm:"size:100;uniqueIndex"`
+	Email             string     `json:"email" binding:"required,email" gorm:"size:255;uniqueIndex"`
+	Password          string     `json:"-"`                                  // 不序列化
+	Role              string     `json:"role" gorm:"size:50"`                // super_admin/admin/author/contributor/guest
+	Avatar            string     `json:"avatar,omitempty"`                   // 头像 URL
+	EmailVerified     bool       `json:"email_verified"`                     // 邮箱是否已验证
+	VerificationToken string     `json:"verification_token" gorm:"size:255"` // 验证令牌
+	TokenExpiresAt    *time.Time `json:"token_expires_at"`                   // 令牌过期时间（可为NULL）
 }
 
 type Tag struct {
 	ID   uint   `json:"id" gorm:"primaryKey"`
-	Name string `json:"name" gorm:"uniqueIndex"`
+	Name string `json:"name" gorm:"size:100;uniqueIndex"`
 }
 
 type Category struct {
 	ID          uint   `json:"id" gorm:"primaryKey"`
-	Name        string `json:"name" gorm:"uniqueIndex"`
+	Name        string `json:"name" gorm:"size:100;uniqueIndex"`
 	Description string `json:"description"`
 }
 
@@ -61,7 +61,7 @@ type Comment struct {
 	UserID    uint      `json:"userId"`
 	User      User      `json:"author" gorm:"foreignKey:UserID"`
 	Content   string    `json:"content" gorm:"type:text"`
-	Status    string    `json:"status" gorm:"default:'published'"` // published, pending, rejected
+	Status    string    `json:"status" gorm:"size:20;default:'published'"` // published, pending, rejected
 	ParentID  *uint     `json:"parentId,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -83,10 +83,10 @@ type Like struct {
 
 type MediaFile struct {
 	ID           uint      `json:"id" gorm:"primaryKey"`
-	URL          string    `json:"url"`
-	OriginalName string    `json:"originalName"`
+	URL          string    `json:"url" gorm:"size:500"`
+	OriginalName string    `json:"originalName" gorm:"size:255"`
 	Size         int64     `json:"size"`
-	Type         string    `json:"type"` // image/video 等
+	Type         string    `json:"type" gorm:"size:50"` // image/video 等
 	UserID       uint      `json:"userId"`
 	User         User      `json:"-" gorm:"foreignKey:UserID"`
 	CreatedAt    time.Time `json:"createdAt"`
