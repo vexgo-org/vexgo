@@ -1,6 +1,7 @@
 package main
 
 import (
+	"vexgo/backend/cmd"
 	"vexgo/backend/config"
 	"vexgo/backend/handler"
 	"vexgo/backend/middleware"
@@ -9,13 +10,16 @@ import (
 )
 
 func main() {
-	// 1. 初始化配置（加载JWT密钥等环境变量）
+	// 1. 解析命令行参数
+	cfg := cmd.ParseFlags()
+
+	// 2. 初始化配置（加载JWT密钥等环境变量）
 	config.Init()
 
-	// 2. 初始化数据库连接（确保数据库驱动、连接串配置正确）
+	// 3. 初始化数据库连接（确保数据库驱动、连接串配置正确）
 	handler.InitDB()
 
-	// 3. 创建Gin引擎实例（默认包含Logger和Recovery中间件）
+	// 4. 创建Gin引擎实例（默认包含Logger和Recovery中间件）
 	r := gin.Default()
 
 	// ===================== 核心API路由分组（所有接口都在/api下） =====================
@@ -142,7 +146,6 @@ func main() {
 		c.File("../frontend/dist/index.html")
 	})
 
-	// 4. 启动HTTP服务，监听3001端口（和前端请求的端口保持一致）
-	// 若需修改端口，需同步修改前端.env文件中的VITE_API_URL（如 http://localhost:3001/api）
-	r.Run(":3001")
+	// 启动HTTP服务，监听配置的地址和端口
+	r.Run(cfg.GetListenAddr())
 }
