@@ -34,6 +34,8 @@ If not set, the application will generate a random secret at startup for develop
 
 ### Postgres
 
+Recommend Version: Postgres 18
+
 To use postgres.
 
 First, you run a postgres instance.
@@ -56,6 +58,8 @@ go run main.go -c ../examples/config-postgres.yml
 ```
 
 ### Mysql
+
+Recommend Version: Mysql 8
 
 To use mysql.
 
