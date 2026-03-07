@@ -15,12 +15,13 @@ type Config struct {
 	DataDir string // Data directory for storing sqlite database and media files
 
 	// Database configuration
-	DBType     string `yaml:"db_type"`     // Database type: "sqlite" or "mysql"
-	DBHost     string `yaml:"db_host"`     // MySQL host (for mysql)
-	DBPort     int    `yaml:"db_port"`     // MySQL port (for mysql)
-	DBUser     string `yaml:"db_user"`     // MySQL user (for mysql)
-	DBPassword string `yaml:"db_password"` // MySQL password (for mysql)
-	DBName     string `yaml:"db_name"`     // MySQL database name (for mysql)
+	DBType     string `yaml:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"
+	DBHost     string `yaml:"db_host"`     // Database host
+	DBPort     int    `yaml:"db_port"`     // Database port
+	DBUser     string `yaml:"db_user"`     // Database user
+	DBPassword string `yaml:"db_password"` // Database password
+	DBName     string `yaml:"db_name"`     // Database name
+	DBSSLMode  string `yaml:"db_ssl_mode"` // PostgreSQL SSL mode (for postgres)
 }
 
 // ParseFlags parses command line flags and returns the server configuration

@@ -1,0 +1,19 @@
+# Server listen address
+addr: "0.0.0.0"
+
+# Server listen port
+port: 3001
+
+# Data directory (for storing uploaded media files, not used for PostgreSQL)
+data: "./data"
+
+# Database configuration
+db_type: "postgres"  # Options: "sqlite", "mysql", or "postgres"
+
+# PostgreSQL specific configuration
+db_host: "127.0.0.1"
+db_port: 5432
+db_user: "vexgo_user"
+db_password: "test"
+db_name: "vexgo_db"
+db_ssl_mode: "disable"  # Options: "disable", "require", "verify-ca", "verify-full"

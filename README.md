@@ -32,6 +32,29 @@ If not set, the application will generate a random secret at startup for develop
 
 ## Database
 
+### Postgres
+
+To use postgres.
+
+First, you run a postgres instance.
+
+```bash
+sudo docker run -d --name postgres -e POSTGRES_PASSWORD=test -p 5432:5432 -v ./postgres:/var/lib/postgresql/data docker.io/library/postgres:18-alpine
+```
+
+Then, enter postgres shell.
+
+```bash
+psql -U postgres
+postgres=# CREATE USER vexgo_user WITH PASSWORD 'test';
+postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0;
+```
+
+Run backend with this command:
+```bash
+go run main.go -c ../examples/config-postgres.yml
+```
+
 ### Mysql
 
 To use mysql.

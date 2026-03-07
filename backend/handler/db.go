@@ -11,6 +11,7 @@ import (
 	dmsql "github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -88,6 +89,51 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 			}
 		}
 		log.Println("Successfully connected to MySQL database")
+	} else if dbType == "postgres" {
+		// PostgreSQL connection - use config values with environment fallback
+		user := cfg.DBUser
+		if user == "" {
+			user = os.Getenv("DB_USER")
+		}
+		password := cfg.DBPassword
+		if password == "" {
+			password = os.Getenv("DB_PASSWORD")
+		}
+		host := cfg.DBHost
+		if host == "" {
+			host = os.Getenv("DB_HOST")
+		}
+		port := cfg.DBPort
+		if port == 0 {
+			// If port not set in config, get from env
+			portStr := os.Getenv("DB_PORT")
+			if portStr != "" {
+				fmt.Sscanf(portStr, "%d", &port)
+			} else {
+				port = 5432 // default PostgreSQL port
+			}
+		}
+		dbname := cfg.DBName
+		if dbname == "" {
+			dbname = os.Getenv("DB_NAME")
+		}
+		sslMode := cfg.DBSSLMode
+		if sslMode == "" {
+			sslMode = os.Getenv("DB_SSL_MODE")
+			if sslMode == "" {
+				sslMode = "disable" // default SSL mode
+			}
+		}
+
+		// Build DSN for PostgreSQL
+		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			host, port, user, password, dbname, sslMode)
+
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		if err != nil {
+			log.Fatalf("failed to connect to PostgreSQL database: %v", err)
+		}
+		log.Println("Successfully connected to PostgreSQL database")
 	} else {
 		// SQLite connection (default)
 		// Use dataDir from config (already set via command line or config file)
