@@ -55,7 +55,12 @@ export function WritePostPage() {
   const loadCategories = async () => {
     try {
       const response = await categoriesApi.getCategories();
-      setCategories(response.data.categories);
+      // 确保前端 categories 的 id 为字符串，避免与后端数字 id 类型不一致导致 Select 无法匹配
+      const normalized = (response.data.categories || []).map((c: any) => ({
+        ...c,
+        id: String(c.id),
+      }));
+      setCategories(normalized);
     } catch (error) {
       console.error('加载分类失败:', error);
     }
@@ -64,12 +69,44 @@ export function WritePostPage() {
   const loadPost = async () => {
     try {
       const response = await postsApi.getPost(id!);
-      const post = response.data.post;
+      const post: any = response.data.post;
+      console.debug('WritePostPage loaded post:', post);
       setTitle(post.title);
       setContent(post.content);
       setExcerpt(post.excerpt || '');
-      setCategory(post.category);
-      setTags(post.tags || []);
+      // 后端的 category 可能是数字或字符串，统一转为字符串以匹配前端 Select 的 value
+      setCategory(post.category ? String(post.category) : '');
+      // 后端返回的 tags 为对象数组 [{id,name}, ...]，前端需要字符串数组
+      try {
+        let mappedTags: string[] = [];
+
+        // 1) 如果后端直接返回字符串数组
+        if (Array.isArray(post.tags) && post.tags.every((x: any) => typeof x === 'string')) {
+          mappedTags = post.tags as string[];
+        } else if (Array.isArray(post.tags)) {
+          // 2) 常见情况：对象数组 [{id,name}, ...]
+          mappedTags = post.tags.map((t: any) => {
+            if (!t) return '';
+            if (typeof t === 'string') return t;
+            return (
+              t.name || t.Name || t.title || t.label || (t.id ? String(t.id) : undefined) || ''
+            );
+          }).filter(Boolean);
+        } else if (typeof post.tags === 'string') {
+          // 3) 如果后端返回逗号分隔的字符串
+          mappedTags = post.tags.split(',').map((s: string) => s.trim()).filter(Boolean);
+        } else if (post.tag_names && Array.isArray(post.tag_names)) {
+          mappedTags = post.tag_names.map((s: any) => String(s).trim()).filter(Boolean);
+        } else if (post.Tags && Array.isArray(post.Tags)) {
+          mappedTags = post.Tags.map((t: any) => t.name || t.Name || (t.id ? String(t.id) : '')).filter(Boolean);
+        }
+
+        console.debug('WritePostPage loaded post.tags raw:', post.tags, 'mapped:', mappedTags);
+        setTags(mappedTags);
+      } catch (e) {
+        console.error('解析 post.tags 失败:', e, post && post.tags);
+        setTags([]);
+      }
       setCoverImage(post.coverImage || '');
     } catch (error) {
       console.error('加载文章失败:', error);

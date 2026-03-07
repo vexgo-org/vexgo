@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { uploadApi } from '@/lib/api';
 
 interface RichTextEditorProps {
@@ -43,6 +43,24 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
       },
     },
   });
+
+  // 当外部传入的 content 发生变化时，更新编辑器内容
+  useEffect(() => {
+    if (!editor) return;
+    const current = editor.getHTML();
+    if (content !== current) {
+      try {
+        editor.commands.setContent(content || '');
+      } catch (e) {
+        // fallback to setHTML if setContent 抛错
+        try {
+          editor.commands.setContent(content || '');
+        } catch (err) {
+          console.error('更新编辑器内容失败:', err);
+        }
+      }
+    }
+  }, [content, editor]);
 
   const addImage = useCallback(async (file: File) => {
     if (!editor) return;
