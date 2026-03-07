@@ -30,6 +30,11 @@ export JWT_SECRET="your-very-long-random-secret-here"
 
 If not set, the application will generate a random secret at startup for development purposes. Never use the default development secret in production.
 
+
+## Config File
+
+Configuration priority: command-line arguments > configuration files > environment variables > default values
+
 ## Database
 
 ### Postgres
