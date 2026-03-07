@@ -1,7 +1,7 @@
 # VexGo
 This is a blog built on React, Go, Gin, JWT, and SQLite, which implements features such as user registration and article management.
 
-## How to run
+## Quick Start
 
 ### Requirements
 - Linux/MacOS
@@ -16,8 +16,7 @@ cd vexgo/frontend
 pnpm install
 pnpm run build
 cd ../backend
-go build -o vexgo
-./vexgo
+go run main.go
 ```
 Then, visit http://127.0.0.1:3001
 
@@ -30,3 +29,30 @@ export JWT_SECRET="your-very-long-random-secret-here"
 ```
 
 If not set, the application will generate a random secret at startup for development purposes. Never use the default development secret in production.
+
+## Database
+
+### Mysql
+
+To use mysql.
+
+First, you run a mysql instance.
+
+```bash
+sudo docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=test -v ./mysql:/var/lib/mysql docker.io/library/mysql:8
+```
+
+Then, enter mysql shell.
+
+```bash
+mysql -p
+mysql>CREATE DATABASE vexgo_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+mysql>CREATE USER 'vexgo_user'@'%' IDENTIFIED BY '你的密码';
+mysql>GRANT ALL ON vexgo_db.* TO 'vexgo_user'@'%';
+mysql>FLUSH PRIVILEGES;
+```
+
+Run backend with this command:
+```bash
+go run main.go -c ../examples/config-mysql.yml
+```
