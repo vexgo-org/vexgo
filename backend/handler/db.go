@@ -2,6 +2,8 @@ package handler
 
 import (
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 	"vexgo/backend/model"
 
@@ -13,9 +15,18 @@ import (
 
 var db *gorm.DB
 
-func InitDB() {
+// InitDB initializes the database connection using the specified data directory
+func InitDB(dataDir string) {
+	// Ensure data directory exists
+	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+		log.Fatalf("failed to create data directory: %v", err)
+	}
+
+	// Build database path
+	dbPath := filepath.Join(dataDir, "blog.db")
+
 	var err error
-	db, err = gorm.Open(sqlite.Open("blog.db"), &gorm.Config{})
+	db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}

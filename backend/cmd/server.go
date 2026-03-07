@@ -8,21 +8,24 @@ import (
 
 // Config holds the server configuration from command line arguments
 type Config struct {
-	Addr string // Address to listen on (e.g., "0.0.0.0" or "127.0.0.1")
-	Port int    // Port to listen on
+	Addr    string // Address to listen on (e.g., "0.0.0.0" or "127.0.0.1")
+	Port    int    // Port to listen on
+	DataDir string // Data directory for storing sqlite database and media files
 }
 
 // ParseFlags parses command line flags and returns the server configuration
 func ParseFlags() *Config {
 	addr := flag.String("addr", "0.0.0.0", "Address to listen on (default: 0.0.0.0)")
 	port := flag.Int("port", 3001, "Port to listen on (default: 3001)")
+	dataDir := flag.String("data", "./data", "Data directory for storing sqlite database and media files (default: ./data)")
 
 	// Parse command line flags
 	flag.Parse()
 
 	return &Config{
-		Addr: *addr,
-		Port: *port,
+		Addr:    *addr,
+		Port:    *port,
+		DataDir: *dataDir,
 	}
 }
 

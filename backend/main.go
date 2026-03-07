@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"vexgo/backend/cmd"
 	"vexgo/backend/config"
 	"vexgo/backend/handler"
@@ -16,8 +17,11 @@ func main() {
 	// 2. 初始化配置（加载JWT密钥等环境变量）
 	config.Init()
 
+	// 设置数据目录（用于文件上传）
+	handler.DataDir = cfg.DataDir
+
 	// 3. 初始化数据库连接（确保数据库驱动、连接串配置正确）
-	handler.InitDB()
+	handler.InitDB(cfg.DataDir)
 
 	// 4. 创建Gin引擎实例（默认包含Logger和Recovery中间件）
 	r := gin.Default()
@@ -132,8 +136,9 @@ func main() {
 	}
 
 	// ===================== 静态文件托管（必须在API路由之后） =====================
-	// 1. 托管上传的文件：前端访问 /uploads/xxx 对应后端 ../uploads 目录
-	r.Static("/uploads", "../uploads")
+	// 1. 托管上传的文件：前端访问 /uploads/xxx 对应后端数据目录下的 media 文件夹
+	mediaDir := filepath.Join(cfg.DataDir, "media")
+	r.Static("/uploads", mediaDir)
 	// 2. 托管前端打包后的静态资源：/assets/xxx 对应 ../frontend/dist/assets 目录
 	r.Static("/assets", "../frontend/dist/assets")
 	// 3. 前端入口页面：根路径 / 返回index.html

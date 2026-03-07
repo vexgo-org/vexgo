@@ -11,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var DataDir string
+
 // 上传文件（需登录），并在数据库记录
 func UploadFile(c *gin.Context) {
 	var userID uint = 0
@@ -26,8 +28,8 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	// 创建上传目录
-	uploadDir := "../uploads"
+	// 创建上传目录（使用数据目录下的 media 文件夹）
+	uploadDir := filepath.Join(DataDir, "media")
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
 		os.MkdirAll(uploadDir, os.ModePerm)
 	}
@@ -75,7 +77,7 @@ func UploadFiles(c *gin.Context) {
 	}
 
 	files := form.File["files"]
-	uploadDir := "../uploads"
+	uploadDir := filepath.Join(DataDir, "media")
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
 		os.MkdirAll(uploadDir, os.ModePerm)
 	}
@@ -161,7 +163,9 @@ func DeleteFile(c *gin.Context) {
 	}
 
 	// 删除物理文件
-	path := ".." + media.URL
+	// media.URL 格式为 "/uploads/filename"，需要转换为实际路径
+	filename := filepath.Base(media.URL)
+	path := filepath.Join(DataDir, "media", filename)
 	os.Remove(path)
 	db.Delete(&media)
 	c.JSON(http.StatusOK, gin.H{"message": "文件已删除"})
