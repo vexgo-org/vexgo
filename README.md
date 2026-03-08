@@ -3,37 +3,107 @@ This is a blog built on React, Go, Gin, JWT, and SQLite, which implements featur
 
 ## Quick Start
 
-### Requirements
-- Linux/MacOS
-- go
-- nodejs
-- pnpm
+Select the corresponding system and architecture on the release page to download.
 
-### Steps
-```
-git clone https://github.com/weimm16/vexgo.git
-cd vexgo/frontend
-pnpm install
-pnpm run build
-cd ../backend
-go run main.go
-```
-Then, visit http://127.0.0.1:3001
-
-### Security Configuration
-
-For production deployment, it's highly recommended to set the `JWT_SECRET` environment variable to a strong, random secret:
+### Linux
 
 ```bash
-export JWT_SECRET="your-very-long-random-secret-here"
+./vexgo-linux-amd64
 ```
 
-If not set, the application will generate a random secret at startup for development purposes. Never use the default development secret in production.
+### Docker
 
+```bash
+sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/antipeth/vexgo:latest
+```
 
-## Config File
+## Configuration
 
 Configuration priority: command-line arguments > configuration files > environment variables > default values
+
+### Use config file
+Here is example config file:
+
+```config.yml
+# Server listen address
+addr: "0.0.0.0"
+
+# Server listen port
+port: 3001
+
+# Data directory (for storing SQLite database and uploaded media files)
+data: "./data"
+
+# JWT secret key for signing tokens
+# IMPORTANT: Generate a secure random string for production!
+# You can generate one with: openssl rand -base64 32
+jwt_secret: "your-secret-key-change-this-in-production"
+
+# Database configuration
+db_type: "sqlite"  # Options: "sqlite", "mysql", or "postgres"
+
+# When db_type is "mysql", configure the following parameters
+# db_host: "127.0.0.1"
+# db_port: 3306
+# db_user: "your_username"
+# db_password: "your_password"
+# db_name: "vexgo"
+
+# When db_type is "postgres", configure the following parameters
+# db_host: "127.0.0.1"
+# db_port: 5432
+# db_user: "your_username"
+# db_password: "your_password"
+# db_name: "vexgo"
+# db_ssl_mode: "disable"  # Options: "disable", "require", "verify-ca", "verify-full"
+```
+
+Then, Run the following command:
+
+```bash
+./vexgo-linux-amd64 -c /the/path/to/config.yml
+```
+### Use environment
+
+You can also configure the application using environment variables. The environment variable names correspond to the configuration keys in uppercase with underscores.
+
+Available environment variables:
+
+- `ADDR`: Server listen address (default: "0.0.0.0")
+- `PORT`: Server listen port (default: 3001)
+- `DATA`: Data directory path (default: "./data")
+- `JWT_SECRET`: JWT secret key (required for production)
+- `DB_TYPE`: Database type, options: "sqlite", "mysql", or "postgres" (default: "sqlite")
+- `DB_HOST`: Database host (required for mysql/postgres)
+- `DB_PORT`: Database port (required for mysql/postgres)
+- `DB_USER`: Database username (required for mysql/postgres)
+- `DB_PASSWORD`: Database password (required for mysql/postgres)
+- `DB_NAME`: Database name (required for mysql/postgres)
+- `DB_SSL_MODE`: SSL mode for postgres (default: "disable")
+
+Example using environment variables:
+
+```bash
+export PORT=3001
+export DB_TYPE=mysql
+export DB_HOST=127.0.0.1
+export DB_PORT=3306
+export DB_USER=vexgo_user
+export DB_PASSWORD=password
+export DB_NAME=vexgo_db
+./vexgo-linux-amd64
+```
+
+or
+
+```bash
+sudo docker run -d --name vexgo \
+  -p 3001:3001 \
+  -e PORT=3001 \
+  -e DB_TYPE=sqlite \
+  -v ./data:/app/data \ 
+  ghcr.io/antipeth/vexgo:latest
+```
 
 ## Database
 
@@ -89,95 +159,22 @@ Run backend with this command:
 go run main.go -c ../examples/config-mysql.yml
 ```
 
-## Docker Deployment
+## Development
 
-### Using Docker Compose (Recommended)
+### Requirements
+- Linux/MacOS
+- go
+- nodejs
+- pnpm
 
-The easiest way to deploy VexGo is using Docker Compose, which will build the application and run it with SQLite by default.
-
-1. **Build and start the application:**
-
-```bash
-# Build and start the service
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop the service
-docker-compose down
+### Steps
 ```
-
-2. **Configure environment variables:**
-
-Copy `.env.example` to `.env` and modify as needed:
-
-```bash
-cp .env.example .env
+git clone https://github.com/weimm16/vexgo.git
+cd vexgo/frontend
+pnpm install
+pnpm run build
+cd ../backend
+go run main.go
 ```
+Then, visit http://127.0.0.1:3001
 
-Important: **Set a strong `JWT_SECRET` in production!**
-
-3. **Access the application:**
-
-Visit http://localhost:3001
-
-4. **Data persistence:**
-
-All data (SQLite database and uploaded files) are stored in the `./data` directory on the host machine.
-
-### Using External Database with Docker Compose
-
-If you want to use MySQL or PostgreSQL instead of SQLite:
-
-1. **Uncomment the database service** in `docker-compose.yml` (either `mysql` or `postgres` section)
-2. **Configure environment variables** in the `vexgo` service:
-   - For MySQL: set `DB_TYPE=mysql` and ensure the database credentials match
-   - For PostgreSQL: set `DB_TYPE=postgres` and ensure the database credentials match
-3. **Update the database service** with your preferred root password
-4. **Start all services:**
-
-```bash
-docker-compose up -d
-```
-
-The application will automatically connect to the database service via Docker network.
-
-### Building Docker Image Manually
-
-If you prefer to build the Docker image without Docker Compose:
-
-```bash
-# Build the image
-docker build -t vexgo:latest .
-
-# Run the container
-docker run -d \
-  --name vexgo \
-  -p 3001:3001 \
-  -e JWT_SECRET="your-secret-key" \
-  -v $(pwd)/data:/app/data \
-  vexgo:latest
-```
-
-### Docker Image Structure
-
-The Dockerfile uses a multi-stage build:
-
-1. **Frontend builder stage**: Uses Node.js to build the React frontend
-2. **Backend builder stage**: Uses Go to compile the backend with embedded frontend
-3. **Runtime stage**: Uses lightweight Alpine Linux with only necessary dependencies
-
-This ensures the final image is small and contains only the compiled binary and runtime dependencies.
-
-### Production Considerations
-
-1. **JWT_SECRET**: Always set a strong, random secret in production
-2. **Reverse proxy**: Consider using Nginx or Traefik as reverse proxy for SSL termination
-3. **Backups**: Regularly backup the `data` directory (contains SQLite database and uploads)
-4. **Updates**: To update, rebuild the image and restart the container:
-   ```bash
-   docker-compose pull  # if using base images updates
-   docker-compose build
-   docker-compose up -d
-   ```
