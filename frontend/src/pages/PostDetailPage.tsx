@@ -256,9 +256,13 @@ export function PostDetailPage() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <Link to={`/user/${post.author?.id}`} className="flex items-center gap-4 hover:no-underline">
             <Avatar className="w-12 h-12">
-              <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                {post.author?.username?.charAt(0).toUpperCase()}
-              </AvatarFallback>
+              {post.author?.avatar ? (
+                <img src={post.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                  {post.author?.username?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              )}
             </Avatar>
             <div>
               <p className="font-medium hover:text-primary transition-colors">{post.author?.username}</p>
@@ -414,9 +418,13 @@ export function PostDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                        {comment.author?.username?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
+                      {comment.author?.avatar ? (
+                        <img src={comment.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                          {comment.author?.username?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">

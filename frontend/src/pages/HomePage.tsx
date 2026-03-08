@@ -328,9 +328,13 @@ export function HomePage() {
                       <div className="flex flex-col gap-2">
                         <Link to={`/user/${post.author?.id}`} className="flex items-center gap-3 hover:no-underline">
                           <Avatar className="w-8 h-8">
-                            <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                              {post.author?.username?.charAt(0).toUpperCase()}
-                            </AvatarFallback>
+                            {post.author?.avatar ? (
+                              <img src={post.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                                {post.author?.username?.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            )}
                           </Avatar>
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2 text-sm">

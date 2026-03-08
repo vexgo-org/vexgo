@@ -111,9 +111,13 @@ export function UserPostsPage() {
             <CardContent className="p-6">
               <div className="flex flex-col items-center text-center">
                 <Avatar className="w-24 h-24 mb-4">
-                  <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-                    {user?.username?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                      {user?.username?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
                 <h2 className="text-xl font-bold mb-2">{user?.username || '未知用户'}</h2>
                 {!JSON.parse(localStorage.getItem('userSettings') || '{}').hideEmail && (
@@ -171,9 +175,13 @@ export function UserPostsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="w-8 h-8">
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                            {post.author?.username?.charAt(0).toUpperCase() || 'U'}
-                          </AvatarFallback>
+                          {post.author?.avatar ? (
+                            <img src={post.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                              {post.author?.username?.charAt(0).toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          )}
                         </Avatar>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span>{post.author?.username}</span>
