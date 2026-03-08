@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { authApi } from '@/lib/api';
+import { authApi, uploadApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -154,26 +154,11 @@ export function ProfilePage() {
     setAvatarLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // 假设上传API的端点是 /upload/avatar
-      const response = await fetch('/api/upload/avatar', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('上传失败');
-      }
-
-      const data = await response.json();
-      if (data.file && data.file.url) {
+      // 使用现有的上传API
+      const uploadResponse = await uploadApi.uploadFile(file);
+      if (uploadResponse.data.file && uploadResponse.data.file.url) {
         // 更新用户头像
-        const updateResponse = await authApi.updateProfile({ avatar: data.file.url });
+        const updateResponse = await authApi.updateProfile({ avatar: uploadResponse.data.file.url });
         updateUser(updateResponse.data.user);
         setSuccess('头像更新成功');
       }
