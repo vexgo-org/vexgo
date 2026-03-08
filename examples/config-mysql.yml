@@ -19,5 +19,5 @@ db_type: "mysql"  # Options: "sqlite" or "mysql"
 db_host: "127.0.0.1"
 db_port: 3306
 db_user: "vexgo_user"
-db_password: "test"
+db_password: "password"
 db_name: "vexgo_db"

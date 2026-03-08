@@ -19,6 +19,6 @@ db_type: "postgres"  # Options: "sqlite", "mysql", or "postgres"
 db_host: "127.0.0.1"
 db_port: 5432
 db_user: "vexgo_user"
-db_password: "test"
+db_password: "password"
 db_name: "vexgo_db"
 db_ssl_mode: "disable"  # Options: "disable", "require", "verify-ca", "verify-full"

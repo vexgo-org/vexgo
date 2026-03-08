@@ -53,7 +53,7 @@ Then, enter postgres shell.
 
 ```bash
 psql -U postgres
-postgres=# CREATE USER vexgo_user WITH PASSWORD 'test';
+postgres=# CREATE USER vexgo_user WITH PASSWORD 'password';
 postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0;
 ```
 
@@ -79,7 +79,7 @@ Then, enter mysql shell.
 ```bash
 mysql -p
 mysql>CREATE DATABASE vexgo_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-mysql>CREATE USER 'vexgo_user'@'%' IDENTIFIED BY '你的密码';
+mysql>CREATE USER 'vexgo_user'@'%' IDENTIFIED BY 'password';
 mysql>GRANT ALL ON vexgo_db.* TO 'vexgo_user'@'%';
 mysql>FLUSH PRIVILEGES;
 ```
