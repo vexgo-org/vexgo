@@ -5,13 +5,22 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 var DataDir string
+
+// 获取文件扩展名
+func getFileExtension(filename string) string {
+	ext := filepath.Ext(filename)
+	if ext == "" {
+		return ""
+	}
+	return ext
+}
 
 // 上传文件（需登录），并在数据库记录
 func UploadFile(c *gin.Context) {
@@ -34,24 +43,34 @@ func UploadFile(c *gin.Context) {
 		os.MkdirAll(uploadDir, os.ModePerm)
 	}
 
-	// 生成文件名
-	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), file.Filename)
-	filepath := filepath.Join(uploadDir, filename)
+	// 获取文件扩展名
+	ext := getFileExtension(file.Filename)
+
+	// 生成 UUID v4 作为文件名（保留扩展名）
+	uuid := uuid.New().String()
+	var finalFilename string
+	if ext != "" {
+		finalFilename = fmt.Sprintf("%s%s", uuid, ext)
+	} else {
+		finalFilename = uuid
+	}
+
+	// 构建保存路径
+	fullPath := filepath.Join(uploadDir, finalFilename)
 
 	// 保存文件
-	if err := c.SaveUploadedFile(file, filepath); err != nil {
+	if err := c.SaveUploadedFile(file, fullPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件保存失败"})
 		return
 	}
 
-	fileURL := fmt.Sprintf("/uploads/%s", filename)
+	fileURL := fmt.Sprintf("/uploads/%s", finalFilename)
 
 	media := model.MediaFile{
-		URL:          fileURL,
-		OriginalName: file.Filename,
-		Size:         file.Size,
-		Type:         "unknown",
-		UserID:       userID,
+		URL:    fileURL,
+		Size:   file.Size,
+		Type:   "unknown",
+		UserID: userID,
 	}
 	db.Create(&media)
 
@@ -84,19 +103,30 @@ func UploadFiles(c *gin.Context) {
 
 	var uploadedFiles []model.MediaFile
 	for _, file := range files {
-		filename := fmt.Sprintf("%d_%s", time.Now().Unix(), file.Filename)
-		filepath := filepath.Join(uploadDir, filename)
+		// 获取文件扩展名
+		ext := getFileExtension(file.Filename)
 
-		if err := c.SaveUploadedFile(file, filepath); err != nil {
+		// 生成 UUID v4 作为文件名
+		uuid := uuid.New().String()
+		var finalFilename string
+		if ext != "" {
+			finalFilename = fmt.Sprintf("%s%s", uuid, ext)
+		} else {
+			finalFilename = uuid
+		}
+
+		fullPath := filepath.Join(uploadDir, finalFilename)
+
+		// 保存文件
+		if err := c.SaveUploadedFile(file, fullPath); err != nil {
 			continue
 		}
 
 		media := model.MediaFile{
-			URL:          fmt.Sprintf("/uploads/%s", filename),
-			OriginalName: file.Filename,
-			Size:         file.Size,
-			Type:         "unknown",
-			UserID:       userID,
+			URL:    fmt.Sprintf("/uploads/%s", finalFilename),
+			Size:   file.Size,
+			Type:   "unknown",
+			UserID: userID,
 		}
 		db.Create(&media)
 		uploadedFiles = append(uploadedFiles, media)

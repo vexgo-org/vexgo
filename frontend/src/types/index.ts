@@ -133,7 +133,6 @@ export interface MediaFile {
   id: string;
   url: string;
   type: 'image' | 'video';
-  originalName: string;
   size: number;
   createdAt?: string;
 }

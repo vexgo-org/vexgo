@@ -91,12 +91,11 @@ type Like struct {
 // 媒体文件模型，用于记录用户上传的资源
 
 type MediaFile struct {
-	ID           uint      `json:"id" gorm:"primaryKey"`
-	URL          string    `json:"url" gorm:"size:500"`
-	OriginalName string    `json:"originalName" gorm:"size:255"`
-	Size         int64     `json:"size"`
-	Type         string    `json:"type" gorm:"size:50"` // image/video 等
-	UserID       uint      `json:"userId"`
-	User         User      `json:"-" gorm:"foreignKey:UserID"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	URL       string    `json:"url" gorm:"size:500"`
+	Size      int64     `json:"size"`
+	Type      string    `json:"type" gorm:"size:50"` // image/video 等
+	UserID    uint      `json:"userId"`
+	User      User      `json:"-" gorm:"foreignKey:UserID"`
+	CreatedAt time.Time `json:"createdAt"`
 }
