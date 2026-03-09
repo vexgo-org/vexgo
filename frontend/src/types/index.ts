@@ -9,6 +9,11 @@ export interface User {
   createdAt?: string;
   birthday?: string;
   bio?: string;
+  // 隐私设置
+  profile_visibility?: 'public' | 'private';
+  hide_email?: boolean;
+  hide_birthday?: boolean;
+  hide_bio?: boolean;
 }
 
 // SMTP 配置类型

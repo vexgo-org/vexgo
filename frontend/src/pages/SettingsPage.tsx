@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/lib/I18nContext';
+import { authApi } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Check, Bell, Palette, Globe, Shield } from 'lucide-react';
+import { Check, Bell, Palette, Globe, Shield, Loader2 } from 'lucide-react';
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { locale, setLocale: setI18nLocale, t } = useTranslation();
+  const [loading, setLoading] = useState(false);
   
   // Retrieve saved settings from localStorage or use default values
   const getSavedSetting = <T,>(key: string, defaultValue: T): T => {
@@ -43,19 +45,35 @@ export function SettingsPage() {
     getSavedSetting('language', locale)
   );
   
-  // Privacy settings
-  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() =>
-    getSavedSetting('profileVisibility', 'public')
-  );
-  const [hideEmail, setHideEmail] = useState(() =>
-    getSavedSetting('hideEmail', false)
-  );
-  const [hideBirthday, setHideBirthday] = useState(() =>
-    getSavedSetting('hideBirthday', false)
-  );
-  const [hideBio, setHideBio] = useState(() =>
-    getSavedSetting('hideBio', false)
-  );
+  // Privacy settings - 从 user 对象或 localStorage 初始化
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => {
+    const saved = getSavedSetting('profileVisibility', 'public');
+    if (user?.profile_visibility) {
+      return user.profile_visibility as 'public' | 'private';
+    }
+    return saved;
+  });
+  const [hideEmail, setHideEmail] = useState(() => {
+    const saved = getSavedSetting('hideEmail', false);
+    if (user?.hide_email !== undefined) {
+      return user.hide_email;
+    }
+    return saved;
+  });
+  const [hideBirthday, setHideBirthday] = useState(() => {
+    const saved = getSavedSetting('hideBirthday', false);
+    if (user?.hide_birthday !== undefined) {
+      return user.hide_birthday;
+    }
+    return saved;
+  });
+  const [hideBio, setHideBio] = useState(() => {
+    const saved = getSavedSetting('hideBio', false);
+    if (user?.hide_bio !== undefined) {
+      return user.hide_bio;
+    }
+    return saved;
+  });
   
   const [success, setSuccess] = useState('');
 
@@ -64,40 +82,65 @@ export function SettingsPage() {
     setI18nLocale(language);
   }, [language, setI18nLocale]);
 
-  const handleSave = () => {
-    // Save settings to localStorage
-    const settings = {
-      emailNotifications,
-      pushNotifications,
-      theme,
-      language,
-      profileVisibility,
-      hideEmail,
-      hideBirthday,
-      hideBio
-    };
+  const handleSave = async () => {
+    setLoading(true);
+    setError('');
     
-    localStorage.setItem('userSettings', JSON.stringify(settings));
-    
-    // Apply theme
-    document.documentElement.classList.remove('light', 'dark');
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if (theme === 'light') {
-      document.documentElement.classList.add('light');
-    } else {
-      // Follow the system to remove specific theme classes
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.add('light');
+    try {
+      // 保存隐私设置到服务器
+      const response = await authApi.updateSettings({
+        profile_visibility: profileVisibility,
+        hide_email: hideEmail,
+        hide_birthday: hideBirthday,
+        hide_bio: hideBio
+      });
+      
+      // 更新本地用户信息
+      if (response.data.user) {
+        updateUser(response.data.user);
       }
+      
+      // 保存其他设置到 localStorage
+      const settings = {
+        emailNotifications,
+        pushNotifications,
+        theme,
+        language,
+        profileVisibility,
+        hideEmail,
+        hideBirthday,
+        hideBio
+      };
+      
+      localStorage.setItem('userSettings', JSON.stringify(settings));
+      
+      // Apply theme
+      document.documentElement.classList.remove('light', 'dark');
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else if (theme === 'light') {
+        document.documentElement.classList.add('light');
+      } else {
+        // Follow the system to remove specific theme classes
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.add('light');
+        }
+      }
+      
+      setSuccess(t('settings.saveSuccess'));
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : t('settings.saveFailed');
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    
-    setSuccess(t('settings.saveSuccess'));
-    setTimeout(() => setSuccess(''), 3000);
   };
+
+  const [error, setError] = useState('');
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -110,6 +153,11 @@ export function SettingsPage() {
         <Alert className="bg-green-50 border-green-200 mb-6">
           <Check className="w-4 h-4 text-green-600" />
           <AlertDescription className="text-green-600">{success}</AlertDescription>
+        </Alert>
+      )}
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
@@ -289,7 +337,16 @@ export function SettingsPage() {
       </div>
 
       <div className="mt-8 flex justify-end">
-        <Button onClick={handleSave}>{t('settings.save')}</Button>
+        <Button onClick={handleSave} disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {t('common.saving')}
+            </>
+          ) : (
+            t('settings.save')
+          )}
+        </Button>
       </div>
     </div>
   );

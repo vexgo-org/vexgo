@@ -71,6 +71,14 @@ export const authApi = {
   updateEmail: (data: { email: string }) =>
     api.put('/auth/email', data),
 
+  updateSettings: (data: {
+    profile_visibility?: string;
+    hide_email?: boolean;
+    hide_birthday?: boolean;
+    hide_bio?: boolean
+  }) =>
+    api.put('/auth/settings', data),
+
   getVerificationStatus: () =>
     api.get<{ email_verified: boolean; email: string }>('/auth/verification-status'),
   

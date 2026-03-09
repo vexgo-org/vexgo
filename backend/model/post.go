@@ -39,6 +39,11 @@ type User struct {
 	PasswordVersion   int        `json:"-" gorm:"default:1"`                      // 密码版本，用于密码修改后使旧令牌失效
 	Birthday          string     `json:"birthday,omitempty"`                      // 生日
 	Bio               string     `json:"bio,omitempty"`                           // 个人简介
+	// 隐私设置
+	ProfileVisibility string `json:"profile_visibility,omitempty" gorm:"size:20;default:'public'"` // public/private
+	HideEmail         bool   `json:"hide_email,omitempty" gorm:"default:false"`                    // 隐藏邮箱
+	HideBirthday      bool   `json:"hide_birthday,omitempty" gorm:"default:false"`                 // 隐藏生日
+	HideBio           bool   `json:"hide_bio,omitempty" gorm:"default:false"`                      // 隐藏简介
 }
 
 type Tag struct {

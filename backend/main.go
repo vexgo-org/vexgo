@@ -74,6 +74,7 @@ func main() {
 			auth.PUT("/profile", middleware.JWTAuth(), handler.UpdateProfile)                        // PUT /api/auth/profile（更新个人信息）
 			auth.PUT("/password", middleware.JWTAuth(), handler.ChangePassword)                      // PUT /api/auth/password（修改密码）
 			auth.PUT("/email", middleware.JWTAuth(), handler.UpdateEmail)                            // PUT /api/auth/email（更新邮箱）
+			auth.PUT("/settings", middleware.JWTAuth(), handler.UpdateSettings)                      // PUT /api/auth/settings（更新用户设置）
 			auth.POST("/request-password-reset", handler.RequestPasswordReset)                       // POST /api/auth/request-password-reset（请求密码重置）
 			auth.POST("/reset-password", handler.ResetPassword)                                      // POST /api/auth/reset-password（重置密码）
 			auth.GET("/verification-status", middleware.JWTAuth(), handler.GetVerificationStatus)    // GET /api/auth/verification-status（获取验证状态）

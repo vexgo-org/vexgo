@@ -17,6 +17,39 @@ import (
 	"gorm.io/gorm"
 )
 
+// 根据隐私设置过滤用户信息
+func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
+	// 如果用户设置了隐私，需要根据查看者的身份来决定是否隐藏信息
+	// 目前实现：用户自己和管理员可以看到所有信息
+	// 其他用户根据隐私设置隐藏信息
+
+	// 检查查看者是否是用户自己或管理员
+	isSelf := viewerID == user.ID
+	isAdmin := viewerRole == model.RoleAdmin || viewerRole == model.RoleSuperAdmin
+
+	// 如果不是自己且不是管理员，则根据隐私设置过滤
+	if !isSelf && !isAdmin {
+		// 首先检查个人资料可见性设置
+		if user.ProfileVisibility == "private" {
+			// 如果设置为仅自己可见，则隐藏所有个人信息
+			user.Email = ""
+			user.Birthday = ""
+			user.Bio = ""
+		} else {
+			// 如果是公开，则根据单独的隐藏设置过滤
+			if user.HideEmail {
+				user.Email = ""
+			}
+			if user.HideBirthday {
+				user.Birthday = ""
+			}
+			if user.HideBio {
+				user.Bio = ""
+			}
+		}
+	}
+}
+
 // 验证滑动拼图验证码的公共函数
 func verifyCaptcha(captchaID, captchaToken string, captchaX int, markAsUsed bool) (*model.Captcha, error) {
 	// 查询验证码
@@ -353,6 +386,52 @@ func ChangePassword(c *gin.Context) {
 	user.PasswordVersion++
 	db.Save(&user)
 	c.JSON(http.StatusOK, gin.H{"message": "密码已修改"})
+}
+
+// 更新用户设置（隐私设置等）
+func UpdateSettings(c *gin.Context) {
+	var req struct {
+		ProfileVisibility *string `json:"profile_visibility"`
+		HideEmail         *bool   `json:"hide_email"`
+		HideBirthday      *bool   `json:"hide_birthday"`
+		HideBio           *bool   `json:"hide_bio"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	uid, _ := c.Get("userID")
+	userID := uid.(uint)
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		return
+	}
+
+	if req.ProfileVisibility != nil {
+		user.ProfileVisibility = *req.ProfileVisibility
+	}
+	if req.HideEmail != nil {
+		user.HideEmail = *req.HideEmail
+	}
+	if req.HideBirthday != nil {
+		user.HideBirthday = *req.HideBirthday
+	}
+	if req.HideBio != nil {
+		user.HideBio = *req.HideBio
+	}
+
+	if err := db.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存设置失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "设置已更新",
+		"user":    user,
+	})
 }
 
 // 更新邮箱

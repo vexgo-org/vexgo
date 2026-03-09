@@ -138,6 +138,11 @@ func GetPosts(c *gin.Context) {
 		var ccount int64
 		db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
 		posts[i].CommentsCount = int(ccount)
+
+		// 对作者应用隐私过滤（如果不是管理员且不是查看自己的文章）
+		if userRole != model.RoleAdmin && userRole != model.RoleSuperAdmin && posts[i].AuthorID != userID {
+			FilterUserByPrivacy(&posts[i].Author, userID, userRole)
+		}
 	}
 
 	// 4. 计算总页数
@@ -170,6 +175,32 @@ func GetPost(c *gin.Context) {
 		fmt.Printf("Error fetching post with ID %s: %v\n", id, err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在", "postId": id, "details": err.Error()})
 		return
+	}
+
+	// 获取当前用户信息（用于隐私过滤）
+	var currentUserRole string
+	var currentUserID uint
+	if uidVal, exists := c.Get("userID"); exists {
+		switch v := uidVal.(type) {
+		case uint:
+			currentUserID = v
+		case int:
+			currentUserID = uint(v)
+		case float64:
+			currentUserID = uint(v)
+		}
+	}
+	if userContext, exists := c.Get("user"); exists {
+		if userMap, ok := userContext.(map[string]interface{}); ok {
+			if role, ok := userMap["role"].(string); ok {
+				currentUserRole = role
+			}
+		}
+	}
+
+	// 对作者应用隐私过滤（如果不是管理员且不是查看自己的文章）
+	if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && post.AuthorID != currentUserID {
+		FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
 	}
 
 	// 增加浏览量（可选）
@@ -564,6 +595,12 @@ func GetUserPosts(c *gin.Context) {
 		var ccount int64
 		db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
 		posts[i].CommentsCount = int(ccount)
+
+		// 对作者应用隐私过滤
+		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && uint(userID) != currentUserID {
+			// 如果不是管理员且不是查看自己的文章，则应用隐私过滤
+			FilterUserByPrivacy(&posts[i].Author, currentUserID, currentUserRole)
+		}
 	}
 
 	totalPages := (int(total) + limit - 1) / limit

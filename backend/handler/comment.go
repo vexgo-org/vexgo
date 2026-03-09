@@ -19,6 +19,36 @@ func GetComments(c *gin.Context) {
 		Order("created_at ASC").
 		Find(&comments)
 
+	// 获取当前用户信息（用于隐私过滤）
+	var currentUserRole string
+	var currentUserID uint
+	if uidVal, exists := c.Get("userID"); exists {
+		switch v := uidVal.(type) {
+		case uint:
+			currentUserID = v
+		case int:
+			currentUserID = uint(v)
+		case float64:
+			currentUserID = uint(v)
+		}
+	}
+	if userContext, exists := c.Get("user"); exists {
+		if userMap, ok := userContext.(map[string]interface{}); ok {
+			if role, ok := userMap["role"].(string); ok {
+				currentUserRole = role
+			}
+		}
+	}
+
+	// 对评论作者应用隐私过滤
+	for i := range comments {
+		author := &comments[i].User
+		// 如果不是管理员且不是查看自己的评论，则应用隐私过滤
+		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && author.ID != currentUserID {
+			FilterUserByPrivacy(author, currentUserID, currentUserRole)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"comments": comments})
 }
 
