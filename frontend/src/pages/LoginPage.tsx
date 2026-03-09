@@ -311,12 +311,6 @@ export function LoginPage() {
               {t('loginPage.registerNow')}
             </Link>
           </div>
-
-          {/* 演示账号 */}
-          <div className="mt-6 p-4 bg-muted rounded-lg text-sm">
-            <p className="font-medium mb-2">{t('loginPage.demoAccount')}</p>
-            <p className="text-muted-foreground">{t('loginPage.demoAdmin')}</p>
-          </div>
         </CardContent>
       </Card>
 

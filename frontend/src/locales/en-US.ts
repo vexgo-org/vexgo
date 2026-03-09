@@ -521,8 +521,6 @@ export const enUS = {
     forgotPassword: 'Forgot password?',
     noAccount: "Don't have an account?",
     registerNow: 'Register now',
-    demoAccount: 'Demo Account:',
-    demoAdmin: 'Admin: admin@blog.com / admin123',
     completeCaptcha: 'Please complete the slider verification first',
     captchaCompleted: 'Verification completed',
     emailNotVerified: 'Email not verified',

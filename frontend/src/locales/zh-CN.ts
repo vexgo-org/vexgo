@@ -521,8 +521,6 @@ export const zhCN = {
     forgotPassword: '忘记密码？',
     noAccount: '还没有账号？',
     registerNow: '立即注册',
-    demoAccount: '演示账号：',
-    demoAdmin: '管理员：admin@blog.com / admin123',
     completeCaptcha: '请先完成滑块验证',
     captchaCompleted: '验证已完成',
     emailNotVerified: '邮箱未验证',

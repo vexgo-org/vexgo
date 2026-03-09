@@ -17,6 +17,14 @@ Select the corresponding system and architecture on the release page to download
 sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/antipeth/vexgo:latest
 ```
 
+Then, visit http://127.0.0.1:3001
+
+The Default super admin account: `admin@example.com`
+
+The Default super admin password: `password`
+
+You can change your account password on your profile page.
+
 ## Configuration
 
 Configuration priority: command-line arguments > configuration files > environment variables > default values
