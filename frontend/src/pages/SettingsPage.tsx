@@ -194,7 +194,7 @@ export function SettingsPage() {
               <Shield className="w-5 h-5" />
               {t('settings.privacySettings')}
             </CardTitle>
-            <CardDescription>{t('settings.privacySettings')}</CardDescription>
+	          <CardDescription>{t('settings.privacySettingsDesc') || t('settings.privacySettings')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -216,12 +216,12 @@ export function SettingsPage() {
             </div>
             
             <div className="space-y-4 pt-2">
-              <h3 className="text-sm font-medium">{t('settings.accountInfo')}</h3>
+              <h3 className="text-sm font-medium">{t('settings.personalInfoVisibility')}</h3>
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>{t('profile.email')}</Label>
-                  <p className="text-sm text-muted-foreground">{t('profile.avatar')} / {t('profile.email')}</p>
+	                <Label>{t('settings.hideEmail')}</Label>
+                  <p className="text-sm text-muted-foreground">{t('settings.hideEmailDesc')}</p>
                 </div>
                 <Switch
                   checked={hideEmail}
@@ -231,8 +231,8 @@ export function SettingsPage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>{t('profile.title')}</Label>
-                  <p className="text-sm text-muted-foreground">{t('profile.avatar')}</p>
+	                <Label>{t('settings.hideBirthday')}</Label>
+                  <p className="text-sm text-muted-foreground">{t('settings.hideBirthdayDesc')}</p>
                 </div>
                 <Switch
                   checked={hideBirthday}
@@ -242,8 +242,8 @@ export function SettingsPage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>{t('profile.updateProfile')}</Label>
-                  <p className="text-sm text-muted-foreground">{t('profile.avatar')}</p>
+                  <Label>{t('settings.hideBio')}</Label>
+                  <p className="text-sm text-muted-foreground">{t('settings.hideBioDesc')}</p>
                 </div>
                 <Switch
                   checked={hideBio}
