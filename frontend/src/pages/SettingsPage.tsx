@@ -15,24 +15,11 @@ export function SettingsPage() {
   const { locale, setLocale: setI18nLocale, t } = useTranslation();
   const [loading, setLoading] = useState(false);
   
-  // Retrieve saved settings from localStorage or use default values
-  const getSavedSetting = <T,>(key: string, defaultValue: T): T => {
-    const savedSettings = localStorage.getItem('userSettings');
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings);
-        return settings[key] !== undefined ? settings[key] : defaultValue;
-      } catch {
-        return defaultValue;
-      }
-    }
-    return defaultValue;
-  };
-
   // Display settings
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() =>
-    getSavedSetting('theme', 'light')
-  );
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return (savedTheme as 'light' | 'dark' | 'system') || 'light';
+  });
   const [language, setLanguage] = useState(() => {
     const savedLocale = localStorage.getItem('locale');
     return savedLocale === 'zh-CN' || savedLocale === 'en-US' ? savedLocale : locale;
@@ -40,32 +27,64 @@ export function SettingsPage() {
   
   // Privacy settings - 从 user 对象或 localStorage 初始化
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => {
-    const saved = getSavedSetting('profileVisibility', 'public');
+    const savedSettings = localStorage.getItem('userSettings');
     if (user?.profile_visibility) {
       return user.profile_visibility as 'public' | 'private';
     }
-    return saved;
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        return settings.profileVisibility !== undefined ? settings.profileVisibility : 'public';
+      } catch {
+        return 'public';
+      }
+    }
+    return 'public';
   });
   const [hideEmail, setHideEmail] = useState(() => {
-    const saved = getSavedSetting('hideEmail', false);
+    const savedSettings = localStorage.getItem('userSettings');
     if (user?.hide_email !== undefined) {
       return user.hide_email;
     }
-    return saved;
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        return settings.hideEmail !== undefined ? settings.hideEmail : false;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   });
   const [hideBirthday, setHideBirthday] = useState(() => {
-    const saved = getSavedSetting('hideBirthday', false);
+    const savedSettings = localStorage.getItem('userSettings');
     if (user?.hide_birthday !== undefined) {
       return user.hide_birthday;
     }
-    return saved;
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        return settings.hideBirthday !== undefined ? settings.hideBirthday : false;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   });
   const [hideBio, setHideBio] = useState(() => {
-    const saved = getSavedSetting('hideBio', false);
+    const savedSettings = localStorage.getItem('userSettings');
     if (user?.hide_bio !== undefined) {
       return user.hide_bio;
     }
-    return saved;
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        return settings.hideBio !== undefined ? settings.hideBio : false;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   });
   
   const [success, setSuccess] = useState('');
@@ -74,6 +93,24 @@ export function SettingsPage() {
   useEffect(() => {
     setI18nLocale(language);
   }, [language, setI18nLocale]);
+
+  // Apply theme when theme changes or on component mount
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark');
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (theme === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      // Follow the system to remove specific theme classes
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.add('light');
+      }
+    }
+  }, [theme]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -93,9 +130,11 @@ export function SettingsPage() {
         updateUser(response.data.user);
       }
       
-      // 保存其他设置到 localStorage
+      // 单独保存主题设置
+      localStorage.setItem('theme', theme);
+      
+      // 保存隐私设置到 localStorage
       const settings = {
-        theme,
         profileVisibility,
         hideEmail,
         hideBirthday,
@@ -103,24 +142,9 @@ export function SettingsPage() {
       };
       
       localStorage.setItem('userSettings', JSON.stringify(settings));
+      
       // 单独保存语言设置
       localStorage.setItem('locale', language);
-      
-      // Apply theme
-      document.documentElement.classList.remove('light', 'dark');
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else if (theme === 'light') {
-        document.documentElement.classList.add('light');
-      } else {
-        // Follow the system to remove specific theme classes
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (prefersDark) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.add('light');
-        }
-      }
       
       setSuccess(t('settings.saveSuccess'));
       setTimeout(() => setSuccess(''), 3000);
