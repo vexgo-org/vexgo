@@ -1,6 +1,6 @@
 package model
 
-// 角色常量定义
+// Role constant definitions
 const (
 	RoleSuperAdmin  = "super_admin"
 	RoleAdmin       = "admin"
@@ -9,22 +9,22 @@ const (
 	RoleGuest       = "guest"
 )
 
-// IsSuperAdmin 检查是否为超级管理员
+// IsSuperAdmin checks if user is super admin
 func IsSuperAdmin(user User) bool {
 	return user.Role == RoleSuperAdmin
 }
 
-// IsAdmin 检查是否为管理员（包括超级管理员）
+// IsAdmin checks if user is admin (including super admin)
 func IsAdmin(user User) bool {
 	return user.Role == RoleAdmin || user.Role == RoleSuperAdmin
 }
 
-// IsAuthor 检查是否为作者（包括管理员和超级管理员）
+// IsAuthor checks if user is author (including admin and super admin)
 func IsAuthor(user User) bool {
 	return user.Role == RoleAuthor || user.Role == RoleAdmin || user.Role == RoleSuperAdmin
 }
 
-// IsContributor 检查是否为投稿者（包括更高权限的角色）
+// IsContributor checks if user is contributor (including higher privilege roles)
 func IsContributor(user User) bool {
 	return user.Role == RoleContributor || user.Role == RoleAuthor ||
 		user.Role == RoleAdmin || user.Role == RoleSuperAdmin

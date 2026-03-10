@@ -148,7 +148,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		log.Println("Successfully connected to SQLite database")
 	}
 
-	// 自动迁移模型
+	// Auto-migrate models
 	if err := db.AutoMigrate(
 		&model.Post{},
 		&model.User{},
@@ -166,7 +166,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		log.Fatalf("auto migrate failed: %v", err)
 	}
 
-	// 创建一个默认超级管理员（如果不存在），使用 bcrypt 存储密码
+	// Create a default super admin (if not exists), store password using bcrypt
 	var u model.User
 	if err := db.Where("username = ?", "admin").First(&u).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -188,7 +188,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 				}
 			}
 
-			// 创建默认 SMTP 配置（如果不存在）
+			// Create default SMTP configuration (if not exists)
 			var smtpConfig model.SMTPConfig
 			if err := db.First(&smtpConfig).Error; err != nil {
 				if err == gorm.ErrRecordNotFound {
@@ -209,13 +209,13 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 				}
 			}
 
-			// 创建默认通用设置（如果不存在）
+			// Create default general settings (if not exists)
 			var generalSettings model.GeneralSettings
 			if err := db.First(&generalSettings).Error; err != nil {
 				if err == gorm.ErrRecordNotFound {
 					generalSettings = model.GeneralSettings{
-						CaptchaEnabled:      false, // 默认不启用滑块验证
-						RegistrationEnabled: true,  // 默认允许注册
+						CaptchaEnabled:      false, // Disable captcha by default
+						RegistrationEnabled: true,  // Allow registration by default
 						SiteName:            "VexGo",
 						SiteDescription:     "",
 						ItemsPerPage:        20,
@@ -230,7 +230,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		}
 	}
 
-	// 创建默认 AI 配置（如果不存在）
+	// Create default AI configuration (if not exists)
 	var aiConfig model.AIConfig
 	if err := db.First(&aiConfig).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -249,13 +249,13 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		}
 	}
 
-	// 创建一个默认分类（如果不存在）
+	// Create a default category (if not exists)
 	var defaultCategory model.Category
 	if err := db.Where("name = ?", "Default").First(&defaultCategory).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			defaultCategory = model.Category{
 				Name:        "Default",
-				Description: "默认分类，用于未指定分类的文章",
+				Description: "Default category for articles without a specified category",
 			}
 			if err := db.Create(&defaultCategory).Error; err != nil {
 				log.Printf("failed to create default category: %v", err)

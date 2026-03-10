@@ -13,7 +13,7 @@ import (
 
 var DataDir string
 
-// 获取文件扩展名
+// Get file extension
 func getFileExtension(filename string) string {
 	ext := filepath.Ext(filename)
 	if ext == "" {
@@ -22,7 +22,7 @@ func getFileExtension(filename string) string {
 	return ext
 }
 
-// 上传文件（需登录），并在数据库记录
+// Upload file (requires login) and record in database
 func UploadFile(c *gin.Context) {
 	var userID uint = 0
 	if uid, ok := c.Get("userID"); ok {
@@ -33,20 +33,20 @@ func UploadFile(c *gin.Context) {
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "文件上传失败"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File upload failed"})
 		return
 	}
 
-	// 创建上传目录（使用数据目录下的 media 文件夹）
+	// Create upload directory (using media folder in data directory)
 	uploadDir := filepath.Join(DataDir, "media")
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
 		os.MkdirAll(uploadDir, os.ModePerm)
 	}
 
-	// 获取文件扩展名
+	// Get file extension
 	ext := getFileExtension(file.Filename)
 
-	// 生成 UUID v4 作为文件名（保留扩展名）
+	// Generate UUID v4 as filename (preserve extension)
 	uuid := uuid.New().String()
 	var finalFilename string
 	if ext != "" {
@@ -55,12 +55,12 @@ func UploadFile(c *gin.Context) {
 		finalFilename = uuid
 	}
 
-	// 构建保存路径
+	// Build save path
 	fullPath := filepath.Join(uploadDir, finalFilename)
 
-	// 保存文件
+	// Save file
 	if err := c.SaveUploadedFile(file, fullPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件保存失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
 		return
 	}
 
@@ -75,12 +75,12 @@ func UploadFile(c *gin.Context) {
 	db.Create(&media)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "文件上传成功",
+		"message": "File uploaded successfully",
 		"file":    media,
 	})
 }
 
-// 上传多个文件（需登录），并记录到数据库
+// Upload multiple files (requires login) and record to database
 func UploadFiles(c *gin.Context) {
 	var userID uint = 0
 	if uid, ok := c.Get("userID"); ok {
@@ -91,7 +91,7 @@ func UploadFiles(c *gin.Context) {
 
 	form, err := c.MultipartForm()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "文件上传失败"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File upload failed"})
 		return
 	}
 
@@ -103,10 +103,10 @@ func UploadFiles(c *gin.Context) {
 
 	var uploadedFiles []model.MediaFile
 	for _, file := range files {
-		// 获取文件扩展名
+		// Get file extension
 		ext := getFileExtension(file.Filename)
 
-		// 生成 UUID v4 作为文件名
+		// Generate UUID v4 as filename
 		uuid := uuid.New().String()
 		var finalFilename string
 		if ext != "" {
@@ -117,7 +117,7 @@ func UploadFiles(c *gin.Context) {
 
 		fullPath := filepath.Join(uploadDir, finalFilename)
 
-		// 保存文件
+		// Save file
 		if err := c.SaveUploadedFile(file, fullPath); err != nil {
 			continue
 		}
@@ -133,12 +133,12 @@ func UploadFiles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "文件上传完成",
+		"message": "File upload completed",
 		"files":   uploadedFiles,
 	})
 }
 
-// 创建标签
+// Create tag
 func CreateTag(c *gin.Context) {
 	var req struct {
 		Name string `json:"name" binding:"required"`
@@ -154,17 +154,17 @@ func CreateTag(c *gin.Context) {
 	}
 
 	if err := db.Create(&tag).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建标签失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "标签创建成功",
+		"message": "Tag created successfully",
 		"tag":     tag,
 	})
 }
 
-// 获取当前用户上传的文件列表
+// Get current user's uploaded files list
 func GetMyFiles(c *gin.Context) {
 	uid, _ := c.Get("userID")
 	userID := uid.(uint)
@@ -173,12 +173,12 @@ func GetMyFiles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"files": files})
 }
 
-// 删除文件（需是上传者或管理员）
+// Delete file (must be uploader or admin)
 func DeleteFile(c *gin.Context) {
 	id := c.Param("id")
 	var media model.MediaFile
 	if err := db.First(&media, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文件不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "File does not exist"})
 		return
 	}
 
@@ -187,16 +187,16 @@ func DeleteFile(c *gin.Context) {
 	var user model.User
 	if err := db.First(&user, userID).Error; err == nil {
 		if user.Role != "admin" && media.UserID != userID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "无权删除该文件"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this file"})
 			return
 		}
 	}
 
-	// 删除物理文件
-	// media.URL 格式为 "/uploads/filename"，需要转换为实际路径
+	// Delete physical file
+	// media.URL format is "/uploads/filename", need to convert to actual path
 	filename := filepath.Base(media.URL)
 	path := filepath.Join(DataDir, "media", filename)
 	os.Remove(path)
 	db.Delete(&media)
-	c.JSON(http.StatusOK, gin.H{"message": "文件已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
 }

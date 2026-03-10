@@ -11,40 +11,40 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetCommentModerationConfig 获取评论审核配置
+// GetCommentModerationConfig gets comment moderation configuration
 func GetCommentModerationConfig(c *gin.Context) {
 	var config model.CommentModerationConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 返回默认配置
+			// Return default configuration
 			c.JSON(http.StatusOK, model.CommentModerationConfig{
 				Enabled:            false,
 				ModelProvider:      "",
 				ApiKey:             "",
 				ApiEndpoint:        "",
 				ModelName:          "gpt-3.5-turbo",
-				ModerationPrompt:   "请审核以下评论内容是否合规。如果评论包含违法不良信息、人身攻击、色情低俗等内容，请返回 'REJECT'；如果评论合规，请返回 'APPROVE'。只需返回结果，不要解释。\n\n评论内容：\n{{content}}",
+				ModerationPrompt:   "Please review the following comment for compliance. If the comment contains illegal content, personal attacks, or inappropriate material, return 'REJECT'; if the comment is compliant, return 'APPROVE'. Only return the result, no explanation.\n\nComment content:\n{{content}}",
 				BlockKeywords:      "",
 				AutoApproveEnabled: true,
 				MinScoreThreshold:  0.5,
 			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取评论审核配置失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment moderation configuration"})
 		return
 	}
 
-	// 不返回敏感信息如API密钥
+	// Don't return sensitive information like API key
 	config.ApiKey = ""
 	c.JSON(http.StatusOK, config)
 }
 
-// UpdateCommentModerationConfig 更新评论审核配置
+// UpdateCommentModerationConfig updates comment moderation configuration
 func UpdateCommentModerationConfig(c *gin.Context) {
 	var req struct {
 		Enabled            bool    `json:"enabled"`
 		ModelProvider      string  `json:"modelProvider"`
-		ApiKey             string  `json:"apiKey"` // 如果为空则不更新
+		ApiKey             string  `json:"apiKey"` // if empty, don't update
 		ApiEndpoint        string  `json:"apiEndpoint"`
 		ModelName          string  `json:"modelName"`
 		ModerationPrompt   string  `json:"moderationPrompt"`
@@ -58,11 +58,11 @@ func UpdateCommentModerationConfig(c *gin.Context) {
 		return
 	}
 
-	// 获取现有配置
+	// Get existing configuration
 	var config model.CommentModerationConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 创建新配置
+			// Create new configuration
 			config = model.CommentModerationConfig{
 				Enabled:            req.Enabled,
 				ModelProvider:      req.ModelProvider,
@@ -75,15 +75,15 @@ func UpdateCommentModerationConfig(c *gin.Context) {
 				MinScoreThreshold:  req.MinScoreThreshold,
 			}
 			if err := db.Create(&config).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "创建评论审核配置失败"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment moderation configuration"})
 				return
 			}
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取评论审核配置失败"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment moderation configuration"})
 			return
 		}
 	} else {
-		// 更新现有配置
+		// Update existing configuration
 		config.Enabled = req.Enabled
 		config.ModelProvider = req.ModelProvider
 		config.ApiEndpoint = req.ApiEndpoint
@@ -93,26 +93,26 @@ func UpdateCommentModerationConfig(c *gin.Context) {
 		config.AutoApproveEnabled = req.AutoApproveEnabled
 		config.MinScoreThreshold = req.MinScoreThreshold
 
-		// 只有当提供了新API密钥时才更新
+		// Only update if new API key is provided
 		if req.ApiKey != "" {
 			config.ApiKey = req.ApiKey
 		}
 
 		if err := db.Save(&config).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新评论审核配置失败"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment moderation configuration"})
 			return
 		}
 	}
 
-	// 不返回敏感信息
+	// Don't return sensitive information
 	config.ApiKey = ""
 	c.JSON(http.StatusOK, gin.H{
-		"message": "评论审核配置更新成功",
+		"message": "Comment moderation configuration updated successfully",
 		"config":  config,
 	})
 }
 
-// GetPendingComments 获取待审核评论
+// GetPendingComments gets pending comments for moderation
 func GetPendingComments(c *gin.Context) {
 	var comments []model.Comment
 
@@ -163,7 +163,7 @@ func GetPendingComments(c *gin.Context) {
 	})
 }
 
-// GetApprovedComments 获取已通过审核的评论
+// GetApprovedComments gets approved comments
 func GetApprovedComments(c *gin.Context) {
 	var comments []model.Comment
 
@@ -214,7 +214,7 @@ func GetApprovedComments(c *gin.Context) {
 	})
 }
 
-// GetRejectedComments 获取已拒绝的评论
+// GetRejectedComments gets rejected comments
 func GetRejectedComments(c *gin.Context) {
 	var comments []model.Comment
 
@@ -265,81 +265,81 @@ func GetRejectedComments(c *gin.Context) {
 	})
 }
 
-// ApproveComment 批准评论
+// ApproveComment approves a comment
 func ApproveComment(c *gin.Context) {
 	id := c.Param("id")
 	var comment model.Comment
 	if err := db.First(&comment, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "评论不存在"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取评论失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment"})
 		return
 	}
 
 	comment.Status = "published"
 	if err := db.Save(&comment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "批准评论失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve comment"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "评论已批准",
+		"message": "Comment approved",
 		"comment": comment,
 	})
 }
 
-// RejectComment 拒绝评论
+// RejectComment rejects a comment
 func RejectComment(c *gin.Context) {
 	id := c.Param("id")
 	var comment model.Comment
 	if err := db.First(&comment, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "评论不存在"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取评论失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment"})
 		return
 	}
 
 	comment.Status = "rejected"
 	if err := db.Save(&comment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "拒绝评论失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject comment"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "评论已拒绝",
+		"message": "Comment rejected",
 		"comment": comment,
 	})
 }
 
-// ModerateCommentAI 使用模拟AI审核（实际项目中应替换为真实AI API调用）
+// ModerateCommentAI uses simulated AI moderation (should be replaced with real AI API call in production)
 func ModerateCommentAI(content string, config model.CommentModerationConfig) (bool, string, error) {
 	if !config.Enabled {
-		return true, "", nil // 如果未启用，则自动批准
+		return true, "", nil // if not enabled, auto approve
 	}
 
-	// 检查屏蔽关键词
+	// Check blocked keywords
 	if config.BlockKeywords != "" {
 		keywords := strings.Split(config.BlockKeywords, ",")
 		for _, keyword := range keywords {
 			keyword = strings.TrimSpace(keyword)
 			if keyword != "" && strings.Contains(strings.ToLower(content), strings.ToLower(keyword)) {
-				return false, "包含屏蔽关键词: " + keyword, nil
+				return false, "Contains blocked keyword: " + keyword, nil
 			}
 		}
 	}
 
-	// 模拟AI审核逻辑（在实际项目中应替换为真实的AI API调用）
-	// 这里只是简单的关键词检查作为示例
+	// Simulate AI moderation logic (should be replaced with real AI API call in production)
+	// This is just a simple keyword check as an example
 	lowerContent := strings.ToLower(content)
 	if strings.Contains(lowerContent, "垃圾") || strings.Contains(lowerContent, "spam") ||
 		strings.Contains(lowerContent, "广告") || strings.Contains(lowerContent, "ad") {
-		return false, "AI检测到不合规内容", nil
+		return false, "AI detected non-compliant content", nil
 	}
 
-	// 模拟AI审核通过
+	// Simulate AI moderation approval
 	return true, "", nil
 }

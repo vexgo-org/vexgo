@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetPendingPosts 获取待审核的文章列表
+// GetPendingPosts gets pending posts for moderation
 func GetPendingPosts(c *gin.Context) {
 	var posts []model.Post
 
@@ -45,23 +45,23 @@ func GetPendingPosts(c *gin.Context) {
 	})
 }
 
-// ApprovePost 审核通过文章
+// ApprovePost approves a post
 func ApprovePost(c *gin.Context) {
 	id := c.Param("id")
 	var post model.Post
 	if err := db.Preload("Tags").First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
 		return
 	}
 
-	// 更新文章状态为已发布
+	// Update post status to published
 	post.Status = "published"
 	db.Save(&post)
 
-	c.JSON(http.StatusOK, gin.H{"message": "文章审核通过", "post": post})
+	c.JSON(http.StatusOK, gin.H{"message": "Post approved", "post": post})
 }
 
-// RejectPost 拒绝文章
+// RejectPost rejects a post
 func RejectPost(c *gin.Context) {
 	id := c.Param("id")
 
@@ -70,25 +70,25 @@ func RejectPost(c *gin.Context) {
 		RejectionReason string `json:"rejectionReason"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request parameters"})
 		return
 	}
 
 	var post model.Post
 	if err := db.First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
 		return
 	}
 
-	// 更新文章状态为已拒绝，并记录拒绝原因
+	// Update post status to rejected and record rejection reason
 	post.Status = "rejected"
 	post.RejectionReason = req.RejectionReason
 	db.Save(&post)
 
-	c.JSON(http.StatusOK, gin.H{"message": "文章已被拒绝", "post": post})
+	c.JSON(http.StatusOK, gin.H{"message": "Post has been rejected", "post": post})
 }
 
-// GetApprovedPosts 获取已通过的文章列表
+// GetApprovedPosts gets approved posts list
 func GetApprovedPosts(c *gin.Context) {
 	var posts []model.Post
 
@@ -124,30 +124,30 @@ func GetApprovedPosts(c *gin.Context) {
 	})
 }
 
-// ResubmitPost 重新提交文章审核
+// ResubmitPost resubmits post for moderation
 func ResubmitPost(c *gin.Context) {
 	id := c.Param("id")
 	var post model.Post
 	if err := db.Preload("Tags").First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
 		return
 	}
 
-	// 检查文章状态是否为已拒绝
+	// Check if post status is rejected
 	if post.Status != "rejected" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "只有已拒绝的文章才能重新提交审核"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only rejected posts can be resubmitted for moderation"})
 		return
 	}
 
-	// 更新文章状态为待审核，并清除拒绝原因
+	// Update post status to pending and clear rejection reason
 	post.Status = "pending"
 	post.RejectionReason = ""
 	db.Save(&post)
 
-	c.JSON(http.StatusOK, gin.H{"message": "文章已重新提交审核", "post": post})
+	c.JSON(http.StatusOK, gin.H{"message": "Post resubmitted for moderation", "post": post})
 }
 
-// GetRejectedPosts 获取已拒绝的文章列表
+// GetRejectedPosts gets rejected posts list
 func GetRejectedPosts(c *gin.Context) {
 	var posts []model.Post
 

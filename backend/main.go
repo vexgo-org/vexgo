@@ -13,154 +13,154 @@ import (
 )
 
 func main() {
-	// 1. 解析命令行参数
+	// 1. Parse command line arguments
 	cfg := cmd.ParseFlags()
 
-	// 2. 初始化配置（加载JWT密钥等，支持配置文件和环境变量）
+	// 2. Initialize configuration (load JWT secret, etc., support config files and environment variables)
 	config.Init(cfg.JWTSecret)
 
-	// 设置数据目录（用于文件上传）
+	// Set data directory (for file uploads)
 	handler.DataDir = cfg.DataDir
 
-	// 3. 初始化数据库连接（确保数据库驱动、连接串配置正确）
+	// 3. Initialize database connection (ensure database driver and connection string are configured correctly)
 	handler.InitDB(cfg, cfg.DataDir)
-	// 设置数据库连接到认证中间件
+	// Set database connection to authentication middleware
 	middleware.SetDB(handler.DB())
 
-	// 4. 创建Gin引擎实例（默认包含Logger和Recovery中间件）
+	// 4. Create Gin engine instance (includes Logger and Recovery middleware by default)
 	r := gin.Default()
 
-	// ===================== 核心API路由分组（所有接口都在/api下） =====================
-	// 匹配前端Axios的baseURL: /api，确保所有前端API请求都能命中
+	// ===================== Core API routing group (all endpoints under /api) =====================
+	// Match frontend Axios baseURL: /api, ensure all frontend API requests are handled
 	api := r.Group("/api")
-	// 可选 JWT 中间件：公开接口在收到 Authorization 时能识别登录用户
+	// Optional JWT middleware: public endpoints can identify logged-in users when Authorization header is present
 	api.Use(middleware.OptionalJWTAuth())
 	{
-		// -------------------- 公开API（无需JWT认证） --------------------
-		// 文章相关公开接口
-		api.GET("/posts", handler.GetPosts)    // GET /api/posts（获取文章列表）
-		api.GET("/posts/:id", handler.GetPost) // GET /api/posts/:id（获取单篇文章）
+		// -------------------- Public API (no JWT authentication required) --------------------
+		// Public endpoints related to posts
+		api.GET("/posts", handler.GetPosts)    // GET /api/posts (get posts list)
+		api.GET("/posts/:id", handler.GetPost) // GET /api/posts/:id (get single post)
 
-		// 邮箱验证公开接口
-		api.GET("/verify-email", handler.VerifyEmail) // GET /api/verify-email（验证邮箱）
+		// Email verification public endpoints
+		api.GET("/verify-email", handler.VerifyEmail) // GET /api/verify-email (verify email)
 
-		// 滑动拼图验证公开接口
-		api.GET("/captcha", handler.GenerateCaptcha)       // GET /api/captcha（生成滑动拼图验证码）
-		api.POST("/captcha/verify", handler.VerifyCaptcha) // POST /api/captcha/verify（验证滑动拼图）
+		// Sliding puzzle captcha public endpoints
+		api.GET("/captcha", handler.GenerateCaptcha)       // GET /api/captcha (generate sliding puzzle captcha)
+		api.POST("/captcha/verify", handler.VerifyCaptcha) // POST /api/captcha/verify (verify sliding puzzle)
 
-		// 分类/标签公开接口
-		api.GET("/categories", handler.GetCategories) // GET /api/categories（获取分类列表）
-		api.GET("/tags", handler.GetTags)             // GET /api/tags（获取标签列表）
+		// Category/Tag public endpoints
+		api.GET("/categories", handler.GetCategories) // GET /api/categories (get categories list)
+		api.GET("/tags", handler.GetTags)             // GET /api/tags (get tags list)
 
-		// 统计相关公开接口
-		api.GET("/stats", handler.GetStats)                      // GET /api/stats（获取统计数据）
+		// Statistics related public endpoints
+		api.GET("/stats", handler.GetStats)                      // GET /api/stats (get statistics)
 		api.GET("/stats/popular-posts", handler.GetPopularPosts) // GET /api/stats/popular-posts
 		api.GET("/stats/latest-posts", handler.GetLatestPosts)   // GET /api/stats/latest-posts
 
-		// 评论/点赞公开接口
-		api.GET("/comments/post/:id", handler.GetComments) // GET /api/comments/post/:id（获取文章评论）
-		api.GET("/likes/:postId", handler.GetLikeStatus)   // GET /api/likes/:postId（获取点赞状态）
-		// 获取用户文章列表
-		api.GET("/posts/user/:id", handler.GetUserPosts) // GET /api/posts/user/:id（获取指定用户的文章）
+		// Comment/Like public endpoints
+		api.GET("/comments/post/:id", handler.GetComments) // GET /api/comments/post/:id (get post comments)
+		api.GET("/likes/:postId", handler.GetLikeStatus)   // GET /api/likes/:postId (get like status)
+		// Get user posts list
+		api.GET("/posts/user/:id", handler.GetUserPosts) // GET /api/posts/user/:id (get specified user's posts)
 
-		// -------------------- 认证相关API（/api/auth子分组） --------------------
-		// 匹配前端authApi的所有接口：/api/auth/xxx
+		// -------------------- Authentication related API (/api/auth subgroup) --------------------
+		// Match all frontend authApi endpoints: /api/auth/xxx
 		auth := api.Group("/auth")
 		{
-			auth.POST("/register", handler.Register)                                                 // POST /api/auth/register（注册）
-			auth.POST("/login", handler.Login)                                                       // POST /api/auth/login（登录）
-			auth.GET("/me", middleware.JWTAuth(), handler.GetCurrentUser)                            // GET /api/auth/me（获取当前用户，需认证）
-			auth.GET("/user", middleware.JWTAuth(), handler.GetCurrentUser)                          // 向后兼容：/api/auth/user
-			auth.PUT("/profile", middleware.JWTAuth(), handler.UpdateProfile)                        // PUT /api/auth/profile（更新个人信息）
-			auth.PUT("/password", middleware.JWTAuth(), handler.ChangePassword)                      // PUT /api/auth/password（修改密码）
-			auth.PUT("/email", middleware.JWTAuth(), handler.UpdateEmail)                            // PUT /api/auth/email（更新邮箱）
-			auth.PUT("/settings", middleware.JWTAuth(), handler.UpdateSettings)                      // PUT /api/auth/settings（更新用户设置）
-			auth.POST("/request-password-reset", handler.RequestPasswordReset)                       // POST /api/auth/request-password-reset（请求密码重置）
-			auth.POST("/reset-password", handler.ResetPassword)                                      // POST /api/auth/reset-password（重置密码）
-			auth.GET("/verification-status", middleware.JWTAuth(), handler.GetVerificationStatus)    // GET /api/auth/verification-status（获取验证状态）
-			auth.POST("/resend-verification", middleware.JWTAuth(), handler.ResendVerificationEmail) // POST /api/auth/resend-verification（重新发送验证邮件）
+			auth.POST("/register", handler.Register)                                                 // POST /api/auth/register (register)
+			auth.POST("/login", handler.Login)                                                       // POST /api/auth/login (login)
+			auth.GET("/me", middleware.JWTAuth(), handler.GetCurrentUser)                            // GET /api/auth/me (get current user, requires authentication)
+			auth.GET("/user", middleware.JWTAuth(), handler.GetCurrentUser)                          // backward compatibility: /api/auth/user
+			auth.PUT("/profile", middleware.JWTAuth(), handler.UpdateProfile)                        // PUT /api/auth/profile (update profile)
+			auth.PUT("/password", middleware.JWTAuth(), handler.ChangePassword)                      // PUT /api/auth/password (change password)
+			auth.PUT("/email", middleware.JWTAuth(), handler.UpdateEmail)                            // PUT /api/auth/email (update email)
+			auth.PUT("/settings", middleware.JWTAuth(), handler.UpdateSettings)                      // PUT /api/auth/settings (update user settings)
+			auth.POST("/request-password-reset", handler.RequestPasswordReset)                       // POST /api/auth/request-password-reset (request password reset)
+			auth.POST("/reset-password", handler.ResetPassword)                                      // POST /api/auth/reset-password (reset password)
+			auth.GET("/verification-status", middleware.JWTAuth(), handler.GetVerificationStatus)    // GET /api/auth/verification-status (get verification status)
+			auth.POST("/resend-verification", middleware.JWTAuth(), handler.ResendVerificationEmail) // POST /api/auth/resend-verification (resend verification email)
 		}
 
-		// -------------------- 需要JWT认证的业务API --------------------
-		// 文章操作（需登录）
-		api.POST("/posts", middleware.JWTAuth(), handler.CreatePost)              // POST /api/posts（创建文章）
-		api.GET("/posts/user/my-posts", middleware.JWTAuth(), handler.GetMyPosts) // GET /api/posts/user/my-posts（我的文章）
-		api.GET("/posts/drafts", middleware.JWTAuth(), handler.GetDraftPosts)     // GET /api/posts/drafts（草稿文章）
-		api.PUT("/posts/:id", middleware.JWTAuth(), handler.UpdatePost)           // PUT /api/posts/:id（更新文章）
-		api.DELETE("/posts/:id", middleware.JWTAuth(), handler.DeletePost)        // DELETE /api/posts/:id（删除文章）
+		// -------------------- Business API requiring JWT authentication --------------------
+		// Post operations (requires login)
+		api.POST("/posts", middleware.JWTAuth(), handler.CreatePost)              // POST /api/posts (create post)
+		api.GET("/posts/user/my-posts", middleware.JWTAuth(), handler.GetMyPosts) // GET /api/posts/user/my-posts (my posts)
+		api.GET("/posts/drafts", middleware.JWTAuth(), handler.GetDraftPosts)     // GET /api/posts/drafts (draft posts)
+		api.PUT("/posts/:id", middleware.JWTAuth(), handler.UpdatePost)           // PUT /api/posts/:id (update post)
+		api.DELETE("/posts/:id", middleware.JWTAuth(), handler.DeletePost)        // DELETE /api/posts/:id (delete post)
 
-		// 分类/标签操作（需登录）
-		api.POST("/categories", middleware.JWTAuth(), handler.CreateCategory) // POST /api/categories（创建分类）
-		api.POST("/tags", middleware.JWTAuth(), handler.CreateTag)            // POST /api/tags（创建标签）
+		// Category/Tag operations (requires login)
+		api.POST("/categories", middleware.JWTAuth(), handler.CreateCategory) // POST /api/categories (create category)
+		api.POST("/tags", middleware.JWTAuth(), handler.CreateTag)            // POST /api/tags (create tag)
 
-		// 评论操作（需登录）
-		api.POST("/comments", middleware.JWTAuth(), handler.CreateComment)       // POST /api/comments（创建评论）
-		api.DELETE("/comments/:id", middleware.JWTAuth(), handler.DeleteComment) // DELETE /api/comments/:id（删除评论）
+		// Comment operations (requires login)
+		api.POST("/comments", middleware.JWTAuth(), handler.CreateComment)       // POST /api/comments (create comment)
+		api.DELETE("/comments/:id", middleware.JWTAuth(), handler.DeleteComment) // DELETE /api/comments/:id (delete comment)
 
-		// 评论审核相关API（需要管理员权限）
-		api.GET("/moderation/comments/pending", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetPendingComments)           // GET /api/moderation/comments/pending（获取待审核评论）
-		api.GET("/moderation/comments/approved", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetApprovedComments)         // GET /api/moderation/comments/approved（获取已通过评论）
-		api.GET("/moderation/comments/rejected", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetRejectedComments)         // GET /api/moderation/comments/rejected（获取已拒绝评论）
-		api.PUT("/moderation/comments/approve/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ApproveComment)           // PUT /api/moderation/comments/approve/:id（审核通过评论）
-		api.PUT("/moderation/comments/reject/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.RejectComment)             // PUT /api/moderation/comments/reject/:id（拒绝评论）
-		api.GET("/moderation/comments/config", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetCommentModerationConfig)    // GET /api/moderation/comments/config（获取评论审核配置）
-		api.PUT("/moderation/comments/config", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateCommentModerationConfig) // PUT /api/moderation/comments/config（更新评论审核配置）
+		// Comment moderation related API (requires admin permission)
+		api.GET("/moderation/comments/pending", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetPendingComments)           // GET /api/moderation/comments/pending (get pending comments)
+		api.GET("/moderation/comments/approved", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetApprovedComments)         // GET /api/moderation/comments/approved (get approved comments)
+		api.GET("/moderation/comments/rejected", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetRejectedComments)         // GET /api/moderation/comments/rejected (get rejected comments)
+		api.PUT("/moderation/comments/approve/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ApproveComment)           // PUT /api/moderation/comments/approve/:id (approve comment)
+		api.PUT("/moderation/comments/reject/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.RejectComment)             // PUT /api/moderation/comments/reject/:id (reject comment)
+		api.GET("/moderation/comments/config", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetCommentModerationConfig)    // GET /api/moderation/comments/config (get comment moderation config)
+		api.PUT("/moderation/comments/config", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateCommentModerationConfig) // PUT /api/moderation/comments/config (update comment moderation config)
 
-		// 点赞操作（需登录）
-		api.POST("/likes/:postId", middleware.JWTAuth(), handler.ToggleLike) // POST /api/likes/:postId（切换点赞）
+		// Like operations (requires login)
+		api.POST("/likes/:postId", middleware.JWTAuth(), handler.ToggleLike) // POST /api/likes/:postId (toggle like)
 
-		// 上传文件操作（需登录）
-		api.POST("/upload/file", middleware.JWTAuth(), handler.UploadFile)    // POST /api/upload/file（单文件上传）
-		api.POST("/upload/files", middleware.JWTAuth(), handler.UploadFiles)  // POST /api/upload/files（多文件上传）
-		api.GET("/upload/my-files", middleware.JWTAuth(), handler.GetMyFiles) // GET /api/upload/my-files（我的文件）
-		api.DELETE("/upload/:id", middleware.JWTAuth(), handler.DeleteFile)   // DELETE /api/upload/:id（删除文件）
+		// File upload operations (requires login)
+		api.POST("/upload/file", middleware.JWTAuth(), handler.UploadFile)    // POST /api/upload/file (single file upload)
+		api.POST("/upload/files", middleware.JWTAuth(), handler.UploadFiles)  // POST /api/upload/files (multiple files upload)
+		api.GET("/upload/my-files", middleware.JWTAuth(), handler.GetMyFiles) // GET /api/upload/my-files (my files)
+		api.DELETE("/upload/:id", middleware.JWTAuth(), handler.DeleteFile)   // DELETE /api/upload/:id (delete file)
 
-		// 文章审核相关API（需要管理员权限）
-		api.GET("/moderation/pending", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetPendingPosts)   // GET /api/moderation/pending（获取待审核文章）
-		api.GET("/moderation/approved", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetApprovedPosts) // GET /api/moderation/approved（获取已通过文章）
-		api.GET("/moderation/rejected", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetRejectedPosts) // GET /api/moderation/rejected（获取已拒绝文章）
-		api.PUT("/moderation/approve/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ApprovePost)   // PUT /api/moderation/approve/:id（审核通过文章）
-		api.PUT("/moderation/reject/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.RejectPost)     // PUT /api/moderation/reject/:id（拒绝文章）
-		api.PUT("/moderation/resubmit/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ResubmitPost) // PUT /api/moderation/resubmit/:id（重新提交审核文章）
+		// Post moderation related API (requires admin permission)
+		api.GET("/moderation/pending", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetPendingPosts)   // GET /api/moderation/pending (get pending posts)
+		api.GET("/moderation/approved", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetApprovedPosts) // GET /api/moderation/approved (get approved posts)
+		api.GET("/moderation/rejected", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetRejectedPosts) // GET /api/moderation/rejected (get rejected posts)
+		api.PUT("/moderation/approve/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ApprovePost)   // PUT /api/moderation/approve/:id (approve post)
+		api.PUT("/moderation/reject/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.RejectPost)     // PUT /api/moderation/reject/:id (reject post)
+		api.PUT("/moderation/resubmit/:id", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.ResubmitPost) // PUT /api/moderation/resubmit/:id (resubmit post for moderation)
 
-		// 用户管理相关API（需要管理员权限）
-		api.GET("/users", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetUserList)             // GET /api/users（获取用户列表）
-		api.PUT("/users/:id/role", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateUserRole) // PUT /api/users/:id/role（更新用户角色）
+		// User management related API (requires admin permission)
+		api.GET("/users", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetUserList)             // GET /api/users (get user list)
+		api.PUT("/users/:id/role", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateUserRole) // PUT /api/users/:id/role (update user role)
 
-		// SMTP 配置相关API（需要管理员权限）
-		api.GET("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetSMTPConfig)    // GET /api/config/smtp（获取SMTP配置）
-		api.PUT("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateSMTPConfig) // PUT /api/config/smtp（更新SMTP配置）
-		api.POST("/config/smtp/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestSMTP)   // POST /api/config/smtp/test（测试SMTP配置）
+		// SMTP configuration related API (requires admin permission)
+		api.GET("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetSMTPConfig)    // GET /api/config/smtp (get SMTP config)
+		api.PUT("/config/smtp", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateSMTPConfig) // PUT /api/config/smtp (update SMTP config)
+		api.POST("/config/smtp/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestSMTP)   // POST /api/config/smtp/test (test SMTP config)
 
-		// AI 配置相关API（需要管理员权限）
-		api.GET("/config/ai", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetAIConfig)        // GET /api/config/ai（获取AI配置）
-		api.PUT("/config/ai", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateAIConfig)     // PUT /api/config/ai（更新AI配置）
-		api.POST("/config/ai/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestAI)       // POST /api/config/ai/test（测试AI配置）
-		api.GET("/config/ai/models", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetAIModels) // GET /api/config/ai/models（获取模型列表）
+		// AI configuration related API (requires admin permission)
+		api.GET("/config/ai", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetAIConfig)        // GET /api/config/ai (get AI config)
+		api.PUT("/config/ai", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateAIConfig)     // PUT /api/config/ai (update AI config)
+		api.POST("/config/ai/test", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.TestAI)       // POST /api/config/ai/test (test AI config)
+		api.GET("/config/ai/models", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.GetAIModels) // GET /api/config/ai/models (get model list)
 
-		// 通用设置相关API（GET公开，PUT需要管理员权限）
-		api.GET("/config/general", handler.GetGeneralSettings)                                                                                   // GET /api/config/general（获取通用设置，公开）
-		api.PUT("/config/general", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateGeneralSettings) // PUT /api/config/general（更新通用设置，需要管理员权限）
+		// General settings related API (GET public, PUT requires admin permission)
+		api.GET("/config/general", handler.GetGeneralSettings)                                                                                   // GET /api/config/general (get general settings, public)
+		api.PUT("/config/general", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), handler.UpdateGeneralSettings) // PUT /api/config/general (update general settings, requires admin permission)
 	}
 
-	// ===================== 静态文件托管（必须在API路由之后） =====================
-	// 1. 托管上传的文件：前端访问 /uploads/xxx 对应后端数据目录下的 media 文件夹
+	// ===================== Static file hosting (must be after API routes) =====================
+	// 1. Host uploaded files: frontend access /uploads/xxx corresponds to media folder in backend data directory
 	mediaDir := filepath.Join(cfg.DataDir, "media")
 	r.Static("/uploads", mediaDir)
 
-	// 2. 托管前端打包后的静态资源：使用嵌入的文件系统
-	// 将嵌入的 dist 目录挂载到 /assets 路径
+	// 2. Host frontend built static assets: using embedded file system
+	// Mount embedded dist directory to /assets path
 	r.GET("/assets/*filepath", func(c *gin.Context) {
-		// 去掉 /assets 前缀
+		// Remove /assets prefix
 		file := strings.TrimPrefix(c.Param("filepath"), "/")
-		// 读取嵌入的文件，需要加上 assets 前缀，因为文件在 dist/assets/ 下
+		// Read embedded file, need to add assets prefix because files are under dist/assets/
 		// Use forward slashes for embed.FS compatibility across platforms
 		content, err := public.ReadAsset("assets/" + file)
 		if err != nil {
 			c.Status(404)
 			return
 		}
-		// 根据文件扩展名设置 Content-Type
+		// Set Content-Type based on file extension
 		ext := filepath.Ext(file)
 		switch ext {
 		case ".js":
@@ -190,24 +190,24 @@ func main() {
 		}
 	})
 
-	// 3. 前端入口页面：根路径 / 返回嵌入的index.html
+	// 3. Frontend entry page: root path / returns embedded index.html
 	r.GET("/", func(c *gin.Context) {
 		c.Data(200, "text/html; charset=utf-8", public.GetIndexHTML())
 	})
 
-	// ===================== 前端SPA路由兼容（最后定义） =====================
-	// 处理React/Vue的客户端路由（如 /login、/posts/1 等）
-	// 必须放在所有API和静态文件路由之后，确保API请求优先匹配
+	// ===================== Frontend SPA route compatibility (defined last) =====================
+	// Handle React/Vue client-side routes (like /login, /posts/1, etc.)
+	// Must be placed after all API and static file routes to ensure API requests are matched first
 	r.NoRoute(func(c *gin.Context) {
-		// 对于非API请求，返回嵌入的index.html以支持前端路由
+		// For non-API requests, return embedded index.html to support frontend routing
 		if !strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.Data(200, "text/html; charset=utf-8", public.GetIndexHTML())
 			return
 		}
-		// API请求未匹配，返回404
+		// API request not matched, return 404
 		c.JSON(404, gin.H{"error": "Not Found"})
 	})
 
-	// 启动HTTP服务，监听配置的地址和端口
+	// Start HTTP service, listen on configured address and port
 	r.Run(cfg.GetListenAddr())
 }

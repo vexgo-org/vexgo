@@ -12,28 +12,28 @@ import (
 	"gorm.io/gorm"
 )
 
-// 获取文章列表（支持分页、搜索、分类筛选）
+// Get posts list (supports pagination, search, category filtering)
 func GetPosts(c *gin.Context) {
 	var posts []model.Post
 
-	// 1. 分页参数（增加错误处理，避免非法值）
+	// 1. Pagination parameters (add error handling to avoid invalid values)
 	pageStr := c.DefaultQuery("page", "1")
 	limitStr := c.DefaultQuery("limit", "10")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
-		page = 1 // 非法page值默认设为1
+		page = 1 // invalid page value defaults to 1
 	}
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit < 1 || limit > 100 {
-		limit = 10 // 限制limit范围，避免性能问题
+		limit = 10 // limit range restricted to avoid performance issues
 	}
 
-	// 2. 筛选条件
+	// 2. Filter conditions
 	categoryID := c.Query("category")
 	status := c.Query("status")
 	search := c.Query("search")
 
-	// 获取当前用户角色和 ID（如果已登录）——支持多种存储类型
+	// Get current user role and ID (if logged in) - supports multiple storage types
 	var userRole string
 	var userID uint
 
@@ -53,7 +53,7 @@ func GetPosts(c *gin.Context) {
 			if role, ok := userMap["role"].(string); ok {
 				userRole = role
 			}
-			// 尝试多种类型以获取 id
+			// Try multiple types to get id
 			if idf, ok := userMap["id"].(float64); ok {
 				userID = uint(idf)
 			} else if idu, ok := userMap["id"].(uint); ok {
@@ -64,28 +64,28 @@ func GetPosts(c *gin.Context) {
 		}
 	}
 
-	// 构建查询
+	// Build query
 	query := db.Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags")
 
-	// 根据用户角色决定可见的文章
+	// Determine visible posts based on user role
 	if userRole == "" {
-		// 未登录用户只能看到已发布的文章
+		// Non-logged in users can only see published posts
 		query = query.Where("status = ?", "published")
 	} else if userRole == model.RoleGuest {
-		// 访客角色只能看到已发布的文章
+		// Guest role can only see published posts
 		query = query.Where("status = ?", "published")
 	} else if userRole == model.RoleContributor {
-		// 投稿者可以看到自己所有的文章（包括待审核、草稿等）和别人已发布的文章
+		// Contributors can see all their own posts (including pending, drafts, etc.) and others' published posts
 		query = query.Where(
 			db.Where("status = ?", "published").Or("author_id = ?", userID),
 		)
 	} else if userRole == model.RoleAuthor || userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin {
-		// 作者、管理员、超级管理员可以看到所有文章
-		// 不需要添加额外的过滤条件
+		// Authors, admins, and super admins can see all posts
+		// No additional filter conditions needed
 	} else {
-		// 默认情况只显示已发布的文章
+		// Default case: only show published posts
 		query = query.Where("status = ?", "published")
 	}
 
@@ -93,26 +93,26 @@ func GetPosts(c *gin.Context) {
 		query = query.Where("status = ?", status)
 	}
 
-	// 分类筛选
+	// Category filter
 	if categoryID != "" {
-		// 尝试使用分类的 id 或名称来筛选文章
-		// 首先尝试将 categoryID 转换为数字，作为分类的 id
+		// Try to filter posts by category id or name
+		// First try to convert categoryID to number as category id
 		cid, err := strconv.Atoi(categoryID)
 		if err == nil {
-			// 如果转换成功，使用分类的 id 来筛选文章
+			// If conversion successful, use category id to filter posts
 			query = query.Where("category = ?", cid)
 		} else {
-			// 如果转换失败，使用分类的名称来筛选文章
+			// If conversion failed, use category name to filter posts
 			query = query.Where("category = ?", categoryID)
 		}
 	}
 
-	// 搜索筛选
+	// Search filter
 	if search != "" {
 		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
-	// 3. 统计总数+查询数据
+	// 3. Count total + query data
 	var total int64
 	query.Count(&total)
 
@@ -121,7 +121,7 @@ func GetPosts(c *gin.Context) {
 		Limit(limit).
 		Find(&posts)
 
-	// 为列表中的每篇文章填充点赞计数、浏览量和当前登录用户的点赞状态（如果有登录）
+	// Fill likes count, view count, and current logged-in user's like status for each post in the list (if logged in)
 	for i := range posts {
 		var count int64
 		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
@@ -134,24 +134,24 @@ func GetPosts(c *gin.Context) {
 			}
 		}
 
-		// 填充评论计数
+		// Fill comments count
 		var ccount int64
 		db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
 		posts[i].CommentsCount = int(ccount)
 
-		// 对作者应用隐私过滤（如果不是管理员且不是查看自己的文章）
+		// Apply privacy filtering to author (if not admin and not viewing own post)
 		if userRole != model.RoleAdmin && userRole != model.RoleSuperAdmin && posts[i].AuthorID != userID {
 			FilterUserByPrivacy(&posts[i].Author, userID, userRole)
 		}
 	}
 
-	// 4. 计算总页数
+	// 4. Calculate total pages
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
 		totalPages = 1
 	}
 
-	// 5. 返回响应
+	// 5. Return response
 	c.JSON(http.StatusOK, gin.H{
 		"posts": posts,
 		"pagination": gin.H{
@@ -163,21 +163,21 @@ func GetPosts(c *gin.Context) {
 	})
 }
 
-// 获取单篇文章
+// Get single post
 func GetPost(c *gin.Context) {
 	id := c.Param("id")
 	var post model.Post
 
-	// 添加日志来诊断问题
+	// Add logs for debugging
 	fmt.Printf("Attempting to fetch post with ID: %s\n", id)
 
 	if err := db.Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
 		fmt.Printf("Error fetching post with ID %s: %v\n", id, err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在", "postId": id, "details": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "postId": id, "details": err.Error()})
 		return
 	}
 
-	// 获取当前用户信息（用于隐私过滤）
+	// Get current user information (for privacy filtering)
 	var currentUserRole string
 	var currentUserID uint
 	if uidVal, exists := c.Get("userID"); exists {
@@ -198,15 +198,15 @@ func GetPost(c *gin.Context) {
 		}
 	}
 
-	// 对作者应用隐私过滤（如果不是管理员且不是查看自己的文章）
+	// Apply privacy filtering to author (if not admin and not viewing own post)
 	if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && post.AuthorID != currentUserID {
 		FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
 	}
 
-	// 增加浏览量（可选）
+	// Increment view count (optional)
 	db.Model(&post).UpdateColumn("view_count", gorm.Expr("view_count + ?", 1))
 
-	// 填充点赞计数和当前登录用户的点赞状态
+	// Fill likes count and current logged-in user's like status
 	var count int64
 	db.Model(&model.Like{}).Where("post_id = ?", post.ID).Count(&count)
 	post.LikesCount = int(count)
@@ -230,7 +230,7 @@ func GetPost(c *gin.Context) {
 			}
 		}
 	}
-	// 填充评论计数
+	// Fill comments count
 	var ccount int64
 	db.Model(&model.Comment{}).Where("post_id = ?", post.ID).Count(&ccount)
 	post.CommentsCount = int(ccount)
@@ -239,9 +239,9 @@ func GetPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"post": post})
 }
 
-// 封装前端请求的数据结构，和 model.Post 不完全一致
-// tags 使用字符串数组，status 可以由前端传入
-// 覆盖字段按需赋值
+// Wrapper struct for frontend request data, not exactly same as model.Post
+// tags uses string array, status can be provided by frontend
+// Override fields are assigned as needed
 
 type postRequest struct {
 	Title      string      `json:"title" binding:"required"`
@@ -253,7 +253,7 @@ type postRequest struct {
 	Status     string      `json:"status"`
 }
 
-// helpers: take names and return slice of Tag models (create if missing)
+// Helper: take names and return slice of Tag models (create if missing)
 func resolveTags(names []string) ([]model.Tag, error) {
 	var tags []model.Tag
 	for _, name := range names {
@@ -275,11 +275,11 @@ func resolveTags(names []string) ([]model.Tag, error) {
 	return tags, nil
 }
 
-// 创建文章（需登录）
+// Create post (requires login)
 func CreatePost(c *gin.Context) {
-	userID, _ := c.Get("userID") // 从 JWT 中获取
+	userID, _ := c.Get("userID") // Get from JWT
 
-	// 从上下文获取用户角色信息
+	// Get user role information from context
 	var userRole string
 	if userContext, exists := c.Get("user"); exists {
 		if userMap, ok := userContext.(map[string]interface{}); ok {
@@ -289,7 +289,7 @@ func CreatePost(c *gin.Context) {
 		}
 	}
 
-	// 如果从上下文获取不到角色信息，则从数据库查询
+	// If role info not available from context, query from database
 	if userRole == "" {
 		var user model.User
 		if uid, ok := userID.(uint); ok {
@@ -299,7 +299,7 @@ func CreatePost(c *gin.Context) {
 		}
 	}
 
-	// 添加调试信息
+	// Add debug information
 	fmt.Printf("User ID: %+v\n", userID)
 	fmt.Printf("User Role: %s\n", userRole)
 
@@ -309,7 +309,7 @@ func CreatePost(c *gin.Context) {
 		return
 	}
 
-	// convert category to string no matter number or string
+	// Convert category to string regardless of number or string type
 	var catStr string
 	switch v := req.Category.(type) {
 	case string:
@@ -324,14 +324,14 @@ func CreatePost(c *gin.Context) {
 		catStr = fmt.Sprintf("%v", v)
 	}
 
-	// 根据用户角色确定文章初始状态
+	// Determine initial post status based on user role
 	initialStatus := req.Status
 	fmt.Printf("Requested status: %s\n", initialStatus)
 	if initialStatus == "" {
-		// 投稿者需要审核
+		// Contributors need moderation
 		if userRole == "contributor" {
 			initialStatus = "pending"
-			// 作者可以直接发布
+			// Authors can publish directly
 		} else if userRole == "author" || userRole == "admin" || userRole == "super_admin" {
 			initialStatus = "published"
 		} else {
@@ -362,21 +362,21 @@ func CreatePost(c *gin.Context) {
 
 	result := db.Create(&post)
 
-	// 添加日志来诊断问题
+	// Add logs for debugging
 	fmt.Printf("Creating post: %+v\n", post)
 	fmt.Printf("Create result: %+v\n", result)
 	fmt.Printf("Created post ID: %d\n", post.ID)
 
-	c.JSON(http.StatusCreated, gin.H{"message": "文章创建成功", "post": post})
+	c.JSON(http.StatusCreated, gin.H{"message": "Post created successfully", "post": post})
 }
 
-// 获取当前登录用户自己的文章（分页/状态）
+// Get current logged-in user's own posts (pagination/status)
 func GetMyPosts(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 	var posts []model.Post
 
-	// 分页参数
+	// Pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.DefaultQuery("status", "")
@@ -398,7 +398,7 @@ func GetMyPosts(c *gin.Context) {
 		Limit(limit).
 		Find(&posts)
 
-	// 为每篇文章填充点赞计数、浏览量和评论计数
+	// Fill likes count, view count, and comments count for each post
 	for i := range posts {
 		var count int64
 		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
@@ -411,7 +411,7 @@ func GetMyPosts(c *gin.Context) {
 			}
 		}
 
-		// 填充评论计数
+		// Fill comments count
 		var ccount int64
 		db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
 		posts[i].CommentsCount = int(ccount)
@@ -440,7 +440,7 @@ func GetDraftPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	// 获取当前用户角色
+	// Get current user role
 	var userRole string
 	var userID uint
 	if userContext, exists := c.Get("user"); exists {
@@ -458,12 +458,12 @@ func GetDraftPosts(c *gin.Context) {
 		Preload("Author").
 		Preload("Tags")
 
-	// 根据用户角色决定可见的草稿文章
+	// Determine visible draft posts based on user role
 	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
-		// 管理员和超级管理员可以看到所有草稿文章
+		// Admins and super admins can see all draft posts
 		query = query.Where("status = ?", "draft")
 	} else {
-		// 其他用户只能看到自己的草稿文章
+		// Other users can only see their own draft posts
 		userIDFromContext, _ := c.Get("userID")
 		if uid, ok := userIDFromContext.(uint); ok {
 			userID = uid
@@ -479,7 +479,7 @@ func GetDraftPosts(c *gin.Context) {
 		Limit(limit).
 		Find(&posts)
 
-	// 为每篇文章填充点赞计数、浏览量和评论计数
+	// Fill likes count, view count, and comments count for each post
 	for i := range posts {
 		var count int64
 		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
@@ -492,7 +492,7 @@ func GetDraftPosts(c *gin.Context) {
 			}
 		}
 
-		// 填充评论计数
+		// Fill comments count
 		var ccount int64
 		db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
 		posts[i].CommentsCount = int(ccount)
@@ -514,22 +514,22 @@ func GetDraftPosts(c *gin.Context) {
 	})
 }
 
-// 获取指定用户的文章列表
+// Get posts by specific user
 func GetUserPosts(c *gin.Context) {
 	userIDStr := c.Param("id")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
 	var posts []model.Post
 
-	// 分页参数
+	// Pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	// 获取当前用户角色和ID（如果已登录）
+	// Get current user role and ID (if logged in)
 	var currentUserRole string
 	var currentUserID uint
 
@@ -552,23 +552,23 @@ func GetUserPosts(c *gin.Context) {
 		}
 	}
 
-	// 构建查询
+	// Build query
 	query := db.Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
 		Where("author_id = ?", userID)
 
-	// 根据用户角色决定可见的文章
+	// Determine visible posts based on user role
 	if currentUserRole == "" || currentUserRole == model.RoleGuest {
-		// 未登录用户或访客只能看到已发布的文章
+		// Non-logged in users or guests can only see published posts
 		query = query.Where("status = ?", "published")
 	} else if currentUserRole == model.RoleContributor {
-		// 投稿者可以看到自己所有的文章和别人已发布的文章
+		// Contributors can see all their own posts and others' published posts
 		if uint(userID) != currentUserID {
 			query = query.Where("status = ?", "published")
 		}
 	}
-	// 作者、管理员、超级管理员可以看到所有文章
+	// Authors, admins, and super admins can see all posts
 
 	var total int64
 	query.Count(&total)
@@ -578,7 +578,7 @@ func GetUserPosts(c *gin.Context) {
 		Limit(limit).
 		Find(&posts)
 
-	// 为每篇文章填充点赞计数、浏览量和评论计数
+	// Fill likes count, view count, and comments count for each post
 	for i := range posts {
 		var count int64
 		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
@@ -591,14 +591,14 @@ func GetUserPosts(c *gin.Context) {
 			}
 		}
 
-		// 填充评论计数
+		// Fill comments count
 		var ccount int64
 		db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
 		posts[i].CommentsCount = int(ccount)
 
-		// 对作者应用隐私过滤
+		// Apply privacy filtering to author
 		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && uint(userID) != currentUserID {
-			// 如果不是管理员且不是查看自己的文章，则应用隐私过滤
+			// If not admin and not viewing own post, apply privacy filtering
 			FilterUserByPrivacy(&posts[i].Author, currentUserID, currentUserRole)
 		}
 	}

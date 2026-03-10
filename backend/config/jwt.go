@@ -43,10 +43,10 @@ func Init(jwtSecret string) {
 	JWTSecret = []byte(s)
 	log.Printf("JWT secret initialized with length: %d bytes", len(JWTSecret))
 
-	// 加载前端 URL
+	// Load frontend URL
 	FrontendURL = os.Getenv("FRONTEND_URL")
 	if FrontendURL == "" {
-		FrontendURL = "http://localhost:5173" // 默认开发环境地址
+		FrontendURL = "http://localhost:5173" // Default development environment address
 		log.Printf("WARNING: FRONTEND_URL not set — using default: %s", FrontendURL)
 	} else {
 		log.Printf("Frontend URL set to: %s", FrontendURL)

@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 切换点赞（需登录）
+// Toggle like (requires login)
 func ToggleLike(c *gin.Context) {
 	postIDStr := c.Param("postId")
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
@@ -20,11 +20,11 @@ func ToggleLike(c *gin.Context) {
 
 	var like model.Like
 	if err := db.Where("post_id = ? AND user_id = ?", postID, userID).First(&like).Error; err == nil {
-		// 已点赞 -> 取消
+		// Already liked -> unlike
 		db.Delete(&like)
 		var count int64
 		db.Model(&model.Like{}).Where("post_id = ?", postID).Count(&count)
-		c.JSON(http.StatusOK, gin.H{"message": "点赞已取消", "postId": postID, "isLiked": false, "likesCount": count})
+		c.JSON(http.StatusOK, gin.H{"message": "Like removed", "postId": postID, "isLiked": false, "likesCount": count})
 		return
 	}
 
@@ -32,10 +32,10 @@ func ToggleLike(c *gin.Context) {
 	db.Create(&like)
 	var count int64
 	db.Model(&model.Like{}).Where("post_id = ?", postID).Count(&count)
-	c.JSON(http.StatusOK, gin.H{"message": "点赞成功", "postId": postID, "isLiked": true, "likesCount": count})
+	c.JSON(http.StatusOK, gin.H{"message": "Liked successfully", "postId": postID, "isLiked": true, "likesCount": count})
 }
 
-// 获取点赞状态（公开，可选登录）
+// Get like status (public, optional login)
 func GetLikeStatus(c *gin.Context) {
 	postIDStr := c.Param("postId")
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)

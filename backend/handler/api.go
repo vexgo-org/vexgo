@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 获取统计信息
+// Get statistics
 func GetStats(c *gin.Context) {
 	var postsCount, usersCount, categoriesCount, tagsCount, commentsCount int64
 
@@ -29,26 +29,26 @@ func GetStats(c *gin.Context) {
 	})
 }
 
-// 获取热门文章
+// Get popular posts
 func GetPopularPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 	var posts []model.Post
 
-	// 先查询所有已发布的文章
+	// First query all published articles
 	db.Where("status = ?", "published").
 		Preload("Author").
 		Preload("Tags").
 		Find(&posts)
 
-	// 为每篇文章计算点赞数
+	// Calculate likes count for each post
 	for i := range posts {
 		var count int64
 		db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
 		posts[i].LikesCount = int(count)
 	}
 
-	// 按照点赞数乘5加浏览量之和排序
-	// 使用自定义排序，因为GORM不支持复杂的表达式排序
+	// Sort by the sum of likes count multiplied by 5 plus view count
+	// Use custom sorting because GORM doesn't support complex expression sorting
 	for i := 0; i < len(posts); i++ {
 		for j := i + 1; j < len(posts); j++ {
 			scoreI := posts[i].LikesCount*5 + posts[i].ViewCount
@@ -59,7 +59,7 @@ func GetPopularPosts(c *gin.Context) {
 		}
 	}
 
-	// 限制返回数量
+	// Limit the number of returned items
 	if limit < len(posts) {
 		posts = posts[:limit]
 	}
@@ -69,7 +69,7 @@ func GetPopularPosts(c *gin.Context) {
 	})
 }
 
-// 获取最新文章
+// Get latest posts
 func GetLatestPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 	var posts []model.Post
@@ -86,7 +86,7 @@ func GetLatestPosts(c *gin.Context) {
 	})
 }
 
-// 获取分类列表
+// Get category list
 func GetCategories(c *gin.Context) {
 	var categories []model.Category
 
@@ -97,7 +97,7 @@ func GetCategories(c *gin.Context) {
 	})
 }
 
-// 创建分类
+// Create category
 func CreateCategory(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name" binding:"required"`
@@ -115,17 +115,17 @@ func CreateCategory(c *gin.Context) {
 	}
 
 	if err := db.Create(&category).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建分类失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":  "分类创建成功",
+		"message":  "Category created successfully",
 		"category": category,
 	})
 }
 
-// 获取标签列表
+// Get tag list
 func GetTags(c *gin.Context) {
 	var tags []model.Tag
 

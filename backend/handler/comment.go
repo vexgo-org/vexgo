@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// 获取某篇文章的评论列表
+// Get comments for a specific post
 func GetComments(c *gin.Context) {
 	postID := c.Param("id")
 	var comments []model.Comment
@@ -19,7 +19,7 @@ func GetComments(c *gin.Context) {
 		Order("created_at ASC").
 		Find(&comments)
 
-	// 获取当前用户信息（用于隐私过滤）
+	// Get current user information (for privacy filtering)
 	var currentUserRole string
 	var currentUserID uint
 	if uidVal, exists := c.Get("userID"); exists {
@@ -40,10 +40,10 @@ func GetComments(c *gin.Context) {
 		}
 	}
 
-	// 对评论作者应用隐私过滤
+	// Apply privacy filtering to comment authors
 	for i := range comments {
 		author := &comments[i].User
-		// 如果不是管理员且不是查看自己的评论，则应用隐私过滤
+		// If not admin and not viewing own comment, apply privacy filtering
 		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && author.ID != currentUserID {
 			FilterUserByPrivacy(author, currentUserID, currentUserRole)
 		}
@@ -52,9 +52,9 @@ func GetComments(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"comments": comments})
 }
 
-// 创建评论（需登录）
+// Create comment (requires login)
 func CreateComment(c *gin.Context) {
-	// 支持前端传入 postId 为数字或字符串
+	// Support postId as number or string from frontend
 	var req struct {
 		PostID   interface{} `json:"postId" binding:"required"`
 		Content  string      `json:"content" binding:"required"`
@@ -66,13 +66,13 @@ func CreateComment(c *gin.Context) {
 		return
 	}
 
-	// 检查评论字数限制（不超过100字）
+	// Check comment length limit (no more than 100 characters)
 	if len(req.Content) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "评论字数不能超过100字"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment cannot exceed 100 characters"})
 		return
 	}
 
-	// 解析 PostID 为 uint
+	// Parse PostID to uint
 	var postID uint
 	switch v := req.PostID.(type) {
 	case float64:
@@ -86,38 +86,38 @@ func CreateComment(c *gin.Context) {
 	case uint:
 		postID = v
 	default:
-		// 如果无法解析，返回错误
-		c.JSON(http.StatusBadRequest, gin.H{"error": "postId 类型不合法"})
+		// If cannot parse, return error
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId type"})
 		return
 	}
 
 	uid, _ := c.Get("userID")
 	userID, ok := uid.(uint)
 	if !ok {
-		// 拒绝未登录请求
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+		// Reject unauthenticated request
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
 	}
 
-	// 获取评论审核配置
+	// Get comment moderation configuration
 	var config model.CommentModerationConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 配置不存在时使用默认值
+			// Use default values when configuration doesn't exist
 			config = model.CommentModerationConfig{
 				Enabled:            false,
 				ModelProvider:      "",
 				ApiKey:             "",
 				ApiEndpoint:        "",
 				ModelName:          "gpt-3.5-turbo",
-				ModerationPrompt:   "请审核以下评论内容是否合规。如果评论包含违法不良信息、人身攻击、色情低俗等内容，请返回 'REJECT'；如果评论合规，请返回 'APPROVE'。只需返回结果，不要解释。\n\n评论内容：\n{{content}}",
+				ModerationPrompt:   "Please review the following comment for compliance. If the comment contains illegal content, personal attacks, or inappropriate material, return 'REJECT'; if the comment is compliant, return 'APPROVE'. Only return the result, no explanation.\n\nComment content:\n{{content}}",
 				BlockKeywords:      "",
 				AutoApproveEnabled: true,
 				MinScoreThreshold:  0.5,
 			}
 		} else {
-			// 其他数据库错误
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取评论审核配置失败"})
+			// Other database errors
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment moderation configuration"})
 			return
 		}
 	}
@@ -132,31 +132,31 @@ func CreateComment(c *gin.Context) {
 		comment.ParentID = req.ParentID
 	}
 
-	// 设置评论状态
+	// Set comment status
 	if config.Enabled {
-		// 如果启用了AI审核，先设置为待审核状态
+		// If AI moderation enabled, set to pending status first
 		comment.Status = "pending"
 	} else {
-		// 如果未启用AI审核，根据配置决定是否自动批准
+		// If AI moderation not enabled, decide whether to auto-approve based on config
 		if config.AutoApproveEnabled {
 			comment.Status = "published"
 		} else {
-			comment.Status = "pending" // 仍需人工审核
+			comment.Status = "pending" // still requires manual moderation
 		}
 	}
 
 	if err := db.Create(&comment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建评论失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
 		return
 	}
 
-	// 如果启用了AI审核，则进行审核
+	// If AI moderation enabled, perform moderation
 	if config.Enabled {
 		approved, _, err := ModerateCommentAI(req.Content, config)
 		if err != nil {
-			// 如果AI审核失败，记录错误但不影响评论创建
-			fmt.Printf("AI审核失败: %v\n", err)
-			comment.Status = "published" // 失败时默认发布
+			// If AI moderation fails, log error but don't affect comment creation
+			fmt.Printf("AI moderation failed: %v\n", err)
+			comment.Status = "published" // default to published on failure
 		} else {
 			if approved {
 				comment.Status = "published"
@@ -167,39 +167,39 @@ func CreateComment(c *gin.Context) {
 
 		// 更新评论状态
 		if err := db.Save(&comment).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新评论状态失败"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment status"})
 			return
 		}
 	}
 
-	// 返回创建的评论及更新后的评论计数
+	// Return created comment and updated comment count
 	var count int64
 	db.Model(&model.Comment{}).Where("post_id = ? AND status = ?", postID, "published").Count(&count)
 
-	// 预加载作者信息
+	// Preload author information
 	db.Preload("User").First(&comment, comment.ID)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":            "评论创建成功",
+		"message":            "Comment created successfully",
 		"comment":            comment,
 		"commentsCount":      count,
 		"requiresModeration": comment.Status == "pending",
 	})
 }
 
-// 删除评论（需登录，作者或管理员）
+// Delete comment (requires login, author or admin)
 func DeleteComment(c *gin.Context) {
 	id := c.Param("id")
 	var comment model.Comment
 	if err := db.First(&comment, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "评论不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})
 		return
 	}
 
-	// 获取当前操作用户 ID
+	// Get current operating user ID
 	uid, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
 	}
 
@@ -212,30 +212,30 @@ func DeleteComment(c *gin.Context) {
 	case float64:
 		userID = uint(v)
 	default:
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的用户信息"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user information"})
 		return
 	}
 
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 		return
 	}
 
-	// 管理员或超级管理员可以删除任意评论，作者本人也可以删除自己的评论
+	// Admins or super admins can delete any comment, authors can delete their own comments
 	if !model.IsAdmin(user) && comment.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权删除该评论"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this comment"})
 		return
 	}
 
 	if err := db.Delete(&comment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评论失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
 		return
 	}
 
-	// 返回删除后的评论计数，便于前端同步
+	// Return comment count after deletion for frontend sync
 	var count int64
 	db.Model(&model.Comment{}).Where("post_id = ?", comment.PostID).Count(&count)
 
-	c.JSON(http.StatusOK, gin.H{"message": "评论已删除", "commentsCount": count})
+	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted", "commentsCount": count})
 }

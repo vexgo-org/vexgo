@@ -21,26 +21,26 @@ import (
 	"gorm.io/gorm"
 )
 
-// 根据隐私设置过滤用户信息
+// Filter user information based on privacy settings
 func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
-	// 如果用户设置了隐私，需要根据查看者的身份来决定是否隐藏信息
-	// 目前实现：用户自己和管理员可以看到所有信息
-	// 其他用户根据隐私设置隐藏信息
+	// If the user has set privacy, need to decide whether to hide information based on viewer's identity
+	// Current implementation: the user themselves and administrators can see all information
+	// Other users see information according to privacy settings
 
-	// 检查查看者是否是用户自己或管理员
+	// Check if viewer is the user themselves or an admin
 	isSelf := viewerID == user.ID
 	isAdmin := viewerRole == model.RoleAdmin || viewerRole == model.RoleSuperAdmin
 
-	// 如果不是自己且不是管理员，则根据隐私设置过滤
+	// If not self and not admin, filter according to privacy settings
 	if !isSelf && !isAdmin {
-		// 首先检查个人资料可见性设置
+		// First check profile visibility setting
 		if user.ProfileVisibility == "private" {
-			// 如果设置为仅自己可见，则隐藏所有个人信息
+			// If set to private, hide all personal information
 			user.Email = ""
 			user.Birthday = ""
 			user.Bio = ""
 		} else {
-			// 如果是公开，则根据单独的隐藏设置过滤
+			// If public, filter according to individual hide settings
 			if user.HideEmail {
 				user.Email = ""
 			}
@@ -54,42 +54,42 @@ func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
 	}
 }
 
-// 验证滑动拼图验证码的公共函数
+// Public function to verify sliding puzzle captcha
 func verifyCaptcha(captchaID, captchaToken string, captchaX int, markAsUsed bool) (*model.Captcha, error) {
-	// 查询验证码
+	// Query captcha
 	var captcha model.Captcha
 	if err := db.Where("id = ? AND token = ?", captchaID, captchaToken).First(&captcha).Error; err != nil {
-		return nil, fmt.Errorf("验证码无效")
+		return nil, fmt.Errorf("invalid captcha")
 	}
 
-	// 检查验证码是否已使用
+	// Check if captcha has been used
 	if captcha.Used {
-		return nil, fmt.Errorf("验证码已使用")
+		return nil, fmt.Errorf("captcha already used")
 	}
 
-	// 检查验证码是否过期
+	// Check if captcha has expired
 	if time.Now().After(captcha.ExpiresAt) {
-		return nil, fmt.Errorf("验证码已过期")
+		return nil, fmt.Errorf("captcha has expired")
 	}
 
-	// 验证位置（允许一定误差范围）
-	tolerance := 10 // 允许5像素的误差
+	// Verify position (allow certain tolerance)
+	tolerance := 10 // allow 5 pixel tolerance
 	if math.Abs(float64(captchaX-captcha.X)) > float64(tolerance) {
-		return nil, fmt.Errorf("验证失败，请重试")
+		return nil, fmt.Errorf("verification failed, please try again")
 	}
 
-	// 如果需要标记为已使用
+	// If need to mark as used
 	if markAsUsed {
 		captcha.Used = true
 		if err := db.Save(&captcha).Error; err != nil {
-			return nil, fmt.Errorf("验证码验证失败")
+			return nil, fmt.Errorf("captcha verification failed")
 		}
 	}
 
 	return &captcha, nil
 }
 
-// 登录：根据邮箱密码签发 JWT
+// Login: issue JWT based on email and password
 func Login(c *gin.Context) {
 	var req struct {
 		Email        string `json:"email" binding:"required"`
@@ -104,74 +104,74 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 检查是否启用了滑块验证
+	// Check if captcha verification is enabled
 	captchaEnabled, err := IsCaptchaEnabled()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check captcha settings"})
 		return
 	}
 
-	// 如果启用了滑块验证，则验证验证码
+	// If captcha verification is enabled, verify captcha
 	if captchaEnabled {
 		if req.CaptchaID == "" || req.CaptchaToken == "" || req.CaptchaX == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "请完成滑块验证"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Please complete the captcha verification"})
 			return
 		}
-		// 查询验证码
+		// Query captcha
 		var captcha model.Captcha
 		if err := db.Where("id = ? AND token = ?", req.CaptchaID, req.CaptchaToken).First(&captcha).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "验证码不存在或已过期"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Captcha does not exist or has expired"})
 			return
 		}
 
-		// 检查是否过期
+		// Check if expired
 		if time.Now().After(captcha.ExpiresAt) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "验证码已过期"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Captcha has expired"})
 			return
 		}
 
-		// 验证位置（允许一定误差范围）
+		// Verify position (allow certain tolerance)
 		tolerance := 10
 		if math.Abs(float64(req.CaptchaX-captcha.X)) > float64(tolerance) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "验证失败，请重试"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Verification failed, please try again"})
 			return
 		}
 
-		// 如果验证码还未使用，则标记为已使用
+		// If captcha has not been used yet, mark it as used
 		if !captcha.Used {
 			captcha.Used = true
 			if err := db.Save(&captcha).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "验证码验证失败"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Captcha verification failed"})
 				return
 			}
 		}
-		// 如果验证码已使用，说明已经预验证成功，直接通过
+		// If captcha already used, pre-verification successful, pass directly
 	}
 
 	var user model.User
 	if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "邮箱或密码错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid email or password"})
 		return
 	}
 
-	// 使用 bcrypt 比对哈希密码
+	// Use bcrypt to compare hashed password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "邮箱或密码错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid email or password"})
 		return
 	}
 
-	// 检查是否启用了 SMTP，如果启用则检查邮箱验证状态
+	// Check if SMTP is enabled, if so verify email status
 	mailer := utils.NewMailer(db)
 	enabled, err := mailer.IsEmailEnabled()
 	if err == nil && enabled && !user.EmailVerified {
 		c.JSON(http.StatusForbidden, gin.H{
-			"message":        "请先验证您的邮箱地址。请检查您的收件箱并点击验证链接，或请求重新发送验证邮件。",
+			"message":        "Please verify your email address first. Check your inbox and click the verification link, or request to resend the verification email.",
 			"email_verified": false,
 		})
 		return
 	}
 
-	// 生成 token
+	// Generate token
 	claims := jwt.MapClaims{
 		"user_id":          user.ID,
 		"username":         user.Username,
@@ -185,7 +185,7 @@ func Login(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	ss, err := token.SignedString(config.JWTSecret)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token 生成失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
@@ -200,36 +200,36 @@ func Login(c *gin.Context) {
 	})
 }
 
-// 获取当前用户信息
+// Get current user information
 func GetCurrentUser(c *gin.Context) {
 	if uid, ok := c.Get("userID"); ok {
 		var user model.User
 		if err := db.First(&user, uid).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"user": user})
 		return
 	}
-	c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 }
 
-// 更新文章（需要身份验证，只有作者或管理员可修改）
+// Update post (requires authentication, only author or admin can modify)
 func UpdatePost(c *gin.Context) {
 	id := c.Param("id")
 	var post model.Post
 	if err := db.Preload("Tags").First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
 		return
 	}
 
-	// 权限检查
+	// Permission check
 	uid, _ := c.Get("userID")
 	userID := uid.(uint)
 	var user model.User
 	if err := db.First(&user, userID).Error; err == nil {
 		if user.Role != "admin" && user.Role != "super_admin" && post.AuthorID != userID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "无权修改该文章"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this post"})
 			return
 		}
 	}
@@ -289,15 +289,15 @@ func UpdatePost(c *gin.Context) {
 	}
 
 	db.Save(&post)
-	c.JSON(http.StatusOK, gin.H{"message": "文章已更新", "post": post})
+	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "post": post})
 }
 
-// 从HTML内容中提取所有图片URL
+// Extract all image URLs from HTML content
 func extractImageURLs(content string) []string {
 	var urls []string
 
-	// 匹配 <img> 标签的 src 属性
-	// 正则表达式匹配 src="..." 或 src='...' 或 src=...
+	// Match src attribute of <img> tags
+	// Regex matches src="..." or src='...' or src=...
 	re := regexp.MustCompile(`<img[^>]+src=["']([^"']+)["'][^>]*>`)
 	matches := re.FindAllStringSubmatch(content, -1)
 
@@ -313,34 +313,34 @@ func extractImageURLs(content string) []string {
 	return urls
 }
 
-// 删除文件（需是上传者或管理员）
+// Delete file (must be uploader or admin)
 func deleteImageFile(url string) error {
-	// 从URL中提取文件名，例如：/uploads/abc123.jpg -> abc123.jpg
+	// Extract filename from URL, e.g.: /uploads/abc123.jpg -> abc123.jpg
 	filename := filepath.Base(url)
 	if filename == "" || filename == "/" {
-		return fmt.Errorf("无效的文件名: %s", url)
+		return fmt.Errorf("invalid filename: %s", url)
 	}
 
-	// 构建完整路径，使用 upload.go 中定义的 DataDir
+	// Build full path using DataDir defined in upload.go
 	path := filepath.Join(DataDir, "media", filename)
 
-	// 检查文件是否存在
+	// Check if file exists
 	if _, err := os.Stat(path); err == nil {
-		// 文件存在，删除它
+		// File exists, delete it
 		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("删除文件失败: %w", err)
+			return fmt.Errorf("failed to delete file: %w", err)
 		}
 	}
 
 	return nil
 }
 
-// 删除文章（需要身份验证，只有作者或管理员可删除）
+// Delete post (requires authentication, only author or admin can delete)
 func DeletePost(c *gin.Context) {
 	id := c.Param("id")
 	var post model.Post
 	if err := db.First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
 		return
 	}
 
@@ -349,24 +349,24 @@ func DeletePost(c *gin.Context) {
 	var user model.User
 	if err := db.First(&user, userID).Error; err == nil {
 		if user.Role != "admin" && user.Role != "super_admin" && post.AuthorID != userID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "无权删除该文章"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this post"})
 			return
 		}
 	}
 
-	// 收集需要删除的图片URL
+	// Collect image URLs to delete
 	var imagesToDelete []string
 
-	// 1. 添加封面图片
+	// 1. Add cover image
 	if post.CoverImage != "" {
 		imagesToDelete = append(imagesToDelete, post.CoverImage)
 	}
 
-	// 2. 从文章内容中提取所有图片
+	// 2. Extract all images from post content
 	contentImages := extractImageURLs(post.Content)
 	imagesToDelete = append(imagesToDelete, contentImages...)
 
-	// 3. 删除所有收集到的图片文件（去重后）
+	// 3. Delete all collected image files (after deduplication)
 	uniqueImages := make(map[string]bool)
 	for _, url := range imagesToDelete {
 		uniqueImages[url] = true
@@ -374,17 +374,17 @@ func DeletePost(c *gin.Context) {
 
 	for url := range uniqueImages {
 		if err := deleteImageFile(url); err != nil {
-			// 记录错误但继续执行，避免文章删除失败
-			fmt.Printf("删除图片失败 %s: %v\n", url, err)
+			// Log error but continue execution to avoid post deletion failure
+			fmt.Printf("Failed to delete image %s: %v\n", url, err)
 		}
 	}
 
-	// 删除文章（GORM会自动删除关联的评论、点赞等）
+	// Delete post (GORM automatically deletes associated comments, likes, etc.)
 	db.Delete(&post)
-	c.JSON(http.StatusOK, gin.H{"message": "文章已删除"})
+	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
 }
 
-// 更新用户个人信息
+// Update user profile
 func UpdateProfile(c *gin.Context) {
 	var req struct {
 		Username *string `json:"username"`
@@ -402,16 +402,16 @@ func UpdateProfile(c *gin.Context) {
 	userID := uid.(uint)
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 		return
 	}
 
-	// 如果更新头像，删除旧头像
+	// If updating avatar, delete old avatar
 	if req.Avatar != nil && *req.Avatar != user.Avatar && user.Avatar != "" {
-		// 删除旧头像文件
+		// Delete old avatar file
 		if err := deleteImageFile(user.Avatar); err != nil {
-			// 记录错误但继续执行，避免头像更新失败
-			fmt.Printf("删除旧头像失败 %s: %v\n", user.Avatar, err)
+			// Log error but continue execution to avoid avatar update failure
+			fmt.Printf("Failed to delete old avatar %s: %v\n", user.Avatar, err)
 		}
 		user.Avatar = *req.Avatar
 	} else if req.Avatar != nil {
@@ -431,7 +431,7 @@ func UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
-// 修改密码
+// Change password
 func ChangePassword(c *gin.Context) {
 	var req struct {
 		OldPassword string `json:"oldPassword" binding:"required"`
@@ -447,30 +447,30 @@ func ChangePassword(c *gin.Context) {
 	userID := uid.(uint)
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 		return
 	}
 
-	// 验证旧密码
+	// Verify old password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "当前密码不正确"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
 		return
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encrypt password"})
 		return
 	}
 
-	// 增加密码版本号，使旧令牌失效
+	// Increment password version to invalidate old tokens
 	user.Password = string(hashed)
 	user.PasswordVersion++
 	db.Save(&user)
-	c.JSON(http.StatusOK, gin.H{"message": "密码已修改"})
+	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
-// 更新用户设置（隐私设置等）
+// Update user settings (privacy settings, etc.)
 func UpdateSettings(c *gin.Context) {
 	var req struct {
 		ProfileVisibility *string `json:"profile_visibility"`
@@ -488,7 +488,7 @@ func UpdateSettings(c *gin.Context) {
 	userID := uid.(uint)
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 		return
 	}
 
@@ -506,17 +506,17 @@ func UpdateSettings(c *gin.Context) {
 	}
 
 	if err := db.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存设置失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save settings"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "设置已更新",
+		"message": "Settings updated successfully",
 		"user":    user,
 	})
 }
 
-// 更新邮箱
+// Update email
 func UpdateEmail(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
@@ -531,40 +531,40 @@ func UpdateEmail(c *gin.Context) {
 	userID := uid.(uint)
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 		return
 	}
 
-	// 检查新邮箱是否与当前邮箱相同
+	// Check if new email is the same as current email
 	if req.Email == user.Email {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "新邮箱不能与当前邮箱相同"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "New email cannot be the same as current email"})
 		return
 	}
 
-	// 检查新邮箱是否已被其他用户使用
+	// Check if new email is already used by another user
 	var existingUser model.User
 	if err := db.Where("email = ? AND id != ?", req.Email, userID).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "该邮箱已被其他用户使用"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This email is already used by another user"})
 		return
 	}
 
-	// 检查是否启用了 SMTP
+	// Check if SMTP is enabled
 	mailer := utils.NewMailer(db)
 	enabled, err := mailer.IsEmailEnabled()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查邮件配置失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check mail configuration"})
 		return
 	}
 
 	if enabled {
-		// 如果启用 SMTP，生成邮箱变更验证令牌并发送确认邮件
+		// If SMTP enabled, generate email change verification token and send confirmation email
 		token, err := mailer.GenerateEmailChangeToken(userID, req.Email)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成验证令牌失败"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification token"})
 			return
 		}
 
-		// 构建验证链接
+		// Build verification link
 		protocol := "http"
 		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
 			protocol = "https"
@@ -572,25 +572,25 @@ func UpdateEmail(c *gin.Context) {
 		host := c.Request.Host
 		verificationLink := fmt.Sprintf("%s://%s/verify-email?token=%s", protocol, host, token)
 
-		// 发送确认邮件
+		// Send confirmation email
 		if err := mailer.SendEmailChangeEmail(user.Email, user.Username, req.Email, verificationLink); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "发送验证邮件失败"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"message": "已发送验证邮件，请查收并点击链接完成邮箱变更",
+			"message": "Verification email sent. Please check your inbox and click the link to complete email change.",
 			"pending": true,
 		})
 	} else {
-		// 如果未启用 SMTP，直接更新邮箱
+		// If SMTP not enabled, update email directly
 		if err := db.Model(&user).Update("email", req.Email).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新邮箱失败"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"message": "邮箱更新成功",
+			"message": "Email updated successfully",
 			"pending": false,
 			"user": gin.H{
 				"email": req.Email,
@@ -599,7 +599,7 @@ func UpdateEmail(c *gin.Context) {
 	}
 }
 
-// 请求密码重置
+// Request password reset
 func RequestPasswordReset(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
@@ -610,30 +610,30 @@ func RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	// 查找用户
+	// Find user
 	var user model.User
 	if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		// 出于安全考虑，即使用户不存在也返回成功，避免信息泄露
-		c.JSON(http.StatusOK, gin.H{"message": "如果邮箱存在，重置链接已发送"})
+		// For security reasons, return success even if user doesn't exist to avoid information leakage
+		c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
 		return
 	}
 
-	// 检查是否启用了 SMTP
+	// Check if SMTP is enabled
 	mailer := utils.NewMailer(db)
 	enabled, err := mailer.IsEmailEnabled()
 	if err != nil || !enabled {
-		c.JSON(http.StatusOK, gin.H{"message": "如果邮箱存在，重置链接已发送"})
+		c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
 		return
 	}
 
-	// 生成密码重置令牌
+	// Generate password reset token
 	token, err := mailer.GeneratePasswordResetToken(user.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成重置令牌失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
 		return
 	}
 
-	// 构建重置链接 - 使用请求的协议和主机名
+	// Build reset link - use request protocol and hostname
 	protocol := "http"
 	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
 		protocol = "https"
@@ -641,16 +641,16 @@ func RequestPasswordReset(c *gin.Context) {
 	host := c.Request.Host
 	resetLink := fmt.Sprintf("%s://%s/reset-password?token=%s", protocol, host, token)
 
-	// 发送邮件
+	// Send email
 	if err := mailer.SendPasswordResetEmail(user.Email, user.Username, resetLink); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "发送邮件失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send email"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "如果邮箱存在，重置链接已发送"})
+	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
 }
 
-// 重置密码
+// Reset password
 func ResetPassword(c *gin.Context) {
 	var req struct {
 		Token    string `json:"token" binding:"required"`
@@ -662,39 +662,39 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// 查找具有该令牌的用户
+	// Find user with this token
 	var user model.User
 	if err := db.Where("verification_token = ?", req.Token).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的重置令牌"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reset token"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Query failed"})
 		return
 	}
 
-	// 检查令牌是否过期
+	// Check if token has expired
 	if user.TokenExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "重置令牌已过期"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token has expired"})
 		return
 	}
 
-	// 生成新密码的哈希值
+	// Generate hash for new password
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encrypt password"})
 		return
 	}
 
-	// 更新密码并清除重置令牌
+	// Update password and clear reset token
 	if err := db.Model(&user).Updates(map[string]interface{}{
 		"password":           string(hashed),
 		"verification_token": "",
 		"token_expires_at":   time.Time{},
 	}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新密码失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "密码已重置成功"})
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
 }

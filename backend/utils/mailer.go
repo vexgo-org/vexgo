@@ -12,101 +12,101 @@ import (
 	"gorm.io/gorm"
 )
 
-// Mailer 邮件发送器
+// Mailer email sender
 type Mailer struct {
 	DB *gorm.DB
 }
 
-// NewMailer 创建邮件发送器实例
+// NewMailer creates a new Mailer instance
 func NewMailer(db *gorm.DB) *Mailer {
 	return &Mailer{DB: db}
 }
 
-// SendVerificationEmail 发送邮箱验证邮件
+// SendVerificationEmail sends email verification email
 func (m *Mailer) SendVerificationEmail(toEmail, toName, verificationLink string) error {
-	// 获取 SMTP 配置
+	// Get SMTP configuration
 	var config model.SMTPConfig
 	if err := m.DB.First(&config).Error; err != nil {
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	// 检查是否启用 SMTP
+	// Check if SMTP is enabled
 	if !config.Enabled {
 		return fmt.Errorf("SMTP is not enabled")
 	}
 
-	// 邮件正文
+	// Email body (text version)
 	textBody := fmt.Sprintf(`
-尊敬的 %s，
+Dear %s,
 
-感谢您注册我们的博客系统！请点击以下链接完成邮箱验证：
+Thank you for registering for our blog system! Please click the following link to complete email verification:
 
 %s
 
-此链接将在 5 分钟后失效。
+This link will expire in 5 minutes.
 
-如果您没有注册此账户，请忽略此邮件。
+If you did not register for this account, please ignore this email.
 	`, toName, verificationLink)
 
-	// HTML 格式的邮件正文
+	// Email body (HTML version)
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
-	   <meta charset="UTF-8">
-	   <style>
-	       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-	       .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-	       .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
-	       .content { padding: 20px; background-color: #f9f9f9; }
-	       .button {
-	           display: inline-block;
-	           padding: 12px 24px;
-	           background-color: #4CAF50;
-	           color: white;
-	           text-decoration: none;
-	           border-radius: 4px;
-	           margin: 20px 0;
-	       }
-	       .footer { margin-top: 20px; font-size: 12px; color: #777; }
-	   </style>
+		   <meta charset="UTF-8">
+		   <style>
+		       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+		       .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+		       .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
+		       .content { padding: 20px; background-color: #f9f9f9; }
+		       .button {
+		           display: inline-block;
+		           padding: 12px 24px;
+		           background-color: #4CAF50;
+		           color: white;
+		           text-decoration: none;
+		           border-radius: 4px;
+		           margin: 20px 0;
+		       }
+		       .footer { margin-top: 20px; font-size: 12px; color: #777; }
+		   </style>
 </head>
 <body>
-	   <div class="container">
-	       <div class="header">
-	           <h1>邮箱验证</h1>
-	       </div>
-	       <div class="content">
-	           <p>尊敬的 %s，</p>
-	           <p>感谢您注册我们的博客系统！请点击下面的按钮完成邮箱验证：</p>
-	           <p>
-	               <a href="%s" class="button">验证邮箱</a>
-	           </p>
-            <p>或者复制以下链接到浏览器中打开：</p>
-            <p>%s</p>
-            <p>此链接将在 5 分钟后失效。</p>
-	       </div>
-	       <div class="footer">
-	           <p>如果您没有注册此账户，请忽略此邮件。</p>
-	       </div>
-	   </div>
+		   <div class="container">
+		       <div class="header">
+		           <h1>Email Verification</h1>
+		       </div>
+		       <div class="content">
+		           <p>Dear %s,</p>
+		           <p>Thank you for registering for our blog system! Please click the button below to complete email verification:</p>
+		           <p>
+		               <a href="%s" class="button">Verify Email</a>
+		           </p>
+	            <p>Or copy and paste the following link into your browser:</p>
+	            <p>%s</p>
+	            <p>This link will expire in 5 minutes.</p>
+		       </div>
+		       <div class="footer">
+		           <p>If you did not register for this account, please ignore this email.</p>
+		       </div>
+		   </div>
 </body>
 </html>
 	`, toName, verificationLink, verificationLink)
 
-	// 构建邮件
+	// Build email message
 	from := fmt.Sprintf("%s <%s>", config.FromName, config.FromEmail)
 	to := toEmail
 
-	// 邮件头
+	// Email headers
 	headers := make(map[string]string)
 	headers["From"] = from
 	headers["To"] = to
-	headers["Subject"] = "请验证您的邮箱地址"
+	headers["Subject"] = "Please Verify Your Email Address"
 	headers["MIME-Version"] = "1.0"
 	headers["Content-Type"] = "multipart/alternative; boundary=\"boundary\""
 
-	// 构建邮件体
+	// Build email body
 	message := ""
 	for k, v := range headers {
 		message += fmt.Sprintf("%s: %s\r\n", k, v)
@@ -120,29 +120,29 @@ func (m *Mailer) SendVerificationEmail(toEmail, toName, verificationLink string)
 	message += strings.TrimSpace(htmlBody) + "\r\n\r\n"
 	message += "--boundary--\r\n"
 
-	// 连接 SMTP 服务器
+	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
-	log.Printf("正在连接到 SMTP 服务器 %s...", addr)
+	log.Printf("Connecting to SMTP server %s...", addr)
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{toEmail}, []byte(message)); err != nil {
-		log.Printf("发送邮件失败: %v", err)
+		log.Printf("Failed to send email: %v", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Printf("验证邮件已成功发送到 %s", toEmail)
+	log.Printf("Verification email successfully sent to %s", toEmail)
 	return nil
 }
 
-// GenerateVerificationToken 生成验证令牌
+// GenerateVerificationToken generates verification token
 func (m *Mailer) GenerateVerificationToken(userID uint) (string, error) {
-	// 生成随机令牌（实际应用中应该使用更安全的方式）
+	// Generate random token (should use more secure method in production)
 	token := fmt.Sprintf("verify-%d-%d", userID, time.Now().UnixNano())
 
-	// 计算过期时间（5分钟后）
+	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
-	// 保存到数据库
+	// Save to database
 	updates := map[string]interface{}{
 		"verification_token": token,
 		"token_expires_at":   expiresAt,
@@ -154,7 +154,7 @@ func (m *Mailer) GenerateVerificationToken(userID uint) (string, error) {
 	return token, nil
 }
 
-// VerifyEmail 验证邮箱
+// VerifyEmail verifies email address
 func (m *Mailer) VerifyEmail(token string) error {
 	var user model.User
 	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
@@ -164,12 +164,12 @@ func (m *Mailer) VerifyEmail(token string) error {
 		return fmt.Errorf("failed to find user: %w", err)
 	}
 
-	// 检查令牌是否过期
+	// Check if token is expired
 	if user.TokenExpiresAt.Before(time.Now()) {
 		return fmt.Errorf("verification token has expired")
 	}
 
-	// 更新用户验证状态
+	// Update user verification status
 	if err := m.DB.Model(&user).Updates(map[string]interface{}{
 		"email_verified":     true,
 		"verification_token": "",
@@ -181,7 +181,7 @@ func (m *Mailer) VerifyEmail(token string) error {
 	return nil
 }
 
-// IsEmailEnabled 检查是否启用了 SMTP
+// IsEmailEnabled checks if SMTP is enabled
 func (m *Mailer) IsEmailEnabled() (bool, error) {
 	var config model.SMTPConfig
 	if err := m.DB.First(&config).Error; err != nil {
@@ -190,91 +190,91 @@ func (m *Mailer) IsEmailEnabled() (bool, error) {
 	return config.Enabled, nil
 }
 
-// SendPasswordResetEmail 发送密码重置邮件
+// SendPasswordResetEmail sends password reset email
 func (m *Mailer) SendPasswordResetEmail(toEmail, toName, resetLink string) error {
-	// 获取 SMTP 配置
+	// Get SMTP configuration
 	var config model.SMTPConfig
 	if err := m.DB.First(&config).Error; err != nil {
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	// 检查是否启用 SMTP
+	// Check if SMTP is enabled
 	if !config.Enabled {
 		return fmt.Errorf("SMTP is not enabled")
 	}
 
-	// 邮件正文
+	// Email body (text version)
 	textBody := fmt.Sprintf(`
-尊敬的 %s，
+Dear %s,
 
-我们收到了您的密码重置请求。请点击以下链接重置您的密码：
+We received a password reset request from your account. Please click the following link to reset your password:
 
 %s
 
-此链接将在 5 分钟后失效。
+This link will expire in 5 minutes.
 
-如果您没有请求重置密码，请忽略此邮件。
+If you did not request a password reset, please ignore this email.
 	`, toName, resetLink)
 
-	// HTML 格式的邮件正文
+	// Email body (HTML version)
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
-	   <meta charset="UTF-8">
-	   <style>
-	       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-	       .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-	       .header { background-color: #f44336; color: white; padding: 20px; text-align: center; }
-	       .content { padding: 20px; background-color: #f9f9f9; }
-	       .button {
-	           display: inline-block;
-	           padding: 12px 24px;
-	           background-color: #f44336;
-	           color: white;
-	           text-decoration: none;
-	           border-radius: 4px;
-	           margin: 20px 0;
-	       }
-	       .footer { margin-top: 20px; font-size: 12px; color: #777; }
-	   </style>
+		   <meta charset="UTF-8">
+		   <style>
+		       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+		       .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+		       .header { background-color: #f44336; color: white; padding: 20px; text-align: center; }
+		       .content { padding: 20px; background-color: #f9f9f9; }
+		       .button {
+		           display: inline-block;
+		           padding: 12px 24px;
+		           background-color: #f44336;
+		           color: white;
+		           text-decoration: none;
+		           border-radius: 4px;
+		           margin: 20px 0;
+		       }
+		       .footer { margin-top: 20px; font-size: 12px; color: #777; }
+		   </style>
 </head>
 <body>
-	   <div class="container">
-	       <div class="header">
-	           <h1>密码重置</h1>
-	       </div>
-	       <div class="content">
-	           <p>尊敬的 %s，</p>
-	           <p>我们收到了您的密码重置请求。请点击下面的按钮重置您的密码：</p>
-	           <p>
-	               <a href="%s" class="button">重置密码</a>
-	           </p>
-            <p>或者复制以下链接到浏览器中打开：</p>
-            <p>%s</p>
-            <p>此链接将在 5 分钟后失效。</p>
-	       </div>
-	       <div class="footer">
-	           <p>如果您没有请求重置密码，请忽略此邮件。</p>
-	       </div>
-	   </div>
+		   <div class="container">
+		       <div class="header">
+		           <h1>Password Reset</h1>
+		       </div>
+		       <div class="content">
+		           <p>Dear %s,</p>
+		           <p>We received a password reset request from your account. Please click the button below to reset your password:</p>
+		           <p>
+		               <a href="%s" class="button">Reset Password</a>
+		           </p>
+	            <p>Or copy and paste the following link into your browser:</p>
+	            <p>%s</p>
+	            <p>This link will expire in 5 minutes.</p>
+		       </div>
+		       <div class="footer">
+		           <p>If you did not request a password reset, please ignore this email.</p>
+		       </div>
+		   </div>
 </body>
 </html>
 	`, toName, resetLink, resetLink)
 
-	// 构建邮件
+	// Build email message
 	from := fmt.Sprintf("%s <%s>", config.FromName, config.FromEmail)
 	to := toEmail
 
-	// 邮件头
+	// Email headers
 	headers := make(map[string]string)
 	headers["From"] = from
 	headers["To"] = to
-	headers["Subject"] = "密码重置请求"
+	headers["Subject"] = "Password Reset Request"
 	headers["MIME-Version"] = "1.0"
 	headers["Content-Type"] = "multipart/alternative; boundary=\"boundary\""
 
-	// 构建邮件体
+	// Build email body
 	message := ""
 	for k, v := range headers {
 		message += fmt.Sprintf("%s: %s\r\n", k, v)
@@ -288,29 +288,29 @@ func (m *Mailer) SendPasswordResetEmail(toEmail, toName, resetLink string) error
 	message += strings.TrimSpace(htmlBody) + "\r\n\r\n"
 	message += "--boundary--\r\n"
 
-	// 连接 SMTP 服务器
+	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
-	log.Printf("正在发送密码重置邮件到 %s...", toEmail)
+	log.Printf("Sending password reset email to %s...", toEmail)
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{toEmail}, []byte(message)); err != nil {
-		log.Printf("发送密码重置邮件失败: %v", err)
+		log.Printf("Failed to send password reset email: %v", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Printf("密码重置邮件已成功发送到 %s", toEmail)
+	log.Printf("Password reset email successfully sent to %s", toEmail)
 	return nil
 }
 
-// GeneratePasswordResetToken 生成密码重置令牌
+// GeneratePasswordResetToken generates password reset token
 func (m *Mailer) GeneratePasswordResetToken(userID uint) (string, error) {
-	// 生成随机令牌
+	// Generate random token
 	token := fmt.Sprintf("reset-%d-%d", userID, time.Now().UnixNano())
 
-	// 计算过期时间（1小时后）
+	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
-	// 保存到数据库
+	// Save to database
 	updates := map[string]interface{}{
 		"verification_token": token,
 		"token_expires_at":   expiresAt,
@@ -322,15 +322,15 @@ func (m *Mailer) GeneratePasswordResetToken(userID uint) (string, error) {
 	return token, nil
 }
 
-// GenerateEmailChangeToken 生成邮箱变更验证令牌
+// GenerateEmailChangeToken generates email change verification token
 func (m *Mailer) GenerateEmailChangeToken(userID uint, newEmail string) (string, error) {
-	// 生成随机令牌
+	// Generate random token
 	token := fmt.Sprintf("email-change-%d-%d", userID, time.Now().UnixNano())
 
-	// 计算过期时间（5分钟后）
+	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
-	// 保存到数据库，同时存储待确认的新邮箱
+	// Save to database, also store pending new email
 	updates := map[string]interface{}{
 		"verification_token": token,
 		"token_expires_at":   expiresAt,
@@ -343,93 +343,93 @@ func (m *Mailer) GenerateEmailChangeToken(userID uint, newEmail string) (string,
 	return token, nil
 }
 
-// SendEmailChangeEmail 发送邮箱变更确认邮件
+// SendEmailChangeEmail sends email change confirmation email
 func (m *Mailer) SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error {
-	// 获取 SMTP 配置
+	// Get SMTP configuration
 	var config model.SMTPConfig
 	if err := m.DB.First(&config).Error; err != nil {
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	// 检查是否启用 SMTP
+	// Check if SMTP is enabled
 	if !config.Enabled {
 		return fmt.Errorf("SMTP is not enabled")
 	}
 
-	// 邮件正文
+	// Email body (text version)
 	textBody := fmt.Sprintf(`
-尊敬的 %s，
+Dear %s,
 
-我们收到了您的邮箱变更请求。请点击以下链接确认将您的邮箱更改为 %s：
+We received an email change request. Please click the following link to confirm changing your email to %s:
 
 %s
 
-此链接将在 5 分钟后失效。
+This link will expire in 5 minutes.
 
-如果您没有请求变更邮箱，请忽略此邮件。
+If you did not request an email change, please ignore this email.
 	`, toName, newEmail, verificationLink)
 
-	// HTML 格式的邮件正文
+	// Email body (HTML version)
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
-	   <meta charset="UTF-8">
-	   <style>
-	       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-	       .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-	       .header { background-color: #2196F3; color: white; padding: 20px; text-align: center; }
-	       .content { padding: 20px; background-color: #f9f9f9; }
-	       .button {
-	           display: inline-block;
-	           padding: 12px 24px;
-	           background-color: #2196F3;
-	           color: white;
-	           text-decoration: none;
-	           border-radius: 4px;
-	           margin: 20px 0;
-	       }
-	       .footer { margin-top: 20px; font-size: 12px; color: #777; }
-	       .new-email { font-weight: bold; color: #2196F3; }
-	   </style>
+		   <meta charset="UTF-8">
+		   <style>
+		       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+		       .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+		       .header { background-color: #2196F3; color: white; padding: 20px; text-align: center; }
+		       .content { padding: 20px; background-color: #f9f9f9; }
+		       .button {
+		           display: inline-block;
+		           padding: 12px 24px;
+		           background-color: #2196F3;
+		           color: white;
+		           text-decoration: none;
+		           border-radius: 4px;
+		           margin: 20px 0;
+		       }
+		       .footer { margin-top: 20px; font-size: 12px; color: #777; }
+		       .new-email { font-weight: bold; color: #2196F3; }
+		   </style>
 </head>
 <body>
-	   <div class="container">
-	       <div class="header">
-	           <h1>确认邮箱变更</h1>
-	       </div>
-	       <div class="content">
-	           <p>尊敬的 %s，</p>
-	           <p>我们收到了您的邮箱变更请求。请点击下面的按钮确认将您的邮箱更改为：</p>
-	           <p class="new-email">%s</p>
-	           <p>
-	               <a href="%s" class="button">确认变更</a>
-	           </p>
-            <p>或者复制以下链接到浏览器中打开：</p>
-            <p>%s</p>
-            <p>此链接将在 5 分钟后失效。</p>
-	       </div>
-	       <div class="footer">
-	           <p>如果您没有请求变更邮箱，请忽略此邮件。</p>
-	       </div>
-	   </div>
+		   <div class="container">
+		       <div class="header">
+		           <h1>Confirm Email Change</h1>
+		       </div>
+		       <div class="content">
+		           <p>Dear %s,</p>
+		           <p>We received an email change request. Please click the button below to confirm changing your email to:</p>
+		           <p class="new-email">%s</p>
+		           <p>
+		               <a href="%s" class="button">Confirm Change</a>
+		           </p>
+	            <p>Or copy and paste the following link into your browser:</p>
+	            <p>%s</p>
+	            <p>This link will expire in 5 minutes.</p>
+		       </div>
+		       <div class="footer">
+		           <p>If you did not request an email change, please ignore this email.</p>
+		       </div>
+		   </div>
 </body>
 </html>
 	`, toName, newEmail, verificationLink, verificationLink)
 
-	// 构建邮件
+	// Build email message
 	from := fmt.Sprintf("%s <%s>", config.FromName, config.FromEmail)
 	to := toEmail
 
-	// 邮件头
+	// Email headers
 	headers := make(map[string]string)
 	headers["From"] = from
 	headers["To"] = to
-	headers["Subject"] = "确认邮箱变更"
+	headers["Subject"] = "Confirm Email Change"
 	headers["MIME-Version"] = "1.0"
 	headers["Content-Type"] = "multipart/alternative; boundary=\"boundary\""
 
-	// 构建邮件体
+	// Build email body
 	message := ""
 	for k, v := range headers {
 		message += fmt.Sprintf("%s: %s\r\n", k, v)
@@ -443,73 +443,73 @@ func (m *Mailer) SendEmailChangeEmail(toEmail, toName, newEmail, verificationLin
 	message += strings.TrimSpace(htmlBody) + "\r\n\r\n"
 	message += "--boundary--\r\n"
 
-	// 连接 SMTP 服务器
+	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
-	log.Printf("正在发送邮箱变更确认邮件到 %s...", toEmail)
+	log.Printf("Sending email change confirmation to %s...", toEmail)
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{toEmail}, []byte(message)); err != nil {
-		log.Printf("发送邮箱变更确认邮件失败: %v", err)
+		log.Printf("Failed to send email change confirmation: %v", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Printf("邮箱变更确认邮件已成功发送到 %s", toEmail)
+	log.Printf("Email change confirmation successfully sent to %s", toEmail)
 	return nil
 }
 
-// ConfirmEmailChange 确认邮箱变更
+// ConfirmEmailChange confirms email change
 func (m *Mailer) ConfirmEmailChange(token string) error {
-	log.Printf("=== ConfirmEmailChange 开始处理 ===")
-	log.Printf("令牌: %s", token)
+	log.Printf("=== ConfirmEmailChange processing started ===")
+	log.Printf("Token: %s", token)
 
 	var user model.User
 	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			log.Printf("错误: 无效的验证令牌")
+			log.Printf("Error: Invalid verification token")
 			return fmt.Errorf("invalid verification token")
 		}
-		log.Printf("错误: 查询用户失败: %v", err)
+		log.Printf("Error: Failed to query user: %v", err)
 		return fmt.Errorf("failed to find user: %w", err)
 	}
-	log.Printf("找到用户: ID=%d, Username=%s, CurrentEmail=%s, PendingEmail=%s",
+	log.Printf("Found user: ID=%d, Username=%s, CurrentEmail=%s, PendingEmail=%s",
 		user.ID, user.Username, user.Email, user.PendingEmail)
 
-	// 检查令牌是否过期
+	// Check if token is expired
 	if user.TokenExpiresAt.Before(time.Now()) {
-		log.Printf("错误: 令牌已过期 (ExpiresAt: %v, Now: %v)", user.TokenExpiresAt, time.Now())
+		log.Printf("Error: Token expired (ExpiresAt: %v, Now: %v)", user.TokenExpiresAt, time.Now())
 		return fmt.Errorf("verification token has expired")
 	}
-	log.Printf("令牌未过期")
+	log.Printf("Token not expired")
 
-	// 检查是否有待确认的邮箱
+	// Check if there is a pending email
 	if user.PendingEmail == "" {
-		log.Printf("错误: 没有待确认的邮箱 (PendingEmail为空)")
+		log.Printf("Error: No pending email (PendingEmail is empty)")
 		return fmt.Errorf("no pending email change")
 	}
-	log.Printf("待确认邮箱: %s", user.PendingEmail)
+	log.Printf("Pending email: %s", user.PendingEmail)
 
-	// 检查新邮箱是否已被其他用户使用
+	// Check if the new email is already used by another user
 	var existingUser model.User
 	if err := m.DB.Where("email = ? AND id != ?", user.PendingEmail, user.ID).First(&existingUser).Error; err == nil {
-		log.Printf("错误: 邮箱已被其他用户使用 (UserID=%d)", existingUser.ID)
+		log.Printf("Error: Email already in use by another user (UserID=%d)", existingUser.ID)
 		return fmt.Errorf("email already in use by another account")
 	}
-	log.Printf("新邮箱未被其他用户使用")
+	log.Printf("New email is not used by another user")
 
-	// 更新邮箱地址
-	log.Printf("开始更新用户邮箱...")
+	// Update email address
+	log.Printf("Starting to update user email...")
 	if err := m.DB.Model(&user).Updates(map[string]interface{}{
 		"email":              user.PendingEmail,
-		"email_verified":     true, // 变更后的邮箱自动验证
+		"email_verified":     true, // automatically verify the changed email
 		"pending_email":      "",
 		"verification_token": "",
 		"token_expires_at":   time.Time{},
 	}).Error; err != nil {
-		log.Printf("错误: 更新邮箱失败: %v", err)
+		log.Printf("Error: Failed to update email: %v", err)
 		return fmt.Errorf("failed to update email: %w", err)
 	}
 
-	log.Printf("邮箱更新成功! 新邮箱: %s", user.PendingEmail)
-	log.Printf("=== ConfirmEmailChange 处理完成 ===")
+	log.Printf("Email update successful! New email: %s", user.PendingEmail)
+	log.Printf("=== ConfirmEmailChange processing completed ===")
 	return nil
 }

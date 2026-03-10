@@ -13,10 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// 全局数据库连接，需要在初始化时设置
+// Global database connection, needs to be set during initialization
 var db *gorm.DB
 
-// SetDB 设置数据库连接
+// SetDB sets database connection
 func SetDB(database *gorm.DB) {
 	db = database
 }
@@ -25,18 +25,18 @@ func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "未提供认证信息"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "No authentication information provided"})
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if !(len(parts) == 2 && parts[0] == "Bearer") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "认证格式错误"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication format error"})
 			return
 		}
 
 		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
-			// 确保使用 HS256 签名方法
+			// Ensure using HS256 signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrTokenUnverifiable
 			}
@@ -44,21 +44,21 @@ func JWTAuth() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "无效的token"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
 
 		claims := token.Claims.(jwt.MapClaims)
 		userID := uint(claims["user_id"].(float64))
-		
-		// 验证密码版本
+
+		// Verify password version
 		if db != nil {
 			var user model.User
 			if err := db.First(&user, userID).Error; err == nil {
-				// 检查令牌中的密码版本与用户当前的密码版本是否匹配
+				// Check if password version in token matches current user's password version
 				if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
 					if int(tokenPasswordVersion) != user.PasswordVersion {
-						c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "密码已修改，请重新登录"})
+						c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Password has been changed, please log in again"})
 						return
 					}
 				}
@@ -68,13 +68,13 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set("userID", userID)
 		c.Set("username", claims["username"].(string))
 
-		// 获取用户完整信息并设置到上下文中
+		// Get complete user information and set in context
 		userInfo := map[string]interface{}{
 			"id":       userID,
 			"username": claims["username"].(string),
 		}
 
-		// 安全地获取角色信息
+		// Safely get role information
 		if role, ok := claims["role"].(string); ok {
 			userInfo["role"] = role
 		} else {
@@ -87,8 +87,8 @@ func JWTAuth() gin.HandlerFunc {
 	}
 }
 
-// OptionalJWTAuth 尝试解析 Authorization header 中的 JWT 并将用户信息写入上下文，
-// 如果没有提供或解析失败则不阻止请求（用于公开接口可以感知登录用户但不强制认证）。
+// OptionalJWTAuth attempts to parse JWT from Authorization header and write user info to context,
+// If not provided or parsing fails, do not block the request (used for public endpoints that can sense logged-in user but don't require authentication).
 func OptionalJWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -111,7 +111,7 @@ func OptionalJWTAuth() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			// 不中断请求，仅忽略无效 token
+			// Do not interrupt request, only ignore invalid token
 			c.Next()
 			return
 		}
@@ -119,14 +119,14 @@ func OptionalJWTAuth() gin.HandlerFunc {
 		claims := token.Claims.(jwt.MapClaims)
 		userID := uint(0)
 		validToken := true
-		
-		// 验证密码版本
+
+		// Verify password version
 		if db != nil {
 			if uid, ok := claims["user_id"].(float64); ok {
 				userID = uint(uid)
 				var user model.User
 				if err := db.First(&user, userID).Error; err == nil {
-					// 检查令牌中的密码版本与用户当前的密码版本是否匹配
+					// Check if password version in token matches current user's password version
 					if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
 						if int(tokenPasswordVersion) != user.PasswordVersion {
 							validToken = false
@@ -137,12 +137,12 @@ func OptionalJWTAuth() gin.HandlerFunc {
 		}
 
 		if !validToken {
-			// 不中断请求，仅忽略无效 token
+			// Do not interrupt request, only ignore invalid token
 			c.Next()
 			return
 		}
 
-		// 安全地设置 userID/username/role
+		// Safely set userID/username/role
 		if uid, ok := claims["user_id"].(float64); ok {
 			c.Set("userID", uint(uid))
 		}

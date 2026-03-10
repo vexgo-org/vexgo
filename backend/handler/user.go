@@ -10,9 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetUserList 获取用户列表
+// GetUserList gets user list
 func GetUserList(c *gin.Context) {
-	// 分页参数
+	// Pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if page < 1 {
@@ -25,13 +25,13 @@ func GetUserList(c *gin.Context) {
 	var users []model.User
 	var total int64
 
-	// 查询用户列表
+	// Query user list
 	query := db.Model(&model.User{})
 
-	// 统计总数
+	// Count total
 	db.Model(&model.User{}).Count(&total)
 
-	// 分页查询
+	// Paginated query
 	query.Offset((page - 1) * limit).
 		Limit(limit).
 		Order("id ASC").
@@ -53,19 +53,19 @@ func GetUserList(c *gin.Context) {
 	})
 }
 
-// UpdateUserRole 更新用户角色
+// UpdateUserRole updates user role
 func UpdateUserRole(c *gin.Context) {
-	// 从上下文中获取当前用户信息
+	// Get current user information from context
 	currentUserInterface, exists := c.Get("user")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供用户信息"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
 	}
 
-	// 将用户信息从map转换为model.User
+	// Convert user information from map to model.User
 	userMap, ok := currentUserInterface.(map[string]interface{})
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户信息格式错误"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User information format error"})
 		return
 	}
 
@@ -75,39 +75,39 @@ func UpdateUserRole(c *gin.Context) {
 		Role:     userMap["role"].(string),
 	}
 
-	// 获取要更新的用户ID
+	// Get user ID to update
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
 	var user model.User
 
-	// 查找目标用户
+	// Find target user
 	if err := db.First(&user, uint(id)).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询用户失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query user"})
 		return
 	}
 
-	// 不能修改自己的角色
+	// Cannot modify own role
 	if user.ID == currentUser.ID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "不能修改自己的角色"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot modify own role"})
 		return
 	}
 
-	// 不能修改超级管理员的角色（除非当前用户也是超级管理员）
+	// Cannot modify super admin's role (unless current user is also super admin)
 	if user.Role == model.RoleSuperAdmin && currentUser.Role != model.RoleSuperAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权限修改超级管理员角色"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "No permission to modify super admin role"})
 		return
 	}
 
-	// 解析请求参数
+	// Parse request parameters
 	var req struct {
 		Role string `json:"role" binding:"required"`
 	}
@@ -117,7 +117,7 @@ func UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	// 验证角色是否有效
+	// Validate role is valid
 	validRoles := map[string]bool{
 		model.RoleSuperAdmin:  true,
 		model.RoleAdmin:       true,
@@ -127,42 +127,42 @@ func UpdateUserRole(c *gin.Context) {
 	}
 
 	if !validRoles[req.Role] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的角色"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
 		return
 	}
 
-	// 权限检查
-	// 超级管理员可以设置任何角色（包括其他用户成为超级管理员）
-	// 但不能降级自己的超级管理员权限
+	// Permission check
+	// Super admin can set any role (including making other users super admin)
+	// But cannot downgrade own super admin privileges
 	if currentUser.Role == model.RoleSuperAdmin {
-		// 如果当前用户是超级管理员，可以设置任何角色
-		// 注意：不允许超级管理员将自己的角色降级
+		// If current user is super admin, can set any role
+		// Note: super admin cannot downgrade own role
 		if user.ID == currentUser.ID && req.Role != model.RoleSuperAdmin {
-			c.JSON(http.StatusForbidden, gin.H{"error": "超级管理员不能修改自己的角色"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Super admin cannot modify own role"})
 			return
 		}
 		user.Role = req.Role
 	} else if currentUser.Role == model.RoleAdmin {
-		// 管理员只能将用户角色设置为作者、投稿者或访客（不能设置为管理员或超级管理员）
+		// Admin can only set user roles to author, contributor, or guest (cannot set to admin or super admin)
 		if req.Role == model.RoleAuthor || req.Role == model.RoleContributor || req.Role == model.RoleGuest {
 			user.Role = req.Role
 		} else {
-			c.JSON(http.StatusForbidden, gin.H{"error": "管理员只能将用户角色设置为作者、投稿者或访客"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Admin can only set user roles to author, contributor, or guest"})
 			return
 		}
 	} else {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权限修改用户角色"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "No permission to modify user role"})
 		return
 	}
 
-	// 保存更新
+	// Save updates
 	if err := db.Model(&user).Select("Role").Updates(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新用户角色失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user role"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "用户角色更新成功",
+		"message": "User role updated successfully",
 		"user":    user,
 	})
 }

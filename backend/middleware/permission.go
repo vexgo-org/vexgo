@@ -9,26 +9,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// PermissionMiddleware 权限控制中间件
+// PermissionMiddleware checks if user has required role
 func PermissionMiddleware(requiredRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 从上下文中获取用户ID
+		// Get user ID from context
 		userIDInterface, exists := c.Get("userID")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "未提供用户信息"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 			return
 		}
 
 		userID := userIDInterface.(uint)
 
-		// 查询用户信息
+		// Query user information
 		var user model.User
 		if err := handler.DB().First(&user, userID).Error; err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
 			return
 		}
 
-		// 检查用户角色是否符合要求
+		// Check if user role meets requirements
 		hasPermission := false
 		for _, requiredRole := range requiredRoles {
 			if user.Role == requiredRole {
@@ -37,17 +37,17 @@ func PermissionMiddleware(requiredRoles ...string) gin.HandlerFunc {
 			}
 		}
 
-		// 超级管理员拥有所有权限
+		// Super admin has all permissions
 		if user.Role == model.RoleSuperAdmin {
 			hasPermission = true
 		}
 
 		if !hasPermission {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "权限不足"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
 			return
 		}
 
-		// 将用户信息存储到上下文中供后续使用
+		// Store user information in context for later use
 		c.Set("user", map[string]interface{}{
 			"id":       user.ID,
 			"username": user.Username,

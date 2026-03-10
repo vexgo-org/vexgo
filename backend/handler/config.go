@@ -16,12 +16,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// IsCaptchaEnabled 检查是否启用了滑块验证
+// IsCaptchaEnabled checks if captcha verification is enabled
 func IsCaptchaEnabled() (bool, error) {
 	var settings model.GeneralSettings
 	if err := db.First(&settings).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 默认不启用
+			// Not enabled by default
 			return false, nil
 		}
 		return false, err
@@ -29,12 +29,12 @@ func IsCaptchaEnabled() (bool, error) {
 	return settings.CaptchaEnabled, nil
 }
 
-// GetSMTPConfig 获取 SMTP 配置
+// GetSMTPConfig gets SMTP configuration
 func GetSMTPConfig(c *gin.Context) {
 	var config model.SMTPConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 返回默认配置
+			// Return default configuration
 			c.JSON(http.StatusOK, model.SMTPConfig{
 				Enabled:   false,
 				Host:      "",
@@ -50,22 +50,22 @@ func GetSMTPConfig(c *gin.Context) {
 		return
 	}
 
-	// 不返回密码字段
+	// Don't return password field
 	config.Password = ""
 	c.JSON(http.StatusOK, config)
 }
 
-// UpdateSMTPConfig 更新 SMTP 配置
+// UpdateSMTPConfig updates SMTP configuration
 func UpdateSMTPConfig(c *gin.Context) {
 	var req struct {
 		Enabled   bool   `json:"enabled"`
 		Host      string `json:"host"`
 		Port      int    `json:"port"`
 		Username  string `json:"username"`
-		Password  string `json:"password"` // 如果为空则不更新密码
+		Password  string `json:"password"` // if empty, don't update password
 		FromEmail string `json:"fromEmail"`
 		FromName  string `json:"fromName"`
-		TestEmail string `json:"testEmail"` // 测试邮件收件人邮箱
+		TestEmail string `json:"testEmail"` // test email recipient
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -73,11 +73,11 @@ func UpdateSMTPConfig(c *gin.Context) {
 		return
 	}
 
-	// 获取现有配置
+	// Get existing configuration
 	var config model.SMTPConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 创建新配置
+			// Create new configuration
 			config = model.SMTPConfig{
 				Enabled:   req.Enabled,
 				Host:      req.Host,
@@ -97,7 +97,7 @@ func UpdateSMTPConfig(c *gin.Context) {
 			return
 		}
 	} else {
-		// 更新现有配置
+		// Update existing configuration
 		config.Enabled = req.Enabled
 		config.Host = req.Host
 		config.Port = req.Port
@@ -106,7 +106,7 @@ func UpdateSMTPConfig(c *gin.Context) {
 		config.FromName = req.FromName
 		config.TestEmail = req.TestEmail
 
-		// 只有当提供了新密码时才更新密码
+		// Only update password if new password is provided
 		if req.Password != "" {
 			config.Password = req.Password
 		}
@@ -117,49 +117,49 @@ func UpdateSMTPConfig(c *gin.Context) {
 		}
 	}
 
-	// 返回配置，但不包含密码
+	// Return configuration without password
 	config.Password = ""
 	c.JSON(http.StatusOK, config)
 }
 
-// TestSMTP 测试 SMTP 配置
+// TestSMTP tests SMTP configuration
 func TestSMTP(c *gin.Context) {
-	// 获取当前管理员用户邮箱（从 JWT token 中获取）
+	// Get current admin user email (from JWT token)
 	userContext, exists := c.Get("user")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未授权"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
-	// 获取 SMTP 配置
+	// Get SMTP configuration
 	var config model.SMTPConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "请先配置 SMTP 设置"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Please configure SMTP settings first"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get SMTP config"})
 		return
 	}
 
-	// 检查是否启用
+	// Check if enabled
 	if !config.Enabled {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "SMTP 未启用，请先启用并保存配置"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "SMTP is not enabled, please enable and save configuration first"})
 		return
 	}
 
-	// 检查必要字段
+	// Check required fields
 	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" || config.FromEmail == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请完整填写 SMTP 配置信息"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please fill in all SMTP configuration fields"})
 		return
 	}
 
-	// 获取收件人邮箱：优先使用配置的测试邮箱，否则使用当前管理员邮箱
+	// Get recipient email: use configured test email first, otherwise use current admin email
 	var recipientEmail string
 	if config.TestEmail != "" {
 		recipientEmail = config.TestEmail
 	} else {
-		// 回退到使用管理员邮箱
+		// Fallback to admin email
 		if userMap, ok := userContext.(map[string]interface{}); ok {
 			if email, ok := userMap["email"].(string); ok {
 				recipientEmail = email
@@ -167,24 +167,24 @@ func TestSMTP(c *gin.Context) {
 		}
 	}
 	if recipientEmail == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请先填写测试邮箱地址"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please fill in test email address first"})
 		return
 	}
 
-	// 发送测试邮件
-	subject := "SMTP 配置测试邮件"
+	// Send test email
+	subject := "SMTP Configuration Test Email"
 	textBody := fmt.Sprintf(`
-尊敬的 %s，
+Dear %s,
 
-这是一封测试邮件，用于验证您的 SMTP 配置是否正确工作。
+This is a test email to verify your SMTP configuration is working correctly.
 
-如果您收到此邮件，说明 SMTP 配置成功！
+If you receive this email, it means your SMTP configuration is successful!
 
-配置信息：
-- SMTP 服务器: %s:%d
-- 发件人: %s <%s>
+Configuration details:
+- SMTP Server: %s:%d
+- Sender: %s <%s>
 
-时间: %s
+Time: %s
 	`, config.FromName, config.Host, config.Port, config.FromName, config.FromEmail, time.Now().Format("2006-01-02 15:04:05"))
 
 	htmlBody := fmt.Sprintf(`
@@ -204,27 +204,27 @@ func TestSMTP(c *gin.Context) {
 <body>
     <div class="container">
         <div class="header">
-            <h1>SMTP 配置测试</h1>
+            <h1>SMTP Configuration Test</h1>
         </div>
         <div class="content">
-            <p>尊敬的 %s，</p>
-            <p class="success">✓ 测试邮件发送成功！</p>
-            <p>您的 SMTP 配置已正确工作，可以开始使用邮件验证功能了。</p>
+            <p>Dear %s,</p>
+            <p class="success">✓ Test email sent successfully!</p>
+            <p>Your SMTP configuration is working correctly. You can now use email verification features.</p>
             
             <div class="info">
-                <strong>配置信息：</strong><br>
-                SMTP 服务器: %s:%d<br>
-                发件人: %s <%s>
+                <strong>Configuration details:</strong><br>
+                SMTP Server: %s:%d<br>
+                Sender: %s <%s>
             </div>
             
-            <p>时间: %s</p>
+            <p>Time: %s</p>
         </div>
     </div>
 </body>
 </html>
 	`, config.FromName, config.Host, config.Port, config.FromName, config.FromEmail, time.Now().Format("2006-01-02 15:04:05"))
 
-	// 构建邮件
+	// Build email message
 	from := fmt.Sprintf("%s <%s>", config.FromName, config.FromEmail)
 	to := recipientEmail
 
@@ -248,27 +248,27 @@ func TestSMTP(c *gin.Context) {
 	message += strings.TrimSpace(htmlBody) + "\r\n\r\n"
 	message += "--boundary--\r\n"
 
-	// 连接 SMTP 服务器
+	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{to}, []byte(message)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("发送测试邮件失败: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to send test email: %v", err)})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "测试邮件已发送到您的邮箱",
+		"message": "Test email has been sent to your inbox",
 		"to":      recipientEmail,
 	})
 }
 
-// GetGeneralSettings 获取通用设置
+// GetGeneralSettings gets general settings
 func GetGeneralSettings(c *gin.Context) {
 	var config model.GeneralSettings
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 返回默认配置
+			// Return default configuration
 			c.JSON(http.StatusOK, model.GeneralSettings{
 				CaptchaEnabled:      false,
 				RegistrationEnabled: true,
@@ -285,7 +285,7 @@ func GetGeneralSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, config)
 }
 
-// UpdateGeneralSettings 更新通用设置
+// UpdateGeneralSettings updates general settings
 func UpdateGeneralSettings(c *gin.Context) {
 	var req struct {
 		CaptchaEnabled      bool   `json:"captchaEnabled"`
@@ -300,11 +300,11 @@ func UpdateGeneralSettings(c *gin.Context) {
 		return
 	}
 
-	// 获取现有配置
+	// Get existing configuration
 	var config model.GeneralSettings
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 创建新配置
+			// Create new configuration
 			config = model.GeneralSettings{
 				CaptchaEnabled:      req.CaptchaEnabled,
 				RegistrationEnabled: req.RegistrationEnabled,
@@ -321,7 +321,7 @@ func UpdateGeneralSettings(c *gin.Context) {
 			return
 		}
 	} else {
-		// 更新现有配置
+		// Update existing configuration
 		config.CaptchaEnabled = req.CaptchaEnabled
 		config.RegistrationEnabled = req.RegistrationEnabled
 		config.SiteName = req.SiteName
@@ -340,12 +340,12 @@ func UpdateGeneralSettings(c *gin.Context) {
 	})
 }
 
-// GetAIConfig 获取 AI 配置
+// GetAIConfig gets AI configuration
 func GetAIConfig(c *gin.Context) {
 	var config model.AIConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 返回默认配置
+			// Return default configuration
 			c.JSON(http.StatusOK, model.AIConfig{
 				Enabled:     false,
 				Provider:    "openai",
@@ -359,18 +359,18 @@ func GetAIConfig(c *gin.Context) {
 		return
 	}
 
-	// 不返回API密钥字段
+	// Don't return API key field
 	config.ApiKey = ""
 	c.JSON(http.StatusOK, config)
 }
 
-// UpdateAIConfig 更新 AI 配置
+// UpdateAIConfig updates AI configuration
 func UpdateAIConfig(c *gin.Context) {
 	var req struct {
 		Enabled     bool   `json:"enabled"`
 		Provider    string `json:"provider"`
 		ApiEndpoint string `json:"apiEndpoint"`
-		ApiKey      string `json:"apiKey"` // 如果为空则不更新API密钥
+		ApiKey      string `json:"apiKey"` // if empty, don't update API key
 		ModelName   string `json:"modelName"`
 	}
 
@@ -379,11 +379,11 @@ func UpdateAIConfig(c *gin.Context) {
 		return
 	}
 
-	// 获取现有配置
+	// Get existing configuration
 	var config model.AIConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// 创建新配置
+			// Create new configuration
 			config = model.AIConfig{
 				Enabled:     req.Enabled,
 				Provider:    req.Provider,
@@ -400,13 +400,13 @@ func UpdateAIConfig(c *gin.Context) {
 			return
 		}
 	} else {
-		// 更新现有配置
+		// Update existing configuration
 		config.Enabled = req.Enabled
 		config.Provider = req.Provider
 		config.ApiEndpoint = req.ApiEndpoint
 		config.ModelName = req.ModelName
 
-		// 只有当提供了新API密钥时才更新
+		// Only update API key if new API key is provided
 		if req.ApiKey != "" {
 			config.ApiKey = req.ApiKey
 		}
@@ -417,7 +417,7 @@ func UpdateAIConfig(c *gin.Context) {
 		}
 	}
 
-	// 返回配置，但不包含API密钥
+	// Return configuration without API key
 	config.ApiKey = ""
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "AI config updated successfully",
@@ -425,43 +425,43 @@ func UpdateAIConfig(c *gin.Context) {
 	})
 }
 
-// TestAI 测试 AI 配置连接
+// TestAI tests AI configuration connection
 func TestAI(c *gin.Context) {
-	// 获取当前管理员用户信息（从 JWT token 中获取）
+	// Get current admin user information (from JWT token)
 	_, exists := c.Get("user")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未授权"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
-	// 获取 AI 配置
+	// Get AI configuration
 	var config model.AIConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "请先配置 AI 设置"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Please configure AI settings first"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI config"})
 		return
 	}
 
-	// 检查是否启用
+	// Check if enabled
 	if !config.Enabled {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "AI 未启用，请先启用并保存配置"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "AI is not enabled, please enable and save configuration first"})
 		return
 	}
 
-	// 检查必要字段
+	// Check required fields
 	if config.ApiEndpoint == "" || config.ApiKey == "" || config.ModelName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请完整填写 AI 配置信息（端点、API密钥、模型名称）"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please fill in all AI configuration fields (endpoint, API key, model name)"})
 		return
 	}
 
-	// 构建基础API URL
-	// 移除末尾斜杠，确保格式一致
+	// Build base API URL
+	// Remove trailing slash to ensure consistent format
 	baseURL := strings.TrimSuffix(config.ApiEndpoint, "/")
 
-	// 如果用户输入的是完整聊天端点（以 /chat/completions 结尾），提取基础部分
+	// If user entered full chat endpoint (ending with /chat/completions), extract base part
 	if strings.HasSuffix(baseURL, "/v1/chat/completions") {
 		baseURL = strings.TrimSuffix(baseURL, "/chat/completions")
 		baseURL = strings.TrimSuffix(baseURL, "/v1")
@@ -470,33 +470,33 @@ func TestAI(c *gin.Context) {
 		baseURL = strings.TrimSuffix(baseURL, "/chat/completions")
 	}
 
-	// 确保baseURL以 /v1 结尾
+	// Ensure baseURL ends with /v1
 	if !strings.HasSuffix(baseURL, "/v1") {
 		baseURL = baseURL + "/v1"
 	}
 
-	// 构建聊天完成端点
+	// Build chat completion endpoint
 	chatCompletionsURL := baseURL + "/chat/completions"
 
-	// 构建模型验证端点
+	// Build model validation endpoint
 	modelsURL := baseURL + "/models"
 
-	// 获取测试提示词：使用简单的测试问题
+	// Get test prompt: use simple test question
 	testPrompt := "Say this is a test"
 
-	// 步骤1: 验证模型是否存在（可选，但推荐）
+	// Step 1: Verify model exists (optional but recommended)
 	modelExists, modelErr := checkModelExists(modelsURL, config.ApiKey, config.ModelName)
 	if modelErr != nil {
-		// 模型检查失败，但继续测试聊天完成，可能只是该端点不支持模型列表
-		fmt.Printf("模型验证警告 (将继续测试): %v\n", modelErr)
+		// Model check failed, but continue testing chat completion, endpoint may not support model listing
+		fmt.Printf("Model validation warning (will continue test): %v\n", modelErr)
 	} else if !modelExists {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("模型 '%s' 不存在或不可用，请检查模型名称", config.ModelName),
+			"error": fmt.Sprintf("Model '%s' does not exist or is not available, please check model name", config.ModelName),
 		})
 		return
 	}
 
-	// 步骤2: 测试聊天完成功能
+	// Step 2: Test chat completion functionality
 	requestBody := map[string]interface{}{
 		"model": config.ModelName,
 		"messages": []map[string]string{
@@ -509,7 +509,7 @@ func TestAI(c *gin.Context) {
 		"temperature": 0.7,
 	}
 
-	// 发送 HTTP 请求到 AI API
+	// Send HTTP request to AI API
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
@@ -544,14 +544,14 @@ func TestAI(c *gin.Context) {
 		return
 	}
 
-	// 解析响应
+	// Parse response
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse AI response"})
 		return
 	}
 
-	// 检查是否有错误字段
+	// Check for error field
 	if errorMsg, ok := result["error"]; ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("AI API error: %v", errorMsg),
@@ -559,7 +559,7 @@ func TestAI(c *gin.Context) {
 		return
 	}
 
-	// 提取AI回复内容
+	// Extract AI response content
 	var aiResponse string
 	if choices, ok := result["choices"].([]interface{}); ok && len(choices) > 0 {
 		if choice, ok := choices[0].(map[string]interface{}); ok {
@@ -572,40 +572,40 @@ func TestAI(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "AI 连接测试成功！",
+		"message":  "AI connection test successful!",
 		"response": aiResponse,
 	})
 }
 
-// GetAIModels 获取可用的AI模型列表
+// GetAIModels gets available AI model list
 func GetAIModels(c *gin.Context) {
-	// 获取 AI 配置
+	// Get AI configuration
 	var config model.AIConfig
 	if err := db.First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "请先配置 AI 设置"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Please configure AI settings first"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI config"})
 		return
 	}
 
-	// 检查是否启用
+	// Check if enabled
 	if !config.Enabled {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "AI 未启用，请先启用并保存配置"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "AI is not enabled, please enable and save configuration first"})
 		return
 	}
 
-	// 检查必要字段
+	// Check required fields
 	if config.ApiEndpoint == "" || config.ApiKey == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请完整填写 AI 配置信息（端点、API密钥）"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please fill in all AI configuration fields (endpoint, API key)"})
 		return
 	}
 
-	// 构建基础API URL（与TestAI函数保持一致）
+	// Build base API URL (consistent with TestAI function)
 	baseURL := strings.TrimSuffix(config.ApiEndpoint, "/")
 
-	// 如果用户输入的是完整聊天端点（以 /chat/completions 结尾），提取基础部分
+	// If user entered full chat endpoint (ending with /chat/completions), extract base part
 	if strings.HasSuffix(baseURL, "/v1/chat/completions") {
 		baseURL = strings.TrimSuffix(baseURL, "/chat/completions")
 		baseURL = strings.TrimSuffix(baseURL, "/v1")
@@ -614,15 +614,15 @@ func GetAIModels(c *gin.Context) {
 		baseURL = strings.TrimSuffix(baseURL, "/chat/completions")
 	}
 
-	// 确保baseURL以 /v1 结尾
+	// Ensure baseURL ends with /v1
 	if !strings.HasSuffix(baseURL, "/v1") {
 		baseURL = baseURL + "/v1"
 	}
 
-	// 构建模型列表端点
+	// Build models list endpoint
 	modelsURL := baseURL + "/models"
 
-	// 发送请求获取模型列表
+	// Send request to fetch models list
 	client := &http.Client{
 		Timeout: 15 * time.Second,
 	}
@@ -651,14 +651,14 @@ func GetAIModels(c *gin.Context) {
 		return
 	}
 
-	// 解析响应
+	// Parse response
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse models response"})
 		return
 	}
 
-	// 检查是否有错误
+	// Check for errors
 	if errorMsg, ok := result["error"]; ok {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("API error: %v", errorMsg),
@@ -666,7 +666,7 @@ func GetAIModels(c *gin.Context) {
 		return
 	}
 
-	// 提取模型列表
+	// Extract models list
 	var models []map[string]interface{}
 	if data, ok := result["data"].([]interface{}); ok {
 		for _, model := range data {
@@ -688,7 +688,7 @@ func GetAIModels(c *gin.Context) {
 	})
 }
 
-// checkModelExists 检查模型是否存在
+// checkModelExists checks if model exists
 func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -717,7 +717,7 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 		return false, fmt.Errorf("failed to parse models response: %v", err)
 	}
 
-	// 检查模型列表
+	// Check models list
 	if data, ok := result["data"].([]interface{}); ok {
 		for _, model := range data {
 			if modelMap, ok := model.(map[string]interface{}); ok {
