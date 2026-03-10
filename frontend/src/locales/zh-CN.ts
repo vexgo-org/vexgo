@@ -101,6 +101,7 @@ export const zhCN = {
     system: '跟随系统',
     language: '语言',
     privacySettings: '隐私设置',
+    privacySettingsDesc: '管理您的个人资料和信息的可见性',
     profileVisibility: '个人资料可见性',
     public: '公开',
     private: '仅自己可见',

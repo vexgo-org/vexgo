@@ -101,6 +101,7 @@ export const enUS = {
     system: 'System',
     language: 'Language',
     privacySettings: 'Privacy Settings',
+    privacySettingsDesc: 'Manage the visibility of your profile and personal information',
     profileVisibility: 'Profile Visibility',
     public: 'Public',
     private: 'Private',

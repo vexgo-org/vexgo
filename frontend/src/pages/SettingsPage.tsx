@@ -200,7 +200,7 @@ export function SettingsPage() {
               <Shield className="w-5 h-5" />
               {t('settings.privacySettings')}
             </CardTitle>
-	          <CardDescription>{t('settings.privacySettingsDesc') || t('settings.privacySettings')}</CardDescription>
+	          <CardDescription>{t('settings.privacySettingsDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
