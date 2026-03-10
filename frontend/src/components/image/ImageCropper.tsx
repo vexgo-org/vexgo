@@ -7,9 +7,10 @@ type Props = {
   onCrop: (file: File) => void;
   outputWidth?: number;
   outputHeight?: number;
+  circle?: boolean; // 是否使用圆形裁剪
 };
 
-export const ImageCropper: React.FC<Props> = ({ file, aspect = 1200 / 630, onCancel, onCrop, outputWidth = 1200, outputHeight = 630 }) => {
+export const ImageCropper: React.FC<Props> = ({ file, aspect = 1200 / 630, onCancel, onCrop, outputWidth = 1200, outputHeight = 630, circle = false }) => {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cropBoxRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +98,17 @@ export const ImageCropper: React.FC<Props> = ({ file, aspect = 1200 / 630, onCan
       image.onerror = rej;
     });
 
+    // 圆形模式：创建圆形裁剪路径
+    if (circle) {
+      const centerX = outputWidth / 2;
+      const centerY = outputHeight / 2;
+      const radius = Math.min(outputWidth, outputHeight) / 2;
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.clip();
+    }
+
     // Draw and scale the selected source region to the desired output size
     ctx.drawImage(image, sx, sy, sw, sh, 0, 0, outputWidth, outputHeight);
 
@@ -111,7 +123,8 @@ export const ImageCropper: React.FC<Props> = ({ file, aspect = 1200 / 630, onCan
           return;
         }
         const ext = /png/i.test(mime) ? 'png' : /webp/i.test(mime) ? 'webp' : 'jpg';
-        const newFile = new File([blob], file.name.replace(/\.[^.]+$/, '' ) + '-cover.' + ext, { type: blob.type });
+        const suffix = circle ? '-avatar' : '-cover';
+        const newFile = new File([blob], file.name.replace(/\.[^.]+$/, '' ) + suffix + '.' + ext, { type: blob.type });
         onCrop(newFile);
         resolve();
       }, mime, quality as any);
@@ -122,10 +135,10 @@ export const ImageCropper: React.FC<Props> = ({ file, aspect = 1200 / 630, onCan
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded shadow-lg p-4 max-w-4xl w-full mx-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium">裁剪封面（保持比例）</h3>
+          <h3 className="text-lg font-medium">{circle ? '裁剪头像（圆形）' : '裁剪封面（保持比例）'}</h3>
           <div className="flex gap-2">
             <button className="btn" onClick={onCancel}>取消</button>
-            <button className="btn btn-primary" onClick={() => doCrop()}>确定并上传</button>
+            <button className="btn btn-primary" onClick={() => doCrop()}>{circle ? '确定并上传头像' : '确定并上传'}</button>
           </div>
         </div>
 
@@ -191,10 +204,11 @@ export const ImageCropper: React.FC<Props> = ({ file, aspect = 1200 / 630, onCan
                   top: '50%',
                   transform: 'translate(-50%, -50%)',
                   width: '90%',
-                  maxWidth: 1000,
-                  aspectRatio: `${aspect}`,
+                  maxWidth: 600,
+                  aspectRatio: circle ? '1' : `${aspect}`,
                   border: '2px dashed rgba(255,255,255,0.9)',
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)'
+                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)',
+                  borderRadius: circle ? '50%' : '0'
                 }}
                 ref={cropBoxRef}
               />

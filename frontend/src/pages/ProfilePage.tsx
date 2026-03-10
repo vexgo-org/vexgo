@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, User, Mail, Key, Check, Calendar, UserPlus, Eye, EyeOff, Camera } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import ImageCropper from '@/components/image/ImageCropper';
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -43,6 +44,8 @@ export function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,15 +152,20 @@ export function ProfilePage() {
     document.getElementById('avatar-upload')?.click();
   };
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedAvatarFile(file);
+    setShowCropper(true);
+  };
 
+  const handleAvatarCrop = async (croppedFile: File) => {
     setAvatarLoading(true);
+    setShowCropper(false);
 
     try {
       // 使用现有的上传API
-      const uploadResponse = await uploadApi.uploadFile(file);
+      const uploadResponse = await uploadApi.uploadFile(croppedFile);
       if (uploadResponse.data.file && uploadResponse.data.file.url) {
         // 更新用户头像
         const updateResponse = await authApi.updateProfile({ avatar: uploadResponse.data.file.url });
@@ -169,6 +177,7 @@ export function ProfilePage() {
       setError(errorMessage);
     } finally {
       setAvatarLoading(false);
+      setSelectedAvatarFile(null);
     }
   };
 
@@ -470,6 +479,22 @@ export function ProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 头像裁剪 */}
+      {showCropper && selectedAvatarFile && (
+        <ImageCropper
+          file={selectedAvatarFile}
+          circle={true}
+          aspect={1}
+          outputWidth={400}
+          outputHeight={400}
+          onCancel={() => {
+            setShowCropper(false);
+            setSelectedAvatarFile(null);
+          }}
+          onCrop={handleAvatarCrop}
+        />
+      )}
     </div>
   );
 }
