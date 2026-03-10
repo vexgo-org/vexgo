@@ -66,6 +66,12 @@ func CreateComment(c *gin.Context) {
 		return
 	}
 
+	// 检查评论字数限制（不超过100字）
+	if len(req.Content) > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "评论字数不能超过100字"})
+		return
+	}
+
 	// 解析 PostID 为 uint
 	var postID uint
 	switch v := req.PostID.(type) {

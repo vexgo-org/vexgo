@@ -402,12 +402,18 @@ export function PostDetailPage() {
         {isAuthenticated ? (
           <Card className="mb-8">
             <CardContent className="p-4">
-              <Textarea
-                placeholder={t('postDetailPage.commentPlaceholder')}
-                value={commentContent}
-                onChange={(e) => setCommentContent(e.target.value)}
-                className="mb-4 min-h-[100px]"
-              />
+              <div className="relative">
+                <Textarea
+                  placeholder={t('postDetailPage.commentPlaceholder')}
+                  value={commentContent}
+                  onChange={(e) => setCommentContent(e.target.value)}
+                  className="mb-4 min-h-[100px]"
+                  maxLength={100}
+                />
+                <div className="absolute bottom-6 right-4 text-sm text-muted-foreground">
+                  {commentContent.length}/100
+                </div>
+              </div>
               <div className="flex justify-end">
                 <Button
                   onClick={handleSubmitComment}
