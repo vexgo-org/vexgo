@@ -46,7 +46,7 @@
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted-foreground: 240 5% 85%;
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
@@ -78,39 +78,39 @@
 @layer utilities {
   /* 富文本编辑器内容样式 */
   .prose {
-    @apply text-gray-800;
+    @apply text-foreground;
   }
   
   .prose h1 {
-    @apply text-3xl font-bold mt-8 mb-4;
+    @apply text-3xl font-bold mt-8 mb-4 text-foreground;
   }
   
   .prose h2 {
-    @apply text-2xl font-bold mt-6 mb-3;
+    @apply text-2xl font-bold mt-6 mb-3 text-foreground;
   }
   
   .prose h3 {
-    @apply text-xl font-bold mt-4 mb-2;
+    @apply text-xl font-bold mt-4 mb-2 text-foreground;
   }
   
   .prose p {
-    @apply mb-4 leading-relaxed;
+    @apply mb-4 leading-relaxed text-foreground;
   }
   
   .prose ul {
-    @apply list-disc pl-6 mb-4;
+    @apply list-disc pl-6 mb-4 text-foreground;
   }
   
   .prose ol {
-    @apply list-decimal pl-6 mb-4;
+    @apply list-decimal pl-6 mb-4 text-foreground;
   }
   
   .prose blockquote {
-    @apply border-l-4 border-gray-300 pl-4 italic my-4;
+    @apply border-l-4 border-muted pl-4 italic my-4 text-foreground;
   }
   
   .prose code {
-    @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+    @apply bg-muted px-1 py-0.5 rounded text-sm font-mono text-foreground;
   }
   
   .prose pre {
@@ -126,7 +126,7 @@
   }
   
   .prose a {
-    @apply text-blue-600 hover:underline;
+    @apply text-primary hover:underline;
   }
   
   /* 行数限制 */
