@@ -219,7 +219,7 @@ export function WritePostPage() {
         content,
         category,
         tags,
-        excerpt: excerpt.trim() || content.substring(0, 200) + '...',
+        excerpt: excerpt.trim(),
         coverImage: coverImage || undefined,
         status: isContributor && status === 'published' ? 'pending' : status
       };
