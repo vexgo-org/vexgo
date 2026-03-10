@@ -736,7 +736,7 @@ export const enUS = {
     tagsPlaceholder: 'Add tag',
     addTag: 'Add',
     excerptLabel: 'Excerpt',
-    excerptPlaceholder: 'Enter article excerpt (optional, will auto-extract first 200 chars if empty)',
+    excerptPlaceholder: 'Enter article excerpt (optional)',
     contentLabel: 'Content',
     contentPlaceholder: 'Start writing...',
     contentRequired: 'Please enter article content',
