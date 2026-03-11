@@ -71,8 +71,7 @@ export const zhCN = {
     emailAlreadyUsed: "该邮箱已被其他用户使用",
     emailChangeConfirm: "确认修改邮箱",
     enterNewEmail: "请输入新邮箱地址",
-    smtpEnabled:
-      "由于您已启用邮件验证，系统将发送一封确认邮件到您的新邮箱，请点击邮件中的链接完成验证。",
+    smtpEnabled: "由于您已启用邮件验证，系统将发送一封确认邮件到您的新邮箱，请点击邮件中的链接完成验证。",
     smtpDisabled: "由于未启用SMTP，邮箱将直接更新。",
   },
 
@@ -585,8 +584,7 @@ export const zhCN = {
     popularTags: "热门标签",
     categories: "分类",
     aboutVexgo: "关于 VexGo",
-    aboutVexgoDesc:
-      "VexGo 是一个现代化的博客平台，支持富文本编辑、图片视频上传、评论互动等功能。快来分享你的故事吧！",
+    aboutVexgoDesc: "VexGo 是一个现代化的博客平台，支持富文本编辑、图片视频上传、评论互动等功能。快来分享你的故事吧！",
     comments: "评论",
     views: "阅读",
     prevPage: "上一页",
@@ -674,8 +672,7 @@ export const zhCN = {
     successMessage: "操作成功",
     uploadAvatar: "上传头像",
     bioPlaceholder: "请输入个性签名",
-    smtpEnabled:
-      "由于您已启用邮件验证，系统将发送一封确认邮件到您的新邮箱，请点击邮件中的链接完成验证。",
+    smtpEnabled: "由于您已启用邮件验证，系统将发送一封确认邮件到您的新邮箱，请点击邮件中的链接完成验证。",
     smtpDisabled: "由于未启用SMTP，邮箱将直接更新。",
     confirmChange: "确认修改",
   },
