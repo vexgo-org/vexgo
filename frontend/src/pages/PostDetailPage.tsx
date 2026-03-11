@@ -28,6 +28,7 @@ import {
   Clock, Eye, XCircle
 } from 'lucide-react';
 import { normalizeTagsArray } from '@/lib/utils';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 export function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -348,10 +349,9 @@ export function PostDetailPage() {
       )}
 
       {/* 文章内容 */}
-      <div
-        className="prose prose-lg max-w-none mb-12"
-        dangerouslySetInnerHTML={{ __html: post.content }}
-      />
+      <div className="mb-12">
+        <MarkdownRenderer content={post.content} />
+      </div>
 
       {/* 互动区域 */}
       <div className="flex items-center justify-between py-6 border-y">

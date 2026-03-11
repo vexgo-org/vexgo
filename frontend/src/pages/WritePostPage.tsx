@@ -100,8 +100,11 @@ export function WritePostPage() {
       const response = await postsApi.getPost(id!);
       const post: any = response.data.post;
       console.debug('WritePostPage loaded post:', post);
+      console.log('Post content:', post.content);
+      console.log('Post content type:', typeof post.content);
+      console.log('Post content length:', post.content?.length);
       setTitle(post.title);
-      setContent(post.content);
+      setContent(post.content || '');
       setExcerpt(post.excerpt || '');
       // 后端的 category 可能是数字或字符串，需要根据分类列表找到对应的分类名称
       if (post.category) {
