@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect } from "react";
+import { useIsDark } from "@/hooks/useIsDark";
 import { uploadApi } from "@/lib/api";
 import {
   MDXEditor,
@@ -14,8 +15,6 @@ import {
   InsertThematicBreak,
   InsertTable,
   InsertCodeBlock,
-  InsertAdmonition,
-  InsertFrontmatter,
   headingsPlugin,
   listsPlugin,
   linkPlugin,
@@ -50,6 +49,7 @@ export function RichTextEditor({
   originalContent,
 }: RichTextEditorProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
+  const isDark = useIsDark();
   const isInternalChange = useRef(false);
 
   // Image upload handler
@@ -113,7 +113,7 @@ export function RichTextEditor({
         onChange={handleChange}
         placeholder={placeholder || "Start writing..."}
         contentEditableClassName="prose"
-        className="dark-editor"
+        className={isDark ? "dark-theme dark-editor" : "dark-editor"}
         plugins={[
           headingsPlugin(),
           listsPlugin(),
@@ -163,8 +163,6 @@ export function RichTextEditor({
                           <InsertImage />
                           <InsertTable />
                           <InsertCodeBlock />
-                          <InsertAdmonition />
-                          <InsertFrontmatter />
                           <InsertThematicBreak />
                         </>
                       ),

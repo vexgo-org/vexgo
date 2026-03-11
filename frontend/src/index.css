@@ -3,280 +3,272 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.625rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    /* MDXEditor CodeMirror theme variables */
-    --mdxeditor-background: 255 255% 255%;
-    --mdxeditor-foreground: 0 0% 0%;
-    --mdxeditor-gutter-background: 248 100% 98%;
-    --mdxeditor-gutter-foreground: 0 0% 50%;
-    --mdxeditor-cursor: 0 0% 0%;
-    --mdxeditor-selection-background: 210 100% 85%;
-    --mdxeditor-active-line-background: 0 0% 96%;
-    --mdxeditor-line-number-color: 0 0% 50%;
-    --mdxeditor-matching-bracket-background: 210 100% 85%;
-  }
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 240 10% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 240 10% 3.9%;
+        --primary: 240 5.9% 10%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 240 4.8% 95.9%;
+        --secondary-foreground: 240 5.9% 10%;
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+        --accent: 240 4.8% 95.9%;
+        --accent-foreground: 240 5.9% 10%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 240 5.9% 90%;
+        --input: 240 5.9% 90%;
+        --ring: 240 5.9% 10%;
+        --radius: 0.625rem;
+        --sidebar-background: 0 0% 98%;
+        --sidebar-foreground: 240 5.3% 26.1%;
+        --sidebar-primary: 240 5.9% 10%;
+        --sidebar-primary-foreground: 0 0% 98%;
+        --sidebar-accent: 240 4.8% 95.9%;
+        --sidebar-accent-foreground: 240 5.9% 10%;
+        --sidebar-border: 220 13% 91%;
+        --sidebar-ring: 217.2 91.2% 59.8%;
+        /* MDXEditor CodeMirror theme variables */
+        --mdxeditor-background: 255 255% 255%;
+        --mdxeditor-foreground: 0 0% 0%;
+        --mdxeditor-gutter-background: 248 100% 98%;
+        --mdxeditor-gutter-foreground: 0 0% 50%;
+        --mdxeditor-cursor: 0 0% 0%;
+        --mdxeditor-selection-background: 210 100% 85%;
+        --mdxeditor-active-line-background: 0 0% 96%;
+        --mdxeditor-line-number-color: 0 0% 50%;
+        --mdxeditor-matching-bracket-background: 210 100% 85%;
+    }
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 85%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    /* MDXEditor CodeMirror dark theme variables */
-    --mdxeditor-background: 240 10% 3.9%;
-    --mdxeditor-foreground: 0 0% 98%;
-    --mdxeditor-gutter-background: 240 10% 3.9%;
-    --mdxeditor-gutter-foreground: 240 5% 65%;
-    --mdxeditor-cursor: 0 0% 98%;
-    --mdxeditor-selection-background: 217.2 91.2% 59.8%;
-    --mdxeditor-active-line-background: 240 3.7% 20%;
-    --mdxeditor-line-number-color: 240 5% 65%;
-    --mdxeditor-matching-bracket-background: 217.2 91.2% 59.8%;
-  }
+    .dark {
+        --background: 240 10% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 240 10% 3.9%;
+        --card-foreground: 0 0% 98%;
+        --popover: 240 10% 3.9%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 0% 98%;
+        --primary-foreground: 240 5.9% 10%;
+        --secondary: 240 3.7% 15.9%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 240 3.7% 15.9%;
+        --muted-foreground: 240 5% 85%;
+        --accent: 240 3.7% 15.9%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 240 3.7% 15.9%;
+        --input: 240 3.7% 15.9%;
+        --ring: 240 4.9% 83.9%;
+        --sidebar-background: 240 5.9% 10%;
+        --sidebar-foreground: 240 4.8% 95.9%;
+        --sidebar-primary: 224.3 76.3% 48%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 240 3.7% 15.9%;
+        --sidebar-accent-foreground: 240 4.8% 95.9%;
+        --sidebar-border: 240 3.7% 15.9%;
+        --sidebar-ring: 217.2 91.2% 59.8%;
+        /* MDXEditor CodeMirror dark theme variables */
+        --mdxeditor-background: 240 10% 3.9%;
+        --mdxeditor-foreground: 0 0% 98%;
+        --mdxeditor-gutter-background: 240 10% 3.9%;
+        --mdxeditor-gutter-foreground: 240 5% 65%;
+        --mdxeditor-cursor: 0 0% 98%;
+        --mdxeditor-selection-background: 217.2 91.2% 59.8%;
+        --mdxeditor-active-line-background: 240 3.7% 20%;
+        --mdxeditor-line-number-color: 240 5% 65%;
+        --mdxeditor-matching-bracket-background: 217.2 91.2% 59.8%;
+    }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
 }
 
 /* Custom styles */
 @layer utilities {
-  /* Rich text editor content styles */
-  .prose {
-    @apply text-foreground;
-  }
-  
-  .prose h1 {
-    @apply text-3xl font-bold mt-8 mb-4 text-foreground;
-  }
-  
-  .prose h2 {
-    @apply text-2xl font-bold mt-6 mb-3 text-foreground;
-  }
-  
-  .prose h3 {
-    @apply text-xl font-bold mt-4 mb-2 text-foreground;
-  }
-  
-  .prose p {
-    @apply mb-4 leading-relaxed text-foreground;
-  }
-  
-  .prose ul {
-    @apply list-disc pl-6 mb-4 text-foreground;
-  }
-  
-  .prose ol {
-    @apply list-decimal pl-6 mb-4 text-foreground;
-  }
-  
-  .prose blockquote {
-    @apply border-l-4 border-muted pl-4 italic my-4 text-foreground;
-  }
-  
-  .prose code {
-    @apply bg-muted px-1 py-0.5 rounded text-sm font-mono text-foreground;
-  }
-  
-  .prose pre {
-    @apply bg-gray-900 text-white p-4 rounded-lg overflow-x-auto my-4;
-  }
-  
-  .prose pre code {
-    @apply bg-transparent text-white p-0;
-  }
-  
-  .prose img {
-    @apply max-w-full h-auto rounded-lg my-4;
-  }
-  
-  .prose a {
-    @apply text-primary hover:underline;
-  }
-  
-  /* Line clamp utilities */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
+    /* Rich text editor content styles */
+    .prose {
+        @apply text-foreground;
+    }
+
+    .prose h1 {
+        @apply text-3xl font-bold mt-8 mb-4 text-foreground;
+    }
+
+    .prose h2 {
+        @apply text-2xl font-bold mt-6 mb-3 text-foreground;
+    }
+
+    .prose h3 {
+        @apply text-xl font-bold mt-4 mb-2 text-foreground;
+    }
+
+    .prose p {
+        @apply mb-4 leading-relaxed text-foreground;
+    }
+
+    .prose ul {
+        @apply list-disc pl-6 mb-4 text-foreground;
+    }
+
+    .prose ol {
+        @apply list-decimal pl-6 mb-4 text-foreground;
+    }
+
+    .prose blockquote {
+        @apply border-l-4 border-muted pl-4 italic my-4 text-foreground;
+    }
+
+    .prose code {
+        @apply bg-muted px-1 py-0.5 rounded text-sm font-mono text-foreground;
+    }
+
+    .prose pre {
+        @apply bg-gray-900 text-white p-4 rounded-lg overflow-x-auto my-4;
+    }
+
+    .prose pre code {
+        @apply bg-transparent text-white p-0;
+    }
+
+    .prose img {
+        @apply max-w-full h-auto rounded-lg my-4;
+    }
+
+    .prose a {
+        @apply text-primary hover:underline;
+    }
+
+    /* Line clamp utilities */
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
 }
 
 /* Editor placeholder styles */
 .ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: #adb5bd;
-  pointer-events: none;
-  height: 0;
+    content: attr(data-placeholder);
+    float: left;
+    color: #adb5bd;
+    pointer-events: none;
+    height: 0;
 }
 
 /* Scrollbar styles */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+    width: 8px;
+    height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+    background: #f1f1f1;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
+    background: #c1c1c1;
+    border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+    background: #a8a8a8;
 }
 
-/* ========== MDXEditor Dark Theme Fix ========== */
-/* Apply dark theme styles using .dark-editor class */
+/* ========== MDXEditor Theme Integration ========== */
+/*
+ * MDXEditor dark mode is activated by adding the `dark-theme` class to the
+ * MDXEditor root element (alongside `dark-editor`). This switches the full
+ * Radix UI color palette used by the toolbar and all editor UI.
+ * The `dark-editor` class below handles only the CodeMirror source/diff
+ * panels, keeping them in sync with the app's own design tokens.
+ */
 
-.dark-editor {
-  /* CSS variable definitions */
-  --mdxeditor-bg: hsl(var(--background));
-  --mdxeditor-fg: hsl(var(--foreground));
-  --mdxeditor-gutter-bg: hsl(var(--muted) / 0.3);
-  --mdxeditor-gutter-fg: hsl(var(--muted-foreground));
-  --mdxeditor-border: hsl(var(--border));
-  --mdxeditor-selection: hsl(var(--ring) / 0.3);
-  --mdxeditor-cursor: hsl(var(--foreground));
-  --mdxeditor-active-line: hsl(var(--accent) / 0.1);
-  --mdxeditor-accent: hsl(var(--accent) / 0.2);
+/* --- CodeMirror source & diff panels (dark mode only) --- */
+.dark-theme.dark-editor .mdxeditor-source-editor,
+.dark-theme.dark-editor .mdxeditor-diff-editor,
+.dark-theme.dark-editor .mdxeditor-source-editor *,
+.dark-theme.dark-editor .mdxeditor-diff-editor * {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
 }
 
-/* Force override all elements in source mode and diff mode */
-.dark-editor .mdxeditor-source-editor,
-.dark-editor .mdxeditor-diff-editor,
-.dark-editor .mdxeditor-source-editor *,
-.dark-editor .mdxeditor-diff-editor * {
-  background-color: var(--mdxeditor-bg) !important;
-  color: var(--mdxeditor-fg) !important;
-  border-color: var(--mdxeditor-border) !important;
+/* CodeMirror core */
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-editor,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-editor,
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-scroller,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-scroller,
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-content,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-content {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
 }
 
-/* Ensure CodeMirror core elements */
-.dark-editor .mdxeditor-source-editor .cm-editor,
-.dark-editor .mdxeditor-diff-editor .cm-editor,
-.dark-editor .mdxeditor-source-editor .cm-scroller,
-.dark-editor .mdxeditor-diff-editor .cm-scroller,
-.dark-editor .mdxeditor-source-editor .cm-content,
-.dark-editor .mdxeditor-diff-editor .cm-content {
-  background-color: var(--mdxeditor-bg) !important;
-  color: var(--mdxeditor-fg) !important;
+/* Gutter / line numbers */
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-gutters,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-gutters {
+    background-color: hsl(var(--muted) / 0.3) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-right: 1px solid hsl(var(--border)) !important;
 }
 
-/* Line number area */
-.dark-editor .mdxeditor-source-editor .cm-gutters,
-.dark-editor .mdxeditor-diff-editor .cm-gutters {
-  background-color: var(--mdxeditor-gutter-bg) !important;
-  color: var(--mdxeditor-gutter-fg) !important;
-  border-right: 1px solid var(--mdxeditor-border) !important;
-}
-
-/* Line numbers */
-.dark-editor .mdxeditor-source-editor .cm-lineNumbers,
-.dark-editor .mdxeditor-diff-editor .cm-lineNumbers {
-  color: var(--mdxeditor-gutter-fg) !important;
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-lineNumbers,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-lineNumbers {
+    color: hsl(var(--muted-foreground)) !important;
 }
 
 /* Cursor */
-.dark-editor .mdxeditor-source-editor .cm-cursor,
-.dark-editor .mdxeditor-diff-editor .cm-cursor {
-  border-left-color: var(--mdxeditor-cursor) !important;
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-cursor,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-cursor {
+    border-left-color: hsl(var(--foreground)) !important;
 }
 
-/* Selected text */
-.dark-editor .mdxeditor-source-editor .cm-selectionBackground,
-.dark-editor .mdxeditor-diff-editor .cm-selectionBackground {
-  background-color: var(--mdxeditor-selection) !important;
+/* Selection */
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-selectionBackground,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-selectionBackground {
+    background-color: hsl(var(--ring) / 0.3) !important;
 }
 
-/* Current line highlight */
-.dark-editor .mdxeditor-source-editor .cm-activeLine,
-.dark-editor .mdxeditor-diff-editor .cm-activeLine {
-  background-color: var(--mdxeditor-active-line) !important;
+/* Active line */
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-activeLine,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-activeLine {
+    background-color: hsl(var(--accent) / 0.1) !important;
 }
 
-.dark-editor .mdxeditor-source-editor .cm-activeLineGutter,
-.dark-editor .mdxeditor-diff-editor .cm-activeLineGutter {
-  background-color: var(--mdxeditor-gutter-bg) !important;
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-activeLineGutter,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-activeLineGutter {
+    background-color: hsl(var(--muted) / 0.3) !important;
 }
 
-/* Matching bracket highlight */
-.dark-editor .mdxeditor-source-editor .cm-matchingBracket,
-.dark-editor .mdxeditor-diff-editor .cm-matchingBracket {
-  background-color: var(--mdxeditor-accent) !important;
+/* Matching bracket */
+.dark-theme.dark-editor .mdxeditor-source-editor .cm-matchingBracket,
+.dark-theme.dark-editor .mdxeditor-diff-editor .cm-matchingBracket {
+    background-color: hsl(var(--accent) / 0.2) !important;
 }
 
-/* Ensure diff source wrapper also has dark background */
-.dark-editor .mdxeditor-diff-source-wrapper,
-.dark-editor .mdxeditor-diff-source-wrapper * {
-  background-color: var(--mdxeditor-bg) !important;
-  color: var(--mdxeditor-fg) !important;
-  border-color: var(--mdxeditor-border) !important;
+/* Diff source wrapper */
+.dark-theme.dark-editor .mdxeditor-diff-source-wrapper,
+.dark-theme.dark-editor .mdxeditor-diff-source-wrapper * {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
 }
