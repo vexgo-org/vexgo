@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useTranslation } from '@/lib/I18nContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Calendar, MessageSquare, Heart } from 'lucide-react';
-import { postsApi } from '@/lib/api';
-import type { Post, User } from '@/types';
+import { useState, useEffect, useCallback } from "react";
+import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "@/lib/I18nContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Calendar, MessageSquare, Heart } from "lucide-react";
+import { postsApi } from "@/lib/api";
+import type { Post, User } from "@/types";
 
 export function UserPostsPage() {
   const { t } = useTranslation();
@@ -20,16 +20,13 @@ export function UserPostsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    if (id) {
-      loadUserPosts();
-    }
-  }, [id, currentPage]);
-
-  const loadUserPosts = async () => {
+  const loadUserPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await postsApi.getUserPosts(id!, { page: currentPage, limit: 10 });
+      const response = await postsApi.getUserPosts(id!, {
+        page: currentPage,
+        limit: 10,
+      });
       setPosts(response.data.posts);
       setTotalPages(response.data.pagination.totalPages);
       // 从第一篇文章中获取用户信息
@@ -37,17 +34,23 @@ export function UserPostsPage() {
         setUser(response.data.posts[0].author);
       }
     } catch (error) {
-      console.error('加载用户文章失败:', error);
+      console.error("加载用户文章失败:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, currentPage]);
+
+  useEffect(() => {
+    if (id) {
+      loadUserPosts();
+    }
+  }, [id, loadUserPosts]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -57,7 +60,7 @@ export function UserPostsPage() {
         <Button variant="ghost" size="sm" asChild className="mb-6">
           <Link to="/" className="flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
-            {t('userPostsPage.backToHome')}
+            {t("userPostsPage.backToHome")}
           </Link>
         </Button>
 
@@ -102,7 +105,7 @@ export function UserPostsPage() {
       <Button variant="ghost" size="sm" asChild className="mb-6">
         <Link to="/" className="flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
-          {t('userPostsPage.backToHome')}
+          {t("userPostsPage.backToHome")}
         </Link>
       </Button>
 
@@ -114,35 +117,57 @@ export function UserPostsPage() {
               <div className="flex flex-col items-center text-center">
                 <Avatar className="w-24 h-24 mb-4">
                   {user?.avatar ? (
-                    <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    <img
+                      src={user.avatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-                      {user?.username?.charAt(0).toUpperCase() || 'U'}
+                      {user?.username?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>
                   )}
                 </Avatar>
-                <h2 className="text-xl font-bold mb-2">{user?.username || t('userPostsPage.unknownUser')}</h2>
-                {!JSON.parse(localStorage.getItem('userSettings') || '{}').hideEmail && (
-                  <p className="text-sm text-muted-foreground mb-2">{user?.email || ''}</p>
+                <h2 className="text-xl font-bold mb-2">
+                  {user?.username || t("userPostsPage.unknownUser")}
+                </h2>
+                {!JSON.parse(localStorage.getItem("userSettings") || "{}")
+                  .hideEmail && (
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {user?.email || ""}
+                  </p>
                 )}
 
                 {/* 生日和个性签名 */}
                 <div className="flex flex-col gap-1 mb-4 text-sm text-muted-foreground">
-                  {user?.birthday && !JSON.parse(localStorage.getItem('userSettings') || '{}').hideBirthday && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>{t('profilePage.birthday')}: {new Date(user.birthday).toLocaleDateString('zh-CN')}</span>
-                    </div>
-                  )}
-                  {user?.bio && !JSON.parse(localStorage.getItem('userSettings') || '{}').hideBio && (
-                    <p className="text-sm text-muted-foreground">{user.bio}</p>
-                  )}
+                  {user?.birthday &&
+                    !JSON.parse(localStorage.getItem("userSettings") || "{}")
+                      .hideBirthday && (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>
+                          {t("profilePage.birthday")}:{" "}
+                          {new Date(user.birthday).toLocaleDateString("zh-CN")}
+                        </span>
+                      </div>
+                    )}
+                  {user?.bio &&
+                    !JSON.parse(localStorage.getItem("userSettings") || "{}")
+                      .hideBio && (
+                      <p className="text-sm text-muted-foreground">
+                        {user.bio}
+                      </p>
+                    )}
                 </div>
 
                 <Separator className="my-4" />
                 <div className="w-full">
-                  <p className="text-sm text-muted-foreground mb-2">{t('userPostsPage.totalPosts')}</p>
-                  <p className="text-2xl font-bold">{posts.length > 0 ? posts.length : 0}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {t("userPostsPage.totalPosts")}
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {posts.length > 0 ? posts.length : 0}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -152,38 +177,54 @@ export function UserPostsPage() {
         {/* 文章列表 */}
         <div className="flex-1">
           <h1 className="text-2xl font-bold mb-6">
-            {t('userPostsPage.userPosts', { username: user?.username || t('userPostsPage.unknownUser') })}
+            {t("userPostsPage.userPosts", {
+              username: user?.username || t("userPostsPage.unknownUser"),
+            })}
           </h1>
 
           {posts.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
-                <h3 className="text-lg font-semibold mb-2">{t('userPostsPage.noPosts')}</h3>
-                <p className="text-muted-foreground">{t('userPostsPage.noPostsDesc')}</p>
+                <h3 className="text-lg font-semibold mb-2">
+                  {t("userPostsPage.noPosts")}
+                </h3>
+                <p className="text-muted-foreground">
+                  {t("userPostsPage.noPostsDesc")}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
               {posts.map((post) => (
-                <Card key={post.id} className="hover:shadow-md transition-shadow">
+                <Card
+                  key={post.id}
+                  className="hover:shadow-md transition-shadow"
+                >
                   <CardContent className="p-6">
                     <Link to={`/post/${post.id}`} className="block group">
                       <h2 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">
                         {post.title}
                       </h2>
-                      <p className="text-muted-foreground mb-4 line-clamp-2">
-                        {post.excerpt || post.content.substring(0, 100) + '...'}
-                      </p>
+                      {post.excerpt && (
+                        <p className="text-muted-foreground mb-4 line-clamp-2">
+                          {post.excerpt}
+                        </p>
+                      )}
                     </Link>
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="w-8 h-8">
                           {post.author?.avatar ? (
-                            <img src={post.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                            <img
+                              src={post.author.avatar}
+                              alt="Avatar"
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                              {post.author?.username?.charAt(0).toUpperCase() || 'U'}
+                              {post.author?.username?.charAt(0).toUpperCase() ||
+                                "U"}
                             </AvatarFallback>
                           )}
                         </Avatar>
@@ -219,7 +260,7 @@ export function UserPostsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-6">
               <div className="text-sm text-muted-foreground">
-                {t('userPostsPage.pageInfo', { page: currentPage, totalPages })}
+                {t("userPostsPage.pageInfo", { page: currentPage, totalPages })}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -228,15 +269,17 @@ export function UserPostsPage() {
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                 >
-                  {t('userPostsPage.previousPage')}
+                  {t("userPostsPage.previousPage")}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
                   disabled={currentPage === totalPages}
                 >
-                  {t('userPostsPage.nextPage')}
+                  {t("userPostsPage.nextPage")}
                 </Button>
               </div>
             </div>

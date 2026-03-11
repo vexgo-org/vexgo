@@ -40,12 +40,14 @@ interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  originalContent?: string;
 }
 
 export function RichTextEditor({
   content,
   onChange,
   placeholder,
+  originalContent,
 }: RichTextEditorProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
   const isInternalChange = useRef(false);
@@ -130,6 +132,7 @@ export function RichTextEditor({
           markdownShortcutPlugin(),
           diffSourcePlugin({
             viewMode: "rich-text",
+            diffMarkdown: originalContent ?? "",
             readOnlyDiff: false,
           }),
           toolbarPlugin({
