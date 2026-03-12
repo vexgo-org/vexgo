@@ -39,6 +39,7 @@ type User struct {
 	PasswordVersion   int        `json:"-" gorm:"default:1"`                      // password version, used to invalidate old tokens after password modification
 	Birthday          string     `json:"birthday,omitempty"`                      // birthday
 	Bio               string     `json:"bio,omitempty"`                           // personal bio
+	CreatedAt         time.Time  `json:"createdAt"`                               // registration time
 	// Privacy settings
 	ProfileVisibility string `json:"profile_visibility,omitempty" gorm:"size:20;default:'public'"` // public/private
 	HideEmail         bool   `json:"hide_email,omitempty" gorm:"default:false"`                    // hide email
