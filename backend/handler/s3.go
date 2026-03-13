@@ -34,6 +34,9 @@ func InitS3(cfg *config.S3Config) error {
 		return fmt.Errorf("S3 configuration error: %w", err)
 	}
 
+	// Debug logging for configuration
+	fmt.Printf("S3 Debug: Initializing with Endpoint=%s, Region=%s, Bucket=%s, ForcePath=%v, CustomDomain=%s\n", cfg.Endpoint, cfg.Region, cfg.Bucket, cfg.ForcePath, cfg.CustomDomain)
+
 	// Create credential provider
 	credProvider := credentials.NewStaticCredentialsProvider(
 		cfg.AccessKey,
@@ -56,6 +59,9 @@ func InitS3(cfg *config.S3Config) error {
 		// Trim trailing slash
 		endpoint = strings.TrimSuffix(endpoint, "/")
 		awsCfg.BaseEndpoint = aws.String(endpoint)
+		fmt.Printf("S3 Debug: Using custom endpoint: %s\n", endpoint)
+	} else {
+		fmt.Printf("S3 Debug: Using standard AWS endpoint\n")
 	}
 
 	// Create S3 client with proper configuration for S3-compatible services
@@ -63,6 +69,9 @@ func InitS3(cfg *config.S3Config) error {
 		// Force path-style URLs for S3-compatible services (MinIO, Wasabi, Garage, etc.)
 		if cfg.ForcePath {
 			o.UsePathStyle = true
+			fmt.Printf("S3 Debug: Forcing path-style URLs\n")
+		} else {
+			fmt.Printf("S3 Debug: Using virtual-hosted style URLs\n")
 		}
 	})
 
@@ -79,10 +88,13 @@ func InitS3(cfg *config.S3Config) error {
 
 	// Test connection by listing buckets (optional)
 	// This can help diagnose connection issues early
+	fmt.Printf("S3 Debug: Testing connection by listing buckets...\n")
 	_, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 	if err != nil {
+		fmt.Printf("S3 Debug: Connection test failed: %v\n", err)
 		return fmt.Errorf("failed to connect to S3: %w", err)
 	}
+	fmt.Printf("S3 Debug: Connection test successful\n")
 
 	return nil
 }
