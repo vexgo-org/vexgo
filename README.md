@@ -50,8 +50,11 @@ data: "./data"
 # You can generate one with: openssl rand -base64 32
 jwt_secret: "your-secret-key-change-this-in-production"
 
-# Database configuration
-db_type: "sqlite"  # Options: "sqlite", "mysql", or "postgres"
+# ==================== Database Configuration ====================
+
+# Database type
+# Options: "sqlite", "mysql", "postgres"
+db_type: "sqlite"
 
 # When db_type is "mysql", configure the following parameters
 # db_host: "127.0.0.1"
@@ -98,18 +101,18 @@ oidc_client_secret: ""
 
 # Manual endpoint override (only needed when OIDC discovery is unavailable)
 # If provided, these override the discovery endpoints
-oidc_auth_url: ""      # Authorization endpoint
-oidc_token_url: ""     # Token endpoint
-oidc_userinfo_url: ""  # UserInfo endpoint (optional fallback)
+oidc_auth_url: "" # Authorization endpoint
+oidc_token_url: "" # Token endpoint
+oidc_userinfo_url: "" # UserInfo endpoint (optional fallback)
 
 # OIDC scopes (space-separated, default: "openid profile email")
 # Add extra scopes if your provider requires them, e.g., "openid profile email groups"
 oidc_scopes: "openid profile email"
 
 # OIDC claim names (defaults are standard OIDC claims)
-oidc_email_claim: "email"   # Claim name for user's email
-oidc_name_claim: "name"     # Claim name for user's display name
-oidc_group_claim: "groups"  # Claim name for user's groups (for access control)
+oidc_email_claim: "email" # Claim name for user's email
+oidc_name_claim: "name" # Claim name for user's display name
+oidc_group_claim: "groups" # Claim name for user's groups (for access control)
 
 # OIDC access control (optional)
 # Comma-separated list of groups allowed to log in
@@ -117,12 +120,40 @@ oidc_group_claim: "groups"  # Claim name for user's groups (for access control)
 oidc_allowed_groups: ""
 
 # OIDC user experience options
-oidc_auto_redirect: false  # If true, skip login page and redirect to OIDC provider automatically
-oidc_verify_email: false   # If true, require email_verified=true in the ID token
+oidc_auto_redirect: false # If true, skip login page and redirect to OIDC provider automatically
+oidc_verify_email: false # If true, require email_verified=true in the ID token
 
 # -------------------- Global Options --------------------
 # Set to false to enforce SSO-only (disable password login)
 allow_local_login: true
+
+# ==================== S3 Storage Configuration ====================
+
+# Enable S3-compatible storage for file uploads
+# Uploaded media files will be stored in the configured bucket instead of the local data directory.
+s3_enabled: false
+
+# S3 endpoint URL (leave empty for standard AWS S3)
+s3_endpoint: ""
+
+# AWS region (required for AWS S3; can be any value for S3-compatible services)
+s3_region: "us-east-1"
+
+# S3 bucket name
+s3_bucket: "my-bucket"
+
+# S3 access key ID
+s3_access_key: ""
+
+# S3 secret access key
+s3_secret_key: ""
+
+# Force path-style URLs (required for MinIO, Wasabi, and some S3-compatible services)
+s3_force_path: false
+
+# Optional custom domain for public file URLs (e.g., CDN domain like "cdn.example.com")
+# Leave empty to use default S3 endpoints
+s3_custom_domain: ""
 ```
 
 Then, Run the following command:
@@ -236,6 +267,39 @@ export OIDC_ISSUER_URL=https://auth.example.com/realms/myrealm
 export OIDC_CLIENT_ID=your-client-id
 export OIDC_CLIENT_SECRET=your-client-secret
 ./vexgo-linux-amd64
+```
+
+#### S3 / Object Storage
+
+> **Note:** When `S3_ENABLED=true`, uploaded media files will be stored in the configured bucket instead of the local `data` directory.
+
+VexGo supports any S3-compatible object storage (AWS S3, MinIO, Garage, etc.).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `S3_ENABLED` | `false` | Set to `true` to enable S3 storage |
+| `S3_ENDPOINT` | — | S3 endpoint URL, e.g. `https://minio.example.com`. Leave empty for standard AWS S3. |
+| `S3_REGION` | — | AWS region, e.g. `us-east-1`. Required for AWS S3; can be any value for S3-compatible services. |
+| `S3_BUCKET` | — | Target bucket name |
+| `S3_ACCESS_KEY` | — | Access key ID |
+| `S3_SECRET_KEY` | — | Secret access key |
+| `S3_FORCE_PATH` | `false` | Set to `true` to use path-style URLs (required for MinIO and most S3-compatible services) |
+| `S3_CUSTOM_DOMAIN` | — | Custom domain for generating public file URLs, e.g. `cdn.example.com`. Useful when using a CDN in front of your bucket. |
+
+**Example: Docker with MinIO**
+
+```bash
+sudo docker run -d --name vexgo \
+  -p 3001:3001 \
+  -v ./data:/app/data \
+  -e S3_ENABLED=true \
+  -e S3_ENDPOINT=https://minio.example.com \
+  -e S3_REGION=us-east-1 \
+  -e S3_BUCKET=vexgo \
+  -e S3_ACCESS_KEY=your-access-key \
+  -e S3_SECRET_KEY=your-secret-key \
+  -e S3_FORCE_PATH=true \
+  ghcr.io/weimm16/vexgo:latest
 ```
 
 ## Database
