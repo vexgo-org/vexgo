@@ -9,135 +9,97 @@ import (
 
 	"vexgo/backend/config"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
-	S3Client     *s3.Client
-	S3Cfg        *config.S3Config
-	S3Uploader   *manager.Uploader
-	UseS3Storage bool
+	S3Client     *minio.Client    // MinIO client instance
+	S3Cfg        *config.S3Config // S3 configuration reference
+	UseS3Storage bool             // Flag indicating whether S3 storage is active
 )
 
-// InitS3 initializes S3 client if S3 storage is enabled
+// InitS3 initializes the MinIO client and verifies the connection.
+// Returns an error if configuration is invalid or the bucket is unreachable.
 func InitS3(cfg *config.S3Config) error {
 	if !cfg.IsEnabled() {
 		UseS3Storage = false
 		return nil
 	}
 
-	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("S3 configuration error: %w", err)
 	}
 
-	// Debug logging for configuration
-	fmt.Printf("S3 Debug: Initializing with Endpoint=%s, Region=%s, Bucket=%s, ForcePath=%v, CustomDomain=%s\n", cfg.Endpoint, cfg.Region, cfg.Bucket, cfg.ForcePath, cfg.CustomDomain)
+	// Strip protocol prefix from endpoint, minio-go manages SSL separately
+	endpoint := cfg.Endpoint
+	useSSL := true
+	if strings.HasPrefix(endpoint, "http://") {
+		endpoint = strings.TrimPrefix(endpoint, "http://")
+		useSSL = false
+	} else if strings.HasPrefix(endpoint, "https://") {
+		endpoint = strings.TrimPrefix(endpoint, "https://")
+		useSSL = true
+	}
+	endpoint = strings.TrimSuffix(endpoint, "/")
 
-	// Create credential provider
-	credProvider := credentials.NewStaticCredentialsProvider(
-		cfg.AccessKey,
-		cfg.SecretKey,
-		"", // session token, not needed
-	)
-
-	// Build AWS config
-	awsCfg := aws.Config{
-		Region:      cfg.Region,
-		Credentials: credProvider,
+	// Create MinIO client with static credentials
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure: useSSL,
+		Region: cfg.Region,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create minio client: %w", err)
 	}
 
-	// Set custom endpoint if provided
-	if cfg.Endpoint != "" {
-		endpoint := cfg.Endpoint
-		if !strings.HasPrefix(endpoint, "http") {
-			endpoint = "https://" + endpoint
-		}
-		// Trim trailing slash
-		endpoint = strings.TrimSuffix(endpoint, "/")
-		awsCfg.BaseEndpoint = aws.String(endpoint)
-		fmt.Printf("S3 Debug: Using custom endpoint: %s\n", endpoint)
-	} else {
-		fmt.Printf("S3 Debug: Using standard AWS endpoint\n")
+	// Verify connectivity by checking if the target bucket exists
+	exists, err := client.BucketExists(context.TODO(), cfg.Bucket)
+	if err != nil {
+		return fmt.Errorf("failed to connect to S3: %w", err)
 	}
-
-	// Create S3 client with proper configuration for S3-compatible services
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		// Force path-style URLs for S3-compatible services (MinIO, Wasabi, Garage, etc.)
-		if cfg.ForcePath {
-			o.UsePathStyle = true
-			fmt.Printf("S3 Debug: Forcing path-style URLs\n")
-		} else {
-			fmt.Printf("S3 Debug: Using virtual-hosted style URLs\n")
-		}
-	})
-
-	// Create uploader with reasonable defaults
-	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
-		u.PartSize = 10 * 1024 * 1024 // 10MB per part
-		u.Concurrency = 5             // 5 concurrent uploads
-	})
+	if !exists {
+		return fmt.Errorf("bucket %s does not exist", cfg.Bucket)
+	}
 
 	S3Client = client
-	S3Uploader = uploader
 	S3Cfg = cfg
 	UseS3Storage = true
 
-	// Test connection by listing buckets (optional)
-	// This can help diagnose connection issues early
-	fmt.Printf("S3 Debug: Testing connection by listing buckets...\n")
-	_, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
-	if err != nil {
-		fmt.Printf("S3 Debug: Connection test failed: %v\n", err)
-		return fmt.Errorf("failed to connect to S3: %w", err)
-	}
-	fmt.Printf("S3 Debug: Connection test successful\n")
-
+	fmt.Printf("S3: Connected successfully\n")
 	return nil
 }
 
-// UploadFile uploads a file to S3 and returns the public URL
+// UploadFileToS3 uploads a file to the configured S3 bucket.
+// Passing size as -1 lets minio-go handle multipart upload automatically.
+// Returns the public URL of the uploaded file.
 func UploadFileToS3(reader io.Reader, filename string, contentType string) (string, error) {
-	if S3Client == nil || S3Uploader == nil {
+	if S3Client == nil {
 		return "", fmt.Errorf("S3 storage not initialized")
 	}
 
-	// Determine content type if not provided
+	// Fall back to extension-based detection if content type is not provided
 	if contentType == "" {
 		contentType = detectContentType(filename)
 	}
 
-	// Upload to S3
-	result, err := S3Uploader.Upload(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(S3Cfg.Bucket),
-		Key:         aws.String(filename),
-		Body:        reader,
-		ContentType: aws.String(contentType),
+	_, err := S3Client.PutObject(context.TODO(), S3Cfg.Bucket, filename, reader, -1, minio.PutObjectOptions{
+		ContentType: contentType,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	// Generate public URL
-	url := GetFileURL(filename)
-	_ = result // result contains Location, ETag, etc.
-
-	return url, nil
+	return GetFileURL(filename), nil
 }
 
-// DeleteFile deletes a file from S3
+// DeleteFileFromS3 removes an object from the configured S3 bucket by key.
 func DeleteFileFromS3(key string) error {
 	if S3Client == nil {
 		return fmt.Errorf("S3 storage not initialized")
 	}
 
-	_, err := S3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(S3Cfg.Bucket),
-		Key:    aws.String(key),
-	})
+	err := S3Client.RemoveObject(context.TODO(), S3Cfg.Bucket, key, minio.RemoveObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete from S3: %w", err)
 	}
@@ -145,41 +107,41 @@ func DeleteFileFromS3(key string) error {
 	return nil
 }
 
-// GetFileURL returns the public URL for a file stored in S3
+// GetFileURL constructs the public URL for a stored object.
+// Priority: CustomDomain > path-style endpoint > virtual-hosted style.
 func GetFileURL(key string) string {
 	if S3Cfg == nil {
 		return ""
 	}
 
+	// Use custom domain if configured (e.g. CDN domain)
 	if S3Cfg.CustomDomain != "" {
 		return fmt.Sprintf("https://%s/%s", S3Cfg.CustomDomain, key)
 	}
 
-	// Default S3 URL format
 	if S3Cfg.ForcePath {
-		// Path-style: https://endpoint/bucket/key
+		// Path-style URL: https://endpoint/bucket/key
 		endpoint := S3Cfg.Endpoint
 		if !strings.HasPrefix(endpoint, "http") {
 			endpoint = "https://" + endpoint
 		}
-		// Remove trailing slash if present
 		endpoint = strings.TrimSuffix(endpoint, "/")
 		return fmt.Sprintf("%s/%s/%s", endpoint, S3Cfg.Bucket, key)
 	}
 
-	// Virtual-hosted style: https://bucket.s3.region.amazonaws.com/key
-	// or for custom endpoint: https://bucket.endpoint.com/key
 	endpoint := S3Cfg.Endpoint
 	if endpoint == "" {
-		// Standard AWS endpoint
+		// Standard AWS virtual-hosted style URL
 		return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", S3Cfg.Bucket, S3Cfg.Region, key)
 	}
-	// Custom endpoint (e.g., MinIO, Wasabi) - remove port if present
-	endpoint = strings.Split(endpoint, ":")[0]
+
+	// Virtual-hosted style for custom endpoints: https://bucket.endpoint/key
+	endpoint = strings.Split(endpoint, ":")[0] // strip port if present
 	return fmt.Sprintf("https://%s.%s/%s", S3Cfg.Bucket, endpoint, key)
 }
 
-// detectContentType detects MIME type based on file extension
+// detectContentType returns the MIME type based on the file extension.
+// Defaults to application/octet-stream for unknown types.
 func detectContentType(filename string) string {
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
