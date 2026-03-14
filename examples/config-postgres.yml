@@ -108,3 +108,6 @@ s3_force_path: false
 # Optional custom domain for public file URLs (e.g., CDN domain like "cdn.example.com")
 # Leave empty to use default S3 endpoints
 s3_custom_domain: ""
+
+# Disable including bucket in custom domain URLs (default: false, meaning include bucket by default)
+s3_disable_bucket_in_custom_url: false
