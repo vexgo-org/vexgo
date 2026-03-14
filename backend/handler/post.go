@@ -235,7 +235,7 @@ func GetPost(c *gin.Context) {
 	db.Model(&model.Comment{}).Where("post_id = ?", post.ID).Count(&ccount)
 	post.CommentsCount = int(ccount)
 
-	fmt.Printf("Successfully fetched post: %+v\n", post)
+	fmt.Printf("Successfully fetched post ID: %d, Title: %s, Author: %s (ID: %d)\n", post.ID, post.Title, post.Author.Username, post.AuthorID)
 	c.JSON(http.StatusOK, gin.H{"post": post})
 }
 
@@ -363,7 +363,7 @@ func CreatePost(c *gin.Context) {
 	result := db.Create(&post)
 
 	// Add logs for debugging
-	fmt.Printf("Creating post: %+v\n", post)
+	fmt.Printf("Creating post: Title: %s, AuthorID: %d\n", post.Title, post.AuthorID)
 	fmt.Printf("Create result: %+v\n", result)
 	fmt.Printf("Created post ID: %d\n", post.ID)
 
