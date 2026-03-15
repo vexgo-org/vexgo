@@ -16,7 +16,7 @@
         });
   in {
     overlays.default = import ./nix/overlay.nix;
-
+    nixosModules.default = import ./nix/options.nix;
     packages = forEachSupportedSystem ({pkgs}: {
       vexgo = pkgs.callPackage ./nix/package.nix {};
       default = pkgs.callPackage ./nix/package.nix {};
