@@ -211,13 +211,13 @@ Time: %s
             <p>Dear %s,</p>
             <p class="success">✓ Test email sent successfully!</p>
             <p>Your SMTP configuration is working correctly. You can now use email verification features.</p>
-            
+
             <div class="info">
                 <strong>Configuration details:</strong><br>
                 SMTP Server: %s:%d<br>
                 Sender: %s <%s>
             </div>
-            
+
             <p>Time: %s</p>
         </div>
     </div>
@@ -738,4 +738,79 @@ func GetThemes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"themes": themes,
 	})
+}
+
+// GetThemeConfig returns the currently active theme stored in the database
+func GetThemeConfig(c *gin.Context) {
+	var config model.ThemeConfig
+	if err := db.First(&config).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusOK, gin.H{"activeTheme": public.DefaultTheme})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get theme config"})
+		return
+	}
+	activeTheme := config.ActiveTheme
+	if activeTheme == "" {
+		activeTheme = public.DefaultTheme
+	}
+	c.JSON(http.StatusOK, gin.H{"activeTheme": activeTheme})
+}
+
+// UpdateThemeConfig sets the globally active theme in the database
+func UpdateThemeConfig(c *gin.Context) {
+	var req struct {
+		ActiveTheme string `json:"activeTheme" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate that the requested theme actually exists
+	if !public.ThemeExists(req.ActiveTheme) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Theme not found"})
+		return
+	}
+
+	var config model.ThemeConfig
+	if err := db.First(&config).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			config = model.ThemeConfig{ActiveTheme: req.ActiveTheme}
+			if err := db.Create(&config).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save theme config"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get theme config"})
+			return
+		}
+	} else {
+		config.ActiveTheme = req.ActiveTheme
+		if err := db.Save(&config).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update theme config"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Theme updated successfully",
+		"activeTheme": config.ActiveTheme,
+	})
+}
+
+// SetupThemeProvider injects a DB-backed theme provider into the public package.
+// This must be called after InitDB so that db is available.
+func SetupThemeProvider() {
+	public.ActiveThemeProvider = func() string {
+		var config model.ThemeConfig
+		if err := db.First(&config).Error; err != nil {
+			return public.DefaultTheme
+		}
+		if config.ActiveTheme == "" {
+			return public.DefaultTheme
+		}
+		return config.ActiveTheme
+	}
 }

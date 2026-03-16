@@ -14,6 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ActiveThemeProvider is a function that returns the currently active theme ID from the database.
+// It is set by the handler package after DB initialization to avoid circular imports.
+var ActiveThemeProvider func() string
+
 //go:embed dist/**/*
 var staticFS embed.FS
 
@@ -155,13 +159,18 @@ func isSafePath(basePath, targetPath string) bool {
 }
 
 // getRequestedTheme determines which theme should be used for this request.
-// It supports a query parameter 'theme' or a cookie named 'theme'.
+// It checks the 'theme' query parameter first (for admin preview), then falls back
+// to the globally active theme stored in the database via ActiveThemeProvider.
 func getRequestedTheme(c *gin.Context) string {
+	// Query param takes precedence (allows admin to preview themes)
 	if theme := c.Query("theme"); theme != "" {
 		return theme
 	}
-	if cookie, err := c.Cookie("theme"); err == nil && cookie != "" {
-		return cookie
+	// Use the DB-stored active theme via the injected provider
+	if ActiveThemeProvider != nil {
+		if theme := ActiveThemeProvider(); theme != "" {
+			return theme
+		}
 	}
 	return DefaultTheme
 }

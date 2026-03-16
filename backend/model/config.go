@@ -73,3 +73,11 @@ type AIConfig struct {
 	CreatedAt   time.Time `json:"created_at"`                                        // Creation time
 	UpdatedAt   time.Time `json:"updated_at"`                                        // Update time
 }
+
+// ThemeConfig stores the active theme selection for the entire site
+type ThemeConfig struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	ActiveTheme string    `json:"activeTheme" gorm:"size:100;default:'default'"` // Active theme ID
+	CreatedAt   time.Time `json:"created_at"`                                    // Creation time
+	UpdatedAt   time.Time `json:"updated_at"`                                    // Update time
+}

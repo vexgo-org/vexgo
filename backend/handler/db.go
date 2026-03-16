@@ -163,6 +163,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		&model.CommentModerationConfig{},
 		&model.AIConfig{},
 		&model.SSOBinding{},
+		&model.ThemeConfig{},
 	); err != nil {
 		log.Fatalf("auto migrate failed: %v", err)
 	}
@@ -250,6 +251,21 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		}
 	}
 
+	// Create default theme configuration (if not exists)
+	var themeConfig model.ThemeConfig
+	if err := db.First(&themeConfig).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			themeConfig = model.ThemeConfig{
+				ActiveTheme: "default",
+			}
+			if err := db.Create(&themeConfig).Error; err != nil {
+				log.Printf("failed to create default theme config: %v", err)
+			} else {
+				log.Println("default theme config created")
+			}
+		}
+	}
+
 	// Create a default category (if not exists)
 	var defaultCategory model.Category
 	if err := db.Where("name = ?", "Default").First(&defaultCategory).Error; err != nil {
@@ -265,6 +281,8 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 			}
 		}
 	}
+	// Set up the theme provider so the public package can read the active theme from DB
+	SetupThemeProvider()
 }
 
 // DB returns the database instance
