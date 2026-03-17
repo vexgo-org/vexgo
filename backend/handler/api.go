@@ -29,6 +29,7 @@ func RegisterAPIRoutes(r *gin.Engine) {
 		api.GET("/stats/latest-posts", GetLatestPosts)
 
 		api.GET("/themes", GetThemes)
+		api.GET("/theme/:id/preview", GetThemePreview)
 
 		api.GET("/comments/post/:id", GetComments)
 		api.GET("/likes/:postId", GetLikeStatus)

@@ -244,6 +244,7 @@ export const zhCN = {
     uploadSuccess: "主题上传成功",
     uploadFailed: "上传主题失败",
     uploadError: "上传错误: {message}",
+    viewDetails: "查看详情",
   },
 
   // 通用设置页面

@@ -6,14 +6,14 @@ import api from "@/lib/api";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Check, AlertCircle, Palette, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Loader2, Check, AlertCircle, Palette, Upload, Eye } from "lucide-react";
 
 interface ThemeInfo {
   id: string;
@@ -22,6 +22,7 @@ interface ThemeInfo {
   version: string;
   description: string;
   url: string;
+  preview?: string;
 }
 
 export function ThemePage() {
@@ -38,6 +39,7 @@ export function ThemePage() {
     text: string;
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -195,78 +197,142 @@ export function ThemePage() {
         </Alert>
       )}
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {themes.length === 0 ? (
-          <Card>
+          <Card className="col-span-full">
             <CardContent className="pt-6">
               <p className="text-center text-gray-500">{t('themePage.noThemesFound')}</p>
             </CardContent>
           </Card>
         ) : (
           themes.map((theme) => (
-            <Card
-              key={theme.id}
-              className={`transition-all ${
-                activeTheme === theme.id
-                  ? "border-blue-500 border-2 bg-blue-50"
-                  : "hover:border-gray-400"
-              }`}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      {theme.name}
+            <Dialog key={theme.id}>
+              <DialogTrigger asChild>
+                <div 
+                  className={`cursor-pointer transition-all hover:shadow-md ${activeTheme === theme.id ? "border-blue-500 border-2" : "border border-gray-200"} rounded-lg overflow-hidden bg-white`}
+                  onClick={() => setSelectedTheme(theme)}
+                >
+                  {theme.preview && (
+                    <div className="w-full h-48 overflow-hidden">
+                      <img 
+                        src={`/api/theme/${theme.id}/preview`} 
+                        alt={`${theme.name} preview`} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                      <h3 className="font-semibold text-sm">{theme.name}</h3>
                       {activeTheme === theme.id && (
-                        <Badge className="bg-blue-500">{t('themePage.currentBadge')}</Badge>
+                        <Badge className="bg-blue-500 text-xs">{t('themePage.currentBadge')}</Badge>
                       )}
-                    </CardTitle>
-                    <CardDescription>
-                      <div className="mt-2 space-y-1 text-sm">
-                        <p>
-                          <span className="font-semibold">{t('themePage.author')}:</span>{" "}
-                          {theme.author}
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-600 mb-4">
+                      <p>
+                        <span className="font-semibold">{t('themePage.author')}:</span> {theme.author}
+                      </p>
+                      <p>
+                        <span className="font-semibold">{t('themePage.version')}:</span> {theme.version}
+                      </p>
+                      {theme.description && (
+                        <p className="line-clamp-2">
+                          <span className="font-semibold">{t('themePage.themeDescription')}:</span> {theme.description}
                         </p>
-                        <p>
-                          <span className="font-semibold">{t('themePage.version')}:</span>{" "}
-                          {theme.version}
-                        </p>
-                        {theme.description && (
-                          <p>
-                            <span className="font-semibold">{t('themePage.themeDescription')}:</span>{" "}
-                            {theme.description}
-                          </p>
+                      )}
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center gap-1 text-xs"
+                      >
+                        <Eye className="w-3 h-3" />
+                        {t('themePage.viewDetails')}
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApplyTheme(theme.id);
+                        }}
+                        disabled={activeTheme === theme.id || applying !== null}
+                        variant={activeTheme === theme.id ? "secondary" : "default"}
+                        size="sm"
+                        className="text-xs"
+                      >
+                        {applying === theme.id && (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                         )}
-                        {theme.url && (
-                          <p>
-                            <span className="font-semibold">{t('themePage.link')}:</span>{" "}
-                            <a
-                              href={theme.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-500 hover:underline break-all"
-                            >
-                              {theme.url}
-                            </a>
-                          </p>
-                        )}
-                      </div>
-                    </CardDescription>
+                        {activeTheme === theme.id ? t('themePage.applied') : t('themePage.applyTheme')}
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    onClick={() => handleApplyTheme(theme.id)}
-                    disabled={activeTheme === theme.id || applying !== null}
-                    variant={activeTheme === theme.id ? "secondary" : "default"}
-                    className="shrink-0"
-                  >
-                    {applying === theme.id && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    {activeTheme === theme.id ? t('themePage.applied') : t('themePage.applyTheme')}
-                  </Button>
                 </div>
-              </CardHeader>
-            </Card>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                {selectedTheme && (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center justify-between">
+                        {selectedTheme.name}
+                        {activeTheme === selectedTheme.id && (
+                          <Badge className="bg-blue-500">{t('themePage.currentBadge')}</Badge>
+                        )}
+                      </DialogTitle>
+                      <DialogDescription>
+                        <div className="space-y-2 text-sm">
+                          <p>
+                            <span className="font-semibold">{t('themePage.author')}:</span> {selectedTheme.author}
+                          </p>
+                          <p>
+                            <span className="font-semibold">{t('themePage.version')}:</span> {selectedTheme.version}
+                          </p>
+                          {selectedTheme.description && (
+                            <p>
+                              <span className="font-semibold">{t('themePage.themeDescription')}:</span> {selectedTheme.description}
+                            </p>
+                          )}
+                          {selectedTheme.url && (
+                            <p>
+                              <span className="font-semibold">{t('themePage.link')}:</span>
+                              <a
+                                href={selectedTheme.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:underline break-all"
+                              >
+                                {selectedTheme.url}
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                      </DialogDescription>
+                    </DialogHeader>
+                    {selectedTheme.preview && (
+                      <div className="mt-4">
+                        <img 
+                          src={`/api/theme/${selectedTheme.id}/preview`} 
+                          alt={`${selectedTheme.name} preview`} 
+                          className="w-full h-auto rounded-md shadow-sm"
+                        />
+                      </div>
+                    )}
+                    <div className="mt-6 flex justify-end">
+                      <Button
+                        onClick={() => handleApplyTheme(selectedTheme.id)}
+                        disabled={activeTheme === selectedTheme.id || applying !== null}
+                        variant={activeTheme === selectedTheme.id ? "secondary" : "default"}
+                      >
+                        {applying === selectedTheme.id && (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        )}
+                        {activeTheme === selectedTheme.id ? t('themePage.applied') : t('themePage.applyTheme')}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
           ))
         )}
       </div>

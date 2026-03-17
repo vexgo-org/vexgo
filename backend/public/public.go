@@ -50,6 +50,7 @@ type ThemeInfo struct {
 	Version     string `json:"version"`
 	Description string `json:"description"`
 	URL         string `json:"url"`
+	Preview     string `json:"preview,omitempty"`
 }
 
 // Default constants for theme support

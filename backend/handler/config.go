@@ -743,6 +743,49 @@ func GetThemes(c *gin.Context) {
 	})
 }
 
+// GetThemePreview returns the preview image for a theme
+func GetThemePreview(c *gin.Context) {
+	themeID := c.Param("id")
+	
+	// Check if theme exists
+	if !public.ThemeExists(themeID) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Theme not found"})
+		return
+	}
+	
+	// Read theme metadata
+	metaPath := filepath.Join(public.DataDir, public.ThemesDir, themeID, public.ThemeMetaFile)
+	content, err := os.ReadFile(metaPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read theme metadata"})
+		return
+	}
+	
+	var themeInfo public.ThemeInfo
+	if err := json.Unmarshal(content, &themeInfo); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid theme metadata"})
+		return
+	}
+	
+	// Check if preview is specified
+	if themeInfo.Preview == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Preview not specified"})
+		return
+	}
+	
+	// Build preview image path
+	previewPath := filepath.Join(public.DataDir, public.ThemesDir, themeID, themeInfo.Preview)
+	
+	// Check if preview image exists
+	if _, err := os.Stat(previewPath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Preview image not found"})
+		return
+	}
+	
+	// Serve the preview image
+	c.File(previewPath)
+}
+
 // GetThemeConfig returns the currently active theme stored in the database
 func GetThemeConfig(c *gin.Context) {
 	var config model.ThemeConfig

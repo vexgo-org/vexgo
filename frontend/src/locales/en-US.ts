@@ -244,6 +244,7 @@ export const enUS = {
     uploadSuccess: "Theme uploaded successfully",
     uploadFailed: "Failed to upload theme",
     uploadError: "Upload error: {message}",
+    viewDetails: "View Details",
   },
 
   // General Settings Page
