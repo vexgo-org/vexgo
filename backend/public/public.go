@@ -219,6 +219,20 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 	// Serve embedded assets (the default theme's assets)
 	r.GET("/assets/*filepath", func(c *gin.Context) {
 		file := strings.TrimPrefix(c.Param("filepath"), "/")
+		theme := getRequestedTheme(c)
+
+		if theme != DefaultTheme {
+			targetFile := path.Join(DistDir, "assets", file)
+			content, mimeType, exists := getFileContent(theme, targetFile)
+			if exists {
+				if mimeType == "" {
+					mimeType = "application/octet-stream"
+				}
+				c.Data(http.StatusOK, mimeType, content)
+				return
+			}
+		}
+
 		content, err := ReadAsset("assets/" + file)
 		if err != nil {
 			c.Status(http.StatusNotFound)
