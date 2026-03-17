@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import { useIsDark } from "@/hooks/useIsDark";
 import { uploadApi } from "@/lib/api";
 import {
@@ -35,37 +35,88 @@ import {
 } from "@mdxeditor/editor";
 import "@mdxeditor/editor/style.css";
 
+export interface RichTextEditorRef {
+  uploadTempImages: () => Promise<Array<{ tempUrl: string; realUrl: string }>>;
+}
+
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
   originalContent?: string;
+  onImagesUploaded?: (images: Array<{ tempUrl: string; realUrl: string }>) => void;
 }
 
-export function RichTextEditor({
+interface TempImage {
+  file: File;
+  tempUrl: string;
+}
+
+export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   content,
   onChange,
   placeholder,
   originalContent,
-}: RichTextEditorProps) {
+  onImagesUploaded,
+}, ref) => {
   const editorRef = useRef<MDXEditorMethods>(null);
   const isDark = useIsDark();
   const isInternalChange = useRef(false);
+  const [tempImages, setTempImages] = useState<TempImage[]>([]);
 
-  // Image upload handler
+  // Clean up temporary URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      tempImages.forEach(img => URL.revokeObjectURL(img.tempUrl));
+    };
+  }, [tempImages]);
+
+  // Image upload handler for temporary storage
   const imageUploadHandler = useCallback(
     async (file: File): Promise<string> => {
-      try {
-        const response = await uploadApi.uploadFile(file);
-        return response.data.file!.url;
-      } catch (error) {
-        console.error("Failed to upload image:", error);
-        alert("Failed to upload image, please try again");
-        throw error;
-      }
+      // Create temporary URL for preview
+      const tempUrl = URL.createObjectURL(file);
+      
+      // Store the temporary image
+      setTempImages(prev => [...prev, { file, tempUrl }]);
+      
+      return tempUrl;
     },
     [],
   );
+
+  // Upload all temporary images to server
+  const uploadTempImages = useCallback(async (): Promise<Array<{ tempUrl: string; realUrl: string }>> => {
+    if (tempImages.length === 0) return [];
+
+    const uploadPromises = tempImages.map(async (tempImg) => {
+      try {
+        const response = await uploadApi.uploadFile(tempImg.file);
+        const realUrl = response.data.file!.url;
+        return { tempUrl: tempImg.tempUrl, realUrl };
+      } catch (error) {
+        console.error("Failed to upload image:", error);
+        throw error;
+      }
+    });
+
+    const results = await Promise.all(uploadPromises);
+    
+    // Revoke temporary URLs
+    tempImages.forEach(img => URL.revokeObjectURL(img.tempUrl));
+    setTempImages([]);
+
+    if (onImagesUploaded) {
+      onImagesUploaded(results);
+    }
+
+    return results;
+  }, [tempImages, onImagesUploaded]);
+
+  // Expose uploadTempImages method through ref
+  useImperativeHandle(ref, () => ({
+    uploadTempImages,
+  }));
 
   // Handle content changes
   const handleChange = useCallback(
@@ -176,4 +227,6 @@ export function RichTextEditor({
       />
     </div>
   );
-}
+});
+
+RichTextEditor.displayName = "RichTextEditor";
