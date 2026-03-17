@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Check, AlertCircle, Palette } from "lucide-react";
+import { Loader2, Check, AlertCircle, Palette, Upload } from "lucide-react";
 
 interface ThemeInfo {
   id: string;
@@ -37,6 +37,8 @@ export function ThemePage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user && user.role !== "admin" && user.role !== "super_admin") {
@@ -91,6 +93,47 @@ export function ThemePage() {
     }
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 检查文件类型
+    if (!file.name.endsWith('.zip')) {
+      setMessage({ type: "error", text: t('themePage.uploadError', { message: "请上传 zip 格式的文件" }) });
+      return;
+    }
+
+    setUploading(true);
+    setMessage(null);
+
+    const formData = new FormData();
+    formData.append('theme', file);
+
+    try {
+      await api.post("/themes/upload", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setMessage({ type: "success", text: t('themePage.uploadSuccess') });
+      // 重新加载主题列表
+      loadData();
+    } catch (error) {
+      console.error("上传主题失败:", error);
+      setMessage({ type: "error", text: t('themePage.uploadFailed') });
+    } finally {
+      setUploading(false);
+      // 清空文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -101,14 +144,32 @@ export function ThemePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Palette className="w-8 h-8" />
-          {t('themePage.title')}
-        </h1>
-        <p className="text-gray-500 mt-2">
-          {t('themePage.description')}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Palette className="w-8 h-8" />
+            {t('themePage.title')}
+          </h1>
+          <p className="text-gray-500 mt-2">
+            {t('themePage.description')}
+          </p>
+        </div>
+        <Button
+          onClick={handleUploadClick}
+          disabled={uploading}
+          className="flex items-center gap-2"
+        >
+          {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+          <Upload className="w-4 h-4" />
+          {t('themePage.uploadTheme')}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".zip"
+          onChange={handleFileChange}
+          className="hidden"
+        />
       </div>
 
       {message && (
@@ -215,6 +276,21 @@ export function ThemePage() {
           <CardTitle className="text-blue-900">{t('themePage.installationInstructions')}</CardTitle>
         </CardHeader>
         <CardContent className="text-blue-800 space-y-2">
+          <p>
+            <strong>方法一：上传主题包</strong>
+          </p>
+          <p>
+            1. 点击上方的「上传主题」按钮
+          </p>
+          <p>
+            2. 选择包含主题的 zip 压缩包
+          </p>
+          <p>
+            3. 等待上传完成，系统会自动解压并加载主题
+          </p>
+          <p className="mt-4">
+            <strong>方法二：手动安装</strong>
+          </p>
           <p>
             1. {t('themePage.instruction1')}{" "}
             <code className="bg-white px-2 py-1 rounded">./data/theme/</code>{" "}

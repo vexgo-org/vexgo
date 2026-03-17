@@ -7,8 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/smtp"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
+	"archive/zip"
 
 	"vexgo/backend/model"
 	"vexgo/backend/public"
@@ -813,4 +816,224 @@ func SetupThemeProvider() {
 		}
 		return config.ActiveTheme
 	}
+}
+
+// UploadTheme handles theme zip file upload and extraction
+func UploadTheme(c *gin.Context) {
+	// Get the file from the request
+	file, header, err := c.Request.FormFile("theme")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+	defer file.Close()
+
+	// Check if the file is a zip
+	if !strings.HasSuffix(header.Filename, ".zip") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File must be a zip archive"})
+		return
+	}
+
+	// Create a temporary directory for extraction
+	tempDir, err := os.MkdirTemp("", "theme-upload-")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create temporary directory"})
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Read the zip file
+	zipReader, err := zip.NewReader(file, header.Size)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid zip file"})
+		return
+	}
+
+	// Extract the zip file
+	for _, f := range zipReader.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+
+		// Ensure the file path is safe
+		if strings.Contains(f.Name, "..") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
+			return
+		}
+
+		// Create the directory structure
+		filePath := filepath.Join(tempDir, f.Name)
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory structure"})
+			return
+		}
+
+		// Extract the file
+		dstFile, err := os.Create(filePath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
+			return
+		}
+
+		srcFile, err := f.Open()
+		if err != nil {
+			dstFile.Close()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open zip file"})
+			return
+		}
+
+		_, err = io.Copy(dstFile, srcFile)
+		srcFile.Close()
+		dstFile.Close()
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to extract file"})
+			return
+		}
+	}
+
+	// Check if the extracted directory contains a vexgo-theme.json file
+	var themeInfo public.ThemeInfo
+	var themeDir string
+
+	// Find the directory containing vexgo-theme.json
+	entries, err := os.ReadDir(tempDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read extracted files"})
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			metaPath := filepath.Join(tempDir, entry.Name(), public.ThemeMetaFile)
+			if _, err := os.Stat(metaPath); err == nil {
+				// Found the theme directory
+				themeDir = entry.Name()
+				
+				// Read and parse the theme metadata
+				content, err := os.ReadFile(metaPath)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read theme metadata"})
+					return
+				}
+				
+				if err := json.Unmarshal(content, &themeInfo); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme metadata"})
+					return
+				}
+				
+				break
+			}
+		}
+	}
+
+	// If no theme directory found, check if the root contains vexgo-theme.json
+	if themeDir == "" {
+		metaPath := filepath.Join(tempDir, public.ThemeMetaFile)
+		if _, err := os.Stat(metaPath); err == nil {
+			// Theme files are in the root of the zip
+			content, err := os.ReadFile(metaPath)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read theme metadata"})
+				return
+			}
+			
+			if err := json.Unmarshal(content, &themeInfo); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme metadata"})
+				return
+			}
+			
+			// Use the theme ID from metadata or generate one
+			if themeInfo.ID == "" {
+				// Generate a theme ID from the filename
+				themeDir = strings.TrimSuffix(header.Filename, ".zip")
+				// Remove any non-alphanumeric characters
+				themeDir = strings.Map(func(r rune) rune {
+					if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+						return r
+					}
+					return '_'
+				}, themeDir)
+			} else {
+				themeDir = themeInfo.ID
+			}
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No vexgo-theme.json found in the zip file"})
+			return
+		}
+	}
+
+	// Ensure the theme ID is valid
+	if themeDir == "" || themeDir == public.DefaultTheme {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		return
+	}
+
+	// Create the theme directory in data/theme
+	targetThemeDir := filepath.Join(public.DataDir, public.ThemesDir, themeDir)
+	
+	// Remove existing theme directory if it exists
+	if err := os.RemoveAll(targetThemeDir); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove existing theme directory"})
+		return
+	}
+
+	// Create the target directory
+	if err := os.MkdirAll(targetThemeDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create theme directory"})
+		return
+	}
+
+	// Copy files from temporary directory to target
+	sourceDir := tempDir
+	if themeDir != "" {
+		sourceDir = filepath.Join(tempDir, themeDir)
+	}
+
+	// Check if source directory exists
+	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
+		sourceDir = tempDir // Use root if themeDir doesn't exist
+	}
+
+	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return err
+		}
+
+		targetPath := filepath.Join(targetThemeDir, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(targetPath, 0755)
+		}
+
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		dstFile, err := os.Create(targetPath)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+
+		_, err = io.Copy(dstFile, srcFile)
+		return err
+	})
+
+	if err != nil {
+		// Clean up partial installation
+		os.RemoveAll(targetThemeDir)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to copy theme files"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Theme uploaded successfully"})
 }

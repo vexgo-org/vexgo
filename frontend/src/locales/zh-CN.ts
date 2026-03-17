@@ -240,6 +240,10 @@ export const zhCN = {
     instruction5: "在主题目录中放置",
     instruction6: "文件夹（包含编译后的静态资源）",
     instruction7: "刷新此页面以查看新主题，应用后对所有用户即时生效",
+    uploadTheme: "上传主题",
+    uploadSuccess: "主题上传成功",
+    uploadFailed: "上传主题失败",
+    uploadError: "上传错误: {message}",
   },
 
   // 通用设置页面

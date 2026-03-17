@@ -240,6 +240,10 @@ export const enUS = {
     instruction5: "Place the",
     instruction6: "folder (containing compiled static assets) in the theme directory",
     instruction7: "Refresh this page to see new themes. After application, changes take effect immediately for all users",
+    uploadTheme: "Upload Theme",
+    uploadSuccess: "Theme uploaded successfully",
+    uploadFailed: "Failed to upload theme",
+    uploadError: "Upload error: {message}",
   },
 
   // General Settings Page

@@ -122,5 +122,8 @@ func RegisterAPIRoutes(r *gin.Engine) {
 
 		api.GET("/config/theme", GetThemeConfig)
 		api.PUT("/config/theme", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), UpdateThemeConfig)
+		
+		// Theme upload endpoint
+		api.POST("/themes/upload", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), UploadTheme)
 	}
 }
