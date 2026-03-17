@@ -317,7 +317,12 @@ func resolveTags(names []string) ([]model.Tag, error) {
 
 // Create post (requires login)
 func CreatePost(c *gin.Context) {
-	userID, _ := c.Get("userID") // Get from JWT
+	// Check if user is logged in
+	userID, exists := c.Get("userID")
+	if !exists || userID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，请先登录"})
+		return
+	}
 
 	// Get user role information from context
 	var userRole string
@@ -337,6 +342,12 @@ func CreatePost(c *gin.Context) {
 				userRole = user.Role
 			}
 		}
+	}
+
+	// Check if user has permission to create posts
+	if userRole == "" || userRole == model.RoleGuest {
+		c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，无法创建文章"})
+		return
 	}
 
 	// Add debug information

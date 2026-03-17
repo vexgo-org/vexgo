@@ -792,5 +792,6 @@ export const zhCN = {
     writePostFailed: "保存文章失败，请重试",
     imageTooLarge: "图片大小不能超过10MB",
     uploadFailed: "上传失败，请重试",
+    permissionDenied: "权限不足，无法访问写文章页面",
   },
 };

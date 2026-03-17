@@ -792,5 +792,6 @@ export const enUS = {
     writePostFailed: "Failed to save article, please try again",
     imageTooLarge: "Image size cannot exceed 10MB",
     uploadFailed: "Upload failed, please try again",
+    permissionDenied: "Permission denied, cannot access write post page",
   },
 };

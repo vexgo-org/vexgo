@@ -33,8 +33,23 @@ export function WritePostPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isEditMode = !!id;
+
+  // Check if user is authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      alert(t("writePostPage.permissionDenied"));
+      navigate("/");
+      return;
+    }
+    // Check if user has permission to create posts
+    if (user.role === "guest") {
+      alert(t("writePostPage.permissionDenied"));
+      navigate("/");
+      return;
+    }
+  }, [isAuthenticated, user, navigate, t]);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
