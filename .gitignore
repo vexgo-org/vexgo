@@ -18,3 +18,5 @@ backend/.DS_Store
 frontend/.DS_Store
 
 uploads/
+
+scripts/api_test.sh
