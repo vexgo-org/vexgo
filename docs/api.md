@@ -137,7 +137,7 @@ Verify email address using token.
 
 - `token` (string, required): Verification token
 
-**Response:**
+**Response (email verification):**
 
 ```json
 {
@@ -145,7 +145,7 @@ Verify email address using token.
 }
 ```
 
-**For email change:**
+**Response (email change - success with user found):**
 
 ```json
 {
@@ -154,6 +154,29 @@ Verify email address using token.
   "new_email": "newemail@example.com"
 }
 ```
+
+**Response (email change - success but user not found):**
+
+```json
+{
+  "message": "Email change successful! Your new email is now active.",
+  "require_relogin": true
+}
+```
+
+**Error Response:**
+
+```json
+{
+  "error": "Verification token cannot be empty"
+}
+```
+
+**Notes:**
+
+- Token prefix `email-change-` indicates email change verification
+- Normal tokens are for initial email verification
+- After email change, user needs to re-login (`require_relogin: true`)
 
 ---
 
@@ -165,15 +188,29 @@ Generate a sliding puzzle captcha.
 
 ```json
 {
-  "captcha": {
-    "id": "uuid",
-    "token": "captcha_token",
-    "background": "data:image/png;base64,...",
-    "piece": "data:image/png;base64,...",
-    "x": 150
-  }
+  "id": "uuid",
+  "token": "captcha_token",
+  "bg_image": "data:image/png;base64,...",
+  "puzzle_img": "data:image/png;base64,...",
+  "y": 100,
+  "expires_at": "2024-01-01T00:00:00Z"
 }
 ```
+
+**Field Descriptions:**
+
+- `id`: Captcha unique identifier
+- `token`: Verification token (used with `/captcha/verify`)
+- `bg_image`: Base64 encoded background image with缺口 (missing puzzle piece area)
+- `puzzle_img`: Base64 encoded puzzle piece image (the draggable piece)
+- `y`: Y coordinate of the puzzle position (for reference, not used in verification)
+- `expires_at`: Expiration timestamp (5 minutes from generation)
+
+**Notes:**
+
+- Only the X coordinate (`x`) is verified; Y is provided for frontend reference
+- Images are returned as Base64 encoded PNG data URLs
+- Captcha can only be verified once and expires after 5 minutes
 
 ---
 
@@ -185,19 +222,60 @@ Verify captcha token and position.
 
 ```json
 {
-  "captcha_id": "uuid",
-  "captcha_token": "token",
-  "captcha_x": 150
+  "id": "uuid",
+  "token": "token",
+  "x": 150
 }
 ```
 
-**Response:**
+**Response (success):**
 
 ```json
 {
-  "valid": true
+  "success": true,
+  "message": "Verification successful"
 }
 ```
+
+**Error Responses:**
+
+Verification failed (wrong position):
+
+```json
+{
+  "error": "Verification failed, please try again"
+}
+```
+
+Captcha already used:
+
+```json
+{
+  "error": "Captcha already used"
+}
+```
+
+Captcha expired:
+
+```json
+{
+  "error": "Captcha has expired"
+}
+```
+
+Captcha not found:
+
+```json
+{
+  "error": "Captcha does not exist or has expired"
+}
+```
+
+**Notes:**
+
+- X coordinate verification allows ±10 pixel tolerance
+- Captcha can only be verified once
+- Captcha expires after 5 minutes
 
 ---
 
@@ -212,13 +290,21 @@ Get all categories.
   "categories": [
     {
       "id": 1,
-      "name": "Technology",
-      "slug": "technology",
-      "description": "Tech related posts"
-    }
+      "name": "Default",
+      "description": "Default category for articles without a specified category"
+    },
+    { "id": 2, "name": "test", "description": "" },
+    { "id": 3, "name": "test1", "description": "" },
+    { "id": 4, "name": "12", "description": "" }
   ]
 }
 ```
+
+**Notes:**
+
+- Returns all categories from database
+- Guests can view categories only if `allow_guest_view_posts` is enabled
+- If guest viewing is disabled and user is not logged in, returns empty array
 
 ---
 
@@ -233,12 +319,17 @@ Get all tags.
   "tags": [
     {
       "id": 1,
-      "name": "golang",
-      "slug": "golang"
+      "name": "golang"
     }
   ]
 }
 ```
+
+**Notes:**
+
+- Returns all tags from database
+- Guests can view tags only if `allow_guest_view_posts` is enabled
+- If guest viewing is disabled and user is not logged in, returns empty array
 
 ---
 
