@@ -20,6 +20,60 @@ Select the corresponding system and architecture on the release page to download
 sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/weimm16/vexgo:latest
 ```
 
+### ❄️NixOS Flake
+
+Add the following to your `inputs` in `flake.nix`:
+
+```nix
+# flake.nix
+inputs = {
+  vexgo = {
+    url = "github:weimm16/vexgo";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+};
+```
+
+Then import the module in your `nixosSystem` modules:
+
+```nix
+# flake.nix
+outputs = { self, nixpkgs, vexgo, ... } @ inputs:
+  nixpkgs.lib.nixosSystem {
+    specialArgs = {
+      inherit inputs;
+    };
+    modules = [
+      inputs.vexgo.nixosModules.default
+      ./vexgo.nix
+    ];
+  };
+```
+
+Create `vexgo.nix` with your configuration:
+
+```nix
+# vexgo.nix
+{ inputs,... }: {
+  nixpkgs.overlays = [inputs.vexgo.overlays.default];
+  services.vexgo = {
+    enable = true;
+    settings = {
+      addr = "0.0.0.0";
+      port = 3001;
+    };
+  };
+}
+```
+
+Then rebuild your system:
+
+```bash
+sudo nixos-rebuild switch --flake .#your-host
+```
+
+### After Installation
+
 Then, visit http://127.0.0.1:3001
 
 The Default super admin account: `admin@example.com`  
@@ -184,26 +238,26 @@ You can also configure the application using environment variables.
 
 #### Server
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ADDR` | `0.0.0.0` | Server listen address |
-| `PORT` | `3001` | Server listen port |
-| `DATA` | `./data` | Data directory path |
-| `JWT_SECRET` | — | JWT secret key (required for production) |
-| `BEHIND_REVERSE_PROXY` | `false` | Set to `true` if the server is behind a reverse proxy (nginx, Cloudflare, etc.). This enables proper handling of `X-Forwarded-*` headers. |
-| `TRUSTED_PROXIES` | — | Comma-separated list of trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. If empty, defaults to common private networks (127.0.0.1, ::1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12). Example: `TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
+| Variable               | Default   | Description                                                                                                                                                                                                                                                  |
+| ---------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ADDR`                 | `0.0.0.0` | Server listen address                                                                                                                                                                                                                                        |
+| `PORT`                 | `3001`    | Server listen port                                                                                                                                                                                                                                           |
+| `DATA`                 | `./data`  | Data directory path                                                                                                                                                                                                                                          |
+| `JWT_SECRET`           | —         | JWT secret key (required for production)                                                                                                                                                                                                                     |
+| `BEHIND_REVERSE_PROXY` | `false`   | Set to `true` if the server is behind a reverse proxy (nginx, Cloudflare, etc.). This enables proper handling of `X-Forwarded-*` headers.                                                                                                                    |
+| `TRUSTED_PROXIES`      | —         | Comma-separated list of trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. If empty, defaults to common private networks (127.0.0.1, ::1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12). Example: `TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
 
 #### Database
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_TYPE` | `sqlite` | Database type: `sqlite`, `mysql`, or `postgres` |
-| `DB_HOST` | — | Database host (required for mysql/postgres) |
-| `DB_PORT` | — | Database port (required for mysql/postgres) |
-| `DB_USER` | — | Database username (required for mysql/postgres) |
-| `DB_PASSWORD` | — | Database password (required for mysql/postgres) |
-| `DB_NAME` | — | Database name (required for mysql/postgres) |
-| `DB_SSL_MODE` | `disable` | SSL mode for postgres |
+| Variable      | Default   | Description                                     |
+| ------------- | --------- | ----------------------------------------------- |
+| `DB_TYPE`     | `sqlite`  | Database type: `sqlite`, `mysql`, or `postgres` |
+| `DB_HOST`     | —         | Database host (required for mysql/postgres)     |
+| `DB_PORT`     | —         | Database port (required for mysql/postgres)     |
+| `DB_USER`     | —         | Database username (required for mysql/postgres) |
+| `DB_PASSWORD` | —         | Database password (required for mysql/postgres) |
+| `DB_NAME`     | —         | Database name (required for mysql/postgres)     |
+| `DB_SSL_MODE` | `disable` | SSL mode for postgres                           |
 
 #### SSO / Single Sign-On
 
@@ -211,52 +265,52 @@ VexGo supports GitHub, Google, and any OpenID Connect (OIDC) compatible provider
 
 **General**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BASE_URL` | — | Public base URL of your instance, e.g. `https://vexgo.example.com`. Required when running behind a reverse proxy so that OAuth2 redirect URIs are generated correctly. |
-| `ALLOW_LOCAL_LOGIN` | `true` | Set to `false` to disable password login and enforce SSO-only access. |
+| Variable            | Default | Description                                                                                                                                                            |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BASE_URL`          | —       | Public base URL of your instance, e.g. `https://vexgo.example.com`. Required when running behind a reverse proxy so that OAuth2 redirect URIs are generated correctly. |
+| `ALLOW_LOCAL_LOGIN` | `true`  | Set to `false` to disable password login and enforce SSO-only access.                                                                                                  |
 
 **GitHub**
 
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID |
+| Variable               | Description                    |
+| ---------------------- | ------------------------------ |
+| `GITHUB_CLIENT_ID`     | GitHub OAuth App Client ID     |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
 
 Register your OAuth App at https://github.com/settings/developers. Set the callback URL to `https://your-domain/api/sso/github/callback`.
 
 **Google**
 
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID |
+| Variable               | Description                    |
+| ---------------------- | ------------------------------ |
+| `GOOGLE_CLIENT_ID`     | Google OAuth 2.0 Client ID     |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret |
 
 Create credentials at https://console.developers.google.com. Set the callback URL to `https://your-domain/api/sso/google/callback`.
 
 **OIDC**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OIDC_ENABLED` | `false` | Set to `true` to enable OIDC login |
-| `OIDC_ISSUER_URL` | — | Issuer URL of your OIDC provider, e.g. `https://auth.example.com/realms/myrealm`. VexGo will auto-discover endpoints via `<issuer>/.well-known/openid-configuration`. |
-| `OIDC_CLIENT_ID` | — | Client ID provided by your OIDC provider |
-| `OIDC_CLIENT_SECRET` | — | Client Secret provided by your OIDC provider |
+| Variable             | Default | Description                                                                                                                                                           |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OIDC_ENABLED`       | `false` | Set to `true` to enable OIDC login                                                                                                                                    |
+| `OIDC_ISSUER_URL`    | —       | Issuer URL of your OIDC provider, e.g. `https://auth.example.com/realms/myrealm`. VexGo will auto-discover endpoints via `<issuer>/.well-known/openid-configuration`. |
+| `OIDC_CLIENT_ID`     | —       | Client ID provided by your OIDC provider                                                                                                                              |
+| `OIDC_CLIENT_SECRET` | —       | Client Secret provided by your OIDC provider                                                                                                                          |
 
 Advanced options:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OIDC_SCOPES` | `openid profile email` | Space-separated scopes. Add `groups` if your provider requires it for group claims. |
-| `OIDC_EMAIL_CLAIM` | `email` | Claim name for the user's email |
-| `OIDC_NAME_CLAIM` | `name` | Claim name for the user's display name |
-| `OIDC_GROUP_CLAIM` | `groups` | Claim name for group membership |
-| `OIDC_ALLOWED_GROUPS` | — | Comma-separated list of groups allowed to log in, e.g. `admins,developers`. Empty = allow all users. |
-| `OIDC_AUTO_REDIRECT` | `false` | Automatically redirect to the OIDC provider on the login page, skipping the password form. |
-| `OIDC_VERIFY_EMAIL` | `false` | Require `email_verified=true` in the token before allowing login. |
-| `OIDC_AUTH_URL` | — | Manual override for the authorization endpoint (only needed if OIDC discovery is unavailable). |
-| `OIDC_TOKEN_URL` | — | Manual override for the token endpoint. |
-| `OIDC_USERINFO_URL` | — | Manual override for the userinfo endpoint (optional fallback when the `id_token` lacks required claims). |
+| Variable              | Default                | Description                                                                                              |
+| --------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `OIDC_SCOPES`         | `openid profile email` | Space-separated scopes. Add `groups` if your provider requires it for group claims.                      |
+| `OIDC_EMAIL_CLAIM`    | `email`                | Claim name for the user's email                                                                          |
+| `OIDC_NAME_CLAIM`     | `name`                 | Claim name for the user's display name                                                                   |
+| `OIDC_GROUP_CLAIM`    | `groups`               | Claim name for group membership                                                                          |
+| `OIDC_ALLOWED_GROUPS` | —                      | Comma-separated list of groups allowed to log in, e.g. `admins,developers`. Empty = allow all users.     |
+| `OIDC_AUTO_REDIRECT`  | `false`                | Automatically redirect to the OIDC provider on the login page, skipping the password form.               |
+| `OIDC_VERIFY_EMAIL`   | `false`                | Require `email_verified=true` in the token before allowing login.                                        |
+| `OIDC_AUTH_URL`       | —                      | Manual override for the authorization endpoint (only needed if OIDC discovery is unavailable).           |
+| `OIDC_TOKEN_URL`      | —                      | Manual override for the token endpoint.                                                                  |
+| `OIDC_USERINFO_URL`   | —                      | Manual override for the userinfo endpoint (optional fallback when the `id_token` lacks required claims). |
 
 Register your OIDC client with the callback URL: `https://your-domain/api/sso/oidc/callback`.
 
@@ -293,17 +347,17 @@ export OIDC_CLIENT_SECRET=your-client-secret
 
 VexGo supports any S3-compatible object storage (AWS S3, MinIO, Garage, etc.).
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `S3_ENABLED` | `false` | Set to `true` to enable S3 storage |
-| `S3_ENDPOINT` | — | S3 endpoint URL, e.g. `https://minio.example.com`. Leave empty for standard AWS S3. |
-| `S3_REGION` | — | AWS region, e.g. `us-east-1`. Required for AWS S3; can be any value for S3-compatible services. |
-| `S3_BUCKET` | — | Target bucket name |
-| `S3_ACCESS_KEY` | — | Access key ID |
-| `S3_SECRET_KEY` | — | Secret access key |
-| `S3_FORCE_PATH` | `false` | Set to `true` to use path-style URLs (required for MinIO and most S3-compatible services) |
-| `S3_CUSTOM_DOMAIN` | — | Custom domain for generating public file URLs, e.g. `cdn.example.com`. Useful when using a CDN in front of your bucket. |
-| `S3_DISABLE_BUCKET_IN_CUSTOM_URL` | `false` | Set to `true` to disable including bucket in custom domain URLs (default: include bucket by default) |
+| Variable                          | Default | Description                                                                                                             |
+| --------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `S3_ENABLED`                      | `false` | Set to `true` to enable S3 storage                                                                                      |
+| `S3_ENDPOINT`                     | —       | S3 endpoint URL, e.g. `https://minio.example.com`. Leave empty for standard AWS S3.                                     |
+| `S3_REGION`                       | —       | AWS region, e.g. `us-east-1`. Required for AWS S3; can be any value for S3-compatible services.                         |
+| `S3_BUCKET`                       | —       | Target bucket name                                                                                                      |
+| `S3_ACCESS_KEY`                   | —       | Access key ID                                                                                                           |
+| `S3_SECRET_KEY`                   | —       | Secret access key                                                                                                       |
+| `S3_FORCE_PATH`                   | `false` | Set to `true` to use path-style URLs (required for MinIO and most S3-compatible services)                               |
+| `S3_CUSTOM_DOMAIN`                | —       | Custom domain for generating public file URLs, e.g. `cdn.example.com`. Useful when using a CDN in front of your bucket. |
+| `S3_DISABLE_BUCKET_IN_CUSTOM_URL` | `false` | Set to `true` to disable including bucket in custom domain URLs (default: include bucket by default)                    |
 
 **Example: Docker with MinIO**
 
@@ -388,18 +442,20 @@ go run main.go -c ../examples/config-mysql.yml
 The backend is organized into the following folders with clear separation of concerns:
 
 #### **cmd/** — Application Entry Point and Configuration Parsing
+
 - **Files**: `server.go`
 - **Purpose**: Parses command-line arguments and loads configuration from config files, environment variables, and command-line flags
-- **Key Functions**: 
+- **Key Functions**:
   - `ParseFlags()`: Parses command-line arguments and config files
   - `Config` struct: Holds all configuration values
-- **Import Rules**: 
+- **Import Rules**:
   - ✅ **Can import**: Standard library, external packages (gin, gorm, etc.)
   - ✅ **Can be imported by**: `main.go`, other initialization modules
   - ❌ **Cannot import**: Other backend modules (to avoid circular imports and keep it as a pure configuration parser)
 
 #### **config/** — Configuration Initialization (Pure Setup Module)
-- **Files**: 
+
+- **Files**:
   - `jwt.go`: JWT secret initialization and validation
   - `s3.go`: S3-compatible storage configuration (AWS S3, MinIO, etc.)
   - `sso.go`: SSO provider configuration (GitHub, Google, OIDC)
@@ -408,14 +464,15 @@ The backend is organized into the following folders with clear separation of con
   - `config.Init(jwtSecret)`: Initializes JWT configuration
   - `config.LoadFromConfig(cfg)`: Loads SSO configuration from config file
   - `S3Config.GetURL()`: Generates S3 object URLs
-- **Import Rules**: 
+- **Import Rules**:
   - ✅ **Can import**: Standard library, external packages only (NO backend modules)
   - ✅ **Can be imported by**: `main.go`, `handler`, `middleware`, `utils`
   - ❌ **Cannot import**: `handler`, `middleware`, `model`, `utils`, `public` (maintains isolation)
   - **Reason**: `config` is a pure initialization module that must not depend on application logic to prevent circular imports
 
 #### **handler/** — HTTP Request Handlers and API Endpoints
-- **Files**: 
+
+- **Files**:
   - `api.go`: Main API route registration
   - `auth.go`: Authentication endpoints (login, logout, password reset)
   - `register.go`: User registration endpoints
@@ -439,6 +496,7 @@ The backend is organized into the following folders with clear separation of con
   - ❌ **Cannot import**: `cmd`, `public`
 
 #### **middleware/** — HTTP Middleware Functions
+
 - **Files**:
   - `auth.go`: JWT token verification and authentication
   - `permission.go`: Role-based authorization and permission checking
@@ -453,6 +511,7 @@ The backend is organized into the following folders with clear separation of con
   - ❌ **Cannot import**: `cmd`, `handler`, `utils`, `public`
 
 #### **model/** — Data Models and Database Schemas
+
 - **Files**:
   - `post.go`: Post, User, Tag, Like, Comment data models
   - `roles.go`: User role definitions and permissions
@@ -466,6 +525,7 @@ The backend is organized into the following folders with clear separation of con
   - **Reason**: Model is at the core of the dependency graph; it must not import application logic
 
 #### **utils/** — Utility Functions and Helpers
+
 - **Files**:
   - `mailer.go`: Email sending functionality (SMTP client)
 - **Purpose**: Provides reusable utility functions for common tasks
@@ -475,6 +535,7 @@ The backend is organized into the following folders with clear separation of con
   - ❌ **Cannot import**: `cmd`, `public`
 
 #### **public/** — Embedded Static Resources
+
 - **Files**:
   - `public.go`: Embedded frontend build output management
 - **Purpose**: Serves the built frontend application as embedded assets
@@ -491,6 +552,7 @@ The backend is organized into the following folders with clear separation of con
 The project uses Go modules with the module name `vexgo`. All imports follow the pattern `vexgo/backend/{folder}`.
 
 **Example imports**:
+
 ```go
 import (
     "vexgo/backend/config"    // From config package
@@ -502,6 +564,7 @@ import (
 ```
 
 **Dependency Graph** (arrows show "can import"):
+
 ```
 main.go
   ↓
@@ -513,6 +576,7 @@ main.go → handler → config, model, middleware, utils
 ```
 
 **Critical Rules**:
+
 1. `config/` package must NOT import any other backend modules (prevents circular dependencies)
 2. `model/` package must NOT import application logic modules (keeps data structures clean)
 3. Never import from `cmd/` outside of `main.go` (command-line parsing is initialization-only)
