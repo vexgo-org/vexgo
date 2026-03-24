@@ -8,7 +8,7 @@
   pnpmConfigHook,
   fetchFromGitHub,
   makeWrapper,
-  version ? "0.3.2",
+  version ? "0.4.0",
 }: let
   src = fetchFromGitHub {
     owner = "weimm16";

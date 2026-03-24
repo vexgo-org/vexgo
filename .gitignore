@@ -11,7 +11,7 @@ backend/data/
 backend/public/dist/
 data/
 .env
-result/
+result
 
 .DS_Store
 backend/.DS_Store
