@@ -20,6 +20,14 @@
 sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/weimm16/vexgo:latest
 ```
 
+### ❄️Nix
+
+无需安装即可立即试用 `VexGo` :
+
+```bash
+nix run github:weimm16/vexgo
+```
+
 ### ❄️NixOS Flake
 
 在你的 `flake.nix` 的 `inputs` 中添加：

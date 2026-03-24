@@ -20,6 +20,14 @@ Select the corresponding system and architecture on the release page to download
 sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/weimm16/vexgo:latest
 ```
 
+### ❄️Nix
+
+You can try VexGo instantly without installing:
+
+```bash
+nix run github:weimm16/vexgo
+```
+
 ### ❄️NixOS Flake
 
 Add the following to your `inputs` in `flake.nix`:
