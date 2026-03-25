@@ -184,18 +184,23 @@ func CreateComment(c *gin.Context) {
 	var post model.Post
 	if err := db.First(&post, postID).Error; err == nil {
 		if post.AuthorID != userID { // Don't notify the commenter if they are the post author
-			var user model.User
-			if err := db.First(&user, userID).Error; err == nil {
-				CreateNotification(
-					post.AuthorID,
-					"comment",
-					"文章被评论",
-					fmt.Sprintf("用户 \"%s\" 评论了你的文章 \"%s\"", user.Username, post.Title),
-					strconv.FormatUint(uint64(postID), 10),
-					"post",
-				)
+				var user model.User
+				if err := db.First(&user, userID).Error; err == nil {
+					// Truncate comment content to first 50 characters
+					commentContent := req.Content
+					if len(commentContent) > 50 {
+						commentContent = commentContent[:50] + "..."
+					}
+					CreateNotification(
+						post.AuthorID,
+						"comment",
+						"Post Commented",
+						fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
+						strconv.FormatUint(uint64(postID), 10),
+						"post",
+					)
+				}
 			}
-		}
 	}
 
 	// 2. Notify parent comment author if this is a reply
@@ -205,11 +210,16 @@ func CreateComment(c *gin.Context) {
 			if parentComment.UserID != userID { // Don't notify the commenter if they are the parent comment author
 				var user model.User
 				if err := db.First(&user, userID).Error; err == nil {
+					// Truncate reply content to first 50 characters
+					replyContent := req.Content
+					if len(replyContent) > 50 {
+						replyContent = replyContent[:50] + "..."
+					}
 					CreateNotification(
 						parentComment.UserID,
 						"reply",
-						"评论被回复",
-						fmt.Sprintf("用户 \"%s\" 回复了你的评论", user.Username),
+						"Comment Replied",
+						fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
 						strconv.FormatUint(uint64(*req.ParentID), 10),
 						"comment",
 					)
