@@ -548,6 +548,7 @@ export const enUS = {
     home: "Home",
     writePost: "Write Post",
     myPosts: "My Posts",
+    messages: "Messages",
     adminPanel: "Admin Panel",
     searchPlaceholder: "Search articles...",
     login: "Login",
@@ -794,5 +795,35 @@ export const enUS = {
     imageTooLarge: "Image size cannot exceed 10MB",
     uploadFailed: "Upload failed, please try again",
     permissionDenied: "Permission denied, cannot access write post page",
+  },
+
+  // Message Center Page
+  messageCenter: {
+    title: "Message Center",
+    markAllAsRead: "Mark all as read",
+    tabs: {
+      all: "All",
+      unread: "Unread",
+      comment: "Comments",
+      like: "Likes",
+      review: "Review",
+      role: "Roles",
+    },
+    empty: {
+      noMessages: "No messages",
+      noMessagesDesc: "You haven't received any messages yet",
+      noUnreadMessages: "No unread messages",
+      allRead: "All your messages have been read",
+      noCommentMessages: "No comment messages",
+      noCommentMessagesDesc: "You haven't received any comment-related messages",
+      noLikeMessages: "No like messages",
+      noLikeMessagesDesc: "You haven't received any like-related messages",
+      noReviewMessages: "No review messages",
+      noReviewMessagesDesc: "You haven't received any review-related messages",
+      noRoleMessages: "No role messages",
+      noRoleMessagesDesc: "You haven't received any role-related messages",
+    },
+    unreadBadge: "Unread",
+    view: "View",
   },
 };

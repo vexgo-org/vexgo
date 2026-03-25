@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { messagesApi } from '@/lib/api';
+import { useTranslation } from '@/lib/I18nContext';
 
 import {
   Bell,
@@ -40,6 +41,7 @@ type Message = {
 };
 
 export function MessageCenterPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('all');
   
@@ -55,9 +57,20 @@ export function MessageCenterPage() {
       try {
         const response = await messagesApi.getMessages();
         // 转换后端数据格式为前端使用的格式
-        const formattedMessages = response.data.notifications.map((notification: any) => ({
+        interface Notification {
+          id: number;
+          type: string;
+          title: string;
+          content: string;
+          related_id: string;
+          related_type: 'post' | 'comment';
+          created_at: string;
+          is_read: boolean;
+        }
+        
+        const formattedMessages = response.data.notifications.map((notification: Notification) => ({
           id: notification.id.toString(),
-          type: notification.type,
+          type: notification.type as MessageType,
           title: notification.title,
           content: notification.content,
           relatedId: notification.related_id,
@@ -69,7 +82,7 @@ export function MessageCenterPage() {
         }));
         setMessages(formattedMessages);
       } catch (error) {
-        console.error('获取消息失败:', error);
+        console.error(t('errors.networkError'), error);
       } finally {
         setLoading(false);
       }
@@ -100,7 +113,7 @@ export function MessageCenterPage() {
         )
       );
     } catch (error) {
-      console.error('标记消息为已读失败:', error);
+      console.error(t('errors.networkError'), error);
     }
   };
 
@@ -113,7 +126,7 @@ export function MessageCenterPage() {
         prev.map((message) => ({ ...message, isRead: true }))
       );
     } catch (error) {
-      console.error('全部标记为已读失败:', error);
+      console.error(t('errors.networkError'), error);
     }
   };
 
@@ -124,7 +137,7 @@ export function MessageCenterPage() {
       // 更新本地状态
       setMessages((prev) => prev.filter((message) => message.id !== id));
     } catch (error) {
-      console.error('删除消息失败:', error);
+      console.error(t('errors.networkError'), error);
     }
   };
 
@@ -153,20 +166,20 @@ export function MessageCenterPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">消息中心</h1>
+        <h1 className="text-2xl font-bold">{t('messageCenter.title')}</h1>
         <Button variant="outline" size="sm" onClick={markAllAsRead}>
-          全部标记为已读
+          {t('messageCenter.markAllAsRead')}
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-6">
-          <TabsTrigger value="all">全部</TabsTrigger>
-          <TabsTrigger value="unread">未读</TabsTrigger>
-          <TabsTrigger value="comment">评论</TabsTrigger>
-          <TabsTrigger value="like">点赞</TabsTrigger>
-          <TabsTrigger value="review">审核</TabsTrigger>
-          <TabsTrigger value="role">权限</TabsTrigger>
+          <TabsTrigger value="all">{t('messageCenter.tabs.all')}</TabsTrigger>
+          <TabsTrigger value="unread">{t('messageCenter.tabs.unread')}</TabsTrigger>
+          <TabsTrigger value="comment">{t('messageCenter.tabs.comment')}</TabsTrigger>
+          <TabsTrigger value="like">{t('messageCenter.tabs.like')}</TabsTrigger>
+          <TabsTrigger value="review">{t('messageCenter.tabs.review')}</TabsTrigger>
+          <TabsTrigger value="role">{t('messageCenter.tabs.role')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -178,8 +191,8 @@ export function MessageCenterPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">暂无消息</h3>
-                <p className="text-muted-foreground">您还没有收到任何消息</p>
+                <h3 className="text-lg font-medium mb-2">{t('messageCenter.empty.noMessages')}</h3>
+                <p className="text-muted-foreground">{t('messageCenter.empty.noMessagesDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -219,8 +232,8 @@ export function MessageCenterPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {!message.isRead && (
-                            <Badge variant="secondary" className="text-xs">未读</Badge>
-                          )}
+                           <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
+                         )}
                           {getStatusIcon(message.type)}
                         </div>
                         <div className="flex items-center gap-2">
@@ -235,7 +248,7 @@ export function MessageCenterPage() {
                               }
                             }}
                           >
-                            查看 <ArrowRight className="w-3 h-3 ml-1" />
+                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -268,8 +281,8 @@ export function MessageCenterPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Eye className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">暂无未读消息</h3>
-                <p className="text-muted-foreground">您的所有消息都已读</p>
+                <h3 className="text-lg font-medium mb-2">{t('messageCenter.empty.noUnreadMessages')}</h3>
+                <p className="text-muted-foreground">{t('messageCenter.empty.allRead')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -307,7 +320,7 @@ export function MessageCenterPage() {
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">{message.content}</p>
                       <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="text-xs">未读</Badge>
+                        <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
@@ -320,7 +333,7 @@ export function MessageCenterPage() {
                               }
                             }}
                           >
-                            查看 <ArrowRight className="w-3 h-3 ml-1" />
+                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -352,8 +365,8 @@ export function MessageCenterPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">暂无评论消息</h3>
-                <p className="text-muted-foreground">您还没有收到任何评论相关的消息</p>
+                <h3 className="text-lg font-medium mb-2">{t('messageCenter.empty.noCommentMessages')}</h3>
+                <p className="text-muted-foreground">{t('messageCenter.empty.noCommentMessagesDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -392,7 +405,7 @@ export function MessageCenterPage() {
                       <p className="text-sm text-muted-foreground mb-2">{message.content}</p>
                       <div className="flex items-center justify-between">
                         {!message.isRead && (
-                          <Badge variant="secondary" className="text-xs">未读</Badge>
+                          <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
                         )}
                         <div className="flex items-center gap-2">
                           <Button
@@ -406,7 +419,7 @@ export function MessageCenterPage() {
                               }
                             }}
                           >
-                            查看 <ArrowRight className="w-3 h-3 ml-1" />
+                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -438,8 +451,8 @@ export function MessageCenterPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <ThumbsUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">暂无点赞消息</h3>
-                <p className="text-muted-foreground">您还没有收到任何点赞相关的消息</p>
+                <h3 className="text-lg font-medium mb-2">{t('messageCenter.empty.noLikeMessages')}</h3>
+                <p className="text-muted-foreground">{t('messageCenter.empty.noLikeMessagesDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -478,7 +491,7 @@ export function MessageCenterPage() {
                       <p className="text-sm text-muted-foreground mb-2">{message.content}</p>
                       <div className="flex items-center justify-between">
                         {!message.isRead && (
-                          <Badge variant="secondary" className="text-xs">未读</Badge>
+                          <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
                         )}
                         <div className="flex items-center gap-2">
                           <Button
@@ -492,7 +505,7 @@ export function MessageCenterPage() {
                               }
                             }}
                           >
-                            查看 <ArrowRight className="w-3 h-3 ml-1" />
+                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -524,8 +537,8 @@ export function MessageCenterPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">暂无审核消息</h3>
-                <p className="text-muted-foreground">您还没有收到任何审核相关的消息</p>
+                <h3 className="text-lg font-medium mb-2">{t('messageCenter.empty.noReviewMessages')}</h3>
+                <p className="text-muted-foreground">{t('messageCenter.empty.noReviewMessagesDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -557,7 +570,7 @@ export function MessageCenterPage() {
                       <p className="text-sm text-muted-foreground mb-2">{message.content}</p>
                       <div className="flex items-center justify-between">
                         {!message.isRead && (
-                          <Badge variant="secondary" className="text-xs">未读</Badge>
+                          <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
                         )}
                         <div className="flex items-center gap-2">
                           <Button
@@ -571,7 +584,7 @@ export function MessageCenterPage() {
                               }
                             }}
                           >
-                            查看 <ArrowRight className="w-3 h-3 ml-1" />
+                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -603,8 +616,8 @@ export function MessageCenterPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <UserPlus className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">暂无权限消息</h3>
-                <p className="text-muted-foreground">您还没有收到任何权限相关的消息</p>
+                <h3 className="text-lg font-medium mb-2">{t('messageCenter.empty.noRoleMessages')}</h3>
+                <p className="text-muted-foreground">{t('messageCenter.empty.noRoleMessagesDesc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -633,7 +646,7 @@ export function MessageCenterPage() {
                       <p className="text-sm text-muted-foreground mb-2">{message.content}</p>
                       <div className="flex items-center justify-between">
                         {!message.isRead && (
-                          <Badge variant="secondary" className="text-xs">未读</Badge>
+                          <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
                         )}
                         <Button
                           variant="ghost"

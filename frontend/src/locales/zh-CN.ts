@@ -548,6 +548,7 @@ export const zhCN = {
     home: "首页",
     writePost: "写文章",
     myPosts: "我的文章",
+    messages: "消息",
     adminPanel: "管理后台",
     searchPlaceholder: "搜索文章...",
     login: "登录",
@@ -794,5 +795,35 @@ export const zhCN = {
     imageTooLarge: "图片大小不能超过10MB",
     uploadFailed: "上传失败，请重试",
     permissionDenied: "权限不足，无法访问写文章页面",
+  },
+
+  // 消息中心页面
+  messageCenter: {
+    title: "消息中心",
+    markAllAsRead: "全部标记为已读",
+    tabs: {
+      all: "全部",
+      unread: "未读",
+      comment: "评论",
+      like: "点赞",
+      review: "审核",
+      role: "权限",
+    },
+    empty: {
+      noMessages: "暂无消息",
+      noMessagesDesc: "您还没有收到任何消息",
+      noUnreadMessages: "暂无未读消息",
+      allRead: "您的所有消息都已读",
+      noCommentMessages: "暂无评论消息",
+      noCommentMessagesDesc: "您还没有收到任何评论相关的消息",
+      noLikeMessages: "暂无点赞消息",
+      noLikeMessagesDesc: "您还没有收到任何点赞相关的消息",
+      noReviewMessages: "暂无审核消息",
+      noReviewMessagesDesc: "您还没有收到任何审核相关的消息",
+      noRoleMessages: "暂无权限消息",
+      noRoleMessagesDesc: "您还没有收到任何权限相关的消息",
+    },
+    unreadBadge: "未读",
+    view: "查看",
   },
 };

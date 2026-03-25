@@ -126,7 +126,7 @@ export function Layout({ children }: LayoutProps) {
     { path: '/', label: t('layout.home'), icon: Home },
     ...(isAuthenticated ? [{ path: '/write', label: t('layout.writePost'), icon: PenLine }] : []),
     ...(isAuthenticated ? [{ path: '/my-posts', label: t('layout.myPosts'), icon: FileText }] : []),
-    ...(isAuthenticated ? [{ path: '/messages', label: '消息', icon: Bell }] : []),
+    ...(isAuthenticated ? [{ path: '/messages', label: t('layout.messages'), icon: Bell }] : []),
     ...(user?.role === 'admin' || user?.role === 'super_admin' ? [{ path: '/admin', label: t('layout.adminPanel'), icon: BarChart3 }] : []),
   ];
 
