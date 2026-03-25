@@ -584,12 +584,21 @@ Get current user information (requires authentication).
 
 ```json
 {
-  "id": 1,
-  "email": "user@example.com",
-  "username": "username",
-  "role": "user",
-  "email_verified": true,
-  "created_at": "2024-01-01T00:00:00Z"
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "username": "username",
+    "role": "user",
+    "email_verified": true,
+    "avatar": "url_to_avatar",
+    "bio": "My bio",
+    "birthday": "2023-01-01",
+    "created_at": "2024-01-01T00:00:00Z",
+    "profile_visibility": "public",
+    "hide_email": false,
+    "hide_birthday": false,
+    "hide_bio": false
+  }
 }
 ```
 
@@ -611,7 +620,8 @@ Update user profile (requires authentication).
 {
   "username": "new_username",
   "bio": "My bio",
-  "avatar": "url_to_avatar"
+  "avatar": "url_to_avatar",
+  "birthday": "2023-01-01"
 }
 ```
 
@@ -619,7 +629,21 @@ Update user profile (requires authentication).
 
 ```json
 {
-  "message": "Profile updated successfully"
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "username": "new_username",
+    "role": "user",
+    "email_verified": true,
+    "avatar": "url_to_avatar",
+    "bio": "My bio",
+    "birthday": "2023-01-01",
+    "created_at": "2024-01-01T00:00:00Z",
+    "profile_visibility": "public",
+    "hide_email": false,
+    "hide_birthday": false,
+    "hide_bio": false
+  }
 }
 ```
 
@@ -656,8 +680,7 @@ Request email change (requires authentication).
 
 ```json
 {
-  "new_email": "newemail@example.com",
-  "password": "current_password"
+  "email": "newemail@example.com"
 }
 ```
 
@@ -665,7 +688,8 @@ Request email change (requires authentication).
 
 ```json
 {
-  "message": "Verification email sent to new address"
+  "message": "Verification email sent. Please check your inbox and click the link to complete email change.",
+  "pending": true
 }
 ```
 
@@ -690,7 +714,22 @@ Update user settings (requires authentication).
 
 ```json
 {
-  "message": "Settings updated successfully"
+  "message": "Settings updated successfully",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "username": "username",
+    "role": "user",
+    "email_verified": true,
+    "avatar": "url_to_avatar",
+    "bio": "My bio",
+    "birthday": "2023-01-01",
+    "created_at": "2024-01-01T00:00:00Z",
+    "profile_visibility": "public",
+    "hide_email": true,
+    "hide_birthday": false,
+    "hide_bio": false
+  }
 }
 ```
 
@@ -837,8 +876,10 @@ Create a new post (requires authentication).
 {
   "title": "My Post",
   "content": "Post content in markdown...",
-  "category_id": 1,
-  "tag_ids": [1, 2],
+  "category": 1,
+  "tags": ["golang", "programming"],
+  "excerpt": "Post excerpt",
+  "coverImage": "/uploads/image.jpg",
   "status": "draft" | "published"
 }
 ```
@@ -847,13 +888,16 @@ Create a new post (requires authentication).
 
 ```json
 {
-  "id": 1,
-  "title": "My Post",
-  "content": "Post content...",
-  "status": "draft",
-  "category_id": 1,
-  "tags": [...],
-  "created_at": "2024-01-01T00:00:00Z"
+  "message": "Post created successfully",
+  "post": {
+    "id": 1,
+    "title": "My Post",
+    "content": "Post content...",
+    "status": "draft",
+    "category": 1,
+    "tags": [...],
+    "created_at": "2024-01-01T00:00:00Z"
+  }
 }
 ```
 
@@ -909,8 +953,10 @@ Update a post (requires authentication, author only).
 {
   "title": "Updated Title",
   "content": "Updated content...",
-  "category_id": 1,
-  "tag_ids": [1, 2],
+  "category": 1,
+  "tags": ["golang", "programming"],
+  "excerpt": "Post excerpt",
+  "coverImage": "/uploads/image.jpg",
   "status": "draft" | "published"
 }
 ```
@@ -919,11 +965,14 @@ Update a post (requires authentication, author only).
 
 ```json
 {
-  "id": 1,
-  "title": "Updated Title",
-  "content": "Updated content...",
-  "status": "published",
-  "updated_at": "2024-01-01T00:00:00Z"
+  "message": "Post updated successfully",
+  "post": {
+    "id": 1,
+    "title": "Updated Title",
+    "content": "Updated content...",
+    "status": "published",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
 }
 ```
 
@@ -955,7 +1004,7 @@ Create a comment (requires authentication).
 {
   "postId": 1,
   "content": "This is a comment",
-  "parentId": null | 123
+  "parentId": null
 }
 ```
 
@@ -963,12 +1012,18 @@ Create a comment (requires authentication).
 
 ```json
 {
-  "id": 1,
-  "content": "This is a comment",
-  "post_id": 1,
-  "user_id": 1,
-  "parent_id": null,
-  "created_at": "2024-01-01T00:00:00Z"
+  "message": "Comment created successfully",
+  "comment": {
+    "id": 1,
+    "content": "This is a comment",
+    "post_id": 1,
+    "user_id": 1,
+    "parent_id": null,
+    "status": "published",
+    "created_at": "2024-01-01T00:00:00Z"
+  },
+  "commentsCount": 1,
+  "requiresModeration": false
 }
 ```
 
@@ -987,7 +1042,8 @@ Delete a comment (requires authentication, comment author or admin only).
 
 ```json
 {
-  "message": "Comment deleted successfully"
+  "message": "Comment deleted",
+  "commentsCount": 1
 }
 ```
 
@@ -1026,11 +1082,15 @@ Upload a single file (requires authentication).
 
 ```json
 {
-  "id": 1,
-  "url": "/uploads/uuid.ext",
-  "size": 1024,
-  "type": "image/jpeg",
-  "created_at": "2024-01-01T00:00:00Z"
+  "message": "File uploaded successfully",
+  "file": {
+    "id": 1,
+    "url": "/uploads/uuid.ext",
+    "size": 1024,
+    "type": "image/jpeg",
+    "user_id": 1,
+    "created_at": "2024-01-01T00:00:00Z"
+  }
 }
 ```
 
@@ -1053,16 +1113,23 @@ Upload multiple files (requires authentication).
 
 ```json
 {
+  "message": "File upload completed",
   "files": [
     {
       "id": 1,
       "url": "/uploads/uuid1.ext",
-      "size": 1024
+      "size": 1024,
+      "type": "unknown",
+      "user_id": 1,
+      "created_at": "2024-01-01T00:00:00Z"
     },
     {
       "id": 2,
       "url": "/uploads/uuid2.ext",
-      "size": 2048
+      "size": 2048,
+      "type": "unknown",
+      "user_id": 1,
+      "created_at": "2024-01-01T00:00:00Z"
     }
   ]
 }
@@ -1074,11 +1141,6 @@ Upload multiple files (requires authentication).
 
 Get current user's uploaded files (requires authentication).
 
-**Query Parameters:**
-
-- `page` (int, default: 1)
-- `limit` (int, default: 10)
-
 **Response:**
 
 ```json
@@ -1088,11 +1150,11 @@ Get current user's uploaded files (requires authentication).
       "id": 1,
       "url": "/uploads/uuid.ext",
       "size": 1024,
-      "type": "image/jpeg",
+      "type": "unknown",
+      "user_id": 1,
       "created_at": "2024-01-01T00:00:00Z"
     }
-  ],
-  "pagination": {...}
+  ]
 }
 ```
 
@@ -1106,7 +1168,7 @@ Delete a file (requires authentication, file owner or admin only).
 
 ```json
 {
-  "message": "File deleted successfully"
+  "message": "File deleted"
 }
 ```
 
@@ -1372,7 +1434,7 @@ Update user role.
 
 ```json
 {
-  "role": "admin" | "user" | "super_admin"
+  "role": "admin" | "user" | "contributor" | "super_admin"
 }
 ```
 
@@ -1617,7 +1679,7 @@ Update general settings (admin only).
 
 ### Theme Configuration
 
-#### GET /api/config/theme
+### GET /api/config/theme
 
 Get current theme configuration.
 
@@ -1631,7 +1693,7 @@ Get current theme configuration.
 
 ---
 
-#### PUT /api/config/theme
+### PUT /api/config/theme
 
 Set active theme.
 
@@ -1801,8 +1863,7 @@ Create a new tag (admin only).
 
 ```json
 {
-  "name": "golang",
-  "slug": "golang"
+  "name": "golang"
 }
 ```
 
@@ -1810,9 +1871,11 @@ Create a new tag (admin only).
 
 ```json
 {
-  "id": 1,
-  "name": "golang",
-  "slug": "golang"
+  "message": "Tag created successfully",
+  "tag": {
+    "id": 1,
+    "name": "golang"
+  }
 }
 ```
 
@@ -1828,13 +1891,12 @@ Generate a sliding puzzle captcha.
 
 ```json
 {
-  "captcha": {
-    "id": "uuid",
-    "token": "captcha_token",
-    "background": "base64_encoded_image",
-    "piece": "base64_encoded_image",
-    "x": 150
-  }
+  "id": "uuid",
+  "token": "captcha_token",
+  "bg_image": "base64_encoded_image",
+  "puzzle_img": "base64_encoded_image",
+  "y": 100,
+  "expires_at": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -1842,9 +1904,10 @@ Generate a sliding puzzle captcha.
 
 - `id`: Captcha ID for verification
 - `token`: Token for verification
-- `background`: Base64 encoded background image with缺口
-- `piece`: Base64 encoded puzzle piece image
-- `x`: Target X position for the puzzle piece
+- `bg_image`: Base64 encoded background image with缺口
+- `puzzle_img`: Base64 encoded puzzle piece image
+- `y`: Y coordinate of the puzzle position (for reference, not used in verification)
+- `expires_at`: Expiration timestamp (5 minutes from generation)
 
 ---
 
@@ -1856,9 +1919,9 @@ Verify captcha solution.
 
 ```json
 {
-  "captcha_id": "uuid",
-  "captcha_token": "token",
-  "captcha_x": 150
+  "id": "uuid",
+  "token": "token",
+  "x": 150
 }
 ```
 
@@ -1866,7 +1929,8 @@ Verify captcha solution.
 
 ```json
 {
-  "valid": true
+  "success": true,
+  "message": "Verification successful"
 }
 ```
 
@@ -1874,7 +1938,7 @@ Verify captcha solution.
 
 - Captcha can only be verified once (marked as used after first verification)
 - Captcha expires after configured time (default 5 minutes)
-- X position verification allows ±5 pixel tolerance
+- X position verification allows ±10 pixel tolerance
 
 ---
 
@@ -1993,8 +2057,104 @@ All paginated endpoints accept `page` and `limit` query parameters and return:
 
 ---
 
+## Messages
+
+### GET /api/messages
+
+Get current user's messages (requires authentication).
+
+**Query Parameters:**
+
+- `page` (int, default: 1)
+- `limit` (int, default: 10)
+- `type` (string, optional): Filter by message type
+- `is_read` (string, optional): Filter by read status ('true' or 'false')
+
+**Response:**
+
+```json
+{
+  "notifications": [
+    {
+      "id": 1,
+      "title": "New notification",
+      "content": "You have a new notification",
+      "type": "comment",
+      "related_id": "1",
+      "related_type": "post",
+      "is_read": false,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 20,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 2
+  }
+}
+```
+
+---
+
+### GET /api/messages/unread-count
+
+Get unread message count for current user (requires authentication).
+
+**Response:**
+
+```json
+{
+  "unreadCount": 5
+}
+```
+
+---
+
+### PUT /api/messages/:id/read
+
+Mark a message as read (requires authentication).
+
+**Response:**
+
+```json
+{
+  "message": "Message marked as read"
+}
+```
+
+---
+
+### PUT /api/messages/read-all
+
+Mark all messages as read (requires authentication).
+
+**Response:**
+
+```json
+{
+  "message": "All messages marked as read"
+}
+```
+
+---
+
+### DELETE /api/messages/:id
+
+Delete a message (requires authentication, message owner only).
+
+**Response:**
+
+```json
+{
+  "message": "Message deleted"
+}
+```
+
+---
+
 ## Version
 
 API Version: 0.4.0
 
-Last Updated: 2026-03-19
+Last Updated: 2026-03-25
