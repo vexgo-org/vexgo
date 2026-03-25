@@ -16,6 +16,7 @@ type Config struct {
 	Port      int    // Port to listen on
 	DataDir   string // Data directory for storing sqlite database and media files
 	JWTSecret string `yaml:"jwt_secret"` // JWT secret key for signing tokens
+	LogLevel  string `yaml:"log_level"`  // Logging level: "debug", "info", "warn", "error", "fatal", "panic"
 
 	// Database configuration
 	DBType     string `yaml:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"
@@ -85,6 +86,7 @@ func ParseFlags() *Config {
 		Port:      getIntEnvOrDefault("PORT", *port, 3001),
 		DataDir:   getEnvOrDefault("DATA_DIR", *dataDir, "./data"),
 		JWTSecret: getEnvOrDefault("JWT_SECRET", "", ""),
+		LogLevel:  getEnvOrDefault("LOG_LEVEL", "", "info"),
 
 		// S3 configuration defaults
 		S3Enabled:                  getBoolEnvOrDefault("S3_ENABLED", false),

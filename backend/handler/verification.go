@@ -8,7 +8,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"log"
+	"github.com/sirupsen/logrus"
 	"math"
 	"net/http"
 	"strings"
@@ -24,7 +24,7 @@ import (
 // VerifyEmail verifies email (supports initial verification and email change)
 func VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
-	log.Printf("[VerifyEmail] Received verification request, token: %s", token)
+	logrus.Printf("[VerifyEmail] Received verification request, token: %s", token)
 
 	if token == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token cannot be empty"})
@@ -36,15 +36,15 @@ func VerifyEmail(c *gin.Context) {
 	// Determine if token is for email verification or email change based on prefix
 	var err error
 	if strings.HasPrefix(token, "email-change-") {
-		log.Printf("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
+		logrus.Printf("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
 		// Email change token
 		err = mailer.ConfirmEmailChange(token)
 		if err != nil {
-			log.Printf("[VerifyEmail] ConfirmEmailChange failed: %v", err)
+			logrus.Printf("[VerifyEmail] ConfirmEmailChange failed: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		log.Printf("[VerifyEmail] ConfirmEmailChange succeeded")
+		logrus.Printf("[VerifyEmail] ConfirmEmailChange succeeded")
 		// Query user information after change
 		var user model.User
 		if err := db.Where("verification_token = ?", token).First(&user).Error; err == nil {
@@ -60,15 +60,15 @@ func VerifyEmail(c *gin.Context) {
 			})
 		}
 	} else {
-		log.Printf("[VerifyEmail] Normal email verification token, calling VerifyEmail")
+		logrus.Printf("[VerifyEmail] Normal email verification token, calling VerifyEmail")
 		// Normal email verification token
 		err = mailer.VerifyEmail(token)
 		if err != nil {
-			log.Printf("[VerifyEmail] VerifyEmail failed: %v", err)
+			logrus.Printf("[VerifyEmail] VerifyEmail failed: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		log.Printf("[VerifyEmail] VerifyEmail succeeded")
+		logrus.Printf("[VerifyEmail] VerifyEmail succeeded")
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Email verification successful! You can now log in.",
 		})

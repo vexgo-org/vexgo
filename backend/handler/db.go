@@ -2,11 +2,12 @@ package handler
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"vexgo/backend/cmd"
 	"vexgo/backend/model"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/glebarez/sqlite"
 	dmsql "github.com/go-sql-driver/mysql"
@@ -63,32 +64,32 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		if err != nil {
 			// Check if the error is "Unknown database" (error code 1049)
 			if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
-				log.Printf("Database '%s' not found, attempting to create it.", dbname)
+				logrus.Printf("Database '%s' not found, attempting to create it.", dbname)
 
 				// DSN without database name to connect to the server
 				serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
 				serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{})
 				if serverErr != nil {
-					log.Fatalf("failed to connect to MySQL server to create database: %v", serverErr)
+					logrus.Fatalf("failed to connect to MySQL server to create database: %v", serverErr)
 				}
 
 				// Create the database
 				createDbSQL := fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbname)
 				if execErr := serverDb.Exec(createDbSQL).Error; execErr != nil {
-					log.Fatalf("failed to create database '%s': %v", dbname, execErr)
+					logrus.Fatalf("failed to create database '%s': %v", dbname, execErr)
 				}
-				log.Printf("Database '%s' created successfully.", dbname)
+				logrus.Printf("Database '%s' created successfully.", dbname)
 
 				// Re-attempt connection to the newly created database
 				db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 				if err != nil {
-					log.Fatalf("failed to connect to newly created MySQL database: %v", err)
+					logrus.Fatalf("failed to connect to newly created MySQL database: %v", err)
 				}
 			} else {
-				log.Fatalf("failed to connect to MySQL database: %v", err)
+				logrus.Fatalf("failed to connect to MySQL database: %v", err)
 			}
 		}
-		log.Println("Successfully connected to MySQL database")
+		logrus.Println("Successfully connected to MySQL database")
 	} else if dbType == "postgres" {
 		// PostgreSQL connection - use config values with environment fallback
 		user := cfg.DBUser
@@ -131,21 +132,21 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 		if err != nil {
-			log.Fatalf("failed to connect to PostgreSQL database: %v", err)
+			logrus.Fatalf("failed to connect to PostgreSQL database: %v", err)
 		}
-		log.Println("Successfully connected to PostgreSQL database")
+		logrus.Println("Successfully connected to PostgreSQL database")
 	} else {
 		// SQLite connection (default)
 		// Use dataDir from config (already set via command line or config file)
 		if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
-			log.Fatalf("failed to create data directory: %v", err)
+			logrus.Fatalf("failed to create data directory: %v", err)
 		}
 		dbPath := filepath.Join(dataDir, "blog.db")
 		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 		if err != nil {
-			log.Fatalf("failed to connect to SQLite database: %v", err)
+			logrus.Fatalf("failed to connect to SQLite database: %v", err)
 		}
-		log.Println("Successfully connected to SQLite database")
+		logrus.Println("Successfully connected to SQLite database")
 	}
 
 	// Auto-migrate models
@@ -167,7 +168,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		&model.Message{},
 		&model.Notification{},
 	); err != nil {
-		log.Fatalf("auto migrate failed: %v", err)
+		logrus.Fatalf("auto migrate failed: %v", err)
 	}
 
 	// Create a default super admin (if not exists), store password using bcrypt
@@ -176,7 +177,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 		if err == gorm.ErrRecordNotFound {
 			pwHash, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 			if err != nil {
-				log.Printf("failed to hash default admin password: %v", err)
+				logrus.Printf("failed to hash default admin password: %v", err)
 			} else {
 				u = model.User{
 					Username:          "admin",
@@ -188,7 +189,7 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 					TokenExpiresAt:    nil,
 				}
 				if err := db.Create(&u).Error; err != nil {
-					log.Printf("failed to create default admin: %v", err)
+					logrus.Printf("failed to create default admin: %v", err)
 				}
 			}
 
@@ -206,9 +207,9 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 						FromName:  "VexGo",
 					}
 					if err := db.Create(&smtpConfig).Error; err != nil {
-						log.Printf("failed to create default smtp config: %v", err)
+						logrus.Printf("failed to create default smtp config: %v", err)
 					} else {
-						log.Println("default smtp config created")
+						logrus.Println("default smtp config created")
 					}
 				}
 			}
@@ -225,9 +226,9 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 						ItemsPerPage:        20,
 					}
 					if err := db.Create(&generalSettings).Error; err != nil {
-						log.Printf("failed to create default general settings: %v", err)
+						logrus.Printf("failed to create default general settings: %v", err)
 					} else {
-						log.Println("default general settings created")
+						logrus.Println("default general settings created")
 					}
 				}
 			}
@@ -246,9 +247,9 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 				ModelName:   "gpt-3.5-turbo",
 			}
 			if err := db.Create(&aiConfig).Error; err != nil {
-				log.Printf("failed to create default ai config: %v", err)
+				logrus.Printf("failed to create default ai config: %v", err)
 			} else {
-				log.Println("default ai config created")
+				logrus.Println("default ai config created")
 			}
 		}
 	}
@@ -261,9 +262,9 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 				ActiveTheme: "default",
 			}
 			if err := db.Create(&themeConfig).Error; err != nil {
-				log.Printf("failed to create default theme config: %v", err)
+				logrus.Printf("failed to create default theme config: %v", err)
 			} else {
-				log.Println("default theme config created")
+				logrus.Println("default theme config created")
 			}
 		}
 	}
@@ -277,9 +278,9 @@ func InitDB(cfg *cmd.Config, dataDir string) {
 				Description: "Default category for articles without a specified category",
 			}
 			if err := db.Create(&defaultCategory).Error; err != nil {
-				log.Printf("failed to create default category: %v", err)
+				logrus.Printf("failed to create default category: %v", err)
 			} else {
-				log.Println("default category created: Default")
+				logrus.Println("default category created: Default")
 			}
 		}
 	}

@@ -4,15 +4,18 @@ import (
 	"vexgo/backend/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 // RegisterAPIRoutes registers all HTTP routes under /api.
 // This keeps routing logic out of main.go and avoids import cycles.
 func RegisterAPIRoutes(r *gin.Engine) {
+	logrus.Debug("Registering API routes")
 	api := r.Group("/api")
 	api.Use(middleware.OptionalJWTAuth())
 	{
 		// -------------------- Public API (no JWT authentication required) --------------------
+		logrus.Debug("Registering public API routes")
 		api.GET("/posts", GetPosts)
 		api.GET("/posts/:id", GetPost)
 
@@ -35,7 +38,8 @@ func RegisterAPIRoutes(r *gin.Engine) {
 		api.GET("/likes/:postId", GetLikeStatus)
 		api.GET("/posts/user/:id", GetUserPosts)
 
-		// -------------------- Authentication related API --------------------
+		// -------------------- Authentication API --------------------
+		logrus.Debug("Registering authentication API routes")
 		auth := api.Group("/auth")
 		{
 			auth.POST("/register", Register)
@@ -49,7 +53,6 @@ func RegisterAPIRoutes(r *gin.Engine) {
 			auth.POST("/request-password-reset", RequestPasswordReset)
 			auth.POST("/reset-password", ResetPassword)
 			auth.GET("/verification-status", middleware.JWTAuth(), GetVerificationStatus)
-			auth.POST("/resend-verification", middleware.JWTAuth(), ResendVerificationEmail)
 		}
 
 		// -------------------- SSO --------------------

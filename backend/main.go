@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"strings"
 	"vexgo/backend/cmd"
 	"vexgo/backend/config"
 	"vexgo/backend/handler"
@@ -9,22 +9,26 @@ import (
 	"vexgo/backend/public"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	// 1. Parse command line arguments
 	cfg := cmd.ParseFlags()
 
-	// 2. Initialize configuration (load JWT secret, etc., support config files and environment variables)
+	// 2. Setup logging
+	setupLogging(cfg.LogLevel)
+
+	// 3. Initialize configuration (load JWT secret, etc., support config files and environment variables)
 	config.Init(cfg.JWTSecret)
 
-	// 2.1 Load SSO configuration from config file (overrides environment variables)
+	// 3.1 Load SSO configuration from config file (overrides environment variables)
 	config.LoadFromConfig(cfg)
 
 	// Set data directory (for file uploads, only used if S3 is not enabled)
 	handler.DataDir = cfg.DataDir
 
-	// 3. Initialize S3 storage if enabled
+	// 4. Initialize S3 storage if enabled
 	if cfg.S3Enabled {
 		s3Cfg := &config.S3Config{
 			Enabled:                  cfg.S3Enabled,
@@ -37,23 +41,30 @@ func main() {
 			CustomDomain:             cfg.S3CustomDomain,
 			DisableBucketInCustomURL: cfg.S3DisableBucketInCustomURL,
 		}
-		fmt.Printf("S3 Config Loaded: Enabled=%v, Endpoint=%s, Region=%s, Bucket=%s, CustomDomain=%s, DisableBucketInCustomURL=%v\n", s3Cfg.Enabled, s3Cfg.Endpoint, s3Cfg.Region, s3Cfg.Bucket, s3Cfg.CustomDomain, s3Cfg.DisableBucketInCustomURL)
+		logrus.WithFields(logrus.Fields{
+			"enabled":                  s3Cfg.Enabled,
+			"endpoint":                 s3Cfg.Endpoint,
+			"region":                   s3Cfg.Region,
+			"bucket":                   s3Cfg.Bucket,
+			"customDomain":             s3Cfg.CustomDomain,
+			"disableBucketInCustomURL": s3Cfg.DisableBucketInCustomURL,
+		}).Info("S3 Config Loaded")
 		if err := handler.InitS3(s3Cfg); err != nil {
-			panic(err)
+			logrus.WithError(err).Fatal("Failed to initialize S3 storage")
 		}
-		fmt.Println("S3 storage initialized")
+		logrus.Info("S3 storage initialized")
 	} else {
-		fmt.Println("Using local file storage")
+		logrus.Info("Using local file storage")
 	}
 
-	// 4. Initialize database connection (ensure database driver and connection string are configured correctly)
+	// 5. Initialize database connection (ensure database driver and connection string are configured correctly)
 	handler.InitDB(cfg, cfg.DataDir)
 	// Set database connection to authentication middleware
 	middleware.SetDB(handler.DB())
 	// Set database connection to handler package
 	handler.SetDB(handler.DB())
 
-	// 4. Create Gin engine instance (includes Logger and Recovery middleware by default)
+	// 6. Create Gin engine instance (includes Logger and Recovery middleware by default)
 	r := gin.Default()
 
 	// Configure trusted proxies based on environment/configuration
@@ -63,7 +74,7 @@ func main() {
 		if len(cfg.TrustedProxies) > 0 {
 			// Use explicitly configured trusted proxies
 			r.SetTrustedProxies(cfg.TrustedProxies)
-			fmt.Printf("Trusted proxies configured: %v\n", cfg.TrustedProxies)
+			logrus.WithField("proxies", cfg.TrustedProxies).Info("Trusted proxies configured")
 		} else {
 			// Use common defaults: trust all private IP ranges and localhost
 			// This is a reasonable default for self-hosted behind reverse proxy
@@ -75,11 +86,12 @@ func main() {
 				"172.16.0.0/12",
 			}
 			r.SetTrustedProxies(defaultProxies)
-			fmt.Printf("Trusted proxies set to common private networks (behind reverse proxy)\n")
+			logrus.WithField("proxies", defaultProxies).Info("Trusted proxies set to common private networks (behind reverse proxy)")
 		}
 	} else {
 		// Not behind a reverse proxy, disable trust
 		r.SetTrustedProxies(nil)
+		logrus.Info("No trusted proxies configured (not behind reverse proxy)")
 	}
 
 	// ===================== Core API routing group (all endpoints under /api) =====================
@@ -90,5 +102,23 @@ func main() {
 	// Register all static routes (assets, uploads, SPA fallback) in the public package
 	public.RegisterStaticRoutes(r, cfg.DataDir, cfg.S3Enabled)
 
-	r.Run(cfg.GetListenAddr())
+	// 7. Start the server
+	logrus.WithField("address", cfg.GetListenAddr()).Info("Starting server")
+	if err := r.Run(cfg.GetListenAddr()); err != nil {
+		logrus.WithError(err).Fatal("Failed to start server")
+	}
+}
+
+// setupLogging configures the logging level based on the provided string
+func setupLogging(levelStr string) {
+	level, err := logrus.ParseLevel(strings.ToLower(levelStr))
+	if err != nil {
+		logrus.Warnf("Invalid log level '%s', defaulting to 'info'", levelStr)
+		level = logrus.InfoLevel
+	}
+	logrus.SetLevel(level)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+	logrus.Infof("Log level set to: %s", level)
 }

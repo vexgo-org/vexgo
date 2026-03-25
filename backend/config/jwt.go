@@ -3,17 +3,17 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
 
 // init is called before main to load environment variables from a .env file.
 func init() {
 	// The path is relative to where the go binary is run.
 	if err := godotenv.Load("../.env"); err != nil {
-		log.Println("No .env file found, will use environment variables from the system")
+		logrus.Info("No .env file found, will use environment variables from the system")
 	}
 }
 
@@ -33,22 +33,22 @@ func Init(jwtSecret string) {
 	}
 	if s == "" {
 		// Generate a secure random key in the development environment.
-		log.Println("WARNING: JWT_SECRET not set — generating a random secret for development")
+		logrus.Warn("JWT_SECRET not set — generating a random secret for development")
 		key := make([]byte, 32) // 256 bits
 		if _, err := rand.Read(key); err != nil {
-			log.Fatalf("failed to generate random JWT secret: %v", err)
+			logrus.Fatalf("failed to generate random JWT secret: %v", err)
 		}
 		s = hex.EncodeToString(key)
 	}
 	JWTSecret = []byte(s)
-	log.Printf("JWT secret initialized with length: %d bytes", len(JWTSecret))
+	logrus.Infof("JWT secret initialized with length: %d bytes", len(JWTSecret))
 
 	// Load frontend URL
 	FrontendURL = os.Getenv("FRONTEND_URL")
 	if FrontendURL == "" {
 		FrontendURL = "http://localhost:5173" // Default development environment address
-		log.Printf("WARNING: FRONTEND_URL not set — using default: %s", FrontendURL)
+		logrus.Warnf("FRONTEND_URL not set — using default: %s", FrontendURL)
 	} else {
-		log.Printf("Frontend URL set to: %s", FrontendURL)
+		logrus.Infof("Frontend URL set to: %s", FrontendURL)
 	}
 }

@@ -9,11 +9,13 @@ import (
 	"vexgo/backend/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 // Get posts list (supports pagination, search, category filtering)
 func GetPosts(c *gin.Context) {
+	logrus.Debug("GetPosts: starting to fetch posts")
 	var posts []model.Post
 
 	// 1. Pagination parameters (add error handling to avoid invalid values)
@@ -25,8 +27,9 @@ func GetPosts(c *gin.Context) {
 	}
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit < 1 || limit > 100 {
-		limit = 10 // limit range restricted to avoid performance issues
+		limit = 10 // invalid limit value defaults to 10, max 100
 	}
+	logrus.Debugf("GetPosts: page=%d, limit=%d", page, limit)
 
 	// 2. Filter conditions
 	categoryID := c.Query("category")

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"fmt"
-	"log"
+	"github.com/sirupsen/logrus"
 	"math"
 	"net/http"
 	"time"
@@ -126,7 +126,7 @@ func Register(c *gin.Context) {
 		// Generate verification token
 		token, err := mailer.GenerateVerificationToken(newUser.ID)
 		if err != nil {
-			log.Printf("Failed to generate verification token: %v", err)
+			logrus.Printf("Failed to generate verification token: %v", err)
 		} else {
 			// Build verification link - use request protocol and hostname
 			protocol := "http"
@@ -138,7 +138,7 @@ func Register(c *gin.Context) {
 
 			// Send verification email
 			if err := mailer.SendVerificationEmail(newUser.Email, newUser.Username, verificationLink); err != nil {
-				log.Printf("Failed to send verification email: %v", err)
+				logrus.Printf("Failed to send verification email: %v", err)
 			} else {
 				c.JSON(http.StatusCreated, gin.H{
 					"message":               "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
