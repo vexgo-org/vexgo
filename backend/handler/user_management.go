@@ -170,8 +170,8 @@ func UpdateUserRole(c *gin.Context) {
 	CreateNotification(
 		user.ID,
 		"role",
-		"角色权限变更",
-		fmt.Sprintf("你的角色已从 \"%s\" 变更为 \"%s\"", oldRole, req.Role),
+		"role changed",
+		fmt.Sprintf("Your role has been changed from \"%s\" to \"%s\"", oldRole, req.Role),
 		"",
 		"",
 	)

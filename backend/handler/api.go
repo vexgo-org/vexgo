@@ -123,11 +123,11 @@ func RegisterAPIRoutes(r *gin.Engine) {
 
 		api.GET("/config/theme", GetThemeConfig)
 		api.PUT("/config/theme", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), UpdateThemeConfig)
-		
+
 		// Theme upload endpoint
 		api.POST("/themes/upload", middleware.JWTAuth(), middleware.PermissionMiddleware("admin", "super_admin"), UploadTheme)
 
-		// 消息相关
+		// Messages related
 		api.GET("/messages", middleware.JWTAuth(), GetMessages)
 		api.GET("/messages/unread-count", middleware.JWTAuth(), GetUnreadCount)
 		api.PUT("/messages/:id/read", middleware.JWTAuth(), MarkAsRead)

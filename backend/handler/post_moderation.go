@@ -63,8 +63,8 @@ func ApprovePost(c *gin.Context) {
 	CreateNotification(
 		post.AuthorID,
 		"review",
-		"文章审核通过",
-		fmt.Sprintf("你的文章 \"%s\" 已通过审核", post.Title),
+		"Post approved",
+		fmt.Sprintf("Your post \"%s\" has been approved", post.Title),
 		id,
 		"post",
 	)
@@ -100,8 +100,8 @@ func RejectPost(c *gin.Context) {
 	CreateNotification(
 		post.AuthorID,
 		"review",
-		"文章审核拒绝",
-		fmt.Sprintf("你的文章 \"%s\" 未通过审核，原因：%s", post.Title, req.RejectionReason),
+		"post rejected",
+		fmt.Sprintf("Your post \"%s\" has been rejected, reason: %s", post.Title, req.RejectionReason),
 		id,
 		"post",
 	)

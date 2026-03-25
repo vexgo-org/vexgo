@@ -8,39 +8,39 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetMessages 获取消息列表
+// GetMessages retrieves the message list
 func GetMessages(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	// 分页参数
+	// Pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	offset := (page - 1) * limit
 
-	// 筛选参数
+	// Filter parameters
 	messageType := c.Query("type")
 	isRead := c.Query("is_read")
 
-	// 构建查询
+	// Build query
 	query := db.Model(&model.Notification{}).Where("user_id = ?", uid)
 
-	// 类型筛选
+	// Type filter
 	if messageType != "" {
 		query = query.Where("type = ?", messageType)
 	}
 
-	// 已读状态筛选
+	// Read status filter
 	if isRead != "" {
 		readStatus := isRead == "true"
 		query = query.Where("is_read = ?", readStatus)
 	}
 
-	// 计算总数
+	// Calculate total count
 	var total int64
 	query.Count(&total)
 
-	// 查询消息
+	// Query messages
 	var notifications []model.Notification
 	query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&notifications)
 
@@ -55,7 +55,7 @@ func GetMessages(c *gin.Context) {
 	})
 }
 
-// MarkAsRead 标记消息为已读
+// MarkAsRead marks a message as read
 func MarkAsRead(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
@@ -67,7 +67,7 @@ func MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	// 直接更新消息状态，避免先查询再更新的问题
+	// Directly update message status to avoid the problem of querying first and then updating
 	result := db.Model(&model.Notification{}).Where("id = ? AND user_id = ?", id, uid).Update("is_read", true)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark message as read"})
@@ -81,12 +81,12 @@ func MarkAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Message marked as read"})
 }
 
-// MarkAllAsRead 标记所有消息为已读
+// MarkAllAsRead marks all messages as read
 func MarkAllAsRead(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	// 标记所有消息为已读
+	// Mark all messages as read
 	result := db.Model(&model.Notification{}).Where("user_id = ?", uid).Update("is_read", true)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark all messages as read"})
@@ -96,7 +96,7 @@ func MarkAllAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "All messages marked as read"})
 }
 
-// DeleteMessage 删除消息
+// DeleteMessage deletes a message
 func DeleteMessage(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
@@ -108,7 +108,7 @@ func DeleteMessage(c *gin.Context) {
 		return
 	}
 
-	// 直接删除消息，避免先查询再删除的问题
+	// Directly delete the message to avoid the problem of querying first and then deleting
 	result := db.Where("id = ? AND user_id = ?", id, uid).Delete(&model.Notification{})
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message"})
@@ -122,19 +122,19 @@ func DeleteMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Message deleted"})
 }
 
-// GetUnreadCount 获取未读消息数量
+// GetUnreadCount retrieves the number of unread messages
 func GetUnreadCount(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	// 计算未读消息数量
+	// Calculate the number of unread messages
 	var count int64
 	db.Model(&model.Notification{}).Where("user_id = ? AND is_read = ?", uid, false).Count(&count)
 
 	c.JSON(http.StatusOK, gin.H{"unreadCount": count})
 }
 
-// CreateNotification 创建通知
+// CreateNotification creates a notification
 func CreateNotification(userID uint, notificationType string, title string, content string, relatedID string, relatedType string) error {
 	notification := model.Notification{
 		UserID:      userID,

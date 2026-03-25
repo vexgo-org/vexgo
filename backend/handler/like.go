@@ -43,8 +43,8 @@ func ToggleLike(c *gin.Context) {
 				CreateNotification(
 					post.AuthorID,
 					"like",
-					"文章被点赞",
-					fmt.Sprintf("用户 \"%s\" 点赞了你的文章 \"%s\"", user.Username, post.Title),
+					"The post received likes",
+					fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
 					strconv.FormatUint(uint64(postID), 10),
 					"post",
 				)
