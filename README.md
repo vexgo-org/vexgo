@@ -2,7 +2,27 @@
 
 **English | [中文](docs/README_zh_cn.md)**
 
-This is a blog CMS built on React, Go, Gin, JWT, and SQLite, which implements features such as user registration and article management.
+## VexGo - Modern Blog CMS
+
+VexGo is a lightweight, self-hosted blog content management system designed for developers and writers who value simplicity, performance, and control. Built with modern technologies, it provides a complete blogging platform with user management, rich content creation, and extensibility.
+
+### ✨ Key Features
+
+- **🖥️ Modern Web Interface**: Clean React-based admin panel for content management
+- **🚀 High Performance**: Built with Go and Gin for fast, efficient processing
+- **🔐 Secure Authentication**: JWT-based user system with role-based permissions
+- **📝 Rich Content**: Markdown support, categories, tags, and commenting
+- **🖼️ Media Management**: Built-in file storage with S3-compatible support
+- **🎨 Customizable**: Theme system and plugin architecture
+- **🌐 Self-Hosted**: Complete control over your data and deployment
+
+### 🛠️ Technology Stack
+
+- **Backend**: Go, Gin, GORM, SQLite/PostgreSQL/MySQL
+- **Frontend**: React, TypeScript
+- **Authentication**: JWT, OAuth (GitHub, Google, OIDC)
+- **Storage**: Local filesystem or S3-compatible services
+- **Email**: SMTP integration
 
 ## Quick Start
 
