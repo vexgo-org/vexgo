@@ -4,41 +4,41 @@ import (
 	"time"
 )
 
-// Message 消息模型
+// Message message model
 type Message struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	SenderID  uint      `json:"sender_id"` // 发送者ID，系统消息为0
-	ReceiverID uint     `json:"receiver_id"` // 接收者ID
-	Type      string    `json:"type"` // 消息类型：comment, like, reply, review, role
-	Title     string    `json:"title"` // 消息标题
-	Content   string    `json:"content"` // 消息内容
-	RelatedID string    `json:"related_id"` // 相关资源ID，如文章ID、评论ID
-	RelatedType string  `json:"related_type"` // 相关资源类型：post, comment
-	Status    string    `json:"status"` // 消息状态：sent, read
+	SenderID  uint      `json:"sender_id"` // Sender ID, 0 for system messages
+	ReceiverID uint     `json:"receiver_id"` // Receiver ID
+	Type      string    `json:"type"` // Message type: comment, like, reply, review, role
+	Title     string    `json:"title"` // Message title
+	Content   string    `json:"content"` // Message content
+	RelatedID string    `json:"related_id"` // Related resource ID, such as post ID, comment ID
+	RelatedType string  `json:"related_type"` // Related resource type: post, comment
+	Status    string    `json:"status"` // Message status: sent, read
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// TableName 指定表名
+// TableName specifies table name
 func (Message) TableName() string {
 	return "messages"
 }
 
-// Notification 通知模型
+// Notification notification model
 type Notification struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	UserID    uint      `json:"user_id"` // 接收用户ID
-	Type      string    `json:"type"` // 通知类型：comment, like, reply, review, role
-	Title     string    `json:"title"` // 通知标题
-	Content   string    `json:"content"` // 通知内容
-	RelatedID string    `json:"related_id"` // 相关资源ID
-	RelatedType string  `json:"related_type"` // 相关资源类型
-	IsRead    bool      `json:"is_read"` // 是否已读
+	UserID    uint      `json:"user_id"` // Receiving user ID
+	Type      string    `json:"type"` // Notification type: comment, like, reply, review, role
+	Title     string    `json:"title"` // Notification title
+	Content   string    `json:"content"` // Notification content
+	RelatedID string    `json:"related_id"` // Related resource ID
+	RelatedType string  `json:"related_type"` // Related resource type
+	IsRead    bool      `json:"is_read"` // Whether it has been read
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// TableName 指定表名
+// TableName specifies table name
 func (Notification) TableName() string {
 	return "notifications"
 }

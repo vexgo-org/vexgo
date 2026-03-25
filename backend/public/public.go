@@ -61,9 +61,9 @@ const (
 	DefaultTheme  = "default"
 	ThemeMetaFile = "vexgo-theme.json"
 
-	// 主题内部结构定义
-	DistDir   = "dist"       // 静态资源存放目录
-	IndexFile = "index.html" // 相对于 DistDir
+	// Theme internal structure definition
+	DistDir   = "dist"       // Static assets directory
+	IndexFile = "index.html" // Relative to DistDir
 )
 
 func init() {

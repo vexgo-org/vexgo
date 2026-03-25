@@ -76,7 +76,7 @@ func ApprovePost(c *gin.Context) {
 func RejectPost(c *gin.Context) {
 	id := c.Param("id")
 
-	// 解析请求体，获取拒绝原因
+	// Parse request body to get rejection reason
 	var req struct {
 		RejectionReason string `json:"rejectionReason"`
 	}
