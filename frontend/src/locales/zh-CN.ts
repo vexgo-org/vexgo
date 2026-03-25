@@ -269,6 +269,7 @@ export const zhCN = {
     allowGuestViewPostsDesc: "开启后，未登录用户可以浏览文章内容",
     saveSettings: "保存设置",
     saving: "保存中...",
+    saveSuccess: "设置已保存",
     siteNameRequired: "请输入网站名称",
     itemsPerPageInvalid: "每页显示数量必须在 1-100 之间",
     loadFailed: "加载设置失败",

@@ -269,6 +269,7 @@ export const enUS = {
     allowGuestViewPostsDesc: "When enabled, unlogged users can view post content",
     saveSettings: "Save Settings",
     saving: "Saving...",
+    saveSuccess: "Settings saved",
     siteNameRequired: "Please enter site name",
     itemsPerPageInvalid: "Items per page must be between 1-100",
     loadFailed: "Failed to load settings",
