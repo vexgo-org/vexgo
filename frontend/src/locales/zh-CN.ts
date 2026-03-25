@@ -231,7 +231,7 @@ export const zhCN = {
     applying: "应用中...",
     applyFailed: "应用主题失败",
     loadFailed: "加载主题数据失败",
-    applySuccess: "主题 \"{themeName}\" 已成功应用，对所有用户生效",
+    applySuccess: '主题 "{themeName}" 已成功应用，对所有用户生效',
     installationInstructions: "主题安装说明",
     instruction1: "在",
     instruction2: "目录下创建主题文件夹",
@@ -245,6 +245,15 @@ export const zhCN = {
     uploadFailed: "上传主题失败",
     uploadError: "上传错误: {message}",
     viewDetails: "查看详情",
+    method1: {
+      title: "方法一：上传主题包",
+      step1: "1. 点击上方的「上传主题」按钮",
+      step2: "2. 选择包含主题的 zip 压缩包",
+      step3: "3. 等待上传完成，系统会自动解压并加载主题",
+    },
+    method2: {
+      title: "方法二：手动安装",
+    },
   },
 
   // 通用设置页面

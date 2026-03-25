@@ -231,7 +231,7 @@ export const enUS = {
     applying: "Applying...",
     applyFailed: "Failed to apply theme",
     loadFailed: "Failed to load theme data",
-    applySuccess: "Theme \"{themeName}\" has been applied successfully, taking effect for all users",
+    applySuccess: 'Theme "{themeName}" has been applied successfully, taking effect for all users',
     installationInstructions: "Theme Installation Instructions",
     instruction1: "Create a theme folder in the",
     instruction2: "directory",
@@ -245,6 +245,15 @@ export const enUS = {
     uploadFailed: "Failed to upload theme",
     uploadError: "Upload error: {message}",
     viewDetails: "View Details",
+    method1: {
+      title: "Method 1: Upload Theme Package",
+      step1: '1. Click the "Upload Theme" button above',
+      step2: "2. Select a zip file containing the theme",
+      step3: "3. Wait for the upload to complete, the system will automatically extract and load the theme",
+    },
+    method2: {
+      title: "Method 2: Manual Installation",
+    },
   },
 
   // General Settings Page
