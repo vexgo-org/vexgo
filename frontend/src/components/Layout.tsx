@@ -1,22 +1,31 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { configApi, messagesApi } from '@/lib/api';
-import { useTranslation } from '@/lib/I18nContext';
-import { Button } from '@/components/ui/button';
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { configApi, messagesApi } from "@/lib/api";
+import { useTranslation } from "@/lib/I18nContext";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import {
-  Search, PenLine, Menu, X, Home, User, Settings,
-  LogOut, FileText, BarChart3, Bell
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
+  Search,
+  PenLine,
+  Menu,
+  X,
+  Home,
+  User,
+  Settings,
+  LogOut,
+  FileText,
+  BarChart3,
+  Bell,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -27,9 +36,9 @@ export function Layout({ children }: LayoutProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [siteName, setSiteName] = useState('VexGo');
+  const [siteName, setSiteName] = useState("VexGo");
   const [allowGuestView, setAllowGuestView] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +54,7 @@ export function Layout({ children }: LayoutProps) {
         // 加载允许访客浏览的设置
         setAllowGuestView(response.data.allowGuestViewPosts !== false);
       } catch (error) {
-        console.error(t('common.error'), error);
+        console.error(t("common.error"), error);
       } finally {
         setLoading(false);
       }
@@ -57,8 +66,8 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     if (!loading && !isAuthenticated && !allowGuestView) {
       // 只在非登录页面且需要登录时重定向
-      if (location.pathname !== '/login' && location.pathname !== '/register') {
-        navigate('/login');
+      if (location.pathname !== "/login" && location.pathname !== "/register") {
+        navigate("/login");
       }
     }
   }, [loading, isAuthenticated, allowGuestView, navigate, location.pathname]);
@@ -69,14 +78,14 @@ export function Layout({ children }: LayoutProps) {
       if (isAuthenticated) {
         navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
       } else {
-        navigate('/login');
+        navigate("/login");
       }
     }
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   // 消息数量
@@ -88,7 +97,7 @@ export function Layout({ children }: LayoutProps) {
       const response = await messagesApi.getUnreadCount();
       setUnreadCount(response.data.unreadCount);
     } catch (error) {
-      console.error('获取未读消息数量失败:', error);
+      console.error("获取未读消息数量失败:", error);
     }
   };
 
@@ -123,20 +132,28 @@ export function Layout({ children }: LayoutProps) {
   }, [isAuthenticated, location.pathname]);
 
   const navItems = [
-    { path: '/', label: t('layout.home'), icon: Home },
-    ...(isAuthenticated && user?.role !== 'guest' ? [{ path: '/write', label: t('layout.writePost'), icon: PenLine }] : []),
-    ...(isAuthenticated && user?.role !== 'guest' ? [{ path: '/my-posts', label: t('layout.myPosts'), icon: FileText }] : []),
-    ...(isAuthenticated ? [{ path: '/messages', label: t('layout.messages'), icon: Bell }] : []),
-    ...(user?.role === 'admin' || user?.role === 'super_admin' ? [{ path: '/admin', label: t('layout.adminPanel'), icon: BarChart3 }] : []),
+    { path: "/", label: t("layout.home"), icon: Home },
+    ...(isAuthenticated && user?.role !== "guest"
+      ? [{ path: "/write", label: t("layout.writePost"), icon: PenLine }]
+      : []),
+    ...(isAuthenticated && user?.role !== "guest"
+      ? [{ path: "/my-posts", label: t("layout.myPosts"), icon: FileText }]
+      : []),
+    ...(isAuthenticated
+      ? [{ path: "/messages", label: t("layout.messages"), icon: Bell }]
+      : []),
+    ...(user?.role === "admin" || user?.role === "super_admin"
+      ? [{ path: "/admin", label: t("layout.adminPanel"), icon: BarChart3 }]
+      : []),
   ];
 
   const isActive = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
+    if (path === "/") {
+      return location.pathname === "/";
     }
     // 对于管理后台的特定路由，需要精确匹配
-    if (path === '/admin') {
-      return location.pathname === '/admin';
+    if (path === "/admin") {
+      return location.pathname === "/admin";
     }
     return location.pathname.startsWith(path);
   };
@@ -153,19 +170,31 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex h-16 items-center justify-between gap-4">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <PenLine className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold hidden sm:inline">{siteName}</span>
+              <img
+                src="/assets/vexgo-light.ico"
+                alt="Logo"
+                className="w-8 h-8 dark:hidden"
+              />
+              <img
+                src="/assets/vexgo-dark.ico"
+                alt="Logo"
+                className="w-8 h-8 hidden dark:block"
+              />
+              <span className="text-xl font-bold hidden sm:inline">
+                {siteName}
+              </span>
             </Link>
 
             {/* 搜索框 - 桌面端 */}
-            <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
+            <form
+              onSubmit={handleSearch}
+              className="hidden md:flex flex-1 max-w-md"
+            >
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder={t('layout.searchPlaceholder')}
+                  placeholder={t("layout.searchPlaceholder")}
                   className="pl-10 w-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -178,15 +207,15 @@ export function Layout({ children }: LayoutProps) {
               {navItems.map((item) => (
                 <Button
                   key={item.path}
-                  variant={isActive(item.path) ? 'default' : 'ghost'}
+                  variant={isActive(item.path) ? "default" : "ghost"}
                   size="sm"
                   asChild
-                  className={item.path === '/messages' ? 'relative' : ''}
+                  className={item.path === "/messages" ? "relative" : ""}
                 >
                   <Link to={item.path} className="flex items-center gap-2">
                     <item.icon className="w-4 h-4" />
                     {item.label}
-                    {item.path === '/messages' && unreadCount > 0 && (
+                    {item.path === "/messages" && unreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
                         {unreadCount}
                       </span>
@@ -201,10 +230,17 @@ export function Layout({ children }: LayoutProps) {
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                    <Button
+                      variant="ghost"
+                      className="relative h-9 w-9 rounded-full"
+                    >
                       <Avatar className="h-9 w-9">
                         {user?.avatar ? (
-                          <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                          <img
+                            src={user.avatar}
+                            alt="Avatar"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <AvatarFallback className="bg-primary/10 text-primary">
                             {user?.username?.charAt(0).toUpperCase()}
@@ -217,7 +253,11 @@ export function Layout({ children }: LayoutProps) {
                     <div className="flex items-center gap-2 p-2">
                       <Avatar className="h-8 w-8">
                         {user?.avatar ? (
-                          <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                          <img
+                            src={user.avatar}
+                            alt="Avatar"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <AvatarFallback className="bg-primary/10 text-primary text-sm">
                             {user?.username?.charAt(0).toUpperCase()}
@@ -226,32 +266,37 @@ export function Layout({ children }: LayoutProps) {
                       </Avatar>
                       <div className="flex flex-col">
                         <p className="text-sm font-medium">{user?.username}</p>
-                        <p className="text-xs text-muted-foreground">{user?.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {user?.email}
+                        </p>
                       </div>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <DropdownMenuItem onClick={() => navigate("/profile")}>
                       <User className="mr-2 h-4 w-4" />
-                      {t('layout.profile')}
+                      {t("layout.profile")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <DropdownMenuItem onClick={() => navigate("/settings")}>
                       <Settings className="mr-2 h-4 w-4" />
-                      {t('layout.settings')}
+                      {t("layout.settings")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    <DropdownMenuItem
+                      onClick={handleLogout}
+                      className="text-destructive"
+                    >
                       <LogOut className="mr-2 h-4 w-4" />
-                      {t('layout.logout')}
+                      {t("layout.logout")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to="/login">{t('layout.login')}</Link>
+                    <Link to="/login">{t("layout.login")}</Link>
                   </Button>
                   <Button size="sm" asChild>
-                    <Link to="/register">{t('layout.registerText')}</Link>
+                    <Link to="/register">{t("layout.registerText")}</Link>
                   </Button>
                 </div>
               )}
@@ -263,7 +308,11 @@ export function Layout({ children }: LayoutProps) {
                 className="md:hidden"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5" />
+                ) : (
+                  <Menu className="w-5 h-5" />
+                )}
               </Button>
             </div>
           </div>
@@ -277,7 +326,7 @@ export function Layout({ children }: LayoutProps) {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder={t('layout.searchPlaceholder')}
+                    placeholder={t("layout.searchPlaceholder")}
                     className="pl-10 w-full"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -290,7 +339,7 @@ export function Layout({ children }: LayoutProps) {
                 {navItems.map((item) => (
                   <Button
                     key={item.path}
-                    variant={isActive(item.path) ? 'default' : 'ghost'}
+                    variant={isActive(item.path) ? "default" : "ghost"}
                     className="justify-start"
                     asChild
                     onClick={() => setMobileMenuOpen(false)}
@@ -308,29 +357,40 @@ export function Layout({ children }: LayoutProps) {
       </header>
 
       {/* 主内容 */}
-      <main className="flex-1">
-        {children}
-      </main>
+      <main className="flex-1">{children}</main>
 
       {/* 页脚 */}
       <footer className="border-t bg-muted/50">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                <PenLine className="w-4 h-4 text-primary-foreground" />
-              </div>
+              <img
+                src="/assets/vexgo-light.ico"
+                alt="Logo"
+                className="w-6 h-6 dark:hidden"
+              />
+              <img
+                src="/assets/vexgo-dark.ico"
+                alt="Logo"
+                className="w-6 h-6 hidden dark:block"
+              />
               <span className="font-semibold">{siteName}</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {t('layout.allRightsReserved', { siteName })}
+              {t("layout.allRightsReserved", { siteName })}
             </p>
             <div className="flex gap-4">
-              <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-                {t('layout.home')}
+              <Link
+                to="/"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {t("layout.home")}
               </Link>
-              <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground">
-                {t('layout.about')}
+              <Link
+                to="/about"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {t("layout.about")}
               </Link>
             </div>
           </div>
