@@ -261,19 +261,21 @@ export function MessageCenterPage() {
                           {getStatusIcon(message.type)}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (message.relatedId) {
-                                navigateToRelated(message.relatedId, message.relatedType);
-                              }
-                            }}
-                          >
-                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
+                          {message.type !== 'role' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (message.relatedId) {
+                                  navigateToRelated(message.relatedId, message.relatedType);
+                                }
+                              }}
+                            >
+                              {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -346,19 +348,21 @@ export function MessageCenterPage() {
                       <div className="flex items-center justify-between">
                         <Badge variant="secondary" className="text-xs">{t('messageCenter.unreadBadge')}</Badge>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (message.relatedId) {
-                                navigateToRelated(message.relatedId, message.relatedType);
-                              }
-                            }}
-                          >
-                            {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
+                          {message.type !== 'role' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (message.relatedId) {
+                                  navigateToRelated(message.relatedId, message.relatedType);
+                                }
+                              }}
+                            >
+                              {t('messageCenter.view')} <ArrowRight className="w-3 h-3 ml-1" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
