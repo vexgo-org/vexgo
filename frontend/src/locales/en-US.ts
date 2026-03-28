@@ -138,6 +138,7 @@ export const enUS = {
     delete: "Delete",
     deleteConfirmation: "Confirm Delete",
     deleteDescription: "Are you sure you want to delete user {username}? This action will delete all the user's posts, comments and related data, and cannot be undone.",
+    searchPlaceholder: "Search users...",
   },
 
   // Comment Config Page
@@ -320,6 +321,7 @@ export const enUS = {
     author: "Author",
     rejectionReasonLabel: "Rejection Reason",
     rejectionReasonInPost: "Rejection reason: ",
+    searchPlaceholder: "Search posts...",
   },
 
   // Roles

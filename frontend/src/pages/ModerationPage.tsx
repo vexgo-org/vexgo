@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
-  CheckCircle, XCircle, Clock, AlertCircle,
+  CheckCircle, XCircle, Clock, AlertCircle, Search,
   Eye, Edit, Send, MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,30 +28,62 @@ export function ModerationPage() {
   const [rejectingPostId, setRejectingPostId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     loadData();
   }, [activeTab]);
 
-  const loadData = async () => {
+  const loadData = async (search?: string) => {
     setLoading(true);
     try {
+      // 确保只更新当前标签页的数据，避免其他标签页数据被清空
       if (activeTab === 'pending') {
-        const response = await getPendingPosts({ limit: 100 });
-        setPendingPosts(response.data.posts);
+        const response = await getPendingPosts({ limit: 100, search: search });
+        if (response && response.data) {
+          setPendingPosts(response.data.posts || []);
+        } else {
+          setPendingPosts([]);
+        }
       } else if (activeTab === 'approved') {
-        const response = await getApprovedPosts({ limit: 100 });
-        setApprovedPosts(response.data.posts);
+        const response = await getApprovedPosts({ limit: 100, search: search });
+        if (response && response.data) {
+          setApprovedPosts(response.data.posts || []);
+        } else {
+          setApprovedPosts([]);
+        }
       } else if (activeTab === 'rejected') {
-        const response = await getRejectedPosts({ limit: 100 });
-        setRejectedPosts(response.data.posts);
+        const response = await getRejectedPosts({ limit: 100, search: search });
+        if (response && response.data) {
+          setRejectedPosts(response.data.posts || []);
+        } else {
+          setRejectedPosts([]);
+        }
       }
     } catch (error) {
       console.error('加载数据失败:', error);
       toast.error(t('moderation.loadFailed'));
+      // 出错时保持当前数据不变，避免白屏
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = async () => {
+    // 直接调用loadData函数，传递搜索参数
+    await loadData(searchTerm);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // 当切换标签页时，清空搜索
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSearchTerm('');
   };
 
   const handleApprovePost = async (postId: string) => {
@@ -149,9 +182,28 @@ export function ModerationPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold">{t('moderation.title')}</h1>
+        <div className="relative w-64">
+          <Input
+            type="text"
+            placeholder={t('moderation.searchPlaceholder')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="pl-10"
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+            onClick={handleSearch}
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-md">
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />

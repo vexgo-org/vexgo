@@ -5,6 +5,7 @@ import type { Post, PostsResponse } from '@/types';
 export const getPendingPosts = (params?: {
   page?: number;
   limit?: number;
+  search?: string;
 }) =>
   api.get<PostsResponse>('/moderation/pending', { params });
 
@@ -12,6 +13,7 @@ export const getPendingPosts = (params?: {
 export const getApprovedPosts = (params?: {
   page?: number;
   limit?: number;
+  search?: string;
 }) =>
   api.get<PostsResponse>('/moderation/approved', { params });
 
@@ -19,6 +21,7 @@ export const getApprovedPosts = (params?: {
 export const getRejectedPosts = (params?: {
   page?: number;
   limit?: number;
+  search?: string;
 }) =>
   api.get<PostsResponse>('/moderation/rejected', { params });
 

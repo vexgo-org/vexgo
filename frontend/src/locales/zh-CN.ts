@@ -138,6 +138,7 @@ export const zhCN = {
     delete: "删除",
     deleteConfirmation: "确认删除",
     deleteDescription: "确定要删除用户 {username} 吗？此操作将删除该用户的所有文章、评论和相关数据，且不可撤销。",
+    searchPlaceholder: "搜索用户...",
   },
 
   // 评论配置页面
@@ -320,6 +321,7 @@ export const zhCN = {
     author: "作者",
     rejectionReasonLabel: "拒绝原因",
     rejectionReasonInPost: "拒绝原因：",
+    searchPlaceholder: "搜索文章...",
   },
 
   // 角色

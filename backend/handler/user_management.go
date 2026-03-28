@@ -25,14 +25,23 @@ func GetUserList(c *gin.Context) {
 		limit = 10
 	}
 
+	// Search parameter
+	search := c.DefaultQuery("search", "")
+
 	var users []model.User
 	var total int64
 
 	// Query user list
 	query := db.Model(&model.User{})
 
+	// Add search condition if search term is provided
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		query = query.Where("username LIKE ? OR email LIKE ?", searchTerm, searchTerm)
+	}
+
 	// Count total
-	db.Model(&model.User{}).Count(&total)
+	query.Count(&total)
 
 	// Paginated query
 	query.Offset((page - 1) * limit).

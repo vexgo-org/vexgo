@@ -36,6 +36,7 @@ export interface CreatorApplication {
 export const getUsers = (params?: { 
   page?: number; 
   limit?: number; 
+  search?: string;
 }) =>
   api.get<UsersResponse>('/users', { params });
 

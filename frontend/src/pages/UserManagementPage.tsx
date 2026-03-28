@@ -13,9 +13,10 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
-  Users, UserCheck, Trash2
+  Users, UserCheck, Trash2, Search
 } from 'lucide-react';
 import { getLocale } from '@/lib/i18n';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -27,6 +28,8 @@ export function UserManagementPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 角色显示映射
   const roleDisplayMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -58,12 +61,12 @@ export function UserManagementPage() {
 
   useEffect(() => {
     loadData();
-  }, [currentPage]);
+  }, [currentPage, searchQuery]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const response = await getUsers({ page: currentPage, limit: 10 });
+      const response = await getUsers({ page: currentPage, limit: 10, search: searchQuery });
       setUsers(response.data.users);
       setTotalPages(response.data.pagination.totalPages);
     } catch (error) {
@@ -71,6 +74,17 @@ export function UserManagementPage() {
       toast.error(t('userManagement.loadingUsers'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    setSearchQuery(searchTerm);
+    setCurrentPage(1); // 搜索时重置到第一页
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
     }
   };
 
@@ -157,6 +171,25 @@ export function UserManagementPage() {
           <Users className="w-6 h-6" />
           {t('userManagement.title')}
         </h1>
+        <div className="relative w-64">
+          <Input
+            type="text"
+            placeholder={t('userManagement.searchPlaceholder')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="pl-10"
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+            onClick={handleSearch}
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       <Card>

@@ -16,11 +16,19 @@ func GetPendingPosts(c *gin.Context) {
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	search := c.DefaultQuery("search", "")
 
 	query := db.Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
 		Where("status = ?", "pending")
+
+	// Add search condition if search term is provided
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		query = query.Joins("LEFT JOIN users ON posts.author_id = users.id").
+			Where("posts.title LIKE ? OR posts.content LIKE ? OR users.username LIKE ?", searchTerm, searchTerm, searchTerm)
+	}
 
 	var total int64
 	query.Count(&total)
@@ -115,11 +123,19 @@ func GetApprovedPosts(c *gin.Context) {
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	search := c.DefaultQuery("search", "")
 
 	query := db.Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
 		Where("status = ?", "published")
+
+	// Add search condition if search term is provided
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		query = query.Joins("LEFT JOIN users ON posts.author_id = users.id").
+			Where("posts.title LIKE ? OR posts.content LIKE ? OR users.username LIKE ?", searchTerm, searchTerm, searchTerm)
+	}
 
 	var total int64
 	query.Count(&total)
@@ -174,11 +190,19 @@ func GetRejectedPosts(c *gin.Context) {
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	search := c.DefaultQuery("search", "")
 
 	query := db.Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
 		Where("status = ?", "rejected")
+
+	// Add search condition if search term is provided
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		query = query.Joins("LEFT JOIN users ON posts.author_id = users.id").
+			Where("posts.title LIKE ? OR posts.content LIKE ? OR users.username LIKE ?", searchTerm, searchTerm, searchTerm)
+	}
 
 	var total int64
 	query.Count(&total)
