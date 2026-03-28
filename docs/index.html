@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="Description">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+</head>
+
+<body>
+  <nav>
+    <select id="language-select" class="language-switch">
+      <option value="en">English (EN)</option>
+      <option value="zh-cn">中文 (中文)</option>
+    </select>
+  </nav>
+  <div id="app"></div>
+  <script>
+    window.$docsify = {
+      name: 'VexGo',
+      repo: 'https://github.com/vexgo-org/vexgo'
+    }
+    
+    document.addEventListener('DOMContentLoaded', function () {
+      const select = document.getElementById('language-select');
+
+      function updateSelectedLanguage() {
+        const hash = window.location.hash || '#/';
+        if (hash.includes('/zh-cn/')) {
+          select.value = 'zh-cn';
+        } else {
+          select.value = 'en';
+        }
+      }
+
+      select.addEventListener('change', function () {
+        const selectedLang = this.value;
+
+        if (selectedLang === 'zh-cn') {
+          window.location.hash = '#/zh-cn/';
+        } else {
+          window.location.hash = '#/';
+        }
+      });
+
+      updateSelectedLanguage();
+
+      window.addEventListener('hashchange', updateSelectedLanguage);
+    });
+  </script>
+  <!-- Docsify v4 -->
+  <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+</body>
+
+</html>
