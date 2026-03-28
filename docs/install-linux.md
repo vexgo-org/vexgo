@@ -268,7 +268,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: vexgo-postgres
     environment:
       - POSTGRES_USER=vexgo
@@ -540,19 +540,16 @@ git clone https://github.com/weimm16/vexgo.git
 cd vexgo
 ```
 
-### Step 4: Build the Application
-
-The application is built in two phases - first the frontend assets, then the combined binary:
+### Step 4: Build the Frontend
 
 ```bash
-# Build the entire application using Go
-make build  # if Makefile exists
-
-# Or build directly with Go
-CGO_ENABLED=0 go build -o vexgo ./backend
+cd frontend
+pnpm install
+pnpm run build
+cd ..
 ```
 
-### Step 4: Build the Backend
+### Step 5: Build the Backend
 
 ```bash
 cd backend
@@ -561,13 +558,13 @@ go build -o vexgo ./cmd/server
 cd ..
 ```
 
-### Step 5: Run VexGo
+### Step 6: Run VexGo
 
 ```bash
 ./vexgo
 ```
 
-### Step 6: (Optional) Create a Production Build
+### Step 7: (Optional) Create a Production Build
 
 ```bash
 # Build with version information and optimizations
@@ -581,7 +578,7 @@ CGO_ENABLED=0 go build \
 chmod +x vexgo
 ```
 
-### Step 7: (Optional) Install System-wide
+### Step 8: (Optional) Install System-wide
 
 ```bash
 # Copy binary to system path
@@ -786,7 +783,7 @@ If VexGo is running slowly:
 
 3. **Increase log level** for debugging:
    ```bash
-   ./vexgo-linux-amd64 --log-level debug
+   ./vexgo --log-level debug
    ```
 
 ### Getting Help
