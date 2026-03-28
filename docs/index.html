@@ -11,45 +11,17 @@
 </head>
 
 <body>
-  <nav>
-    <select id="language-select" class="language-switch">
-      <option value="en">English (EN)</option>
-      <option value="zh-cn">中文 (中文)</option>
-    </select>
-  </nav>
   <div id="app"></div>
   <script>
     window.$docsify = {
       name: 'VexGo',
-      repo: 'https://github.com/vexgo-org/vexgo'
+      repo: 'https://github.com/vexgo-org/vexgo',
+
+      loadSidebar: true,
+      subMaxLevel: 2,
+
+      loadNavbar: true
     }
-    
-    document.addEventListener('DOMContentLoaded', function () {
-      const select = document.getElementById('language-select');
-
-      function updateSelectedLanguage() {
-        const hash = window.location.hash || '#/';
-        if (hash.includes('/zh-cn/')) {
-          select.value = 'zh-cn';
-        } else {
-          select.value = 'en';
-        }
-      }
-
-      select.addEventListener('change', function () {
-        const selectedLang = this.value;
-
-        if (selectedLang === 'zh-cn') {
-          window.location.hash = '#/zh-cn/';
-        } else {
-          window.location.hash = '#/';
-        }
-      });
-
-      updateSelectedLanguage();
-
-      window.addEventListener('hashchange', updateSelectedLanguage);
-    });
   </script>
   <!-- Docsify v4 -->
   <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
