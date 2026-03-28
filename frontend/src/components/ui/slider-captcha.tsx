@@ -30,6 +30,14 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
   const trackRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
   const currentXRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const sliderPositionRef = useRef(0);
+
+  // 同步 ref 和 state
+  useEffect(() => {
+    isDraggingRef.current = isDragging;
+    sliderPositionRef.current = sliderPosition;
+  }, [isDragging, sliderPosition]);
 
   // 生成验证码
   const generateCaptcha = async () => {
@@ -130,31 +138,31 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
     currentXRef.current = sliderPosition;
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging || !trackRef.current) return;
-
-    const trackWidth = trackRef.current.offsetWidth;
-    const sliderWidth = 40;
-    const deltaX = e.clientX - startXRef.current;
-    let newPosition = currentXRef.current + deltaX;
-
-    newPosition = Math.max(0, Math.min(newPosition, trackWidth - sliderWidth));
-    
-    setSliderPosition(newPosition);
-  };
-
-  const handleMouseUp = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-
-    // 验证拼图位置
-    if (sliderPosition > 0) {
-      verifyCaptcha(sliderPosition);
-    }
-  };
-
   // 添加全局鼠标事件监听
   useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !trackRef.current) return;
+
+      const trackWidth = trackRef.current.offsetWidth;
+      const sliderWidth = 40;
+      const deltaX = e.clientX - startXRef.current;
+      let newPosition = currentXRef.current + deltaX;
+
+      newPosition = Math.max(0, Math.min(newPosition, trackWidth - sliderWidth));
+      
+      setSliderPosition(newPosition);
+    };
+
+    const handleMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      setIsDragging(false);
+
+      // 验证拼图位置
+      if (sliderPositionRef.current > 0) {
+        verifyCaptcha(sliderPositionRef.current);
+      }
+    };
+
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
@@ -164,7 +172,7 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, sliderPosition]);
+  }, [isDragging]);
 
   // 处理触摸事件
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -174,35 +182,35 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
     currentXRef.current = sliderPosition;
   };
 
-  const handleTouchMove = (e: TouchEvent) => {
-    if (!isDragging || !trackRef.current) return;
-    
-    e.preventDefault();
-
-    const trackWidth = trackRef.current.offsetWidth;
-    const sliderWidth = 40;
-    const deltaX = e.touches[0].clientX - startXRef.current;
-    let newPosition = currentXRef.current + deltaX;
-
-    newPosition = Math.max(0, Math.min(newPosition, trackWidth - sliderWidth));
-    
-    setSliderPosition(newPosition);
-  };
-
-  const handleTouchEnd = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-
-    // 验证拼图位置
-    if (sliderPosition > 0) {
-      verifyCaptcha(sliderPosition);
-    }
-  };
-
   // 添加全局触摸事件监听
   useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current || !trackRef.current) return;
+      
+      e.preventDefault();
+
+      const trackWidth = trackRef.current.offsetWidth;
+      const sliderWidth = 40;
+      const deltaX = e.touches[0].clientX - startXRef.current;
+      let newPosition = currentXRef.current + deltaX;
+
+      newPosition = Math.max(0, Math.min(newPosition, trackWidth - sliderWidth));
+      
+      setSliderPosition(newPosition);
+    };
+
+    const handleTouchEnd = () => {
+      if (!isDraggingRef.current) return;
+      setIsDragging(false);
+
+      // 验证拼图位置
+      if (sliderPositionRef.current > 0) {
+        verifyCaptcha(sliderPositionRef.current);
+      }
+    };
+
     if (isDragging) {
-      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
       document.addEventListener('touchend', handleTouchEnd);
 
       return () => {
@@ -210,7 +218,7 @@ export function SliderCaptcha({ isOpen, onClose, onSuccess }: SliderCaptchaProps
         document.removeEventListener('touchend', handleTouchEnd);
       };
     }
-  }, [isDragging, sliderPosition]);
+  }, [isDragging]);
 
   // 如果弹窗未打开，不渲染任何内容
   if (!isOpen) return null;
