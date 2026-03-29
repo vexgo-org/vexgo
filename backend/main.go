@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"vexgo/backend/cmd"
 	"vexgo/backend/config"
@@ -66,6 +67,11 @@ func main() {
 
 	// 6. Create Gin engine instance (includes Logger and Recovery middleware by default)
 	r := gin.Default()
+
+	// 6.1 Set BaseURL and DBProvider for SSR
+	public.BaseURL = fmt.Sprintf("http://%s", cfg.GetListenAddr())
+	public.DBProvider = handler.DB
+	logrus.WithField("baseURL", public.BaseURL).Info("Base URL and DB provider set for server-side rendering")
 
 	// Configure trusted proxies based on environment/configuration
 	// If BEHIND_REVERSE_PROXY=true, use TRUSTED_PROXIES list or common defaults

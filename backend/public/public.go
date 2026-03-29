@@ -11,12 +11,22 @@ import (
 	"path/filepath"
 	"strings"
 
+	"vexgo/backend/model"
+
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+// BaseURL 站点基础URL
+var BaseURL = "http://localhost:3001"
 
 // ActiveThemeProvider is a function that returns the currently active theme ID from the database.
 // It is set by the handler package after DB initialization to avoid circular imports.
 var ActiveThemeProvider func() string
+
+// DBProvider is a function that returns the database instance.
+// It is set by the main package after DB initialization to avoid circular imports.
+var DBProvider func() *gorm.DB
 
 //go:embed dist/**/*
 var staticFS embed.FS
@@ -247,11 +257,102 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 		c.Data(http.StatusOK, "application/octet-stream", content)
 	})
 
-	// Root route - serve index.html (supports theme query/cookie)
-	r.GET("/", func(c *gin.Context) {
-		theme := getRequestedTheme(c)
+	// 文章详情页 - 服务器端渲染（复数形式）
+	r.GET("/posts/:id", func(c *gin.Context) {
+		id := c.Param("id")
 
-		// If using default theme, serve directly from embedded HTML
+		// 检查是否是API请求
+		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
+			// 让API处理器处理
+			c.Next()
+			return
+		}
+
+		// 服务器端渲染
+		if DBProvider == nil {
+			// 数据库未初始化，回退到SPA
+			c.Next()
+			return
+		}
+
+		var post model.Post
+		if err := DBProvider().Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
+			// 文章不存在，回退到SPA
+			c.Next()
+			return
+		}
+
+		// 渲染HTML
+		html, err := RenderPostHTML(post, BaseURL)
+		if err != nil {
+			// 渲染失败，回退到SPA
+			c.Next()
+			return
+		}
+
+		c.Data(http.StatusOK, "text/html; charset=utf-8", html)
+	})
+
+	// 文章详情页 - 服务器端渲染（单数形式）
+	r.GET("/post/:id", func(c *gin.Context) {
+		id := c.Param("id")
+
+		// 检查是否是API请求
+		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
+			// 让API处理器处理
+			c.Next()
+			return
+		}
+
+		// 服务器端渲染
+		if DBProvider == nil {
+			// 数据库未初始化，回退到SPA
+			c.Next()
+			return
+		}
+
+		var post model.Post
+		if err := DBProvider().Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
+			// 文章不存在，回退到SPA
+			c.Next()
+			return
+		}
+
+		// 渲染HTML
+		html, err := RenderPostHTML(post, BaseURL)
+		if err != nil {
+			// 渲染失败，回退到SPA
+			c.Next()
+			return
+		}
+
+		c.Data(http.StatusOK, "text/html; charset=utf-8", html)
+	})
+
+	// Root route - 服务器端渲染首页
+	r.GET("/", func(c *gin.Context) {
+		// 检查是否是API请求
+		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
+			// 让API处理器处理
+			c.Next()
+			return
+		}
+
+		// 服务器端渲染
+		if DBProvider != nil {
+			var posts []model.Post
+			if err := DBProvider().Preload("Author").Preload("Tags").Where("status = ?", "published").Order("created_at DESC").Limit(10).Find(&posts).Error; err == nil {
+				// 渲染HTML
+				html, err := RenderIndexHTML(posts, BaseURL)
+				if err == nil {
+					c.Data(http.StatusOK, "text/html; charset=utf-8", html)
+					return
+				}
+			}
+		}
+
+		// 回退到默认HTML
+		theme := getRequestedTheme(c)
 		if theme == DefaultTheme {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
 			return
