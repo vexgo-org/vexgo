@@ -1,6 +1,6 @@
 services:
   vexgo:
-    image: ghcr.io/weimm16/vexgo:latest
+    image: ghcr.io/vexgo-org/vexgo:latest
     container_name: vexgo-app
     restart: unless-stopped
     ports:

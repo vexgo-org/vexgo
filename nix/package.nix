@@ -11,7 +11,7 @@
   version ? "0.5.0",
 }: let
   src = fetchFromGitHub {
-    owner = "weimm16";
+    owner = "vexgo-org";
     repo = "vexgo";
     rev = "v${version}";
     hash = "sha256-4V1f6g/rnVVmvoqE5bL7V/1uiu0T+aLvf/Xgm04ylyg=";
@@ -70,7 +70,7 @@ in
 
     meta = with lib; {
       description = "A blog CMS built on React, Go, Gin, JWT, and SQLite";
-      homepage = "https://github.com/weimm16/vexgo";
+      homepage = "https://github.com/vexgo-org/vexgo";
       license = licenses.agpl3Only;
       mainProgram = "vexgo";
       platforms = platforms.linux ++ platforms.darwin;

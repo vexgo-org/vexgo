@@ -37,13 +37,13 @@ This is the simplest method for most users. Download the pre-compiled binary and
 
 ### Step 1: Download the Binary
 
-Visit the [VexGo Releases page](https://github.com/weimm16/vexgo/releases) and download the appropriate binary for your system architecture.
+Visit the [VexGo Releases page](https://github.com/vexgo-org/vexgo/releases) and download the appropriate binary for your system architecture.
 
 For most modern Linux systems (64-bit x86):
 
 ```bash
 # Download the latest release automatically
-curl -L $(curl -s https://api.github.com/repos/weimm16/vexgo/releases/latest | grep browser_download_url | grep linux-amd64 | cut -d '"' -f 4) -o vexgo
+curl -L $(curl -s https://api.github.com/repos/vexgo-org/vexgo/releases/latest | grep browser_download_url | grep linux-amd64 | cut -d '"' -f 4) -o vexgo
 
 # Make executable
 chmod +x vexgo
@@ -52,7 +52,7 @@ chmod +x vexgo
 For ARM-based systems (Raspberry Pi, ARM servers):
 
 ```bash
-curl -L $(curl -s https://api.github.com/repos/weimm16/vexgo/releases/latest | grep browser_download_url | grep linux-arm64 | cut -d '"' -f 4) -o vexgo
+curl -L $(curl -s https://api.github.com/repos/vexgo-org/vexgo/releases/latest | grep browser_download_url | grep linux-arm64 | cut -d '"' -f 4) -o vexgo
 chmod +x vexgo
 ```
 
@@ -165,7 +165,7 @@ sudo systemctl enable docker
 
 ```bash
 # Pull the latest image
-sudo docker pull ghcr.io/weimm16/vexgo:latest
+sudo docker pull ghcr.io/vexgo-org/vexgo:latest
 
 # Run the container
 sudo docker run -d \
@@ -173,7 +173,7 @@ sudo docker run -d \
   -p 3001:3001 \
   -v ./data:/app/data \
   --restart unless-stopped \
-  ghcr.io/weimm16/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest
 ```
 
 ### Step 3: Verify the Installation
@@ -198,7 +198,7 @@ sudo docker run -d \
   -e PORT=3001 \
   -e JWT_SECRET=your-secret-key-change-this-in-production \
   --restart unless-stopped \
-  ghcr.io/weimm16/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest
 ```
 
 ### Step 5: (Optional) Docker Management Commands
@@ -217,10 +217,10 @@ sudo docker restart vexgo
 sudo docker rm -f vexgo
 
 # Update to the latest version
-sudo docker pull ghcr.io/weimm16/vexgo:latest
+sudo docker pull ghcr.io/vexgo-org/vexgo:latest
 sudo docker stop vexgo
 sudo docker rm vexgo
-sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/weimm16/vexgo:latest
+sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest
 ```
 
 ## Method 3: Docker Compose Installation
@@ -247,7 +247,7 @@ version: '3.8'
 
 services:
   vexgo:
-    image: ghcr.io/weimm16/vexgo:latest
+    image: ghcr.io/vexgo-org/vexgo:latest
     container_name: vexgo
     ports:
       - "3001:3001"
@@ -355,14 +355,14 @@ source ~/.nix-profile/etc/profile.d/nix.sh
 
 ```bash
 # Run VexGo directly from GitHub
-nix run github:weimm16/vexgo
+nix run github:vexgo-org/vexgo
 ```
 
 ### Step 3: (Optional) Install Permanently
 
 ```bash
 # Add to your Nix profile
-nix profile install github:weimm16/vexgo
+nix profile install github:vexgo-org/vexgo
 
 # Run from anywhere
 vexgo
@@ -372,10 +372,10 @@ vexgo
 
 ```bash
 # Run with custom config
-nix run github:weimm16/vexgo -- -c /path/to/config.yml
+nix run github:vexgo-org/vexgo -- -c /path/to/config.yml
 
 # Run with command-line arguments
-nix run github:weimm16/vexgo -- --port 8080 --addr 0.0.0.0
+nix run github:vexgo-org/vexgo -- --port 8080 --addr 0.0.0.0
 ```
 
 ## Method 5: NixOS Flake Installation
@@ -411,7 +411,7 @@ Add VexGo to your `flake.nix`:
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     
     vexgo = {
-      url = "github:weimm16/vexgo";
+      url = "github:vexgo-org/vexgo";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -536,7 +536,7 @@ sudo pacman -S go git nodejs npm pnpm
 ### Step 2: Clone the Repository
 
 ```bash
-git clone https://github.com/weimm16/vexgo.git
+git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 ```
 
@@ -746,7 +746,7 @@ sudo docker inspect vexgo
 
 # Remove and recreate
 sudo docker rm -f vexgo
-sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/weimm16/vexgo:latest
+sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
 ```
 
 ### Systemd Service Issues
@@ -790,9 +790,9 @@ If VexGo is running slowly:
 
 If you encounter issues not covered here:
 
-- Check the [GitHub Issues](https://github.com/weimm16/vexgo/issues)
-- Review the [Documentation](https://github.com/weimm16/vexgo/tree/main/docs)
-- Join the [Discussions](https://github.com/weimm16/vexgo/discussions)
+- Check the [GitHub Issues](https://github.com/vexgo-org/vexgo/issues)
+- Review the [Documentation](https://github.com/vexgo-org/vexgo/tree/main/docs)
+- Join the [Discussions](https://github.com/vexgo-org/vexgo/discussions)
 
 ## Additional Resources
 
@@ -804,7 +804,7 @@ If you encounter issues not covered here:
 ---
 
 **Note**: This documentation is maintained with the latest version of VexGo. For version-specific instructions, please refer to the release notes.
-- Review the [main README](https://github.com/weimm16/vexgo)
+- Review the [main README](https://github.com/vexgo-org/vexgo)
 - Join the community discussions
 
 ## Additional Resources
@@ -812,8 +812,8 @@ If you encounter issues not covered here:
 - [Main Documentation](README.md)
 - [API Documentation](api.md)
 - [Configuration Guide](config.md)
-- [GitHub Repository](https://github.com/weimm16/vexgo)
-- [Docker Hub](https://hub.docker.com/r/weimm16/vexgo)
+- [GitHub Repository](https://github.com/vexgo-org/vexgo)
+- [Docker Hub](https://hub.docker.com/r/vexgo-org/vexgo)
 
 ## License
 

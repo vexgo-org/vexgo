@@ -37,7 +37,7 @@ Select the corresponding system and architecture on the release page to download
 ### Docker
 
 ```bash
-sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/weimm16/vexgo:latest
+sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
 ```
 
 ### ❄️Nix
@@ -45,7 +45,7 @@ sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/weimm16
 You can try VexGo instantly without installing:
 
 ```bash
-nix run github:weimm16/vexgo
+nix run github:vexgo-org/vexgo
 ```
 
 ### ❄️NixOS Flake
@@ -56,7 +56,7 @@ Add the following to your `inputs` in `flake.nix`:
 # flake.nix
 inputs = {
   vexgo = {
-    url = "github:weimm16/vexgo";
+    url = "github:vexgo-org/vexgo";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 };
@@ -405,7 +405,7 @@ sudo docker run -d --name vexgo \
   -e S3_SECRET_KEY=your-secret-key \
   -e S3_FORCE_PATH=true \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
-  ghcr.io/weimm16/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest
 ```
 
 ## Database
@@ -616,7 +616,7 @@ main.go → handler → config, model, middleware, utils
 ### Steps
 
 ```bash
-git clone https://github.com/weimm16/vexgo.git
+git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo/frontend
 pnpm install
 pnpm run build

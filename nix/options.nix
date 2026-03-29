@@ -27,7 +27,7 @@ in {
     settings = lib.mkOption {
       type = settingsFormat.type;
       default = {};
-      description = "VexGo configuration in YAML format. See https://github.com/weimm16/vexgo for all options.";
+      description = "VexGo configuration in YAML format. See https://github.com/vexgo-org/vexgo for all options.";
       example = lib.literalExpression ''
         {
           addr = "0.0.0.0";
