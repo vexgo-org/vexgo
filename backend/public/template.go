@@ -8,7 +8,7 @@ import (
 	"vexgo/backend/model"
 )
 
-// PostTemplateData 文章页面模板数据
+// PostTemplateData represents template data for post pages
 type PostTemplateData struct {
 	Post      model.Post
 	Title     string
@@ -16,7 +16,7 @@ type PostTemplateData struct {
 	Canonical string
 }
 
-// IndexTemplateData 首页模板数据
+// IndexTemplateData represents template data for the homepage
 type IndexTemplateData struct {
 	Posts     []model.Post
 	Title     string
@@ -24,7 +24,7 @@ type IndexTemplateData struct {
 	Canonical string
 }
 
-// RenderPostHTML 渲染文章页面HTML
+// RenderPostHTML renders post page HTML
 func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 	tmpl := `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -60,10 +60,10 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 </body>
 </html>`
 
-	// 生成摘要
+	// Generate meta description
 	metaDesc := post.Excerpt
 	if metaDesc == "" {
-		// 如果没有摘要，从内容中提取
+		// If no excerpt, extract from content
 		content := strings.ReplaceAll(post.Content, "\n", " ")
 		if len(content) > 150 {
 			metaDesc = content[:150] + "..."
@@ -72,7 +72,7 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 		}
 	}
 
-	// 生成规范URL
+	// Generate canonical URL
 	canonical := fmt.Sprintf("%s/posts/%d", baseURL, post.ID)
 
 	// Generate JSON data
@@ -94,7 +94,7 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 		"UtilsVendorJS": GetAssetURL("js", "utils-vendor"),
 	}
 
-	// 解析模板
+	// Parse template
 	t, err := template.New("post").Parse(tmpl)
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// RenderIndexHTML 渲染首页HTML
+// RenderIndexHTML renders homepage HTML
 func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 	tmpl := `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -144,7 +144,7 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 </body>
 </html>`
 
-	// 自定义模板函数
+	// Custom template functions
 	t := template.New("index").Funcs(template.FuncMap{
 		"truncate": func(s string, max int) string {
 			s = strings.ReplaceAll(s, "\n", " ")
@@ -155,14 +155,14 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 		},
 	})
 
-	// 解析模板
+	// Parse template
 	var err error
 	t, err = t.Parse(tmpl)
 	if err != nil {
 		return nil, err
 	}
 
-	// 生成摘要
+	// Generate meta description
 	metaDesc := "最新文章列表"
 	if len(posts) > 0 {
 		metaDesc = fmt.Sprintf("最新文章: %s", posts[0].Title)
@@ -171,7 +171,7 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 		}
 	}
 
-	// 生成规范URL
+	// Generate canonical URL
 	canonical := baseURL
 
 	// Generate JSON data
