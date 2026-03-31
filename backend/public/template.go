@@ -46,9 +46,10 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 <body>
 	<div id="root"></div>
 	<script>
-		// 初始化前端应用
+		// Initialize frontend application with SSR data
 		window.__INITIAL_DATA__ = {
-			post: {{.PostJSON}}
+			post: {{.PostJSON}},
+			ssrRendered: true
 		};
 	</script>
 	<script type="module" crossorigin src="/assets/index-DR2bYJZO.js"></script>
@@ -126,36 +127,13 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 	<link rel="stylesheet" href="/assets/index-BTvxqpsA.css">
 </head>
 <body>
-	<div id="root">
-		<div class="post-list">
-			{{range .Posts}}
-			<article class="post-item">
-				<h2><a href="/posts/{{.ID}}">{{.Title}}</a></h2>
-				<div class="post-meta">
-					<span>作者: {{.Author.Username}}</span>
-					<span>发布时间: {{.CreatedAt.Format "2006-01-02"}}</span>
-					<span>阅读: {{.ViewCount}}</span>
-				</div>
-				{{if .CoverImage}}
-				<div class="post-cover">
-					<img src="{{.CoverImage}}" alt="{{.Title}}">
-				</div>
-				{{end}}
-				<div class="post-excerpt">{{if .Excerpt}}{{.Excerpt}}{{else}}{{.Content | truncate 200}}{{end}}</div>
-				<div class="post-tags">
-					{{range .Tags}}
-						<span class="tag">{{.Name}}</span>
-					{{end}}
-				</div>
-			</article>
-			{{end}}
-		</div>
-	</div>
+	<div id="root"></div>
 	<script>
-		// 初始化前端应用
+		// Initialize frontend application with SSR data
 		window.__INITIAL_DATA__ = {
 			posts: {{.PostsJSON}},
-			hasPosts: {{if .Posts}}true{{else}}false{{end}}
+			hasPosts: {{if .Posts}}true{{else}}false{{end}},
+			ssrRendered: true
 		};
 	</script>
 	<script type="module" crossorigin src="/assets/index-DR2bYJZO.js"></script>

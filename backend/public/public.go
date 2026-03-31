@@ -338,12 +338,11 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 			return
 		}
 
-		// 服务器端渲染
+		// Server-side rendering with proper data initialization
 		if DBProvider != nil {
 			var posts []model.Post
 			DBProvider().Preload("Author").Preload("Tags").Where("status = ?", "published").Order("created_at DESC").Limit(10).Find(&posts)
-			// 即使查询出错或没有文章，也要继续渲染
-			// 渲染HTML
+			// Always render, even with empty posts or query errors
 			html, renderErr := RenderIndexHTML(posts, BaseURL)
 			if renderErr == nil {
 				c.Data(http.StatusOK, "text/html; charset=utf-8", html)
