@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// BaseURL 站点基础URL
+// BaseURL is the site's base URL
 var BaseURL = "http://localhost:3001"
 
 // ActiveThemeProvider is a function that returns the currently active theme ID from the database.
