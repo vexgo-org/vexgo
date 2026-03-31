@@ -264,35 +264,35 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 		c.Data(http.StatusOK, "application/octet-stream", content)
 	})
 
-	// 文章详情页 - 服务器端渲染（复数形式）
+	// Post detail page - server-side rendering (plural form)
 	r.GET("/posts/:id", func(c *gin.Context) {
 		id := c.Param("id")
 
-		// 检查是否是API请求
+		// Check if it's an API request
 		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
-			// 让API处理器处理
+			// Let the API handler process it
 			c.Next()
 			return
 		}
 
-		// 服务器端渲染
+		// Server-side rendering
 		if DBProvider == nil {
-			// 数据库未初始化，回退到SPA
+			// Database not initialized, fall back to SPA
 			c.Next()
 			return
 		}
 
 		var post model.Post
 		if err := DBProvider().Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
-			// 文章不存在，回退到SPA让前端处理404
+			// Post not found, fall back to SPA for frontend 404 handling
 			c.Next()
 			return
 		}
 
-		// 渲染HTML
+		// Render HTML
 		html, err := RenderPostHTML(post, BaseURL)
 		if err != nil {
-			// 渲染失败，回退到SPA
+			// Rendering failed, fall back to SPA
 			c.Next()
 			return
 		}
@@ -300,7 +300,7 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", html)
 	})
 
-	// 文章详情页 - 服务器端渲染（单数形式）
+	// Post detail page - server-side rendering (singular form)
 	r.GET("/post/:id", func(c *gin.Context) {
 		id := c.Param("id")
 
@@ -320,15 +320,14 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 
 		var post model.Post
 		if err := DBProvider().Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
-			// 文章不存在，回退到SPA让前端处理404
+
 			c.Next()
 			return
 		}
 
-		// 渲染HTML
 		html, err := RenderPostHTML(post, BaseURL)
 		if err != nil {
-			// 渲染失败，回退到SPA
+
 			c.Next()
 			return
 		}
@@ -336,11 +335,11 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", html)
 	})
 
-	// Root route - 服务器端渲染首页
+	// Root route
 	r.GET("/", func(c *gin.Context) {
-		// 检查是否是API请求
+
 		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
-			// 让API处理器处理
+
 			c.Next()
 			return
 		}
@@ -357,7 +356,7 @@ func RegisterStaticRoutes(r *gin.Engine, dataDir string, s3Enabled bool) {
 			}
 		}
 
-		// 回退到默认HTML
+		// Fall back to default HTML
 		theme := getRequestedTheme(c)
 		if theme == DefaultTheme {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
