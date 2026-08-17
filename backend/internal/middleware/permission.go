@@ -23,6 +23,8 @@ func (a *Auth) Permission(requiredRoles ...string) gin.HandlerFunc {
 		// Query user information
 		var user model.User
 		if err := a.db.First(&user, userID).Error; err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "No user information provided"})
+			return
 		}
 
 		// Check if user role meets requirements
