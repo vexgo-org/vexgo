@@ -14,6 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
       - name: Set up pnpm
         uses: pnpm/setup@v1
         with:
@@ -26,11 +31,6 @@ jobs:
           pnpm run build
           cd ..
 
-      - name: Set up golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.11
-
       - name: Install ESLint
         run: |
           npm install eslint@9.39.2
@@ -42,7 +42,11 @@ jobs:
 
       - name: Run lint
         run: |
-          golangci-lint run
           npx prettier --check "**/*.{js,jsx,ts,tsx,html,md}"
           diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
           npx eslint -c frontend/eslint.config.js frontend/
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
