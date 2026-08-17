@@ -1,0 +1,34 @@
+name: Build and Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
+      - name: Set up pnpm
+        uses: pnpm/setup@v1
+        with:
+          version: 10
+
+      - name: Build frontend
+        run: |
+          cd frontend/
+          pnpm install
+          pnpm run build
+          cd ..
+
+      - name: Build backend
+        run: go build -v ./...
+
+      - name: Test backend
+        run: go test -v ./...
