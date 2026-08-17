@@ -14,6 +14,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up pnpm
+        uses: pnpm/setup@v1
+        with:
+          version: 10
+
+      - name: Build frontend
+        run: |
+          cd frontend/
+          pnpm install
+          pnpm run build
+          cd ..
+
       - name: Set up golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
