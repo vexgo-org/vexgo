@@ -1,0 +1,36 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
+
+      - name: Install ESLint
+        run: |
+          npm install eslint@9.39.2
+
+      - name: Install formatters
+        run: |
+          npm install prettier@3.6.2
+          go install mvdan.cc/gofumpt@latest
+
+      - name: Run lint
+        run: |
+          golangci-lint run
+          npx prettier --check "**/*.{js,jsx,ts,tsx,html,md}"
+          diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
+          npx eslint -c frontend/eslint.config.js frontend/
