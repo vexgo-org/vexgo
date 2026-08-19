@@ -1,6 +1,8 @@
 package post
 
 import (
+	"context"
+
 	"vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -8,138 +10,125 @@ import (
 
 // Repository is the persistence interface for the post domain.
 type Repository interface {
-	// Posts
-	FindByID(id string) (*model.Post, error)
-	FindByIDPreloadTags(id string) (*model.Post, error)
-	Create(post *model.Post) error
-	Save(post *model.Post) error
-	Delete(post *model.Post) error
-	IncrementViewCount(postID uint) error
+	FindByID(ctx context.Context, id string) (*model.Post, error)
+	FindByIDPreloadTags(ctx context.Context, id string) (*model.Post, error)
+	Create(ctx context.Context, post *model.Post) error
+	Save(ctx context.Context, post *model.Post) error
+	Delete(ctx context.Context, post *model.Post) error
+	IncrementViewCount(ctx context.Context, postID uint) error
 
-	// Query helpers used by the service for complex queries
-	BaseQuery() *gorm.DB
+	BaseQuery(ctx context.Context) *gorm.DB
 
-	// Likes
-	CountLikes(postID uint) (int64, error)
-	FindLike(postID, userID uint) (*model.Like, error)
-	CreateLike(like *model.Like) error
-	DeleteLike(like *model.Like) error
+	CountLikes(ctx context.Context, postID uint) (int64, error)
+	FindLike(ctx context.Context, postID, userID uint) (*model.Like, error)
+	CreateLike(ctx context.Context, like *model.Like) error
+	DeleteLike(ctx context.Context, like *model.Like) error
 
-	// Comments
-	CountComments(postID uint) (int64, error)
-	DeleteCommentsByPostID(postID uint) error
+	CountComments(ctx context.Context, postID uint) (int64, error)
+	DeleteCommentsByPostID(ctx context.Context, postID uint) error
+	DeleteLikesByPostID(ctx context.Context, postID uint) error
 
-	// Likes cascade
-	DeleteLikesByPostID(postID uint) error
+	FindOrCreateTag(ctx context.Context, name string) (*model.Tag, error)
+	ReplaceTagsAssociation(ctx context.Context, post *model.Post, tags []model.Tag) error
+	ClearTagsAssociation(ctx context.Context, post *model.Post) error
+	FindAllTags(ctx context.Context) ([]model.Tag, error)
 
-	// Tags
-	FindOrCreateTag(name string) (*model.Tag, error)
-	ReplaceTagsAssociation(post *model.Post, tags []model.Tag) error
-	ClearTagsAssociation(post *model.Post) error
-	FindAllTags() ([]model.Tag, error)
+	FindAllCategories(ctx context.Context) ([]model.Category, error)
+	CreateCategory(ctx context.Context, category *model.Category) error
 
-	// Categories
-	FindAllCategories() ([]model.Category, error)
-	CreateCategory(category *model.Category) error
+	FindUserByID(ctx context.Context, id uint) (*model.User, error)
+	GetGuestViewSetting(ctx context.Context) bool
 
-	// Users (for permission checks)
-	FindUserByID(id uint) (*model.User, error)
-
-	// Settings
-	GetGuestViewSetting() bool
-
-	// Moderation
-	ListModeration(status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error)
+	ListModeration(ctx context.Context, status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error)
 }
 
 type gormRepository struct {
 	db *gorm.DB
 }
 
-// NewRepository creates a GORM-backed post repository.
 func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }
 
-func (r *gormRepository) FindByID(id string) (*model.Post, error) {
+func (r *gormRepository) FindByID(ctx context.Context, id string) (*model.Post, error) {
 	var post model.Post
-	if err := r.db.Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
 		return nil, err
 	}
 	return &post, nil
 }
 
-func (r *gormRepository) FindByIDPreloadTags(id string) (*model.Post, error) {
+func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id string) (*model.Post, error) {
 	var post model.Post
-	if err := r.db.Preload("Tags").First(&post, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Tags").First(&post, id).Error; err != nil {
 		return nil, err
 	}
 	return &post, nil
 }
 
-func (r *gormRepository) Create(post *model.Post) error {
-	return r.db.Create(post).Error
+func (r *gormRepository) Create(ctx context.Context, post *model.Post) error {
+	return r.db.WithContext(ctx).Create(post).Error
 }
 
-func (r *gormRepository) Save(post *model.Post) error {
-	return r.db.Save(post).Error
+func (r *gormRepository) Save(ctx context.Context, post *model.Post) error {
+	return r.db.WithContext(ctx).Save(post).Error
 }
 
-func (r *gormRepository) Delete(post *model.Post) error {
-	return r.db.Delete(post).Error
+func (r *gormRepository) Delete(ctx context.Context, post *model.Post) error {
+	return r.db.WithContext(ctx).Delete(post).Error
 }
 
-func (r *gormRepository) IncrementViewCount(postID uint) error {
-	return r.db.Model(&model.Post{}).Where("id = ?", postID).
+func (r *gormRepository) IncrementViewCount(ctx context.Context, postID uint) error {
+	return r.db.WithContext(ctx).Model(&model.Post{}).Where("id = ?", postID).
 		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error
 }
 
-func (r *gormRepository) BaseQuery() *gorm.DB {
-	return r.db.Model(&model.Post{}).Preload("Author").Preload("Tags")
+func (r *gormRepository) BaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).Model(&model.Post{}).Preload("Author").Preload("Tags")
 }
 
-func (r *gormRepository) CountLikes(postID uint) (int64, error) {
+func (r *gormRepository) CountLikes(ctx context.Context, postID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Like{}).Where("post_id = ?", postID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.Like{}).Where("post_id = ?", postID).Count(&count).Error
 	return count, err
 }
 
-func (r *gormRepository) FindLike(postID, userID uint) (*model.Like, error) {
+func (r *gormRepository) FindLike(ctx context.Context, postID, userID uint) (*model.Like, error) {
 	var like model.Like
-	if err := r.db.Where("post_id = ? AND user_id = ?", postID, userID).First(&like).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("post_id = ? AND user_id = ?", postID, userID).First(&like).Error; err != nil {
 		return nil, err
 	}
 	return &like, nil
 }
 
-func (r *gormRepository) CreateLike(like *model.Like) error {
-	return r.db.Create(like).Error
+func (r *gormRepository) CreateLike(ctx context.Context, like *model.Like) error {
+	return r.db.WithContext(ctx).Create(like).Error
 }
 
-func (r *gormRepository) DeleteLike(like *model.Like) error {
-	return r.db.Delete(like).Error
+func (r *gormRepository) DeleteLike(ctx context.Context, like *model.Like) error {
+	return r.db.WithContext(ctx).Delete(like).Error
 }
 
-func (r *gormRepository) CountComments(postID uint) (int64, error) {
+func (r *gormRepository) CountComments(ctx context.Context, postID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Comment{}).Where("post_id = ?", postID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.Comment{}).Where("post_id = ?", postID).Count(&count).Error
 	return count, err
 }
 
-func (r *gormRepository) DeleteCommentsByPostID(postID uint) error {
-	return r.db.Where("post_id = ?", postID).Delete(&model.Comment{}).Error
+func (r *gormRepository) DeleteCommentsByPostID(ctx context.Context, postID uint) error {
+	return r.db.WithContext(ctx).Where("post_id = ?", postID).Delete(&model.Comment{}).Error
 }
 
-func (r *gormRepository) DeleteLikesByPostID(postID uint) error {
-	return r.db.Where("post_id = ?", postID).Delete(&model.Like{}).Error
+func (r *gormRepository) DeleteLikesByPostID(ctx context.Context, postID uint) error {
+	return r.db.WithContext(ctx).Where("post_id = ?", postID).Delete(&model.Like{}).Error
 }
 
-func (r *gormRepository) FindOrCreateTag(name string) (*model.Tag, error) {
+func (r *gormRepository) FindOrCreateTag(ctx context.Context, name string) (*model.Tag, error) {
 	var tag model.Tag
-	if err := r.db.Where("name = ?", name).First(&tag).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("name = ?", name).First(&tag).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			tag = model.Tag{Name: name}
-			if err := r.db.Create(&tag).Error; err != nil {
+			if err := r.db.WithContext(ctx).Create(&tag).Error; err != nil {
 				return nil, err
 			}
 			return &tag, nil
@@ -149,52 +138,52 @@ func (r *gormRepository) FindOrCreateTag(name string) (*model.Tag, error) {
 	return &tag, nil
 }
 
-func (r *gormRepository) ReplaceTagsAssociation(post *model.Post, tags []model.Tag) error {
-	return r.db.Model(post).Association("Tags").Replace(tags)
+func (r *gormRepository) ReplaceTagsAssociation(ctx context.Context, post *model.Post, tags []model.Tag) error {
+	return r.db.WithContext(ctx).Model(post).Association("Tags").Replace(tags)
 }
 
-func (r *gormRepository) ClearTagsAssociation(post *model.Post) error {
-	return r.db.Model(post).Association("Tags").Clear()
+func (r *gormRepository) ClearTagsAssociation(ctx context.Context, post *model.Post) error {
+	return r.db.WithContext(ctx).Model(post).Association("Tags").Clear()
 }
 
-func (r *gormRepository) FindAllTags() ([]model.Tag, error) {
+func (r *gormRepository) FindAllTags(ctx context.Context) ([]model.Tag, error) {
 	var tags []model.Tag
-	if err := r.db.Find(&tags).Error; err != nil {
+	if err := r.db.WithContext(ctx).Find(&tags).Error; err != nil {
 		return nil, err
 	}
 	return tags, nil
 }
 
-func (r *gormRepository) FindAllCategories() ([]model.Category, error) {
+func (r *gormRepository) FindAllCategories(ctx context.Context) ([]model.Category, error) {
 	var categories []model.Category
-	if err := r.db.Find(&categories).Error; err != nil {
+	if err := r.db.WithContext(ctx).Find(&categories).Error; err != nil {
 		return nil, err
 	}
 	return categories, nil
 }
 
-func (r *gormRepository) CreateCategory(category *model.Category) error {
-	return r.db.Create(category).Error
+func (r *gormRepository) CreateCategory(ctx context.Context, category *model.Category) error {
+	return r.db.WithContext(ctx).Create(category).Error
 }
 
-func (r *gormRepository) FindUserByID(id uint) (*model.User, error) {
+func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User, error) {
 	var user model.User
-	if err := r.db.First(&user, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (r *gormRepository) GetGuestViewSetting() bool {
+func (r *gormRepository) GetGuestViewSetting(ctx context.Context) bool {
 	var config model.GeneralSettings
-	if err := r.db.First(&config).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&config).Error; err != nil {
 		return true
 	}
 	return config.AllowGuestViewPosts
 }
 
-func (r *gormRepository) ListModeration(status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error) {
-	query := r.db.Model(&model.Post{}).
+func (r *gormRepository) ListModeration(ctx context.Context, status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error) {
+	query := r.db.WithContext(ctx).Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
 		Where("status = ?", status)

@@ -67,9 +67,10 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 
 func TestCreate_SavesDraftAndPublished(t *testing.T) {
 	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleContributor)
 
-	post, err := svc.Create(user.Role, user.ID, CreateRequest{
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
 		Title:      "Hello",
 		Content:    "world",
 		Category:   1,
@@ -99,9 +100,10 @@ func TestCreate_SavesDraftAndPublished(t *testing.T) {
 
 func TestCreate_DerivesStatusByRole(t *testing.T) {
 	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
 
 	contributor := seedUser(t, db, "contrib", model.RoleContributor)
-	post, err := svc.Create(contributor.Role, contributor.ID, CreateRequest{Title: "t", Content: "c", Category: "1"})
+	post, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Title: "t", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -110,7 +112,7 @@ func TestCreate_DerivesStatusByRole(t *testing.T) {
 	}
 
 	author := seedUser(t, db, "auth", model.RoleAuthor)
-	post, err = svc.Create(author.Role, author.ID, CreateRequest{Title: "t", Content: "c", Category: "1"})
+	post, err = svc.Create(ctx, author.Role, author.ID, CreateRequest{Title: "t", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -121,23 +123,25 @@ func TestCreate_DerivesStatusByRole(t *testing.T) {
 
 func TestCreate_ForbidsGuest(t *testing.T) {
 	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
 	guest := seedUser(t, db, "guest", model.RoleGuest)
 
-	if _, err := svc.Create(guest.Role, guest.ID, CreateRequest{Title: "t", Content: "c", Category: "1"}); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Create(ctx, guest.Role, guest.ID, CreateRequest{Title: "t", Content: "c", Category: "1"}); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
 
 func TestUpdate_ModifiesFields(t *testing.T) {
 	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleContributor)
 
-	post, err := svc.Create(user.Role, user.ID, CreateRequest{Title: "A", Content: "B", Category: 1, Status: model.PostStatusDraft})
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Title: "A", Content: "B", Category: 1, Status: model.PostStatusDraft})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	updated, err := svc.Update(idString(post.ID), user.ID, UpdateRequest{
+	updated, err := svc.Update(ctx, idString(post.ID), user.ID, UpdateRequest{
 		Title:  "New",
 		Status: model.PostStatusPublished,
 		Tags:   []string{"foo"},
@@ -156,23 +160,25 @@ func TestUpdate_ModifiesFields(t *testing.T) {
 	}
 
 	other := seedUser(t, db, "other", model.RoleGuest)
-	if _, err := svc.Update(idString(post.ID), other.ID, UpdateRequest{Title: "hack"}); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Update(ctx, idString(post.ID), other.ID, UpdateRequest{Title: "hack"}); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
 
 func TestResolveTags_CreatesIfMissing(t *testing.T) {
 	svc, _, _, _ := newTestService(t)
-	if _, err := svc.resolveTags([]string{"x", "y", "x"}); err != nil {
+	ctx := context.Background()
+	if _, err := svc.resolveTags(ctx, []string{"x", "y", "x"}); err != nil {
 		t.Fatalf("resolveTags error: %v", err)
 	}
 }
 
 func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	svc, _, remover, db := newTestService(t)
+	ctx := context.Background()
 	author := seedUser(t, db, "author", model.RoleAuthor)
 
-	post, err := svc.Create(author.Role, author.ID, CreateRequest{
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
 		Title:      "A",
 		Content:    "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
 		Category:   1,
@@ -186,7 +192,7 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	db.Create(&model.Like{PostID: post.ID, UserID: author.ID})
 	db.Create(&model.Comment{PostID: post.ID, UserID: author.ID, Content: "c", Status: model.CommentStatusPublished})
 
-	if err := svc.Delete(idString(post.ID), author.ID); err != nil {
+	if err := svc.Delete(ctx, idString(post.ID), author.ID); err != nil {
 		t.Fatalf("Delete error: %v", err)
 	}
 
@@ -208,26 +214,27 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 		t.Errorf("comments not deleted")
 	}
 
-	post2, err := svc.Create(author.Role, author.ID, CreateRequest{Title: "B", Content: "b", Category: 1, Status: model.PostStatusPublished})
+	post2, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Title: "B", Content: "b", Category: 1, Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	other := seedUser(t, db, "other", model.RoleGuest)
-	if err := svc.Delete(idString(post2.ID), other.ID); !errors.Is(err, ErrForbidden) {
+	if err := svc.Delete(ctx, idString(post2.ID), other.ID); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
 
 func TestModeration_ApproveRejectResubmit(t *testing.T) {
 	svc, notifier, _, db := newTestService(t)
+	ctx := context.Background()
 	contributor := seedUser(t, db, "contrib", model.RoleContributor)
 
-	post, err := svc.Create(contributor.Role, contributor.ID, CreateRequest{Title: "t", Content: "c", Category: 1})
+	post, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Title: "t", Content: "c", Category: 1})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	approved, err := svc.Approve(idString(post.ID))
+	approved, err := svc.Approve(ctx, idString(post.ID))
 	if err != nil {
 		t.Fatalf("Approve error: %v", err)
 	}
@@ -238,7 +245,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Errorf("expected review notification, got %v", notifier.calls)
 	}
 
-	rejected, err := svc.Reject(idString(post.ID), "too short")
+	rejected, err := svc.Reject(ctx, idString(post.ID), "too short")
 	if err != nil {
 		t.Fatalf("Reject error: %v", err)
 	}
@@ -246,7 +253,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Errorf("unexpected rejected post: %+v", rejected)
 	}
 
-	resubmitted, err := svc.Resubmit(idString(post.ID))
+	resubmitted, err := svc.Resubmit(ctx, idString(post.ID))
 	if err != nil {
 		t.Fatalf("Resubmit error: %v", err)
 	}
@@ -254,22 +261,23 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Errorf("unexpected resubmitted post: %+v", resubmitted)
 	}
 
-	if _, err := svc.Resubmit(idString(post.ID)); !errors.Is(err, ErrBadRequest) {
+	if _, err := svc.Resubmit(ctx, idString(post.ID)); !errors.Is(err, ErrBadRequest) {
 		t.Errorf("expected ErrBadRequest, got %v", err)
 	}
 }
 
 func TestToggleLike(t *testing.T) {
 	svc, notifier, _, db := newTestService(t)
+	ctx := context.Background()
 	author := seedUser(t, db, "author", model.RoleAuthor)
 	liker := seedUser(t, db, "liker", model.RoleGuest)
 
-	post, err := svc.Create(author.Role, author.ID, CreateRequest{Title: "t", Content: "c", Category: 1, Status: model.PostStatusPublished})
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Title: "t", Content: "c", Category: 1, Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	isLiked, count, err := svc.ToggleLike(post.ID, liker.ID)
+	isLiked, count, err := svc.ToggleLike(ctx, post.ID, liker.ID)
 	if err != nil {
 		t.Fatalf("ToggleLike error: %v", err)
 	}
@@ -280,7 +288,7 @@ func TestToggleLike(t *testing.T) {
 		t.Errorf("expected like notification, got %v", notifier.calls)
 	}
 
-	isLiked, count, err = svc.ToggleLike(post.ID, liker.ID)
+	isLiked, count, err = svc.ToggleLike(ctx, post.ID, liker.ID)
 	if err != nil {
 		t.Fatalf("ToggleLike error: %v", err)
 	}
@@ -291,17 +299,18 @@ func TestToggleLike(t *testing.T) {
 
 func TestList_RoleVisibility(t *testing.T) {
 	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
 	contributor := seedUser(t, db, "contrib", model.RoleContributor)
 	db.Create(&model.GeneralSettings{AllowGuestViewPosts: true})
 
-	if _, err := svc.Create(contributor.Role, contributor.ID, CreateRequest{Title: "pub", Content: "c", Category: 1, Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Title: "pub", Content: "c", Category: 1, Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, err := svc.Create(contributor.Role, contributor.ID, CreateRequest{Title: "pend", Content: "c", Category: 1, Status: model.PostStatusPending}); err != nil {
+	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Title: "pend", Content: "c", Category: 1, Status: model.PostStatusPending}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	posts, total, err := svc.List("", 0, 1, 10, "", "", "")
+	posts, total, err := svc.List(ctx, "", 0, 1, 10, "", "", "")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -310,11 +319,11 @@ func TestList_RoleVisibility(t *testing.T) {
 	}
 
 	other := seedUser(t, db, "other", model.RoleAuthor)
-	if _, err := svc.Create(other.Role, other.ID, CreateRequest{Title: "otherpub", Content: "c", Category: 1, Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Create(ctx, other.Role, other.ID, CreateRequest{Title: "otherpub", Content: "c", Category: 1, Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	_, total, err = svc.List(contributor.Role, contributor.ID, 1, 10, "", "", "")
+	_, total, err = svc.List(ctx, contributor.Role, contributor.ID, 1, 10, "", "", "")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -325,11 +334,12 @@ func TestList_RoleVisibility(t *testing.T) {
 
 func TestList_GuestViewDenied(t *testing.T) {
 	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
 	if err := db.Create(&model.GeneralSettings{AllowGuestViewPosts: false}).Error; err != nil {
 		t.Fatalf("failed to seed settings: %v", err)
 	}
 
-	posts, total, err := svc.List("", 0, 1, 10, "", "", "")
+	posts, total, err := svc.List(ctx, "", 0, 1, 10, "", "", "")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -338,11 +348,11 @@ func TestList_GuestViewDenied(t *testing.T) {
 	}
 
 	author := seedUser(t, db, "author", model.RoleAuthor)
-	post, err := svc.Create(author.Role, author.ID, CreateRequest{Title: "t", Content: "c", Category: 1, Status: model.PostStatusPublished})
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Title: "t", Content: "c", Category: 1, Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, err := svc.Get(idString(post.ID), "", 0); !errors.Is(err, ErrGuestViewDenied) {
+	if _, err := svc.Get(ctx, idString(post.ID), "", 0); !errors.Is(err, ErrGuestViewDenied) {
 		t.Errorf("expected ErrGuestViewDenied, got %v", err)
 	}
 }
