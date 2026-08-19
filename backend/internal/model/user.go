@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // Role constant definitions
 const (
@@ -69,4 +72,16 @@ func IsAuthor(role string) bool {
 func IsContributor(role string) bool {
 	return role == RoleContributor || role == RoleAuthor ||
 		role == RoleAdmin || role == RoleSuperAdmin
+}
+
+// ValidRole checks whether a role is valid.
+func ValidRole(role string) bool {
+	validRoles := []string{
+		RoleSuperAdmin,
+		RoleAdmin,
+		RoleAuthor,
+		RoleContributor,
+		RoleGuest,
+	}
+	return slices.Contains(validRoles, role)
 }

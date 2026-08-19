@@ -91,15 +91,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, ErrModifySuperAdmin
 	}
 
-	// Validate role is valid
-	validRoles := map[string]bool{
-		model.RoleSuperAdmin:  true,
-		model.RoleAdmin:       true,
-		model.RoleAuthor:      true,
-		model.RoleContributor: true,
-		model.RoleGuest:       true,
-	}
-	if !validRoles[newRole] {
+	if !model.ValidRole(newRole) {
 		return nil, ErrInvalidRole
 	}
 
