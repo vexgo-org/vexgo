@@ -147,9 +147,6 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 	// Return created comment and updated comment count
 	count, _ := s.repo.CountByPostID(ctx, postID)
 
-	// Preload author information
-	s.repo.FindByID(ctx, fmt.Sprintf("%d", comment.ID))
-
 	// Create notifications
 	s.notifyPostAuthor(ctx, postID, userID, content)
 	if parentID != nil {

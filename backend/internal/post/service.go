@@ -142,8 +142,10 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 		auth.FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
 	}
 
-	// Increment view count (optional)
-	s.repo.IncrementViewCount(ctx, post.ID)
+	// Increment view count (best-effort)
+	if err := s.repo.IncrementViewCount(ctx, post.ID); err != nil {
+		logrus.WithError(err).Warn("failed to increment view count")
+	}
 
 	// Fill likes count and current logged-in user's like status
 	count, _ := s.repo.CountLikes(ctx, post.ID)
@@ -298,7 +300,9 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 		}
 	}
 
-	s.repo.Save(ctx, post)
+	if err := s.repo.Save(ctx, post); err != nil {
+		return nil, fmt.Errorf("save post: %w", err)
+	}
 	return post, nil
 }
 
@@ -557,7 +561,9 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 	}
 
 	post.Status = model.PostStatusPublished
-	s.repo.Save(ctx, post)
+	if err := s.repo.Save(ctx, post); err != nil {
+		return nil, fmt.Errorf("save post: %w", err)
+	}
 
 	if err := s.notifier.CreateNotification(ctx,
 		post.AuthorID, "review", "Post approved",
@@ -578,7 +584,9 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 
 	post.Status = model.PostStatusRejected
 	post.RejectionReason = rejectionReason
-	s.repo.Save(ctx, post)
+	if err := s.repo.Save(ctx, post); err != nil {
+		return nil, fmt.Errorf("save post: %w", err)
+	}
 
 	if err := s.notifier.CreateNotification(ctx,
 		post.AuthorID, "review", "post rejected",
@@ -604,7 +612,9 @@ func (s *Service) Resubmit(ctx context.Context, id string) (*model.Post, error) 
 
 	post.Status = model.PostStatusPending
 	post.RejectionReason = ""
-	s.repo.Save(ctx, post)
+	if err := s.repo.Save(ctx, post); err != nil {
+		return nil, fmt.Errorf("save post: %w", err)
+	}
 
 	return post, nil
 }
@@ -622,7 +632,9 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 	}
 
 	like := &model.Like{PostID: postID, UserID: userID}
-	s.repo.CreateLike(ctx, like)
+	if err := s.repo.CreateLike(ctx, like); err != nil {
+		return false, 0, err
+	}
 	count, _ = s.repo.CountLikes(ctx, postID)
 
 	// Create notification for post author
