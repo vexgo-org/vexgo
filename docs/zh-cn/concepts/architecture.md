@@ -13,51 +13,121 @@ VexGo 是一个自托管的博客 CMS，由两部分组成：
 
 ## 后端结构
 
-后端采用领域导向的目录结构，位于 `backend/internal` 下：
+后端采用领域导向的目录结构，位于 `backend/internal` 下，通过组合根进行引导：
 
 ```text
 backend/
-  main.go            # 入口：参数、配置、存储、数据库、路由、静态资源
+  cmd/vexgo/main.go         # 入口：解析参数，委托给 app 包处理
   internal/
-    auth/            # 注册、登录、JWT、个人资料、密码重置
-    comment/         # 评论和 AI 内容审核
-    config/          # 参数 / 环境变量 / 配置文件解析，JWT、S3、SSO 初始化（纯配置）
-    database/        # 连接、自动迁移、种子数据
-    home/            # 站点统计
-    mailer/          # SMTP 邮件构建与发送
-    message/         # 站内通知
-    middleware/      # JWT 认证、角色权限、请求日志
-    model/           # GORM 数据模型（文章、用户、标签、分类、点赞、评论等）
-    post/            # 文章 CRUD、分类、标签、点赞
-    public/          # 嵌入的前端、主题、SSR 渲染器、静态路由
-    router/          # 路由注册（组合所有领域）
-    settings/        # 管理员配置（SMTP、AI、通用、主题）
-    sso/             # GitHub / Google / OIDC 登录
-    upload/          # 文件上传（本地磁盘或 S3）
-    user/            # 用户管理、角色、创作者申请
-    verification/    # 邮箱验证和滑块验证码
+    app/                     # 组合根：组装所有依赖
+    auth/                    # 注册、登录、JWT、个人资料、密码重置
+    comment/                 # 评论和 AI 内容审核
+    config/                  # 参数 / 环境变量 / 配置文件解析，JWT、S3、SSO 初始化
+    database/                # 连接、自动迁移、种子数据
+    home/                    # 站点统计
+    mailer/                  # SMTP 邮件构建与发送
+    message/                 # 站内通知
+    middleware/              # JWT 认证、角色权限、请求日志
+    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）
+    post/                    # 文章 CRUD、分类、标签、点赞
+    public/                  # 嵌入的前端、主题、SSR 渲染器、静态路由
+    router/                  # 路由注册（组合所有领域）
+    settings/                # 管理员配置（SMTP、AI、通用、主题）
+    sso/                     # GitHub / Google / OIDC 登录
+    upload/                  # 文件上传（本地磁盘或 S3）
+    user/                    # 用户管理、角色、创作者申请
+    verification/            # 邮箱验证和滑块验证码
 ```
 
-导入使用模块路径 `vexgo/backend/internal/<package>`，例如：
+### 分层架构（每个领域）
+
+每个领域包遵循一致的三层模式：
+
+```text
+handler.go    → HTTP 请求解析、响应渲染（调用 service）
+service.go    → 业务逻辑、跨领域编排（调用 repository）
+repository.go → 持久化接口 + GORM 实现（调用数据库）
+```
+
+这种分离确保：
+
+- **Handler** 不直接操作 GORM——它们委托给 Service。
+- **Service** 在 `Repository` 接口之后与数据库无关，可以使用 fake 进行单元测试。
+- **Repository** 封装所有 SQL/GORM 查询，包括批量操作以避免 N+1 问题。
+
+### 共享接口（`model/interfaces.go`）
+
+跨领域的接缝定义在 `model` 包中，作为小型接口：
 
 ```go
-import (
-    "vexgo/backend/internal/model"
-    "vexgo/backend/internal/post"
-    "vexgo/backend/internal/router"
-)
+// Notifier 是创建通知的接缝；由 message 领域实现。
+type Notifier interface {
+    CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
+}
+
+// FileRemover 删除已存储的文件（通过公开 URL）；由 upload.Storage 实现。
+type FileRemover interface {
+    Delete(url string) error
+}
 ```
+
+这些接口允许 `post`、`comment` 和 `user` 等领域触发通知和文件清理，而无需导入具体实现，从而保持依赖图无环。
+
+### 组合根（`internal/app/`）
+
+`internal/app/app.go` 包是组合根（也称"装配层"）。它：
+
+1. 通过 `config.ParseFlags()` 解析参数和加载配置。
+2. 计算运行时密钥（JWT、SSO）。
+3. 打开数据库并运行迁移/种子数据。
+4. 创建存储（本地或 S3）。
+5. 实例化每个领域的依赖并将它们装配到路由器中。
+
+`cmd/vexgo/main.go` 是一个轻量入口，调用 `app.New(cfg)` 和 `app.Run()`。
 
 ### 依赖规则
 
 包结构保证了依赖图**无环**：
 
-- **叶子包** —— `config/` 和 `model/` 不导入任何其他后端模块。`model` 被所有领域包导入；`config` 被 `auth`、`database`、`middleware`、`sso` 和 `upload` 导入。
-- **共享层** —— `middleware/`（JWT 认证、角色权限、请求日志）只依赖 `config` 和 `model`。
-- **跨领域边** —— `auth` 被 `comment`、`post`、`sso` 使用；`auth` 依赖 `verification`；`settings` 依赖 `public`（主题）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。
-- **装配** —— `backend/main.go` 是唯一入口：打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})` 将各领域组装起来。
+```text
+cmd/vexgo/main.go
+    └─→ internal/app          ← 组合根，导入所有包
+            ├─→ config         ← 参数/环境变量/文件解析（不导入领域包）
+            ├─→ database       ← Open/AutoMigrate/Seed（导入 config、model）
+            ├─→ router         ← 路由注册（导入所有领域 handler）
+            └─→ internal/*     ← 各领域包
 
-这种结构使各包可以独立测试，并防止代码增长时产生循环导入。
+叶子包（无内部导入）：
+    model/         ← 数据模型 + 共享接口，被所有领域包导入
+    config/        ← 配置解析，被 app、auth、database、middleware、sso、upload 导入
+
+共享层：
+    middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）
+
+跨领域边：
+    auth/          ← 被 comment、post、sso 使用（隐私过滤）
+    message/       ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
+    upload/        ← 实现 model.FileRemover，被 user、auth、post 用于文件清理
+```
+
+### 配置管理
+
+配置通过三层优先级链加载：
+
+```text
+命令行参数  →  配置文件（YAML）  →  环境变量  →  默认值
+  （最高优先级）                              （最低优先级）
+```
+
+`config.Config` 结构体保存所有运行时值。**不存在全局变量**——JWT 密钥、SSO 配置和前端 URL 是 `Config` 的字段，而非包级别变量。
+
+### context.Context 传播
+
+所有 service 和 repository 方法都以 `context.Context` 作为第一个参数。Handler 从 Gin 请求上下文传递 `c.Request.Context()`，支持：
+
+- 请求作用域的取消和超时
+- 分布式追踪传播
+- GORM `WithContext()` 查询取消
 
 ## 用户、角色与权限
 
@@ -146,6 +216,26 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 站内通知按用户存储。评论、点赞、回复、文章审核和角色变更等事件都会在接收者的收件箱中创建消息，通过 `/messages` API 暴露。
 
+通知系统使用**接缝接口**（`model.Notifier`）——各领域调用 `notifier.CreateNotification()` 而不导入 message 包。具体实现在启动时由组合根注入。
+
+## 数据库
+
+### 连接
+
+`database.Open()` 支持三种后端：
+
+| 后端      | 默认     | 生产可用     |
+| --------- | -------- | ------------ |
+| SQLite    | 是       | 适合小型部署 |
+| MySQL     | 否       | 是           |
+| PostgreSQL | 否      | 是           |
+
+数据库类型由 `db_type` 配置字段或 `DB_TYPE` 环境变量决定。连接 MySQL 时，若数据库不存在会自动创建。
+
+### 迁移与种子数据
+
+`database.AutoMigrate()` 创建或更新所有模型的表结构。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+
 ## 请求流程
 
 一个典型请求的流程：
@@ -160,13 +250,59 @@ Gin 路由器（internal/router）
 中间件链：日志 → 可选 JWT 认证 → 角色权限检查
       │
       ▼
-领域处理器（如 internal/post）→ service → GORM → 数据库
-      │
+领域处理器（如 internal/post/handler.go）
+      │  传递 c.Request.Context()
+      ▼
+领域服务（如 internal/post/service.go）
+      │  调用 repository 方法
+      ▼
+Repository（如 internal/post/repository.go）
+      │  GORM 查询，使用 .WithContext(ctx)
       ▼
 JSON 响应（主题页面则为 SSR 渲染的 HTML）
 ```
 
-JWT 中间件验证令牌并将用户写入 Gin 上下文；权限中间件将数据库中的角色与端点要求的角色进行比对。`super_admin` 始终通过。
+JWT 中间件验证令牌并通过 `middleware.CurrentUser(c)` / `middleware.CurrentUserID(c)` 辅助函数将用户写入 Gin 上下文。权限中间件将数据库中的角色与端点要求的角色进行比对。`super_admin` 始终通过。
+
+### 性能：批量查询
+
+对于显示每篇文章点赞/评论数的列表端点，post 领域使用**批量查询**而非 N+1：
+
+```text
+// 之前（N+1）：每篇文章 3 次查询
+for _, post := range posts {
+    repo.CountLikes(ctx, post.ID)       // 查询 1
+    repo.CountComments(ctx, post.ID)    // 查询 2
+    repo.FindLike(ctx, post.ID, userID) // 查询 3
+}
+
+// 之后（批量）：总共 3 次查询
+likesCounts    := repo.BatchCountLikesByPostIDs(ctx, postIDs)       // 1 次 GROUP BY 查询
+commentsCounts := repo.BatchCountCommentsByPostIDs(ctx, postIDs)    // 1 次 GROUP BY 查询
+likedPosts     := repo.BatchFindLikedPostIDs(ctx, postIDs, userID)  // 1 次 IN 查询
+```
+
+查询次数从 `3 × N` 降为 **3 次**，无论页面大小。
+
+## 测试
+
+每个领域包都有自己的 `_test.go` 文件。测试基础设施：
+
+- 使用**内存 SQLite**（`glebarez/sqlite`）进行快速、隔离的数据库测试。
+- 使用 fake 代替跨领域依赖（`fakeNotifier`、`fakeFiles`），避免测试与其他领域耦合。
+- 每个测试使用 `AutoMigrate()` 创建全新数据库，仅注入所需数据。
+
+运行完整测试套件：
+
+```bash
+cd backend && go test ./...
+```
+
+查看覆盖率：
+
+```bash
+cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/message/...
+```
 
 ## 相关阅读
 
