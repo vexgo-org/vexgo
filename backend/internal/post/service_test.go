@@ -184,7 +184,7 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 
 	// add a like and a comment
 	svc.db.Create(&model.Like{PostID: post.ID, UserID: author.ID})
-	svc.db.Create(&model.Comment{PostID: post.ID, UserID: author.ID, Content: "c", Status: "published"})
+	svc.db.Create(&model.Comment{PostID: post.ID, UserID: author.ID, Content: "c", Status: model.CommentStatusPublished})
 
 	if err := svc.Delete(idString(post.ID), author.ID); err != nil {
 		t.Fatalf("Delete error: %v", err)

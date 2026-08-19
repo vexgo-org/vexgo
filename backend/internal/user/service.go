@@ -230,7 +230,7 @@ func (s *Service) DeleteUser(actor model.User, targetID uint) error {
 	for _, media := range mediaFiles {
 		if err := s.files.Delete(media.URL); err != nil {
 			// Log error but continue execution
-			fmt.Printf("Failed to delete media file %s: %v\n", media.URL, err)
+			logrus.WithError(err).WithField("url", media.URL).Warn("Failed to delete media file")
 		}
 	}
 
@@ -252,7 +252,7 @@ func (s *Service) DeleteUser(actor model.User, targetID uint) error {
 		// Delete post cover image if exists
 		if post.CoverImage != "" {
 			if err := s.files.Delete(post.CoverImage); err != nil {
-				fmt.Printf("Failed to delete cover image %s: %v\n", post.CoverImage, err)
+				logrus.WithError(err).WithField("url", post.CoverImage).Warn("Failed to delete cover image")
 			}
 		}
 
@@ -393,12 +393,12 @@ func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action,
 	}
 
 	// Validate action
-	if action != "approve" && action != "reject" {
+	if action != model.CreatorApplicationActionApprove && action != model.CreatorApplicationActionReject {
 		return ErrInvalidAction
 	}
 
 	// Update application status
-	if action == "approve" {
+	if action == model.CreatorApplicationActionApprove {
 		application.Status = model.CreatorApplicationStatusApproved
 		// Update user role based on current role
 		switch application.User.Role {
@@ -423,7 +423,7 @@ func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action,
 
 	// Send notification to the applicant
 	var notificationTitle, notificationContent string
-	if action == "approve" {
+	if action == model.CreatorApplicationActionApprove {
 		if application.User.Role == model.RoleAuthor {
 			notificationTitle = "Author Application Approved"
 			notificationContent = "Your author application has been approved. You are now an author."
