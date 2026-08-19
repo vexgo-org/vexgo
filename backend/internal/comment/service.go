@@ -36,13 +36,13 @@ type Notifier = model.Notifier
 
 // Service contains the business logic of the comment domain.
 type Service struct {
-	db       *gorm.DB
+	repo     Repository
 	notifier Notifier
 }
 
 // NewService creates a comment service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB, notifier: deps.Notifier}
+	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier}
 }
 
 // defaultModerationConfig returns the configuration used when no row exists.
@@ -63,9 +63,9 @@ func defaultModerationConfig() model.CommentModerationConfig {
 // moderationConfig loads the comment moderation configuration, falling back to
 // the default values when no row exists.
 func (s *Service) moderationConfig() (model.CommentModerationConfig, error) {
-	var config model.CommentModerationConfig
-	if err := s.db.First(&config).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	config, err := s.repo.GetModerationConfig()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return defaultModerationConfig(), nil
 		}
 		return config, err
@@ -76,18 +76,14 @@ func (s *Service) moderationConfig() (model.CommentModerationConfig, error) {
 // ListByPost returns the published comments of a post, applying author privacy
 // filtering for viewers that are neither the author nor an admin.
 func (s *Service) ListByPost(postID string, currentUserID uint, currentUserRole string) ([]model.Comment, error) {
-	var comments []model.Comment
-	if err := s.db.Where("post_id = ? AND status = ?", postID, model.CommentStatusPublished).
-		Preload("User").
-		Order("created_at ASC").
-		Find(&comments).Error; err != nil {
+	comments, err := s.repo.ListByPostID(postID)
+	if err != nil {
 		return nil, err
 	}
 
 	// Apply privacy filtering to comment authors
 	for i := range comments {
 		author := &comments[i].User
-		// If not admin and not viewing own comment, apply privacy filtering
 		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && author.ID != currentUserID {
 			auth.FilterUserByPrivacy(author, currentUserID, currentUserRole)
 		}
@@ -116,18 +112,14 @@ func (s *Service) Create(postID, userID uint, content string, parentID *uint) (*
 
 	// Set comment status
 	if config.Enabled {
-		// If AI moderation enabled, set to pending status first
 		comment.Status = model.CommentStatusPending
+	} else if config.AutoApproveEnabled {
+		comment.Status = model.CommentStatusPublished
 	} else {
-		// If AI moderation not enabled, decide whether to auto-approve based on config
-		if config.AutoApproveEnabled {
-			comment.Status = model.CommentStatusPublished
-		} else {
-			comment.Status = model.CommentStatusPending // still requires manual moderation
-		}
+		comment.Status = model.CommentStatusPending
 	}
 
-	if err := s.db.Create(&comment).Error; err != nil {
+	if err := s.repo.Create(&comment); err != nil {
 		return nil, 0, err
 	}
 
@@ -135,29 +127,24 @@ func (s *Service) Create(postID, userID uint, content string, parentID *uint) (*
 	if config.Enabled {
 		approved, _, err := moderateCommentAI(content, config)
 		if err != nil {
-			// If AI moderation fails, log error but don't affect comment creation
 			logrus.WithError(err).Warn("AI moderation failed, defaulting to published")
-			comment.Status = model.CommentStatusPublished // default to published on failure
+			comment.Status = model.CommentStatusPublished
+		} else if approved {
+			comment.Status = model.CommentStatusPublished
 		} else {
-			if approved {
-				comment.Status = model.CommentStatusPublished
-			} else {
-				comment.Status = model.CommentStatusRejected
-			}
+			comment.Status = model.CommentStatusRejected
 		}
 
-		// Update comment status
-		if err := s.db.Save(&comment).Error; err != nil {
+		if err := s.repo.Save(&comment); err != nil {
 			return nil, 0, err
 		}
 	}
 
 	// Return created comment and updated comment count
-	var count int64
-	s.db.Model(&model.Comment{}).Where("post_id = ? AND status = ?", postID, model.CommentStatusPublished).Count(&count)
+	count, _ := s.repo.CountByPostID(postID)
 
-	// Preload author information
-	s.db.Preload("User").First(&comment, comment.ID)
+	// Reload with author info
+	s.repo.FindByID(fmt.Sprintf("%d", comment.ID))
 
 	// Create notifications
 	s.notifyPostAuthor(postID, userID, content)
@@ -170,19 +157,17 @@ func (s *Service) Create(postID, userID uint, content string, parentID *uint) (*
 
 // notifyPostAuthor notifies the post author unless they wrote the comment.
 func (s *Service) notifyPostAuthor(postID, userID uint, content string) {
-	var post model.Post
-	if err := s.db.First(&post, postID).Error; err != nil {
+	post, err := s.repo.FindPostByID(postID)
+	if err != nil {
 		return
 	}
 	if post.AuthorID == userID {
-		// Don't notify the commenter if they are the post author
 		return
 	}
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+	user, err := s.repo.FindUserByID(userID)
+	if err != nil {
 		return
 	}
-	// Truncate comment content to first 50 characters
 	commentContent := content
 	if len(commentContent) > 50 {
 		commentContent = commentContent[:50] + "..."
@@ -201,19 +186,17 @@ func (s *Service) notifyPostAuthor(postID, userID uint, content string) {
 
 // notifyParentAuthor notifies the parent comment author unless they wrote the reply.
 func (s *Service) notifyParentAuthor(parentID, userID uint, content string) {
-	var parentComment model.Comment
-	if err := s.db.First(&parentComment, parentID).Error; err != nil {
+	parentComment, err := s.repo.FindByID(fmt.Sprintf("%d", parentID))
+	if err != nil {
 		return
 	}
 	if parentComment.UserID == userID {
-		// Don't notify the commenter if they are the parent comment author
 		return
 	}
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+	user, err := s.repo.FindUserByID(userID)
+	if err != nil {
 		return
 	}
-	// Truncate reply content to first 50 characters
 	replyContent := content
 	if len(replyContent) > 50 {
 		replyContent = replyContent[:50] + "..."
@@ -233,29 +216,25 @@ func (s *Service) notifyParentAuthor(parentID, userID uint, content string) {
 // Delete removes a comment when the acting user is its author or an admin.
 // It returns the remaining comment count for the post.
 func (s *Service) Delete(commentID string, userID uint) (int64, error) {
-	var comment model.Comment
-	if err := s.db.First(&comment, commentID).Error; err != nil {
+	comment, err := s.repo.FindByID(commentID)
+	if err != nil {
 		return 0, ErrCommentNotFound
 	}
 
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+	user, err := s.repo.FindUserByID(userID)
+	if err != nil {
 		return 0, ErrUserNotFound
 	}
 
-	// Admins or super admins can delete any comment, authors can delete their own comments
-	if !model.IsAdmin(user) && comment.UserID != userID {
+	if !model.IsAdmin(*user) && comment.UserID != userID {
 		return 0, ErrForbidden
 	}
 
-	if err := s.db.Delete(&comment).Error; err != nil {
+	if err := s.repo.Delete(comment); err != nil {
 		return 0, err
 	}
 
-	// Return comment count after deletion for frontend sync
-	var count int64
-	s.db.Model(&model.Comment{}).Where("post_id = ?", comment.PostID).Count(&count)
-
+	count, _ := s.repo.CountByPostID(comment.PostID)
 	return count, nil
 }
 
@@ -265,8 +244,6 @@ func (s *Service) GetModerationConfig() (model.CommentModerationConfig, error) {
 	if err != nil {
 		return config, err
 	}
-
-	// Don't return sensitive information like API key
 	config.ApiKey = ""
 	return config, nil
 }
@@ -288,29 +265,28 @@ type UpdateModerationConfigRequest struct {
 // configuration. The API key is only overwritten when a non-empty value is
 // provided. The returned configuration has the API key masked.
 func (s *Service) UpdateModerationConfig(req UpdateModerationConfigRequest) (model.CommentModerationConfig, error) {
-	var config model.CommentModerationConfig
-	if err := s.db.First(&config).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// Create new configuration
-			config = model.CommentModerationConfig{
-				Enabled:            req.Enabled,
-				ModelProvider:      req.ModelProvider,
-				ApiKey:             req.ApiKey,
-				ApiEndpoint:        req.ApiEndpoint,
-				ModelName:          req.ModelName,
-				ModerationPrompt:   req.ModerationPrompt,
-				BlockKeywords:      req.BlockKeywords,
-				AutoApproveEnabled: req.AutoApproveEnabled,
-				MinScoreThreshold:  req.MinScoreThreshold,
-			}
-			if err := s.db.Create(&config).Error; err != nil {
-				return config, err
-			}
-		} else {
-			return config, err
+	config, err := s.moderationConfig()
+	if err != nil {
+		return config, err
+	}
+
+	// Check if this is a create (row not found) vs update
+	_, getErr := s.repo.GetModerationConfig()
+	isCreate := errors.Is(getErr, gorm.ErrRecordNotFound)
+
+	if isCreate {
+		config = model.CommentModerationConfig{
+			Enabled:            req.Enabled,
+			ModelProvider:      req.ModelProvider,
+			ApiKey:             req.ApiKey,
+			ApiEndpoint:        req.ApiEndpoint,
+			ModelName:          req.ModelName,
+			ModerationPrompt:   req.ModerationPrompt,
+			BlockKeywords:      req.BlockKeywords,
+			AutoApproveEnabled: req.AutoApproveEnabled,
+			MinScoreThreshold:  req.MinScoreThreshold,
 		}
 	} else {
-		// Update existing configuration
 		config.Enabled = req.Enabled
 		config.ModelProvider = req.ModelProvider
 		config.ApiEndpoint = req.ApiEndpoint
@@ -319,72 +295,50 @@ func (s *Service) UpdateModerationConfig(req UpdateModerationConfigRequest) (mod
 		config.BlockKeywords = req.BlockKeywords
 		config.AutoApproveEnabled = req.AutoApproveEnabled
 		config.MinScoreThreshold = req.MinScoreThreshold
-
-		// Only update if new API key is provided
 		if req.ApiKey != "" {
 			config.ApiKey = req.ApiKey
 		}
-
-		if err := s.db.Save(&config).Error; err != nil {
-			return config, err
-		}
 	}
 
-	// Don't return sensitive information
+	if err := s.repo.SaveModerationConfig(&config); err != nil {
+		return config, err
+	}
+
 	config.ApiKey = ""
 	return config, nil
 }
 
 // ListModeration returns the paginated comments with the given status
-// (pending/published/rejected) for the moderation queue.
+// for the moderation queue.
 func (s *Service) ListModeration(status model.CommentStatus, page, limit int) ([]model.Comment, int64, error) {
-	query := s.db.Model(&model.Comment{}).
-		Preload("User").
-		Preload("Post").
-		Where("status = ?", status)
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var comments []model.Comment
-	if err := query.Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&comments).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return comments, total, nil
+	offset := (page - 1) * limit
+	return s.repo.ListModeration(status, offset, limit)
 }
 
 // SetStatus approves or rejects a comment.
 func (s *Service) SetStatus(id string, status model.CommentStatus) (*model.Comment, error) {
-	var comment model.Comment
-	if err := s.db.First(&comment, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	comment, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrCommentNotFound
 		}
 		return nil, err
 	}
 
 	comment.Status = status
-	if err := s.db.Save(&comment).Error; err != nil {
+	if err := s.repo.Save(comment); err != nil {
 		return nil, err
 	}
 
-	return &comment, nil
+	return comment, nil
 }
 
-// moderateCommentAI performs keyword-based moderation. It is intentionally
-// simple; a real AI API call can replace it later.
+// moderateCommentAI performs keyword-based moderation.
 func moderateCommentAI(content string, config model.CommentModerationConfig) (bool, string, error) {
 	if !config.Enabled {
-		return true, "", nil // if not enabled, auto approve
+		return true, "", nil
 	}
 
-	// Check blocked keywords
 	if config.BlockKeywords != "" {
 		keywords := strings.SplitSeq(config.BlockKeywords, ",")
 		for keyword := range keywords {
@@ -395,14 +349,11 @@ func moderateCommentAI(content string, config model.CommentModerationConfig) (bo
 		}
 	}
 
-	// Simulate AI moderation logic (should be replaced with real AI API call in production)
-	// This is just a simple keyword check as an example
 	lowerContent := strings.ToLower(content)
 	if strings.Contains(lowerContent, "垃圾") || strings.Contains(lowerContent, "spam") ||
 		strings.Contains(lowerContent, "广告") || strings.Contains(lowerContent, "ad") {
 		return false, "AI detected non-compliant content", nil
 	}
 
-	// Simulate AI moderation approval
 	return true, "", nil
 }
