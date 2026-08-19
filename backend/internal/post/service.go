@@ -528,10 +528,13 @@ func (s *Service) Resubmit(ctx context.Context, id string) (*model.Post, error) 
 }
 
 // ToggleLike likes or unlikes a post and notifies the author on like.
+// The like insert is conflict-safe (unique post_id+user_id index), so
+// concurrent toggles cannot create duplicate rows.
 func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked bool, count int64, err error) {
 	existing, err := s.repo.FindLike(ctx, postID, userID)
 	if err == nil {
-		// Already liked -> unlike
+		// Already liked -> unlike. Deleting by primary key is idempotent,
+		// so a concurrent unlike of the same like cannot error.
 		if err := s.repo.DeleteLike(ctx, existing); err != nil {
 			return false, 0, err
 		}
@@ -539,11 +542,17 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 		return false, c, nil
 	}
 
-	like := &model.Like{PostID: postID, UserID: userID}
-	if err := s.repo.CreateLike(ctx, like); err != nil {
+	// Not liked (yet) -> like. If a concurrent request inserted the same
+	// like first, RowsAffected is 0 and we report already-liked instead of
+	// failing or inserting a duplicate.
+	created, err := s.repo.CreateLikeIfAbsent(ctx, postID, userID)
+	if err != nil {
 		return false, 0, err
 	}
 	count, _ = s.repo.CountLikes(ctx, postID)
+	if !created {
+		return true, count, nil
+	}
 
 	// Create notification for post author
 	post, err := s.repo.FindByID(ctx, fmt.Sprintf("%d", postID))

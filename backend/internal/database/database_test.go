@@ -58,6 +58,47 @@ func TestOpen_CreatesMissingDataDir(t *testing.T) {
 	}
 }
 
+func TestAutoMigrate_DeduplicatesExistingLikes(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	if err := AutoMigrate(db); err != nil {
+		t.Fatalf("first migrate: %v", err)
+	}
+
+	// Simulate legacy data: drop the unique index, insert duplicate likes.
+	if err := db.Migrator().DropIndex(&model.Like{}, "idx_likes_post_user"); err != nil {
+		t.Fatalf("drop index: %v", err)
+	}
+	if err := db.Create(&model.Like{PostID: 1, UserID: 1}).Error; err != nil {
+		t.Fatalf("seed like 1: %v", err)
+	}
+	if err := db.Create(&model.Like{PostID: 1, UserID: 1}).Error; err != nil {
+		t.Fatalf("seed duplicate like: %v", err)
+	}
+	if err := db.Create(&model.Like{PostID: 1, UserID: 2}).Error; err != nil {
+		t.Fatalf("seed like 2: %v", err)
+	}
+
+	// Re-running AutoMigrate must deduplicate and recreate the index.
+	if err := AutoMigrate(db); err != nil {
+		t.Fatalf("second migrate with duplicates: %v", err)
+	}
+	var count int64
+	if err := db.Model(&model.Like{}).Count(&count).Error; err != nil {
+		t.Fatalf("count likes: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 likes after dedupe, got %d", count)
+	}
+}
+
 func TestAutoMigrate_CreatesAllTables(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

@@ -297,6 +297,34 @@ func TestToggleLike(t *testing.T) {
 	}
 }
 
+func TestCreateLikeIfAbsent_ConflictSafe(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+
+	created, err := svc.repo.CreateLikeIfAbsent(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("CreateLikeIfAbsent error: %v", err)
+	}
+	if !created {
+		t.Errorf("expected first insert to create the like")
+	}
+
+	// A concurrent request inserting the same post+user must not create a
+	// duplicate row and must not error.
+	created, err = svc.repo.CreateLikeIfAbsent(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("CreateLikeIfAbsent error: %v", err)
+	}
+	if created {
+		t.Errorf("expected second insert to be a no-op")
+	}
+	var likes int64
+	db.Model(&model.Like{}).Count(&likes)
+	if likes != 1 {
+		t.Errorf("expected exactly 1 like row, got %d", likes)
+	}
+}
+
 func TestList_RoleVisibility(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()

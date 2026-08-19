@@ -57,9 +57,9 @@ type Category struct {
 
 type Like struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	PostID    uint      `json:"postId"`
+	PostID    uint      `json:"postId" gorm:"uniqueIndex:idx_likes_post_user"`
 	Post      Post      `json:"-" gorm:"foreignKey:PostID"`
-	UserID    uint      `json:"userId"`
+	UserID    uint      `json:"userId" gorm:"uniqueIndex:idx_likes_post_user"`
 	User      User      `json:"-" gorm:"foreignKey:UserID"`
 	CreatedAt time.Time `json:"createdAt"`
 }

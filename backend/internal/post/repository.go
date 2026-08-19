@@ -7,6 +7,7 @@ import (
 	"vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ListFilter groups the list-query parameters (pagination, status and search
@@ -45,6 +46,10 @@ type Repository interface {
 	CountLikes(ctx context.Context, postID uint) (int64, error)
 	FindLike(ctx context.Context, postID, userID uint) (*model.Like, error)
 	CreateLike(ctx context.Context, like *model.Like) error
+	// CreateLikeIfAbsent inserts a like unless one already exists for the
+	// same post+user, returning whether a new row was created. It relies on
+	// the composite unique index to stay correct under concurrency.
+	CreateLikeIfAbsent(ctx context.Context, postID, userID uint) (bool, error)
 	DeleteLike(ctx context.Context, like *model.Like) error
 
 	// Comments
@@ -248,6 +253,18 @@ func (r *gormRepository) FindLike(ctx context.Context, postID, userID uint) (*mo
 
 func (r *gormRepository) CreateLike(ctx context.Context, like *model.Like) error {
 	return r.db.WithContext(ctx).Create(like).Error
+}
+
+func (r *gormRepository) CreateLikeIfAbsent(ctx context.Context, postID, userID uint) (bool, error) {
+	like := model.Like{PostID: postID, UserID: userID}
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "post_id"}, {Name: "user_id"}},
+		DoNothing: true,
+	}).Create(&like)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func (r *gormRepository) DeleteLike(ctx context.Context, like *model.Like) error {
