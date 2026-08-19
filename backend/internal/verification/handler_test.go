@@ -14,18 +14,18 @@ import (
 func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	svc := newTestService(t)
+	_, db := newTestService(t)
 	u := model.User{
 		Username:      "alice",
 		Email:         "alice@example.com",
 		Role:          model.RoleGuest,
 		EmailVerified: true,
 	}
-	if err := svc.db.Create(&u).Error; err != nil {
+	if err := db.Create(&u).Error; err != nil {
 		t.Fatalf("failed to seed user: %v", err)
 	}
 
-	h := NewHandler(Deps{DB: svc.db})
+	h := NewHandler(Deps{DB: db})
 
 	// The middleware stores the user id as uint in the "user" context map.
 	// The handler used to assert `.(float64)`, which always failed and fell
@@ -59,8 +59,8 @@ func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 func TestGetVerificationStatus_UserNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	svc := newTestService(t)
-	h := NewHandler(Deps{DB: svc.db})
+	_, db := newTestService(t)
+	h := NewHandler(Deps{DB: db})
 
 	r := gin.New()
 	r.GET("/verification-status", func(c *gin.Context) {

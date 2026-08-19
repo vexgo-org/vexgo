@@ -31,7 +31,7 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	emailChange, newEmail, err := h.svc.VerifyEmail(token)
+	emailChange, newEmail, err := h.svc.VerifyEmail(c.Request.Context(), token)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -68,7 +68,7 @@ func (h *Handler) GetVerificationStatus(c *gin.Context) {
 
 	if userMap, ok := userContext.(map[string]any); ok {
 		if userID, ok := userMap["id"].(uint); ok {
-			emailVerified, email, err := h.svc.VerificationStatus(userID)
+			emailVerified, email, err := h.svc.VerificationStatus(c.Request.Context(), userID)
 			if err != nil {
 				if errors.Is(err, ErrUserNotFound) {
 					c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
@@ -91,7 +91,7 @@ func (h *Handler) GetVerificationStatus(c *gin.Context) {
 
 // GenerateCaptcha generates sliding puzzle captcha
 func (h *Handler) GenerateCaptcha(c *gin.Context) {
-	captcha, err := h.svc.GenerateCaptcha()
+	captcha, err := h.svc.GenerateCaptcha(c.Request.Context())
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrEncodeBgImage):
@@ -128,7 +128,7 @@ func (h *Handler) VerifyCaptcha(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.VerifyCaptcha(req.ID, req.Token, req.X)
+	err := h.svc.VerifyCaptcha(c.Request.Context(), req.ID, req.Token, req.X)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaNotFound):
@@ -159,7 +159,7 @@ func (h *Handler) ResendVerificationEmail(c *gin.Context) {
 
 	if userMap, ok := userContext.(map[string]any); ok {
 		if userID, ok := userMap["id"].(uint); ok {
-			err := h.svc.ResendVerificationEmail(userID, c.Request.Host)
+			err := h.svc.ResendVerificationEmail(c.Request.Context(), userID, c.Request.Host)
 			if err != nil {
 				switch {
 				case errors.Is(err, ErrUserNotFound):

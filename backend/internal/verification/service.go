@@ -4,6 +4,7 @@ package verification
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"vexgo/backend/internal/mailer"
 	"vexgo/backend/internal/model"
 
 	"github.com/google/uuid"
@@ -54,53 +54,53 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
+	Mailer    model.Mailer
 }
 
 // Service contains the business logic of the verification domain.
 type Service struct {
-	db *gorm.DB
+	repo   Repository
+	mailer model.Mailer
 }
 
 // NewService creates a verification service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB}
+	return &Service{repo: NewRepository(deps.DB), mailer: deps.Mailer}
 }
 
 // VerifyEmail verifies an email address. Tokens prefixed with "email-change-"
 // confirm a pending email change; all other tokens verify the initial email.
 // It returns whether the token was an email change and the user's new email
 // (only meaningful for email changes).
-func (s *Service) VerifyEmail(token string) (emailChange bool, newEmail string, err error) {
-	mailer := mailer.NewMailer(s.db)
-
+func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bool, newEmail string, err error) {
 	if strings.HasPrefix(token, "email-change-") {
-		logrus.Printf("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
-		if err := mailer.ConfirmEmailChange(token); err != nil {
-			logrus.Printf("[VerifyEmail] ConfirmEmailChange failed: %v", err)
+		logrus.Debug("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
+		if err := s.mailer.ConfirmEmailChange(token); err != nil {
+			logrus.WithError(err).Debug("[VerifyEmail] ConfirmEmailChange failed")
 			return false, "", err
 		}
-		logrus.Printf("[VerifyEmail] ConfirmEmailChange succeeded")
+		logrus.Debug("[VerifyEmail] ConfirmEmailChange succeeded")
 		// Query user information after change
-		var user model.User
-		if err := s.db.Where("verification_token = ?", token).First(&user).Error; err == nil {
+		user, err := s.repo.FindUserByToken(ctx, token)
+		if err == nil {
 			return true, user.Email, nil
 		}
 		return true, "", nil
 	}
 
-	logrus.Printf("[VerifyEmail] Normal email verification token, calling VerifyEmail")
-	if err := mailer.VerifyEmail(token); err != nil {
-		logrus.Printf("[VerifyEmail] VerifyEmail failed: %v", err)
+	logrus.Debug("[VerifyEmail] Normal email verification token, calling VerifyEmail")
+	if err := s.mailer.VerifyEmail(token); err != nil {
+		logrus.WithError(err).Debug("[VerifyEmail] VerifyEmail failed")
 		return false, "", err
 	}
-	logrus.Printf("[VerifyEmail] VerifyEmail succeeded")
+	logrus.Debug("[VerifyEmail] VerifyEmail succeeded")
 	return false, "", nil
 }
 
 // VerificationStatus returns the email verification status of a user.
-func (s *Service) VerificationStatus(userID uint) (emailVerified bool, email string, err error) {
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+func (s *Service) VerificationStatus(ctx context.Context, userID uint) (emailVerified bool, email string, err error) {
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return false, "", ErrUserNotFound
 		}
@@ -111,9 +111,9 @@ func (s *Service) VerificationStatus(userID uint) (emailVerified bool, email str
 
 // ResendVerificationEmail generates a new verification token for the user and
 // sends it to their email address.
-func (s *Service) ResendVerificationEmail(userID uint, host string) error {
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+func (s *Service) ResendVerificationEmail(ctx context.Context, userID uint, host string) error {
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return ErrUserNotFound
 		}
@@ -124,21 +124,20 @@ func (s *Service) ResendVerificationEmail(userID uint, host string) error {
 		return ErrEmailAlreadyVerified
 	}
 
-	mailer := mailer.NewMailer(s.db)
-	enabled, err := mailer.IsEmailEnabled()
+	enabled, err := s.mailer.IsEmailEnabled()
 	if err != nil || !enabled {
 		return ErrEmailServiceDisabled
 	}
 
 	// Generate new verification token
-	token, err := mailer.GenerateVerificationToken(user.ID)
+	token, err := s.mailer.GenerateVerificationToken(user.ID)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrGenerateToken, err)
 	}
 
 	// Build verification link
 	verificationLink := host + "/verify-email?token=" + token
-	if err := mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
+	if err := s.mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
 		return fmt.Errorf("%w: %v", ErrSendVerificationEmail, err)
 	}
 
@@ -147,9 +146,9 @@ func (s *Service) ResendVerificationEmail(userID uint, host string) error {
 
 // IsCaptchaEnabled reports whether captcha verification is enabled in the
 // general settings (disabled by default when no settings row exists).
-func (s *Service) IsCaptchaEnabled() (bool, error) {
-	var settings model.GeneralSettings
-	if err := s.db.First(&settings).Error; err != nil {
+func (s *Service) IsCaptchaEnabled(ctx context.Context) (bool, error) {
+	settings, err := s.repo.GetGeneralSettings(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Not enabled by default
 			return false, nil
@@ -173,7 +172,7 @@ type Captcha struct {
 
 // GenerateCaptcha creates a sliding puzzle captcha, persists it, and returns
 // the client-facing information.
-func (s *Service) GenerateCaptcha() (*Captcha, error) {
+func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 	// Generate captcha ID and token
 	captchaID := uuid.New().String()
 	token := uuid.New().String()
@@ -239,7 +238,7 @@ func (s *Service) GenerateCaptcha() (*Captcha, error) {
 		Used:      false,
 	}
 
-	if err := s.db.Create(&captcha).Error; err != nil {
+	if err := s.repo.CreateCaptcha(ctx, &captcha); err != nil {
 		return nil, err
 	}
 
@@ -256,10 +255,10 @@ func (s *Service) GenerateCaptcha() (*Captcha, error) {
 
 // VerifyCaptcha verifies a sliding puzzle submission and marks the captcha as
 // used.
-func (s *Service) VerifyCaptcha(id, token string, x int) error {
+func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x int) error {
 	// Query captcha
-	var captcha model.Captcha
-	if err := s.db.Where("id = ? AND token = ?", id, token).First(&captcha).Error; err != nil {
+	captcha, err := s.repo.FindCaptcha(ctx, id, token)
+	if err != nil {
 		return ErrCaptchaNotFound
 	}
 
@@ -281,7 +280,7 @@ func (s *Service) VerifyCaptcha(id, token string, x int) error {
 
 	// Mark as used
 	captcha.Used = true
-	if err := s.db.Save(&captcha).Error; err != nil {
+	if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
 		return err
 	}
 
