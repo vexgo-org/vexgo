@@ -138,7 +138,7 @@ func (s *Service) Create(postID, userID uint, content string, parentID *uint) (*
 		approved, _, err := moderateCommentAI(content, config)
 		if err != nil {
 			// If AI moderation fails, log error but don't affect comment creation
-			fmt.Printf("AI moderation failed: %v\n", err)
+			logrus.WithError(err).Warn("AI moderation failed, defaulting to published")
 			comment.Status = model.CommentStatusPublished // default to published on failure
 		} else {
 			if approved {

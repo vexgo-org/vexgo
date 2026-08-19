@@ -345,7 +345,7 @@ func (s *Service) Delete(id string, userID uint) error {
 	for url := range uniqueImages {
 		if err := s.files.Delete(url); err != nil {
 			// Log error but continue execution to avoid post deletion failure
-			fmt.Printf("Failed to delete image %s: %v\n", url, err)
+			logrus.WithError(err).WithField("url", url).Warn("Failed to delete image")
 		}
 	}
 

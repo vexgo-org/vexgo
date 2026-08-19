@@ -99,7 +99,7 @@ func (s *S3Storage) Upload(reader io.Reader, filename, contentType string) (stri
 	}
 
 	url := s.cfg.GetURL(filename)
-	fmt.Printf("Uploaded file, generated URL: %s\n", url)
+	logrus.WithField("url", url).Debug("File uploaded successfully")
 	return url, nil
 }
 

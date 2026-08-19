@@ -40,14 +40,14 @@ func (s *S3Config) GetURL(key string) string {
 		if !strings.HasPrefix(domain, "http://") && !strings.HasPrefix(domain, "https://") {
 			domain = "https://" + domain
 		}
-		fmt.Printf("S3 GetURL: domain='%s'\n", domain)
+		logrus.WithField("domain", domain).Debug("S3 GetURL")
 		if !s.DisableBucketInCustomURL {
 			url := fmt.Sprintf("%s/%s/%s", domain, s.Bucket, key)
-			fmt.Printf("S3 GetURL: including bucket, url='%s'\n", url)
+			logrus.WithField("url", url).Debug("S3 GetURL: including bucket")
 			return url
 		}
 		url := fmt.Sprintf("%s/%s", domain, key)
-		fmt.Printf("S3 GetURL: not including bucket, url='%s'\n", url)
+		logrus.WithField("url", url).Debug("S3 GetURL: not including bucket")
 		return url
 	}
 	// Default S3 URL format

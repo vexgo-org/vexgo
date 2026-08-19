@@ -19,6 +19,7 @@ import (
 	"vexgo/backend/internal/model"
 	"vexgo/backend/internal/public"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -453,7 +454,7 @@ func (s *Service) TestAI() (*AIResult, error) {
 	modelExists, modelErr := checkModelExists(modelsURL, config.ApiKey, config.ModelName)
 	if modelErr != nil {
 		// Model check failed, but continue testing chat completion, endpoint may not support model listing
-		fmt.Printf("Model validation warning (will continue test): %v\n", modelErr)
+		logrus.WithError(modelErr).Warn("Model validation warning (will continue test)")
 	} else if !modelExists {
 		return nil, fmt.Errorf("model '%s' does not exist or is not available, please check model name", config.ModelName)
 	}

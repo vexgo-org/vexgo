@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/sirupsen/logrus"
 )
 
 // Config holds the server configuration from command line arguments and/or config file
@@ -155,7 +156,7 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 		if err := loadConfigFile(configFile, file); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to load config file %s: %v\n", configFile, err)
 		} else {
-			fmt.Printf("Loaded configuration from %s\n", configFile)
+			logrus.Infof("Loaded configuration from %s", configFile)
 			applyFileConfig(cfg, file)
 		}
 	}

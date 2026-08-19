@@ -310,7 +310,7 @@ func (s *Service) UpdateProfile(userID uint, req UpdateProfileRequest) (*model.U
 		// Delete old avatar file
 		if err := s.files.Delete(user.Avatar); err != nil {
 			// Log error but continue execution to avoid avatar update failure
-			fmt.Printf("Failed to delete old avatar %s: %v\n", user.Avatar, err)
+			logrus.WithError(err).WithField("url", user.Avatar).Warn("Failed to delete old avatar")
 		}
 		user.Avatar = *req.Avatar
 	} else if req.Avatar != nil {

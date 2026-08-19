@@ -7,6 +7,7 @@ import (
 
 	"vexgo/backend/internal/model"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -80,7 +81,7 @@ func (s *Service) Delete(id string, userID uint) error {
 
 	// Delete the underlying file; log but continue to delete the DB record
 	if err := s.storage.Delete(media.URL); err != nil {
-		fmt.Printf("Failed to delete file: %v\n", err)
+		logrus.WithError(err).Warn("Failed to delete file")
 	}
 
 	return s.db.Delete(&media).Error
