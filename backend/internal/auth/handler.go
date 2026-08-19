@@ -165,25 +165,22 @@ func (h *Handler) Register(c *gin.Context) {
 
 // GetCurrentUser gets the current logged-in user's information
 func (h *Handler) GetCurrentUser(c *gin.Context) {
-	if uid, ok := c.Get("userID"); ok {
-		userID, ok := uid.(uint)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
-			return
-		}
-		user, err := h.svc.GetCurrentUser(c.Request.Context(), userID)
-		if err != nil {
-			if errors.Is(err, ErrUserNotFound) {
-				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"user": user})
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
 	}
-	c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+
+	user, err := h.svc.GetCurrentUser(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
 // UpdateProfile updates the current user's profile
@@ -200,8 +197,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	user, err := h.svc.UpdateProfile(c.Request.Context(), userID, UpdateProfileRequest{
 		Username: req.Username,
@@ -233,8 +229,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	err := h.svc.ChangePassword(c.Request.Context(), userID, req.OldPassword, req.NewPassword)
 	if err != nil {
@@ -268,8 +263,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	user, err := h.svc.UpdateSettings(c.Request.Context(), userID, UpdateSettingsRequest{
 		ProfileVisibility: req.ProfileVisibility,
@@ -307,8 +301,7 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	protocol, host := requestProtocolAndHost(c)
 	pending, err := h.svc.UpdateEmail(c.Request.Context(), userID, req.Email, protocol, host)

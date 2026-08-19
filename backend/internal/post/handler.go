@@ -80,12 +80,11 @@ func (h *Handler) GetPost(c *gin.Context) {
 // CreatePost creates a post.
 func (h *Handler) CreatePost(c *gin.Context) {
 	// Check if user is logged in
-	userIDVal, exists := c.Get("userID")
-	if !exists || userIDVal == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，请先登录"})
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Please log in first"})
 		return
 	}
-	userID := userIDVal.(uint)
 
 	// Get user role information from context
 	u, _ := middleware.CurrentUser(c)
@@ -116,7 +115,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，无法创建文章"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a post"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post"})
@@ -129,8 +128,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 // UpdatePost updates a post (author or admin only).
 func (h *Handler) UpdatePost(c *gin.Context) {
 	id := c.Param("id")
-	userIDVal, _ := c.Get("userID")
-	userID := userIDVal.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	var req struct {
 		Title      string   `json:"title"`
@@ -173,8 +171,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 // DeletePost deletes a post (author or admin only).
 func (h *Handler) DeletePost(c *gin.Context) {
 	id := c.Param("id")
-	userIDVal, _ := c.Get("userID")
-	userID := userIDVal.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {
@@ -194,8 +191,7 @@ func (h *Handler) DeletePost(c *gin.Context) {
 
 // GetMyPosts returns the current user's own posts.
 func (h *Handler) GetMyPosts(c *gin.Context) {
-	userIDVal, _ := c.Get("userID")
-	userID := userIDVal.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -496,8 +492,7 @@ func (h *Handler) ToggleLike(c *gin.Context) {
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
 	postID := uint(id64)
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	isLiked, count, err := h.svc.ToggleLike(c.Request.Context(), postID, userID)
 	if err != nil {
@@ -518,10 +513,7 @@ func (h *Handler) GetLikeStatus(c *gin.Context) {
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
 	postID := uint(id64)
 
-	var userID uint
-	if uid, exists := c.Get("userID"); exists {
-		userID = uid.(uint)
-	}
+	userID := middleware.CurrentUserID(c)
 
 	isLiked, count := h.svc.LikeStatus(c.Request.Context(), postID, userID)
 

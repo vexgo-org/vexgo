@@ -27,25 +27,8 @@ func (h *Handler) GetComments(c *gin.Context) {
 	postID := c.Param("id")
 
 	// Get current user information (for privacy filtering)
-	var currentUserRole string
-	var currentUserID uint
-	if uidVal, exists := c.Get("userID"); exists {
-		switch v := uidVal.(type) {
-		case uint:
-			currentUserID = v
-		case int:
-			currentUserID = uint(v)
-		case float64:
-			currentUserID = uint(v)
-		}
-	}
-	if userContext, exists := c.Get("user"); exists {
-		if userMap, ok := userContext.(map[string]any); ok {
-			if role, ok := userMap["role"].(string); ok {
-				currentUserRole = role
-			}
-		}
-	}
+	u, _ := middleware.CurrentUser(c)
+	currentUserID, currentUserRole := u.ID, u.Role
 
 	comments, err := h.svc.ListByPost(c.Request.Context(), postID, currentUserID, currentUserRole)
 	if err != nil {
@@ -95,9 +78,8 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID, ok := uid.(uint)
-	if !ok {
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
 		// Reject unauthenticated request
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
@@ -122,22 +104,9 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 	id := c.Param("id")
 
 	// Get current operating user ID
-	uid, exists := c.Get("userID")
-	if !exists {
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
-		return
-	}
-
-	var userID uint
-	switch v := uid.(type) {
-	case uint:
-		userID = v
-	case int:
-		userID = uint(v)
-	case float64:
-		userID = uint(v)
-	default:
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user information"})
 		return
 	}
 

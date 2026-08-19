@@ -51,12 +51,7 @@ func generateFilename(originalName string) string {
 
 // UploadFile uploads a single file (requires login) and records it in the database.
 func (h *Handler) UploadFile(c *gin.Context) {
-	var userID uint = 0
-	if uid, ok := c.Get("userID"); ok {
-		if id, ok2 := uid.(uint); ok2 {
-			userID = id
-		}
-	}
+	userID := middleware.CurrentUserID(c)
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -88,12 +83,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 
 // UploadFiles uploads multiple files (requires login) and records them in the database.
 func (h *Handler) UploadFiles(c *gin.Context) {
-	var userID uint = 0
-	if uid, ok := c.Get("userID"); ok {
-		if id, ok2 := uid.(uint); ok2 {
-			userID = id
-		}
-	}
+	userID := middleware.CurrentUserID(c)
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -128,8 +118,7 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 
 // GetMyFiles returns the current user's uploaded files.
 func (h *Handler) GetMyFiles(c *gin.Context) {
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	files, err := h.svc.ListByUser(c.Request.Context(), userID)
 	if err != nil {
@@ -144,8 +133,7 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 func (h *Handler) DeleteFile(c *gin.Context) {
 	id := c.Param("id")
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {

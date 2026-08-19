@@ -22,8 +22,7 @@ func NewHandler(deps Deps) *Handler {
 
 // GetMessages retrieves the message list
 func (h *Handler) GetMessages(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	uid := userID.(uint)
+	uid := middleware.CurrentUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -47,8 +46,7 @@ func (h *Handler) GetMessages(c *gin.Context) {
 
 // MarkAsRead marks a message as read
 func (h *Handler) MarkAsRead(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	uid := userID.(uint)
+	uid := middleware.CurrentUserID(c)
 
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -72,8 +70,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 
 // MarkAllAsRead marks all messages as read
 func (h *Handler) MarkAllAsRead(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	uid := userID.(uint)
+	uid := middleware.CurrentUserID(c)
 
 	if err := h.svc.MarkAllAsRead(c.Request.Context(), uid); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark all messages as read"})
@@ -85,8 +82,7 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 
 // DeleteMessage deletes a message
 func (h *Handler) DeleteMessage(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	uid := userID.(uint)
+	uid := middleware.CurrentUserID(c)
 
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -110,8 +106,7 @@ func (h *Handler) DeleteMessage(c *gin.Context) {
 
 // GetUnreadCount retrieves the number of unread messages
 func (h *Handler) GetUnreadCount(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	uid := userID.(uint)
+	uid := middleware.CurrentUserID(c)
 
 	count, err := h.svc.UnreadCount(c.Request.Context(), uid)
 	if err != nil {

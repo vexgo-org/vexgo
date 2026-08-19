@@ -3,6 +3,8 @@ package home
 import (
 	"net/http"
 
+	"vexgo/backend/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,16 +21,9 @@ func NewHandler(deps Deps) *Handler {
 // GetStats returns aggregate site statistics.
 func (h *Handler) GetStats(c *gin.Context) {
 	// Get current user role
-	var userRole string
-	if userContext, exists := c.Get("user"); exists {
-		if userMap, ok := userContext.(map[string]any); ok {
-			if role, ok := userMap["role"].(string); ok {
-				userRole = role
-			}
-		}
-	}
+	u, _ := middleware.CurrentUser(c)
 
-	stats := h.svc.Stats(c.Request.Context(), userRole)
+	stats := h.svc.Stats(c.Request.Context(), u.Role)
 
 	c.JSON(http.StatusOK, gin.H{
 		"stats": gin.H{
