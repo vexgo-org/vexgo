@@ -133,6 +133,8 @@ func (a *App) Run() error {
 	return a.engine.Run(a.cfg.GetListenAddr())
 }
 
+// initStorage returns the file storage backend: local disk by default, or an
+// S3-compatible storage when S3 is enabled in the config.
 func initStorage(cfg *config.Config) (upload.Storage, error) {
 	var storage upload.Storage = upload.NewLocalStorage(cfg.DataDir)
 	if !cfg.S3Enabled {
@@ -169,6 +171,9 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 	return storage, nil
 }
 
+// configureProxies sets gin's trusted proxies: none when not behind a reverse
+// proxy, the configured list when behind one, and common private networks as
+// the fallback when the list is empty.
 func configureProxies(r *gin.Engine, cfg *config.Config) {
 	if !cfg.BehindReverseProxy {
 		if err := r.SetTrustedProxies(nil); err != nil {
@@ -191,6 +196,8 @@ func configureProxies(r *gin.Engine, cfg *config.Config) {
 	}
 }
 
+// setupLogging sets the global logrus level and formatter from the config,
+// falling back to info when the level string is invalid.
 func setupLogging(levelStr string) {
 	level, err := logrus.ParseLevel(strings.ToLower(levelStr))
 	if err != nil {

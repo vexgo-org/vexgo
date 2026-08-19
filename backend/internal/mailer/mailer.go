@@ -468,6 +468,8 @@ func (m *Mailer) ConfirmEmailChange(token string) error {
 	return nil
 }
 
+// getConfig loads the SMTP config from the database and fails when SMTP is
+// not enabled.
 func (m *Mailer) getConfig() (*model.SMTPConfig, error) {
 	var config model.SMTPConfig
 	if err := m.DB.First(&config).Error; err != nil {

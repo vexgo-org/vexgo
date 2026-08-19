@@ -244,6 +244,7 @@ func Seed(db *gorm.DB) error {
 	return nil
 }
 
+// seedSMTP inserts the default (disabled) SMTP config when no row exists.
 func seedSMTP(db *gorm.DB) error {
 	var config model.SMTPConfig
 	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
@@ -256,6 +257,7 @@ func seedSMTP(db *gorm.DB) error {
 	return nil
 }
 
+// seedGeneralSettings inserts the default general settings when no row exists.
 func seedGeneralSettings(db *gorm.DB) error {
 	var config model.GeneralSettings
 	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
@@ -274,6 +276,7 @@ func seedGeneralSettings(db *gorm.DB) error {
 	return nil
 }
 
+// seedAIConfig inserts the default (disabled) AI config when no row exists.
 func seedAIConfig(db *gorm.DB) error {
 	var config model.AIConfig
 	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
@@ -290,6 +293,7 @@ func seedAIConfig(db *gorm.DB) error {
 	return nil
 }
 
+// seedThemeConfig inserts the default theme selection when no row exists.
 func seedThemeConfig(db *gorm.DB) error {
 	var config model.ThemeConfig
 	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
@@ -302,6 +306,7 @@ func seedThemeConfig(db *gorm.DB) error {
 	return nil
 }
 
+// seedCategory inserts the default "Default" category when it is missing.
 func seedCategory(db *gorm.DB) error {
 	var category model.Category
 	if err := db.Where("name = ?", "Default").First(&category).Error; err == gorm.ErrRecordNotFound {

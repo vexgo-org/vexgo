@@ -206,6 +206,8 @@ func envDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
+// parseBool parses a boolean environment variable, falling back to defaultVal
+// when the variable is unset or not a valid boolean.
 func parseBool(key string, defaultVal bool) bool {
 	v := os.Getenv(key)
 	if v == "" {

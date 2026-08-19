@@ -525,6 +525,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	return nil
 }
 
+// verifyCaptchaArgs carries the captcha inputs for one verification check.
 type verifyCaptchaArgs struct {
 	Token     string
 	X         int
@@ -533,6 +534,9 @@ type verifyCaptchaArgs struct {
 	Tolerance int
 }
 
+// verifyCaptcha enforces the sliding-puzzle captcha when it is enabled: it
+// checks the required fields, looks the captcha up, verifies expiry and the
+// clicked position within tolerance, then marks the captcha as used.
 func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) error {
 	// Check if captcha verification is enabled
 	captchaEnabled, err := s.captchaEnabled(ctx)

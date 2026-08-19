@@ -47,6 +47,8 @@ var (
 	stateCache = make(map[string]stateEntry) // key: "provider_state"
 )
 
+// generateState creates a random one-time state for CSRF protection and
+// stores it keyed by provider, bound to the client IP and requested method.
 func generateState(provider, ip, method string) string {
 	b := make([]byte, stateLength)
 	rand.Read(b)
@@ -58,6 +60,9 @@ func generateState(provider, ip, method string) string {
 	return state
 }
 
+// verifyState consumes and validates a state previously issued by
+// generateState: it must exist, match the client IP and not be expired.
+// The stored method is returned on success.
 func verifyState(provider, ip, state string) (method string, ok bool) {
 	key := provider + "_" + state
 	stateMu.Lock()
@@ -189,6 +194,7 @@ func (s *Service) Callback(c *gin.Context, provider, state, code string) (payloa
 // OAuth2 configs (built per-request to allow dynamic redirect URI)
 // ─────────────────────────────────────────────
 
+// githubOAuth2Config builds the oauth2.Config for GitHub OAuth.
 func (s *Service) githubOAuth2Config(redirectURI string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     s.sso.GitHub.ClientID,
@@ -199,6 +205,7 @@ func (s *Service) githubOAuth2Config(redirectURI string) *oauth2.Config {
 	}
 }
 
+// googleOAuth2Config builds the oauth2.Config for Google OAuth.
 func (s *Service) googleOAuth2Config(redirectURI string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     s.sso.Google.ClientID,
@@ -266,6 +273,8 @@ type ssoUserInfo struct {
 	avatar     string
 }
 
+// exchange delegates the OAuth2 code exchange to the matching provider
+// implementation and returns the normalized user info.
 func (s *Service) exchange(c *gin.Context, provider, code, redirectURI string) (*ssoUserInfo, error) {
 	switch provider {
 	case "github":
@@ -279,6 +288,8 @@ func (s *Service) exchange(c *gin.Context, provider, code, redirectURI string) (
 	}
 }
 
+// exchangeGitHub exchanges the code with GitHub and fetches the user profile,
+// falling back to the emails endpoint when the primary email is not exposed.
 func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*ssoUserInfo, error) {
 	tok, err := s.githubOAuth2Config(redirectURI).Exchange(c.Request.Context(), code)
 	if err != nil {
@@ -316,6 +327,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 	return info, nil
 }
 
+// exchangeGoogle exchanges the code with Google and fetches the userinfo.
 func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*ssoUserInfo, error) {
 	tok, err := s.googleOAuth2Config(redirectURI).Exchange(c.Request.Context(), code)
 	if err != nil {
@@ -344,6 +356,9 @@ func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*sso
 	return info, nil
 }
 
+// exchangeOIDC exchanges the code with the OIDC provider, preferring id_token
+// claims over a userinfo call, and enforces the verify-email and
+// allowed-groups policies when configured.
 func (s *Service) exchangeOIDC(c *gin.Context, code, redirectURI string) (*ssoUserInfo, error) {
 	oidcCfg := s.sso.OIDC
 
@@ -445,6 +460,8 @@ func parseOIDCIDTokenClaims(rawIDToken string) (map[string]any, error) {
 	return claims, nil
 }
 
+// claimsToUserInfo maps OIDC claims to ssoUserInfo, honoring the configured
+// claim names for email and display name.
 func (s *Service) claimsToUserInfo(claims map[string]any) *ssoUserInfo {
 	cfg := s.sso.OIDC
 	info := &ssoUserInfo{}
@@ -594,6 +611,8 @@ func apiGet(url, accessToken, scheme string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// fetchGitHubPrimaryEmail returns the primary, verified email address from
+// GitHub's /user/emails endpoint, or an empty string when unavailable.
 func fetchGitHubPrimaryEmail(accessToken string) string {
 	body, err := apiGet("https://api.github.com/user/emails", accessToken, "token")
 	if err != nil {
@@ -617,6 +636,7 @@ func fetchGitHubPrimaryEmail(accessToken string) string {
 	return ""
 }
 
+// isValidMethod reports whether the SSO flow method is supported.
 func isValidMethod(method string) bool {
 	return method == "sso_get_token" || method == "get_sso_id"
 }
