@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 
 	"vexgo/backend/internal/model"
 
@@ -15,18 +16,12 @@ type Repository interface {
 	UpdateUser(ctx context.Context, user *model.User) error
 	UpdateUserRole(ctx context.Context, user *model.User) error
 	ListUsers(ctx context.Context, search string, offset, limit int) ([]model.User, int64, error)
-	DeleteUser(ctx context.Context, user *model.User) error
 
-	// Transaction-scoped cascade deletes
-	DeleteCommentsByUserIDTx(tx *gorm.DB, userID uint) error
-	DeleteLikesByUserIDTx(tx *gorm.DB, userID uint) error
-	FindMediaByUserIDTx(tx *gorm.DB, userID uint) ([]model.MediaFile, error)
-	DeleteMediaFilesByUserIDTx(tx *gorm.DB, userID uint) error
-	FindPostsByAuthorIDTx(tx *gorm.DB, authorID uint) ([]model.Post, error)
-	DeleteCommentsByPostIDTx(tx *gorm.DB, postID uint) error
-	DeleteLikesByPostIDTx(tx *gorm.DB, postID uint) error
-	DeletePostsByAuthorIDTx(tx *gorm.DB, postID uint) error
-	DeleteUserTx(tx *gorm.DB, user *model.User) error
+	// DeleteUserCascade deletes the user and everything referencing them
+	// (comments, likes, media rows, posts and their post_tags join rows) in
+	// a single transaction. It returns the URLs of the referenced files so
+	// the caller can delete them after the transaction commits.
+	DeleteUserCascade(ctx context.Context, userID uint) ([]string, error)
 
 	// Creator applications
 	FindPendingApplication(ctx context.Context, userID uint) (*model.CreatorApplication, error)
@@ -37,9 +32,6 @@ type Repository interface {
 
 	// Admins (for notifications)
 	FindAdmins(ctx context.Context) ([]model.User, error)
-
-	// Transaction support
-	Transaction(fn func(tx *gorm.DB) error) error
 }
 
 type gormRepository struct {
@@ -87,52 +79,69 @@ func (r *gormRepository) ListUsers(ctx context.Context, search string, offset, l
 	return users, total, nil
 }
 
-func (r *gormRepository) DeleteUser(ctx context.Context, user *model.User) error {
-	return r.db.WithContext(ctx).Delete(user).Error
-}
+// DeleteUserCascade removes the user and all dependent rows inside a single
+// transaction, including the post_tags join rows that would otherwise survive
+// as orphans. File URLs are collected (not deleted) so the caller can remove
+// the files only after the transaction commits.
+func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]string, error) {
+	var fileURLs []string
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Comments and likes authored by the user.
+		if err := tx.Where("user_id = ?", userID).Delete(&model.Comment{}).Error; err != nil {
+			return fmt.Errorf("delete user comments: %w", err)
+		}
+		if err := tx.Where("user_id = ?", userID).Delete(&model.Like{}).Error; err != nil {
+			return fmt.Errorf("delete user likes: %w", err)
+		}
 
-func (r *gormRepository) DeleteCommentsByUserIDTx(tx *gorm.DB, userID uint) error {
-	return tx.Where("user_id = ?", userID).Delete(&model.Comment{}).Error
-}
+		// Media files owned by the user.
+		var mediaFiles []model.MediaFile
+		if err := tx.Where("user_id = ?", userID).Find(&mediaFiles).Error; err != nil {
+			return fmt.Errorf("query user media files: %w", err)
+		}
+		for _, media := range mediaFiles {
+			fileURLs = append(fileURLs, media.URL)
+		}
+		if err := tx.Where("user_id = ?", userID).Delete(&model.MediaFile{}).Error; err != nil {
+			return fmt.Errorf("delete user media files: %w", err)
+		}
 
-func (r *gormRepository) DeleteLikesByUserIDTx(tx *gorm.DB, userID uint) error {
-	return tx.Where("user_id = ?", userID).Delete(&model.Like{}).Error
-}
+		// Posts authored by the user, with all dependents and join rows.
+		var posts []model.Post
+		if err := tx.Where("author_id = ?", userID).Find(&posts).Error; err != nil {
+			return fmt.Errorf("query user posts: %w", err)
+		}
+		postIDs := make([]uint, 0, len(posts))
+		for _, post := range posts {
+			postIDs = append(postIDs, post.ID)
+			if post.CoverImage != "" {
+				fileURLs = append(fileURLs, post.CoverImage)
+			}
+		}
+		if len(postIDs) > 0 {
+			if err := tx.Where("post_id IN ?", postIDs).Delete(&model.Comment{}).Error; err != nil {
+				return fmt.Errorf("delete post comments: %w", err)
+			}
+			if err := tx.Where("post_id IN ?", postIDs).Delete(&model.Like{}).Error; err != nil {
+				return fmt.Errorf("delete post likes: %w", err)
+			}
+			if err := tx.Exec("DELETE FROM post_tags WHERE post_id IN ?", postIDs).Error; err != nil {
+				return fmt.Errorf("delete post tags: %w", err)
+			}
+			if err := tx.Where("id IN ?", postIDs).Delete(&model.Post{}).Error; err != nil {
+				return fmt.Errorf("delete user posts: %w", err)
+			}
+		}
 
-func (r *gormRepository) FindMediaByUserIDTx(tx *gorm.DB, userID uint) ([]model.MediaFile, error) {
-	var mediaFiles []model.MediaFile
-	if err := tx.Where("user_id = ?", userID).Find(&mediaFiles).Error; err != nil {
+		if err := tx.Delete(&model.User{}, userID).Error; err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	return mediaFiles, nil
-}
-
-func (r *gormRepository) DeleteMediaFilesByUserIDTx(tx *gorm.DB, userID uint) error {
-	return tx.Where("user_id = ?", userID).Delete(&model.MediaFile{}).Error
-}
-
-func (r *gormRepository) FindPostsByAuthorIDTx(tx *gorm.DB, authorID uint) ([]model.Post, error) {
-	var posts []model.Post
-	if err := tx.Where("author_id = ?", authorID).Find(&posts).Error; err != nil {
-		return nil, err
-	}
-	return posts, nil
-}
-
-func (r *gormRepository) DeleteCommentsByPostIDTx(tx *gorm.DB, postID uint) error {
-	return tx.Where("post_id = ?", postID).Delete(&model.Comment{}).Error
-}
-
-func (r *gormRepository) DeleteLikesByPostIDTx(tx *gorm.DB, postID uint) error {
-	return tx.Where("post_id = ?", postID).Delete(&model.Like{}).Error
-}
-
-func (r *gormRepository) DeletePostsByAuthorIDTx(tx *gorm.DB, postID uint) error {
-	return tx.Where("author_id = ?", postID).Delete(&model.Post{}).Error
-}
-
-func (r *gormRepository) DeleteUserTx(tx *gorm.DB, user *model.User) error {
-	return tx.Delete(user).Error
+	return fileURLs, nil
 }
 
 func (r *gormRepository) FindPendingApplication(ctx context.Context, userID uint) (*model.CreatorApplication, error) {
@@ -185,8 +194,4 @@ func (r *gormRepository) FindAdmins(ctx context.Context) ([]model.User, error) {
 		return nil, err
 	}
 	return admins, nil
-}
-
-func (r *gormRepository) Transaction(fn func(tx *gorm.DB) error) error {
-	return r.db.Transaction(fn)
 }

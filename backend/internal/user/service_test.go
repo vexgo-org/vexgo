@@ -45,7 +45,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Comment{}, &model.Like{}, &model.MediaFile{}, &model.CreatorApplication{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Tag{}, &model.Comment{}, &model.Like{}, &model.MediaFile{}, &model.CreatorApplication{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -214,6 +214,47 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 	}
 	if len(files.deleted) != 2 {
 		t.Errorf("expected cover + media file deletion, got %v", files.deleted)
+	}
+}
+
+func TestDeleteUser_ClearsPostTagAssociations(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+
+	post := model.Post{Title: "p", Content: "c", Category: "1", AuthorID: target.ID, Status: model.PostStatusPublished}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("failed to seed post: %v", err)
+	}
+	tags := []model.Tag{{Name: "go"}, {Name: "gin"}}
+	if err := db.Create(&tags).Error; err != nil {
+		t.Fatalf("failed to seed tags: %v", err)
+	}
+	if err := db.Model(&post).Association("Tags").Append(tags); err != nil {
+		t.Fatalf("failed to attach tags: %v", err)
+	}
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	// The many-to-many join rows must not survive as orphans.
+	var joinCount int64
+	if err := db.Table("post_tags").Count(&joinCount).Error; err != nil {
+		t.Fatalf("count post_tags: %v", err)
+	}
+	if joinCount != 0 {
+		t.Errorf("expected post_tags join rows deleted, got %d", joinCount)
+	}
+
+	// Tags themselves are global and must survive the deletion.
+	var tagCount int64
+	if err := db.Model(&model.Tag{}).Count(&tagCount).Error; err != nil {
+		t.Fatalf("count tags: %v", err)
+	}
+	if tagCount != 2 {
+		t.Errorf("expected tags preserved, got %d", tagCount)
 	}
 }
 

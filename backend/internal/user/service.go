@@ -172,60 +172,17 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 		return ErrNoPermissionToDelete
 	}
 
-	// Collect file URLs inside the transaction, but delete the files only
-	// after it commits: a rollback must not leave DB rows pointing at
-	// deleted files (or files deleted for rows that were rolled back).
-	var fileURLs []string
-	err = s.repo.Transaction(func(tx *gorm.DB) error {
-		if err := s.repo.DeleteCommentsByUserIDTx(tx, user.ID); err != nil {
-			return fmt.Errorf("delete user comments: %w", err)
-		}
-		if err := s.repo.DeleteLikesByUserIDTx(tx, user.ID); err != nil {
-			return fmt.Errorf("delete user likes: %w", err)
-		}
-
-		mediaFiles, err := s.repo.FindMediaByUserIDTx(tx, user.ID)
-		if err != nil {
-			return fmt.Errorf("query user media files: %w", err)
-		}
-		for _, media := range mediaFiles {
-			fileURLs = append(fileURLs, media.URL)
-		}
-		if err := s.repo.DeleteMediaFilesByUserIDTx(tx, user.ID); err != nil {
-			return fmt.Errorf("delete user media files: %w", err)
-		}
-
-		posts, err := s.repo.FindPostsByAuthorIDTx(tx, user.ID)
-		if err != nil {
-			return fmt.Errorf("query user posts: %w", err)
-		}
-		for _, post := range posts {
-			if post.CoverImage != "" {
-				fileURLs = append(fileURLs, post.CoverImage)
-			}
-			if err := s.repo.DeleteCommentsByPostIDTx(tx, post.ID); err != nil {
-				return fmt.Errorf("delete post comments: %w", err)
-			}
-			if err := s.repo.DeleteLikesByPostIDTx(tx, post.ID); err != nil {
-				return fmt.Errorf("delete post likes: %w", err)
-			}
-		}
-
-		if err := s.repo.DeletePostsByAuthorIDTx(tx, user.ID); err != nil {
-			return fmt.Errorf("delete user posts: %w", err)
-		}
-		if err := s.repo.DeleteUserTx(tx, user); err != nil {
-			return fmt.Errorf("delete user: %w", err)
-		}
-		return nil
-	})
+	// Cascade-delete inside a single transaction, then remove the referenced
+	// files only after it commits: a rollback must not leave DB rows pointing
+	// at deleted files (or files deleted for rows that were rolled back).
+	fileURLs, err := s.repo.DeleteUserCascade(ctx, user.ID)
 	if err != nil {
 		return err
 	}
 
 	for _, url := range fileURLs {
 		if err := s.files.Delete(url); err != nil {
-			logrus.WithError(err).WithField("url", url).Warn("Failed to delete media file")
+		logrus.WithError(err).WithField("url", url).Warn("Failed to delete media file")
 		}
 	}
 	return nil
