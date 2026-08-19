@@ -24,21 +24,7 @@ func NewHandler(deps Deps) *Handler {
 
 // currentUser extracts the acting user from the JWT context.
 func currentUser(c *gin.Context) (model.User, bool) {
-	userContext, exists := c.Get("user")
-	if !exists {
-		return model.User{}, false
-	}
-	userMap, ok := userContext.(map[string]any)
-	if !ok {
-		return model.User{}, false
-	}
-	id, ok := userMap["id"].(uint)
-	if !ok {
-		return model.User{}, false
-	}
-	username, _ := userMap["username"].(string)
-	role, _ := userMap["role"].(string)
-	return model.User{ID: id, Username: username, Role: role}, true
+	return middleware.CurrentUser(c)
 }
 
 // GetUserList gets user list

@@ -12,17 +12,48 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
-)
-
-// Auth holds the database connection used to validate tokens against the
+)// Auth holds the database connection used to validate tokens against the
 // current user state (password version, last login).
-type Auth struct {
-	db *gorm.DB
+type Auth struct {	db *gorm.DB
 }
 
 // NewAuth creates the authentication middleware with the given database.
 func NewAuth(db *gorm.DB) *Auth {
 	return &Auth{db: db}
+}
+
+// CurrentUser extracts the authenticated user from the gin context.
+// It returns the user and true when a valid JWT was parsed; otherwise
+// it returns a zero-value User and false.
+func CurrentUser(c *gin.Context) (model.User, bool) {
+	userContext, exists := c.Get("user")
+	if !exists {
+		return model.User{}, false
+	}
+	userMap, ok := userContext.(map[string]any)
+	if !ok {
+		return model.User{}, false
+	}
+	id, _ := userMap["id"].(uint)
+	username, _ := userMap["username"].(string)
+	role, _ := userMap["role"].(string)
+	return model.User{ID: id, Username: username, Role: role}, true
+}
+
+// CurrentUserID extracts only the user ID from the context.
+// Returns 0 when no user is authenticated.
+func CurrentUserID(c *gin.Context) uint {
+	if uid, exists := c.Get("userID"); exists {
+		switch v := uid.(type) {
+		case uint:
+			return v
+		case int:
+			return uint(v)
+		case float64:
+			return uint(v)
+		}
+	}
+	return 0
 }
 
 // JWTAuth authenticates requests via a Bearer JWT and writes the user info

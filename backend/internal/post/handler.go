@@ -24,24 +24,11 @@ func NewHandler(deps Deps) *Handler {
 
 // currentUser extracts the role and id of the current user from the context.
 func currentUser(c *gin.Context) (role string, id uint) {
-	if uidVal, exists := c.Get("userID"); exists {
-		switch v := uidVal.(type) {
-		case uint:
-			id = v
-		case int:
-			id = uint(v)
-		case float64:
-			id = uint(v)
-		}
+	u, ok := middleware.CurrentUser(c)
+	if !ok {
+		return "", 0
 	}
-	if userContext, exists := c.Get("user"); exists {
-		if userMap, ok := userContext.(map[string]any); ok {
-			if r, ok := userMap["role"].(string); ok {
-				role = r
-			}
-		}
-	}
-	return role, id
+	return u.Role, u.ID
 }
 
 // GetPosts returns the post list.
