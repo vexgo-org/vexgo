@@ -203,7 +203,7 @@ func (r *gormRepository) MyPosts(ctx context.Context, userID uint, f ListFilter)
 func (r *gormRepository) Drafts(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {
 	query := r.baseQuery(ctx)
 
-	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
+	if userRole != "" && model.IsAdmin(userRole) {
 		// Admins and super admins can see all draft posts
 		query = query.Where("status = ?", model.PostStatusDraft)
 	} else {

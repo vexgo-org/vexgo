@@ -81,7 +81,7 @@ func (s *Service) List(ctx context.Context, userRole string, userID uint, page, 
 
 	// Apply privacy filtering to author information
 	for i := range posts {
-		if userRole != model.RoleAdmin && userRole != model.RoleSuperAdmin && posts[i].AuthorID != userID {
+		if !model.IsAdmin(userRole) && posts[i].AuthorID != userID {
 			auth.FilterUserByPrivacy(&posts[i].Author, userID, userRole)
 		}
 	}
@@ -102,7 +102,7 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 		return nil, ErrGuestViewDenied
 	}
 
-	if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && post.AuthorID != currentUserID {
+	if !model.IsAdmin(currentUserRole) && post.AuthorID != currentUserID {
 		auth.FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
 	}
 
@@ -219,7 +219,7 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 	// Permission check
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err == nil {
-		if user.Role != model.RoleAdmin && user.Role != model.RoleSuperAdmin && post.AuthorID != userID {
+		if !model.IsAdmin(user.Role) && post.AuthorID != userID {
 			return nil, ErrForbidden
 		}
 	}
@@ -281,7 +281,7 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	// Permission check
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err == nil {
-		if user.Role != model.RoleAdmin && user.Role != model.RoleSuperAdmin && post.AuthorID != userID {
+		if !model.IsAdmin(user.Role) && post.AuthorID != userID {
 			return ErrForbidden
 		}
 	}
@@ -368,7 +368,7 @@ func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole stri
 
 	// Apply privacy filtering to author information
 	for i := range posts {
-		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && uint(uid) != currentUserID {
+		if !model.IsAdmin(currentUserRole) && uint(uid) != currentUserID {
 			auth.FilterUserByPrivacy(&posts[i].Author, currentUserID, currentUserRole)
 		}
 	}

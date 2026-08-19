@@ -35,23 +35,23 @@ type User struct {
 	HideBio           bool   `json:"hide_bio,omitempty" gorm:"default:false"`                      // hide bio
 }
 
-// IsSuperAdmin checks if user is super admin
-func IsSuperAdmin(user User) bool {
-	return user.Role == RoleSuperAdmin
+// IsSuperAdmin reports whether the role is super admin.
+func IsSuperAdmin(role string) bool {
+	return role == RoleSuperAdmin
 }
 
-// IsAdmin checks if user is admin (including super admin)
-func IsAdmin(user User) bool {
-	return user.Role == RoleAdmin || user.Role == RoleSuperAdmin
+// IsAdmin reports whether the role is admin-level (admin or super admin).
+func IsAdmin(role string) bool {
+	return role == RoleAdmin || role == RoleSuperAdmin
 }
 
-// IsAuthor checks if user is author (including admin and super admin)
-func IsAuthor(user User) bool {
-	return user.Role == RoleAuthor || user.Role == RoleAdmin || user.Role == RoleSuperAdmin
+// IsAuthor reports whether the role is author-level (author, admin or super admin).
+func IsAuthor(role string) bool {
+	return role == RoleAuthor || role == RoleAdmin || role == RoleSuperAdmin
 }
 
-// IsContributor checks if user is contributor (including higher privilege roles)
-func IsContributor(user User) bool {
-	return user.Role == RoleContributor || user.Role == RoleAuthor ||
-		user.Role == RoleAdmin || user.Role == RoleSuperAdmin
+// IsContributor reports whether the role is contributor-level (contributor or higher).
+func IsContributor(role string) bool {
+	return role == RoleContributor || role == RoleAuthor ||
+		role == RoleAdmin || role == RoleSuperAdmin
 }

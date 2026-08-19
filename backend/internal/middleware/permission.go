@@ -32,7 +32,7 @@ func (a *Auth) Permission(requiredRoles ...string) gin.HandlerFunc {
 		hasPermission := slices.Contains(requiredRoles, user.Role)
 
 		// Super admin has all permissions
-		if user.Role == model.RoleSuperAdmin {
+		if model.IsSuperAdmin(user.Role) {
 			hasPermission = true
 		}
 

@@ -13,7 +13,7 @@ import (
 func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
 	// Check if viewer is the user themselves or an admin
 	isSelf := viewerID == user.ID
-	isAdmin := viewerRole == model.RoleAdmin || viewerRole == model.RoleSuperAdmin
+	isAdmin := model.IsAdmin(viewerRole)
 
 	// If not self and not admin, filter according to privacy settings
 	if !isSelf && !isAdmin {

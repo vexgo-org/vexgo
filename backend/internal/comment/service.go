@@ -83,7 +83,7 @@ func (s *Service) ListByPost(ctx context.Context, postID string, currentUserID u
 	for i := range comments {
 		author := &comments[i].User
 		// If not admin and not viewing own comment, apply privacy filtering
-		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && author.ID != currentUserID {
+		if !model.IsAdmin(currentUserRole) && author.ID != currentUserID {
 			auth.FilterUserByPrivacy(author, currentUserID, currentUserRole)
 		}
 	}
@@ -232,7 +232,7 @@ func (s *Service) Delete(ctx context.Context, commentID string, userID uint) (in
 	}
 
 	// Admins or super admins can delete any comment, authors can delete their own comments
-	if !model.IsAdmin(*user) && comment.UserID != userID {
+	if !model.IsAdmin(user.Role) && comment.UserID != userID {
 		return 0, ErrForbidden
 	}
 

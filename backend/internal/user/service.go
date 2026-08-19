@@ -87,7 +87,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, ErrCannotModifySelf
 	}
 	// Cannot modify super admin's role (unless current user is also super admin)
-	if user.Role == model.RoleSuperAdmin && actor.Role != model.RoleSuperAdmin {
+	if model.IsSuperAdmin(user.Role) && !model.IsSuperAdmin(actor.Role) {
 		return nil, ErrModifySuperAdmin
 	}
 
@@ -163,7 +163,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 	case model.RoleSuperAdmin:
 		// can delete any user
 	case model.RoleAdmin:
-		if user.Role != model.RoleAuthor && user.Role != model.RoleContributor && user.Role != model.RoleGuest {
+		if model.IsAdmin(user.Role) {
 			return ErrAdminDeleteRestricted
 		}
 	default:
@@ -222,7 +222,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 // ApplyForCreator submits a creator application for the given user and
 // notifies all admins. It returns the new application ID.
 func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason string) (uint, error) {
-	if user.Role != model.RoleGuest && user.Role != model.RoleContributor {
+	if model.IsAuthor(user.Role) {
 		return 0, ErrRoleNotEligible
 	}
 
@@ -269,7 +269,7 @@ func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason s
 // ListCreatorApplications returns the paginated creator applications with the
 // applicant preloaded, filtered by status.
 func (s *Service) ListCreatorApplications(ctx context.Context, actorRole string, status model.CreatorApplicationStatus, page, limit int) ([]model.CreatorApplication, int64, error) {
-	if actorRole != model.RoleAdmin && actorRole != model.RoleSuperAdmin {
+	if !model.IsAdmin(actorRole) {
 		return nil, 0, ErrNoPermissionAccessApps
 	}
 	offset := (page - 1) * limit
@@ -279,7 +279,7 @@ func (s *Service) ListCreatorApplications(ctx context.Context, actorRole string,
 // ReviewCreatorApplication approves or rejects a pending creator application,
 // upgrading the applicant's role on approval and notifying the applicant.
 func (s *Service) ReviewCreatorApplication(ctx context.Context, actor model.User, appID uint, action, reason string) error {
-	if actor.Role != model.RoleAdmin && actor.Role != model.RoleSuperAdmin {
+	if !model.IsAdmin(actor.Role) {
 		return ErrNoPermissionReviewApps
 	}
 
