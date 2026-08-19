@@ -40,6 +40,11 @@ type Repository interface {
 	GetGuestViewSetting(ctx context.Context) bool
 
 	ListModeration(ctx context.Context, status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error)
+
+	// Batch queries to avoid N+1
+	BatchCountLikesByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error)
+	BatchCountCommentsByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error)
+	BatchFindLikedPostIDs(ctx context.Context, postIDs []uint, userID uint) (map[uint]bool, error)
 }
 
 type gormRepository struct {
@@ -208,4 +213,70 @@ func (r *gormRepository) ListModeration(ctx context.Context, status model.PostSt
 	}
 
 	return posts, total, nil
+}
+
+func (r *gormRepository) BatchCountLikesByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error) {
+	if len(postIDs) == 0 {
+		return make(map[uint]int64), nil
+	}
+	type result struct {
+		PostID uint
+		Count  int64
+	}
+	var results []result
+	err := r.db.WithContext(ctx).Model(&model.Like{}).
+		Select("post_id, COUNT(*) as count").
+		Where("post_id IN ?", postIDs).
+		Group("post_id").
+		Find(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[uint]int64, len(postIDs))
+	for _, r := range results {
+		counts[r.PostID] = r.Count
+	}
+	return counts, nil
+}
+
+func (r *gormRepository) BatchCountCommentsByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error) {
+	if len(postIDs) == 0 {
+		return make(map[uint]int64), nil
+	}
+	type result struct {
+		PostID uint
+		Count  int64
+	}
+	var results []result
+	err := r.db.WithContext(ctx).Model(&model.Comment{}).
+		Select("post_id, COUNT(*) as count").
+		Where("post_id IN ?", postIDs).
+		Group("post_id").
+		Find(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[uint]int64, len(postIDs))
+	for _, r := range results {
+		counts[r.PostID] = r.Count
+	}
+	return counts, nil
+}
+
+func (r *gormRepository) BatchFindLikedPostIDs(ctx context.Context, postIDs []uint, userID uint) (map[uint]bool, error) {
+	if len(postIDs) == 0 || userID == 0 {
+		return make(map[uint]bool), nil
+	}
+	var likedPostIDs []uint
+	err := r.db.WithContext(ctx).Model(&model.Like{}).
+		Where("post_id IN ? AND user_id = ?", postIDs, userID).
+		Pluck("post_id", &likedPostIDs).Error
+	if err != nil {
+		return nil, err
+	}
+	liked := make(map[uint]bool, len(likedPostIDs))
+	for _, id := range likedPostIDs {
+		liked[id] = true
+	}
+	return liked, nil
 }

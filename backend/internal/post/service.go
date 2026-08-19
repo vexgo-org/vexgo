@@ -588,19 +588,26 @@ func (s *Service) LikeStatus(ctx context.Context, postID, userID uint) (isLiked 
 }
 
 func (s *Service) populateCounts(ctx context.Context, posts []model.Post, userID uint) {
+	if len(posts) == 0 {
+		return
+	}
+
+	postIDs := make([]uint, len(posts))
 	for i := range posts {
-		count, _ := s.repo.CountLikes(ctx, posts[i].ID)
-		posts[i].LikesCount = int(count)
+		postIDs[i] = posts[i].ID
+	}
 
-		posts[i].IsLiked = false
-		if userID != 0 {
-			if _, err := s.repo.FindLike(ctx, posts[i].ID, userID); err == nil {
-				posts[i].IsLiked = true
-			}
-		}
+	likesCounts, _ := s.repo.BatchCountLikesByPostIDs(ctx, postIDs)
+	commentsCounts, _ := s.repo.BatchCountCommentsByPostIDs(ctx, postIDs)
+	var likedPosts map[uint]bool
+	if userID != 0 {
+		likedPosts, _ = s.repo.BatchFindLikedPostIDs(ctx, postIDs, userID)
+	}
 
-		ccount, _ := s.repo.CountComments(ctx, posts[i].ID)
-		posts[i].CommentsCount = int(ccount)
+	for i := range posts {
+		posts[i].LikesCount = int(likesCounts[posts[i].ID])
+		posts[i].CommentsCount = int(commentsCounts[posts[i].ID])
+		posts[i].IsLiked = likedPosts[posts[i].ID]
 	}
 }
 
