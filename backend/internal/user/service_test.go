@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"vexgo/backend/internal/model"
@@ -13,11 +14,13 @@ import (
 
 // fakeNotifier records notification calls instead of touching the DB.
 type fakeNotifier struct {
-	calls []string
+	calls    []string
+	messages []string
 }
 
 func (f *fakeNotifier) CreateNotification(_ context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
 	f.calls = append(f.calls, notificationType)
+	f.messages = append(f.messages, content)
 	return nil
 }
 
@@ -64,6 +67,34 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 		t.Fatalf("failed to seed user: %v", err)
 	}
 	return u
+}
+
+func TestUpdateRole_NotificationReportsOldRole(t *testing.T) {
+	ctx := context.Background()
+	svc, notifier, _, db := newTestService(t)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+	target := seedUser(t, db, "target", model.RoleGuest)
+
+	if _, err := svc.UpdateRole(ctx, admin, target.ID, model.RoleAuthor); err != nil {
+		t.Fatalf("UpdateRole error: %v", err)
+	}
+	if len(notifier.messages) != 1 {
+		t.Fatalf("expected one notification, got %d", len(notifier.messages))
+	}
+	if !strings.Contains(notifier.messages[0], `from "guest" to "author"`) {
+		t.Errorf("expected old role in notification message, got %q", notifier.messages[0])
+	}
+
+	// Role upgrade path: contributor -> author must report both roles too.
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target2 := seedUser(t, db, "target2", model.RoleContributor)
+	notifier.messages = nil
+	if _, err := svc.UpdateRole(ctx, super, target2.ID, model.RoleAuthor); err != nil {
+		t.Fatalf("UpdateRole error: %v", err)
+	}
+	if len(notifier.messages) != 1 || !strings.Contains(notifier.messages[0], `from "contributor" to "author"`) {
+		t.Errorf("expected contributor->author message, got %q", notifier.messages)
+	}
 }
 
 func TestUpdateRole_Permissions(t *testing.T) {

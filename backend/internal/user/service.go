@@ -103,6 +103,10 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, ErrInvalidRole
 	}
 
+	// Capture the old role before it is overwritten below, so the
+	// notification can report the actual before/after values.
+	oldRole := user.Role
+
 	// Permission check
 	// Super admin can set any role (including making other users super admin)
 	// But cannot downgrade own super admin privileges
@@ -124,8 +128,6 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 	}
 
 	// Save updates
-	oldRole := user.Role
-	user.Role = newRole
 	if err := s.repo.UpdateUserRole(ctx, user); err != nil {
 		return nil, err
 	}
