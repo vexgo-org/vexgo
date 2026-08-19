@@ -22,11 +22,6 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
-// currentUser extracts the acting user from the JWT context.
-func currentUser(c *gin.Context) (model.User, bool) {
-	return middleware.CurrentUser(c)
-}
-
 // GetUserList gets user list
 func (h *Handler) GetUserList(c *gin.Context) {
 	// Pagination parameters
@@ -65,7 +60,7 @@ func (h *Handler) GetUserList(c *gin.Context) {
 
 // UpdateUserRole updates user role
 func (h *Handler) UpdateUserRole(c *gin.Context) {
-	actor, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -117,7 +112,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 
 // DeleteUser deletes user and all their posts and comments
 func (h *Handler) DeleteUser(c *gin.Context) {
-	actor, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -152,7 +147,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 
 // ApplyForCreator handles creator application submission
 func (h *Handler) ApplyForCreator(c *gin.Context) {
-	actor, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -187,7 +182,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 
 // GetCreatorApplications gets creator applications for admin review
 func (h *Handler) GetCreatorApplications(c *gin.Context) {
-	actor, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -249,7 +244,7 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 
 // ReviewCreatorApplication handles creator application review
 func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
-	actor, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return

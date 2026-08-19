@@ -22,15 +22,6 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
-// currentUser extracts the role and id of the current user from the context.
-func currentUser(c *gin.Context) (role string, id uint) {
-	u, ok := middleware.CurrentUser(c)
-	if !ok {
-		return "", 0
-	}
-	return u.Role, u.ID
-}
-
 // GetPosts returns the post list.
 func (h *Handler) GetPosts(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -42,7 +33,8 @@ func (h *Handler) GetPosts(c *gin.Context) {
 		limit = 10
 	}
 
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
 	posts, total, err := h.svc.List(c.Request.Context(), userRole, userID, page, limit, c.Query("category"), c.Query("status"), c.Query("search"))
 	if err != nil {
@@ -69,7 +61,8 @@ func (h *Handler) GetPosts(c *gin.Context) {
 // GetPost returns a single post.
 func (h *Handler) GetPost(c *gin.Context) {
 	id := c.Param("id")
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
 	post, err := h.svc.Get(c.Request.Context(), id, userRole, userID)
 	if err != nil {
@@ -95,7 +88,8 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	userID := userIDVal.(uint)
 
 	// Get user role information from context
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 
 	var req struct {
 		Title      string   `json:"title" binding:"required"`
@@ -234,7 +228,8 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
 	posts, total, err := h.svc.Drafts(c.Request.Context(), userRole, userID, page, limit)
 	if err != nil {
@@ -264,7 +259,8 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
 	posts, total, err := h.svc.UserPosts(c.Request.Context(), userIDStr, userRole, userID, page, limit)
 	if err != nil {
@@ -294,7 +290,8 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 
 // GetPopularPosts returns popular posts.
 func (h *Handler) GetPopularPosts(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
 	posts, err := h.svc.Popular(c.Request.Context(), userRole, limit)
@@ -308,7 +305,8 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 
 // GetLatestPosts returns the latest posts.
 func (h *Handler) GetLatestPosts(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
 	posts, err := h.svc.Latest(c.Request.Context(), userRole, limit)
@@ -322,7 +320,8 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 
 // GetCategories returns the category list.
 func (h *Handler) GetCategories(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 
 	categories, err := h.svc.Categories(c.Request.Context(), userRole)
 	if err != nil {
@@ -358,7 +357,8 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 
 // GetTags returns the tag list.
 func (h *Handler) GetTags(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 
 	tags, err := h.svc.Tags(c.Request.Context(), userRole)
 	if err != nil {
