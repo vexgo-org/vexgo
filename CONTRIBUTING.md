@@ -91,7 +91,7 @@ cd frontend
 pnpm install
 pnpm run build
 cd ../backend
-go run main.go
+go run ./cmd/vexgo
 ```
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password` — change it on your profile page.
@@ -100,8 +100,9 @@ Then visit http://127.0.0.1:3001. The default super admin account is `admin@exam
 
 ```text
 backend/
-  main.go                  # application entry point
+  cmd/vexgo/main.go        # application entry point (thin: calls app.New / app.Run)
   internal/
+    app/                   # composition root: wires storage, DB, and every domain
     auth/                  # authentication and JWT
     comment/               # comments and moderation
     config/                # flag, env, and config-file parsing
@@ -110,7 +111,7 @@ backend/
     mailer/                # email sending (SMTP)
     message/               # notifications
     middleware/            # JWT auth and permission middleware
-    model/                 # GORM data models
+    model/                 # GORM data models + shared seams (Notifier, FileRemover, Mailer)
     post/                  # blog post CRUD
     public/                # embedded frontend assets and SSR renderer
     router/                # route registration
@@ -142,6 +143,8 @@ General expectations:
 - frontend code lives under `frontend/src/...`
 - Go tests live next to the code they test (`*_test.go`)
 - avoid placing unrelated experiments or scratch files in the repository
+- each domain package follows the three-layer pattern `handler.go → service.go → repository.go` (HTTP adapter, business logic, persistence); keep GORM queries inside `repository.go`
+- thread `context.Context` through service and repository methods (handlers pass `c.Request.Context()`)
 
 If a module becomes too broad, split it by responsibility rather than growing a single file indefinitely.
 
@@ -181,7 +184,8 @@ Follow these principles:
 - propagate errors explicitly and add context where it helps; do not swallow errors
 - respect the `backend/internal` package boundaries and keep the dependency graph clean (for example, `model` must not import application logic, and `config` must stay a pure setup module)
 - use the `vexgo` module path in imports (`vexgo/backend/internal/...`)
-- pass dependencies explicitly (see `router.Deps`) instead of relying on global mutable state
+- pass dependencies explicitly (see `router.Deps` and the `Deps` structs in each domain) instead of relying on global mutable state
+- keep services database-agnostic: depend on the domain `Repository` interface, put GORM queries in `repository.go`, and use the shared seams in `model/interfaces.go` (`Notifier`, `FileRemover`, `Mailer`) for cross-domain calls
 
 ### TypeScript / React
 

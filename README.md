@@ -449,7 +449,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 Run backend with this command:
 
 ```bash
-go run backend/main.go -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo -c examples/config-postgres.yml
 ```
 
 ### Mysql
@@ -476,7 +476,7 @@ Run backend with this command:
 
 ```bash
 cd backend
-go run main.go -c ../examples/config-mysql.yml
+go run ./cmd/vexgo -c ../examples/config-mysql.yml
 ```
 
 ## Development
@@ -514,19 +514,20 @@ cd frontend
 pnpm install
 pnpm run build
 cd ../backend
-go run main.go
+go run ./cmd/vexgo
 ```
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` / `password` — change it on your profile page.
 
 ### Backend structure
 
-The backend follows a domain-oriented layout under `backend/internal`:
+The backend follows a domain-oriented layout under `backend/internal` with a composition root for bootstrapping:
 
 ```text
 backend/
-  main.go            # entry point: flags, config, storage, DB, router, static routes
+  cmd/vexgo/main.go  # entry point: parses flags, delegates to app.New()
   internal/
+    app/             # composition root: wires storage, DB, and every domain
     auth/            # registration, login, JWT, profile, password reset
     comment/         # comments and AI-powered moderation
     config/          # flag / env / config-file parsing, JWT, S3, SSO setup (pure setup, no backend imports)
@@ -535,7 +536,7 @@ backend/
     mailer/          # SMTP mail building and sending
     message/         # in-app notifications
     middleware/      # JWT auth, role-based permissions, request logging
-    model/           # GORM data models (post, user, tag, category, like, comment, ...)
+    model/           # GORM data models + shared seams (Notifier, FileRemover, Mailer)
     post/            # post CRUD, categories, tags, likes
     public/          # embedded frontend, themes, SSR renderer, static routes
     router/          # route registration (composes every domain)
@@ -545,6 +546,16 @@ backend/
     user/            # user management, roles, creator applications
     verification/    # email verification and sliding-puzzle captcha
 ```
+
+Each domain package follows a consistent three-layer pattern:
+
+```text
+handler.go    → HTTP request parsing, response rendering (calls service)
+service.go    → business logic, cross-domain orchestration (calls repository)
+repository.go → persistence interface + GORM implementation (calls database)
+```
+
+Handlers never touch GORM, services are database-agnostic behind a `Repository` interface (unit-testable with fakes), and repositories encapsulate all SQL/GORM queries including batch operations for N+1 prevention. `context.Context` is propagated through all three layers.
 
 Imports use the module path `vexgo/backend/internal/<package>`, for example:
 
@@ -558,10 +569,10 @@ import (
 
 ### Dependency facts
 
-- **Leaf packages** — `config/` and `model/` import no other backend module. `model` is imported by every domain package (plus `database`, `mailer`, `middleware`, `public`); `config` is imported by `auth`, `database`, `middleware`, `sso`, and `upload`.
+- **Leaf packages** — `config/` and `model/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`, `Mailer`); `config` is imported by `app`, `auth`, `database`, `middleware`, `sso`, and `upload`.
 - **Shared layer** — `middleware/` (JWT auth, role permissions, request logging) depends only on `config` and `model`.
-- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` itself depends on `verification`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. The dependency graph is acyclic.
-- **Wiring** — `backend/main.go` is the single entry point: it opens the database, creates storage and the `public.Renderer`, then wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
+- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` itself depends on `verification`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `message` implements `Notifier`, `upload` implements `FileRemover`, `mailer` implements `Mailer`. The dependency graph is acyclic.
+- **Wiring** — `backend/cmd/vexgo/main.go` is the thin entry point: it parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root — it opens the database, creates storage and the `public.Renderer`, and wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
 ### Contributing
 
