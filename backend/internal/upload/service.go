@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -28,17 +29,17 @@ type Deps struct {
 
 // Service contains the business logic of the upload domain.
 type Service struct {
-	db      *gorm.DB
+	repo    Repository
 	storage Storage
 }
 
 // NewService creates an upload service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB, storage: deps.Storage}
+	return &Service{repo: NewRepository(deps.DB), storage: deps.Storage}
 }
 
 // Upload stores a file and records it in the database.
-func (s *Service) Upload(userID uint, filename string, size int64, src io.Reader) (model.MediaFile, error) {
+func (s *Service) Upload(ctx context.Context, userID uint, filename string, size int64, src io.Reader) (model.MediaFile, error) {
 	url, err := s.storage.Upload(src, filename, "")
 	if err != nil {
 		return model.MediaFile{}, err
@@ -50,31 +51,27 @@ func (s *Service) Upload(userID uint, filename string, size int64, src io.Reader
 		Type:   "unknown",
 		UserID: userID,
 	}
-	if err := s.db.Create(&media).Error; err != nil {
+	if err := s.repo.CreateMedia(ctx, &media); err != nil {
 		return model.MediaFile{}, fmt.Errorf("failed to save file record: %w", err)
 	}
 	return media, nil
 }
 
 // ListByUser returns the files uploaded by a user.
-func (s *Service) ListByUser(userID uint) ([]model.MediaFile, error) {
-	var files []model.MediaFile
-	if err := s.db.Where("user_id = ?", userID).Find(&files).Error; err != nil {
-		return nil, err
-	}
-	return files, nil
+func (s *Service) ListByUser(ctx context.Context, userID uint) ([]model.MediaFile, error) {
+	return s.repo.ListMediaByUser(ctx, userID)
 }
 
 // Delete removes a media file (from storage and database) when the acting user
 // is its uploader or an admin.
-func (s *Service) Delete(id string, userID uint) error {
-	var media model.MediaFile
-	if err := s.db.First(&media, id).Error; err != nil {
+func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
+	media, err := s.repo.FindMediaByID(ctx, id)
+	if err != nil {
 		return ErrNotFound
 	}
 
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err == nil {
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err == nil {
 		if user.Role != model.RoleAdmin && media.UserID != userID {
 			return ErrForbidden
 		}
@@ -85,5 +82,5 @@ func (s *Service) Delete(id string, userID uint) error {
 		logrus.WithError(err).Warn("Failed to delete file")
 	}
 
-	return s.db.Delete(&media).Error
+	return s.repo.DeleteMedia(ctx, media)
 }

@@ -74,7 +74,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 	}
 	defer src.Close()
 
-	media, err := h.svc.Upload(userID, filename, file.Size, src)
+	media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to upload: %v", err)})
 		return
@@ -112,7 +112,7 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 			continue
 		}
 
-		media, err := h.svc.Upload(userID, filename, file.Size, src)
+		media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
 		src.Close()
 		if err != nil {
 			continue
@@ -131,7 +131,7 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 	uid, _ := c.Get("userID")
 	userID := uid.(uint)
 
-	files, err := h.svc.ListByUser(userID)
+	files, err := h.svc.ListByUser(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch files"})
 		return
@@ -147,7 +147,7 @@ func (h *Handler) DeleteFile(c *gin.Context) {
 	uid, _ := c.Get("userID")
 	userID := uid.(uint)
 
-	err := h.svc.Delete(id, userID)
+	err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
