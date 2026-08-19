@@ -50,56 +50,56 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-linux-amd64 .
+            -o vexgo-linux-amd64 ./cmd/vexgo
 
       - name: Build backend (Linux arm64)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-linux-arm64 .
+            -o vexgo-linux-arm64 ./cmd/vexgo
 
       - name: Build backend (macOS amd64)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-darwin-amd64 .
+            -o vexgo-darwin-amd64 ./cmd/vexgo
 
       - name: Build backend (macOS arm64 / Apple Silicon)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-darwin-arm64 .
+            -o vexgo-darwin-arm64 ./cmd/vexgo
 
       - name: Build backend (Windows amd64)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-windows-amd64.exe .
+            -o vexgo-windows-amd64.exe ./cmd/vexgo
 
       - name: Build backend (Windows arm64)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=arm64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-windows-arm64.exe .
+            -o vexgo-windows-arm64.exe ./cmd/vexgo
       
       - name: Build backend (FreeBSD amd64)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-freebsd-amd64 .
+            -o vexgo-freebsd-amd64 ./cmd/vexgo
 
       - name: Build backend (FreeBSD arm64)
         working-directory: backend
         run: |
           CGO_ENABLED=0 GOOS=freebsd GOARCH=arm64 \
             go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" \
-            -o vexgo-freebsd-arm64 .
+            -o vexgo-freebsd-arm64 ./cmd/vexgo
 
 
       # ── Release ───────────────────────────────────────────────

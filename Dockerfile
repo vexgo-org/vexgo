@@ -25,7 +25,7 @@ COPY --from=frontend-builder /app/backend/internal/public/dist ./backend/interna
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w -X main.Version=${VERSION}" \
-    -o vexgo ./backend
+    -o vexgo ./backend/cmd/vexgo
 
 # Phase 3: Final Mirror
 FROM alpine:latest
