@@ -203,7 +203,10 @@ func AutoMigrate(db *gorm.DB) error {
 }
 
 // defaultAdminUsername is the login name of the seeded super admin account.
-const defaultAdminUsername = "admin"
+const (
+	defaultAdminUsername = "admin"
+	defaultAdminPassword = "password"
+)
 
 // Seed inserts default records (admin user, SMTP/general/AI/theme settings,
 // default category) if they do not already exist.
@@ -212,7 +215,7 @@ func Seed(db *gorm.DB) error {
 	var u model.User
 	if err := db.Where("username = ?", defaultAdminUsername).First(&u).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			pwHash, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+			pwHash, err := bcrypt.GenerateFromPassword([]byte(defaultAdminPassword), bcrypt.DefaultCost)
 			if err != nil {
 				return fmt.Errorf("hash admin password: %w", err)
 			}
