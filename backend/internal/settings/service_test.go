@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -28,16 +29,16 @@ func newTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func newTestService(t *testing.T) *Service {
+func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
 	db := newTestDB(t)
 	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
-	return NewService(Deps{DB: db, Themes: renderer})
+	return NewService(Deps{DB: db, Themes: renderer}), db
 }
 
 func TestGetSMTPConfig_Default(t *testing.T) {
-	svc := newTestService(t)
-	config, err := svc.GetSMTPConfig()
+	svc, _ := newTestService(t)
+	config, err := svc.GetSMTPConfig(context.Background())
 	if err != nil {
 		t.Fatalf("GetSMTPConfig error: %v", err)
 	}
@@ -47,10 +48,10 @@ func TestGetSMTPConfig_Default(t *testing.T) {
 }
 
 func TestUpdateSMTPConfig_CreateUpdateAndMaskPassword(t *testing.T) {
-	svc := newTestService(t)
+	svc, db := newTestService(t)
 
 	// create
-	config, err := svc.UpdateSMTPConfig(SMTPConfigRequest{
+	config, err := svc.UpdateSMTPConfig(context.Background(), SMTPConfigRequest{
 		Enabled:   true,
 		Host:      "smtp.example.com",
 		Port:      587,
@@ -68,7 +69,7 @@ func TestUpdateSMTPConfig_CreateUpdateAndMaskPassword(t *testing.T) {
 
 	// stored password persists
 	var stored model.SMTPConfig
-	if err := svc.db.First(&stored).Error; err != nil {
+	if err := db.First(&stored).Error; err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}
 	if stored.Password != "secret" {
@@ -76,7 +77,7 @@ func TestUpdateSMTPConfig_CreateUpdateAndMaskPassword(t *testing.T) {
 	}
 
 	// update without password preserves it
-	config, err = svc.UpdateSMTPConfig(SMTPConfigRequest{
+	config, err = svc.UpdateSMTPConfig(context.Background(), SMTPConfigRequest{
 		Enabled:   false,
 		Host:      "smtp2.example.com",
 		Port:      465,
@@ -88,7 +89,7 @@ func TestUpdateSMTPConfig_CreateUpdateAndMaskPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateSMTPConfig error: %v", err)
 	}
-	if err := svc.db.First(&stored).Error; err != nil {
+	if err := db.First(&stored).Error; err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}
 	if stored.Password != "secret" {
@@ -100,46 +101,46 @@ func TestUpdateSMTPConfig_CreateUpdateAndMaskPassword(t *testing.T) {
 }
 
 func TestTestSMTP_ValidationErrors(t *testing.T) {
-	svc := newTestService(t)
+	svc, db := newTestService(t)
 
 	// not configured
-	if _, err := svc.TestSMTP("admin@example.com"); !errors.Is(err, ErrSMTPNotConfigured) {
+	if _, err := svc.TestSMTP(context.Background(), "admin@example.com"); !errors.Is(err, ErrSMTPNotConfigured) {
 		t.Errorf("expected ErrSMTPNotConfigured, got %v", err)
 	}
 
 	// disabled
-	if err := svc.db.Create(&model.SMTPConfig{Enabled: false}).Error; err != nil {
+	if err := db.Create(&model.SMTPConfig{Enabled: false}).Error; err != nil {
 		t.Fatalf("failed to seed config: %v", err)
 	}
-	if _, err := svc.TestSMTP("admin@example.com"); !errors.Is(err, ErrSMTPDisabled) {
+	if _, err := svc.TestSMTP(context.Background(), "admin@example.com"); !errors.Is(err, ErrSMTPDisabled) {
 		t.Errorf("expected ErrSMTPDisabled, got %v", err)
 	}
 
 	// incomplete fields
-	if err := svc.db.Model(&model.SMTPConfig{}).Where("1 = 1").Updates(map[string]any{"enabled": true, "host": "localhost", "port": 25, "username": "u", "password": "p", "from_email": "a@b.c"}).Error; err != nil {
+	if err := db.Model(&model.SMTPConfig{}).Where("1 = 1").Updates(map[string]any{"enabled": true, "host": "localhost", "port": 25, "username": "u", "password": "p", "from_email": "a@b.c"}).Error; err != nil {
 		t.Fatalf("failed to update config: %v", err)
 	}
 
 	// no recipient (empty test email and empty admin email) → rejected before sending
-	if err := svc.db.Model(&model.SMTPConfig{}).Where("1 = 1").Update("test_email", "").Error; err != nil {
+	if err := db.Model(&model.SMTPConfig{}).Where("1 = 1").Update("test_email", "").Error; err != nil {
 		t.Fatalf("failed to clear test email: %v", err)
 	}
-	if _, err := svc.TestSMTP(""); !errors.Is(err, ErrSMTPNoRecipient) {
+	if _, err := svc.TestSMTP(context.Background(), ""); !errors.Is(err, ErrSMTPNoRecipient) {
 		t.Errorf("expected ErrSMTPNoRecipient, got %v", err)
 	}
 
 	// with a recipient the send is attempted (connection refused here is fine)
-	if err := svc.db.Model(&model.SMTPConfig{}).Where("1 = 1").Update("test_email", "t@example.com").Error; err != nil {
+	if err := db.Model(&model.SMTPConfig{}).Where("1 = 1").Update("test_email", "t@example.com").Error; err != nil {
 		t.Fatalf("failed to set test email: %v", err)
 	}
-	if _, err := svc.TestSMTP(""); err == nil || errors.Is(err, ErrSMTPNoRecipient) || errors.Is(err, ErrSMTPIncomplete) {
+	if _, err := svc.TestSMTP(context.Background(), ""); err == nil || errors.Is(err, ErrSMTPNoRecipient) || errors.Is(err, ErrSMTPIncomplete) {
 		t.Errorf("expected a send attempt error, got %v", err)
 	}
 }
 
 func TestGetGeneralSettings_Default(t *testing.T) {
-	svc := newTestService(t)
-	config, err := svc.GetGeneralSettings()
+	svc, _ := newTestService(t)
+	config, err := svc.GetGeneralSettings(context.Background())
 	if err != nil {
 		t.Fatalf("GetGeneralSettings error: %v", err)
 	}
@@ -149,8 +150,8 @@ func TestGetGeneralSettings_Default(t *testing.T) {
 }
 
 func TestUpdateGeneralSettings(t *testing.T) {
-	svc := newTestService(t)
-	config, err := svc.UpdateGeneralSettings(GeneralSettingsRequest{
+	svc, _ := newTestService(t)
+	config, err := svc.UpdateGeneralSettings(context.Background(), GeneralSettingsRequest{
 		CaptchaEnabled:      true,
 		RegistrationEnabled: false,
 		SiteName:            "My Blog",
@@ -166,7 +167,7 @@ func TestUpdateGeneralSettings(t *testing.T) {
 	// read back — RegistrationEnabled: false must survive the create path.
 	// It used to be stored as true because the model carried gorm:"default:true"
 	// and GORM omitted zero-value bools on Create.
-	got, err := svc.GetGeneralSettings()
+	got, err := svc.GetGeneralSettings(context.Background())
 	if err != nil {
 		t.Fatalf("GetGeneralSettings error: %v", err)
 	}
@@ -179,8 +180,8 @@ func TestUpdateGeneralSettings(t *testing.T) {
 }
 
 func TestGetAIConfig_Default(t *testing.T) {
-	svc := newTestService(t)
-	config, err := svc.GetAIConfig()
+	svc, _ := newTestService(t)
+	config, err := svc.GetAIConfig(context.Background())
 	if err != nil {
 		t.Fatalf("GetAIConfig error: %v", err)
 	}
@@ -190,9 +191,9 @@ func TestGetAIConfig_Default(t *testing.T) {
 }
 
 func TestUpdateAIConfig_KeyPreserved(t *testing.T) {
-	svc := newTestService(t)
+	svc, db := newTestService(t)
 
-	config, err := svc.UpdateAIConfig(AIConfigRequest{
+	config, err := svc.UpdateAIConfig(context.Background(), AIConfigRequest{
 		Enabled:     true,
 		Provider:    "openai",
 		ApiEndpoint: "https://api.openai.com",
@@ -207,7 +208,7 @@ func TestUpdateAIConfig_KeyPreserved(t *testing.T) {
 	}
 
 	// update without key preserves it
-	if _, err := svc.UpdateAIConfig(AIConfigRequest{
+	if _, err := svc.UpdateAIConfig(context.Background(), AIConfigRequest{
 		Enabled:     false,
 		Provider:    "openai",
 		ApiEndpoint: "https://api.openai.com",
@@ -217,7 +218,7 @@ func TestUpdateAIConfig_KeyPreserved(t *testing.T) {
 		t.Fatalf("UpdateAIConfig error: %v", err)
 	}
 	var stored model.AIConfig
-	if err := svc.db.First(&stored).Error; err != nil {
+	if err := db.First(&stored).Error; err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}
 	if stored.ApiKey != "sk-secret" {
@@ -226,8 +227,8 @@ func TestUpdateAIConfig_KeyPreserved(t *testing.T) {
 }
 
 func TestGetThemeConfig_Default(t *testing.T) {
-	svc := newTestService(t)
-	theme, err := svc.GetThemeConfig()
+	svc, _ := newTestService(t)
+	theme, err := svc.GetThemeConfig(context.Background())
 	if err != nil {
 		t.Fatalf("GetThemeConfig error: %v", err)
 	}
@@ -237,15 +238,15 @@ func TestGetThemeConfig_Default(t *testing.T) {
 }
 
 func TestUpdateThemeConfig(t *testing.T) {
-	svc := newTestService(t)
+	svc, _ := newTestService(t)
 
 	// unknown theme rejected
-	if _, err := svc.UpdateThemeConfig("no-such-theme"); !errors.Is(err, ErrThemeNotFound) {
+	if _, err := svc.UpdateThemeConfig(context.Background(), "no-such-theme"); !errors.Is(err, ErrThemeNotFound) {
 		t.Errorf("expected ErrThemeNotFound, got %v", err)
 	}
 
 	// default theme is always valid
-	theme, err := svc.UpdateThemeConfig("default")
+	theme, err := svc.UpdateThemeConfig(context.Background(), "default")
 	if err != nil {
 		t.Fatalf("UpdateThemeConfig error: %v", err)
 	}
@@ -253,7 +254,7 @@ func TestUpdateThemeConfig(t *testing.T) {
 		t.Errorf("expected default theme, got %q", theme)
 	}
 
-	got, err := svc.GetThemeConfig()
+	got, err := svc.GetThemeConfig(context.Background())
 	if err != nil {
 		t.Fatalf("GetThemeConfig error: %v", err)
 	}
@@ -263,7 +264,7 @@ func TestUpdateThemeConfig(t *testing.T) {
 }
 
 func TestThemePreview_UnknownTheme(t *testing.T) {
-	svc := newTestService(t)
+	svc, _ := newTestService(t)
 	if _, err := svc.ThemePreview("no-such-theme"); !errors.Is(err, ErrThemeNotFound) {
 		t.Errorf("expected ErrThemeNotFound, got %v", err)
 	}

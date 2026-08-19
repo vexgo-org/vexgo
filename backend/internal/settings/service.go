@@ -4,6 +4,7 @@ package settings
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,13 +54,13 @@ type Deps struct {
 
 // Service contains the business logic of the settings domain.
 type Service struct {
-	db     *gorm.DB
+	repo   Repository
 	themes *public.Renderer
 }
 
 // NewService creates a settings service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB, themes: deps.Themes}
+	return &Service{repo: NewRepository(deps.DB), themes: deps.Themes}
 }
 
 // SMTPConfigRequest carries the fields accepted when updating the SMTP config.
@@ -76,9 +77,9 @@ type SMTPConfigRequest struct {
 
 // GetSMTPConfig returns the stored SMTP configuration with the password
 // masked, or the default configuration when no row exists.
-func (s *Service) GetSMTPConfig() (model.SMTPConfig, error) {
-	var config model.SMTPConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) GetSMTPConfig(ctx context.Context) (model.SMTPConfig, error) {
+	config, err := s.repo.GetSMTPConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Return default configuration
 			return model.SMTPConfig{
@@ -101,9 +102,9 @@ func (s *Service) GetSMTPConfig() (model.SMTPConfig, error) {
 
 // UpdateSMTPConfig creates or updates the SMTP configuration and returns it
 // with the password masked.
-func (s *Service) UpdateSMTPConfig(req SMTPConfigRequest) (model.SMTPConfig, error) {
-	var config model.SMTPConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (model.SMTPConfig, error) {
+	config, err := s.repo.GetSMTPConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
 			config = model.SMTPConfig{
@@ -116,7 +117,7 @@ func (s *Service) UpdateSMTPConfig(req SMTPConfigRequest) (model.SMTPConfig, err
 				FromName:  req.FromName,
 				TestEmail: req.TestEmail,
 			}
-			if err := s.db.Create(&config).Error; err != nil {
+			if err := s.repo.CreateSMTPConfig(ctx, &config); err != nil {
 				return config, fmt.Errorf("failed to create SMTP config: %w", err)
 			}
 		} else {
@@ -137,7 +138,7 @@ func (s *Service) UpdateSMTPConfig(req SMTPConfigRequest) (model.SMTPConfig, err
 			config.Password = req.Password
 		}
 
-		if err := s.db.Save(&config).Error; err != nil {
+		if err := s.repo.SaveSMTPConfig(ctx, &config); err != nil {
 			return config, fmt.Errorf("failed to update SMTP config: %w", err)
 		}
 	}
@@ -149,9 +150,9 @@ func (s *Service) UpdateSMTPConfig(req SMTPConfigRequest) (model.SMTPConfig, err
 
 // TestSMTP sends a test email to the configured test address (or the admin's
 // email as fallback) using the stored SMTP configuration.
-func (s *Service) TestSMTP(adminEmail string) (string, error) {
-	var config model.SMTPConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) TestSMTP(ctx context.Context, adminEmail string) (string, error) {
+	config, err := s.repo.GetSMTPConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return "", ErrSMTPNotConfigured
 		}
@@ -264,9 +265,9 @@ type GeneralSettingsRequest struct {
 
 // GetGeneralSettings returns the stored general settings, or the defaults
 // when no row exists.
-func (s *Service) GetGeneralSettings() (model.GeneralSettings, error) {
-	var config model.GeneralSettings
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {
+	config, err := s.repo.GetGeneralSettings(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Return default configuration
 			return model.GeneralSettings{
@@ -285,9 +286,9 @@ func (s *Service) GetGeneralSettings() (model.GeneralSettings, error) {
 }
 
 // UpdateGeneralSettings creates or updates the general settings.
-func (s *Service) UpdateGeneralSettings(req GeneralSettingsRequest) (model.GeneralSettings, error) {
-	var config model.GeneralSettings
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettingsRequest) (model.GeneralSettings, error) {
+	config, err := s.repo.GetGeneralSettings(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
 			config = model.GeneralSettings{
@@ -299,7 +300,7 @@ func (s *Service) UpdateGeneralSettings(req GeneralSettingsRequest) (model.Gener
 				SiteIcon:            req.SiteIcon,
 				ItemsPerPage:        req.ItemsPerPage,
 			}
-			if err := s.db.Create(&config).Error; err != nil {
+			if err := s.repo.CreateGeneralSettings(ctx, &config); err != nil {
 				return config, fmt.Errorf("failed to create general settings: %w", err)
 			}
 		} else {
@@ -315,7 +316,7 @@ func (s *Service) UpdateGeneralSettings(req GeneralSettingsRequest) (model.Gener
 		config.SiteIcon = req.SiteIcon
 		config.ItemsPerPage = req.ItemsPerPage
 
-		if err := s.db.Save(&config).Error; err != nil {
+		if err := s.repo.SaveGeneralSettings(ctx, &config); err != nil {
 			return config, fmt.Errorf("failed to update general settings: %w", err)
 		}
 	}
@@ -334,9 +335,9 @@ type AIConfigRequest struct {
 
 // GetAIConfig returns the stored AI configuration with the API key masked,
 // or the defaults when no row exists.
-func (s *Service) GetAIConfig() (model.AIConfig, error) {
-	var config model.AIConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) GetAIConfig(ctx context.Context) (model.AIConfig, error) {
+	config, err := s.repo.GetAIConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Return default configuration
 			return model.AIConfig{
@@ -357,9 +358,9 @@ func (s *Service) GetAIConfig() (model.AIConfig, error) {
 
 // UpdateAIConfig creates or updates the AI configuration and returns it with
 // the API key masked.
-func (s *Service) UpdateAIConfig(req AIConfigRequest) (model.AIConfig, error) {
-	var config model.AIConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (model.AIConfig, error) {
+	config, err := s.repo.GetAIConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
 			config = model.AIConfig{
@@ -369,7 +370,7 @@ func (s *Service) UpdateAIConfig(req AIConfigRequest) (model.AIConfig, error) {
 				ApiKey:      req.ApiKey,
 				ModelName:   req.ModelName,
 			}
-			if err := s.db.Create(&config).Error; err != nil {
+			if err := s.repo.CreateAIConfig(ctx, &config); err != nil {
 				return config, fmt.Errorf("failed to create AI config: %w", err)
 			}
 		} else {
@@ -387,7 +388,7 @@ func (s *Service) UpdateAIConfig(req AIConfigRequest) (model.AIConfig, error) {
 			config.ApiKey = req.ApiKey
 		}
 
-		if err := s.db.Save(&config).Error; err != nil {
+		if err := s.repo.SaveAIConfig(ctx, &config); err != nil {
 			return config, fmt.Errorf("failed to update AI config: %w", err)
 		}
 	}
@@ -405,9 +406,9 @@ type AIResult struct {
 
 // TestAI verifies the AI configuration by calling the chat completions
 // endpoint with a test prompt.
-func (s *Service) TestAI() (*AIResult, error) {
-	var config model.AIConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
+	config, err := s.repo.GetAIConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, ErrAINotConfigured
 		}
@@ -533,9 +534,9 @@ func (s *Service) TestAI() (*AIResult, error) {
 
 // AIModels returns the list of models available from the configured AI
 // endpoint.
-func (s *Service) AIModels() (*AIResult, error) {
-	var config model.AIConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
+	config, err := s.repo.GetAIConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, ErrAINotConfigured
 		}
@@ -714,9 +715,9 @@ func (s *Service) ThemePreview(themeID string) (string, error) {
 
 // GetThemeConfig returns the currently active theme stored in the database,
 // falling back to the default theme.
-func (s *Service) GetThemeConfig() (string, error) {
-	var config model.ThemeConfig
-	if err := s.db.First(&config).Error; err != nil {
+func (s *Service) GetThemeConfig(ctx context.Context) (string, error) {
+	config, err := s.repo.GetThemeConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return public.DefaultTheme, nil
 		}
@@ -730,17 +731,17 @@ func (s *Service) GetThemeConfig() (string, error) {
 }
 
 // UpdateThemeConfig sets the globally active theme in the database.
-func (s *Service) UpdateThemeConfig(activeTheme string) (string, error) {
+func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (string, error) {
 	// Validate that the requested theme actually exists
 	if !s.themes.ThemeExists(activeTheme) {
 		return "", ErrThemeNotFound
 	}
 
-	var config model.ThemeConfig
-	if err := s.db.First(&config).Error; err != nil {
+	config, err := s.repo.GetThemeConfig(ctx)
+	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			config = model.ThemeConfig{ActiveTheme: activeTheme}
-			if err := s.db.Create(&config).Error; err != nil {
+			if err := s.repo.CreateThemeConfig(ctx, &config); err != nil {
 				return "", fmt.Errorf("failed to save theme config: %w", err)
 			}
 		} else {
@@ -748,7 +749,7 @@ func (s *Service) UpdateThemeConfig(activeTheme string) (string, error) {
 		}
 	} else {
 		config.ActiveTheme = activeTheme
-		if err := s.db.Save(&config).Error; err != nil {
+		if err := s.repo.SaveThemeConfig(ctx, &config); err != nil {
 			return "", fmt.Errorf("failed to update theme config: %w", err)
 		}
 	}
