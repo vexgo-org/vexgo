@@ -11,6 +11,12 @@ const (
 	RoleGuest       = "guest"
 )
 
+// Profile visibility values.
+const (
+	ProfileVisibilityPublic  = "public"
+	ProfileVisibilityPrivate = "private"
+)
+
 // User is an account with a role, authentication fields and privacy settings.
 type User struct {
 	ID                uint       `json:"id" gorm:"primaryKey"`

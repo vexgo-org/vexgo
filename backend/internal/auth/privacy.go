@@ -18,7 +18,7 @@ func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
 	// If not self and not admin, filter according to privacy settings
 	if !isSelf && !isAdmin {
 		// First check profile visibility setting
-		if user.ProfileVisibility == "private" {
+		if user.ProfileVisibility == model.ProfileVisibilityPrivate {
 			// If set to private, hide all personal information
 			user.Email = ""
 			user.Birthday = ""

@@ -78,7 +78,7 @@ func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
 // TestSMTP tests SMTP configuration
 func (h *Handler) TestSMTP(c *gin.Context) {
 	// Get current admin user email (from JWT token)
-	userContext, exists := c.Get("user")
+	userContext, exists := c.Get(middleware.CtxUserKey)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -202,7 +202,7 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 // TestAI tests AI configuration connection
 func (h *Handler) TestAI(c *gin.Context) {
 	// Get current admin user information (from JWT token)
-	if _, exists := c.Get("user"); !exists {
+	if _, exists := c.Get(middleware.CtxUserKey); !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}

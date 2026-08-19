@@ -13,7 +13,7 @@ import (
 func (a *Auth) Permission(requiredRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get user ID from context
-		userIDInterface, exists := c.Get("userID")
+		userIDInterface, exists := c.Get(CtxUserIDKey)
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 			return
@@ -42,7 +42,7 @@ func (a *Auth) Permission(requiredRoles ...string) gin.HandlerFunc {
 		}
 
 		// Store user information in context for later use
-		c.Set("user", map[string]any{
+		c.Set(CtxUserKey, map[string]any{
 			"id":       user.ID,
 			"username": user.Username,
 			"role":     user.Role,

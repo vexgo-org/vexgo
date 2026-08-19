@@ -13,6 +13,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Context keys used to carry the authenticated user through the gin context.
+const (
+	CtxUserKey   = "user"
+	CtxUserIDKey = "userID"
+)
+
 // Auth holds the database connection and JWT secret used to validate tokens.
 type Auth struct {
 	db        *gorm.DB
@@ -28,7 +34,7 @@ func NewAuth(db *gorm.DB, jwtSecret []byte) *Auth {
 // It returns the user and true when a valid JWT was parsed; otherwise
 // it returns a zero-value User and false.
 func CurrentUser(c *gin.Context) (model.User, bool) {
-	userContext, exists := c.Get("user")
+	userContext, exists := c.Get(CtxUserKey)
 	if !exists {
 		return model.User{}, false
 	}
@@ -45,7 +51,7 @@ func CurrentUser(c *gin.Context) (model.User, bool) {
 // CurrentUserID extracts only the user ID from the context.
 // Returns 0 when no user is authenticated.
 func CurrentUserID(c *gin.Context) uint {
-	if uid, exists := c.Get("userID"); exists {
+	if uid, exists := c.Get(CtxUserIDKey); exists {
 		switch v := uid.(type) {
 		case uint:
 			return v
@@ -113,8 +119,7 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 			}
 		}
 
-		c.Set("userID", userID)
-		c.Set("username", claims["username"].(string))
+		c.Set(CtxUserIDKey, userID)
 
 		// Get complete user information and set in context
 		userInfo := map[string]any{
@@ -131,7 +136,7 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 			userInfo["role"] = ""
 		}
 
-		c.Set("user", userInfo)
+		c.Set(CtxUserKey, userInfo)
 
 		c.Next()
 	}
@@ -202,10 +207,7 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 
 		// Safely set userID/username/role
 		if uid, ok := claims["user_id"].(float64); ok {
-			c.Set("userID", uint(uid))
-		}
-		if uname, ok := claims["username"].(string); ok {
-			c.Set("username", uname)
+			c.Set(CtxUserIDKey, uint(uid))
 		}
 		userInfo := map[string]any{
 			"id":       uint(0),
@@ -224,7 +226,7 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 		} else if role, ok := claims["role"].(string); ok {
 			userInfo["role"] = role
 		}
-		c.Set("user", userInfo)
+		c.Set(CtxUserKey, userInfo)
 
 		c.Next()
 	}
