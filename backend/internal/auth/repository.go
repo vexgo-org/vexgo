@@ -52,7 +52,11 @@ func (r *gormRepository) FindUserByEmail(ctx context.Context, email string) (*mo
 	return &user, nil
 }
 
-func (r *gormRepository) FindUserByEmailExcluding(ctx context.Context, email string, excludeID uint) (*model.User, error) {
+func (r *gormRepository) FindUserByEmailExcluding(
+	ctx context.Context,
+	email string,
+	excludeID uint,
+) (*model.User, error) {
 	var user model.User
 	if err := r.db.WithContext(ctx).Where("email = ? AND id != ?", email, excludeID).First(&user).Error; err != nil {
 		return nil, err

@@ -90,7 +90,7 @@ func TestLogin_Success(t *testing.T) {
 	svc, _, db := newTestService(t)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
-	token, user, err := svc.Login(context.Background(), "alice@example.com", "password123", "", "", 0)
+	token, user, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123"})
 	if err != nil {
 		t.Fatalf("Login error: %v", err)
 	}
@@ -127,10 +127,10 @@ func TestLogin_WrongCredentials(t *testing.T) {
 	svc, _, db := newTestService(t)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
-	if _, _, err := svc.Login(context.Background(), "alice@example.com", "wrong", "", "", 0); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "wrong"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("expected ErrInvalidCredentials, got %v", err)
 	}
-	if _, _, err := svc.Login(context.Background(), "nobody@example.com", "password123", "", "", 0); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "nobody@example.com", Password: "password123"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("expected ErrInvalidCredentials for unknown email, got %v", err)
 	}
 }
@@ -140,7 +140,7 @@ func TestLogin_EmailUnverified(t *testing.T) {
 	enableSMTP(t, db)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, false)
 
-	if _, _, err := svc.Login(context.Background(), "alice@example.com", "password123", "", "", 0); !errors.Is(err, ErrEmailUnverified) {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123"}); !errors.Is(err, ErrEmailUnverified) {
 		t.Errorf("expected ErrEmailUnverified, got %v", err)
 	}
 }
@@ -154,7 +154,7 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
 	// missing captcha fields
-	if _, _, err := svc.Login(context.Background(), "alice@example.com", "password123", "", "", 0); !errors.Is(err, ErrCaptchaRequired) {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123"}); !errors.Is(err, ErrCaptchaRequired) {
 		t.Errorf("expected ErrCaptchaRequiredLogin, got %v", err)
 	}
 
@@ -163,12 +163,12 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	if err := db.Create(&captcha).Error; err != nil {
 		t.Fatalf("failed to seed captcha: %v", err)
 	}
-	if _, _, err := svc.Login(context.Background(), "alice@example.com", "password123", "c1", "t1", 10); !errors.Is(err, ErrCaptchaMismatch) {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 10}); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch, got %v", err)
 	}
 
 	// correct position passes
-	token, _, err := svc.Login(context.Background(), "alice@example.com", "password123", "c1", "t1", 100)
+	token, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100})
 	if err != nil {
 		t.Fatalf("Login with captcha error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestLogin_WithCaptcha(t *testing.T) {
 func TestRegister_Success(t *testing.T) {
 	svc, _, db := newTestService(t)
 
-	result, err := svc.Register(context.Background(), "new@example.com", "password123", "newbie", "", "", 0, "http", "localhost:8080")
+	result, err := svc.Register(context.Background(), RegisterRequest{Email: "new@example.com", Password: "password123", Username: "newbie", Protocol: "http", Host: "localhost:8080"})
 	if err != nil {
 		t.Fatalf("Register error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	svc, _, db := newTestService(t)
 	seedUser(t, db, "dup@example.com", "password123", model.RoleGuest, true)
 
-	if _, err := svc.Register(context.Background(), "dup@example.com", "password123", "other", "", "", 0, "http", "localhost"); !errors.Is(err, ErrUserExists) {
+	if _, err := svc.Register(context.Background(), RegisterRequest{Email: "dup@example.com", Password: "password123", Username: "other", Protocol: "http", Host: "localhost"}); !errors.Is(err, ErrUserExists) {
 		t.Errorf("expected ErrUserExists, got %v", err)
 	}
 }
@@ -225,7 +225,7 @@ func TestRegister_Disabled(t *testing.T) {
 		t.Fatalf("failed to seed settings: %v", err)
 	}
 
-	if _, err := svc.Register(context.Background(), "new@example.com", "password123", "newbie", "", "", 0, "http", "localhost"); !errors.Is(err, ErrRegistrationDisabled) {
+	if _, err := svc.Register(context.Background(), RegisterRequest{Email: "new@example.com", Password: "password123", Username: "newbie", Protocol: "http", Host: "localhost"}); !errors.Is(err, ErrRegistrationDisabled) {
 		t.Errorf("expected ErrRegistrationDisabled, got %v", err)
 	}
 }
@@ -250,10 +250,10 @@ func TestChangePassword(t *testing.T) {
 	if stored.PasswordVersion != u.PasswordVersion+1 {
 		t.Errorf("expected password version incremented")
 	}
-	if _, _, err := svc.Login(context.Background(), "alice@example.com", "newpass123", "", "", 0); err != nil {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "newpass123"}); err != nil {
 		t.Errorf("expected new password to work, got %v", err)
 	}
-	if _, _, err := svc.Login(context.Background(), "alice@example.com", "oldpass", "", "", 0); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "oldpass"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("expected old password to fail, got %v", err)
 	}
 }

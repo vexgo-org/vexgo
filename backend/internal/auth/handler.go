@@ -51,7 +51,13 @@ func (h *Handler) Login(c *gin.Context) {
 
 	logrus.WithField("email", req.Email).Debug("Login request parsed successfully")
 
-	token, user, err := h.svc.Login(c.Request.Context(), req.Email, req.Password, req.CaptchaID, req.CaptchaToken, req.CaptchaX)
+	token, user, err := h.svc.Login(c.Request.Context(), LoginRequest{
+		Email:        req.Email,
+		Password:     req.Password,
+		CaptchaID:    req.CaptchaID,
+		CaptchaToken: req.CaptchaToken,
+		CaptchaX:     req.CaptchaX,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaCheckFailed):
@@ -118,7 +124,16 @@ func (h *Handler) Register(c *gin.Context) {
 	}).Debug("Registration request parsed successfully")
 
 	protocol, host := requestProtocolAndHost(c)
-	result, err := h.svc.Register(c.Request.Context(), req.Email, req.Password, req.Username, req.CaptchaID, req.CaptchaToken, req.CaptchaX, protocol, host)
+	result, err := h.svc.Register(c.Request.Context(), RegisterRequest{
+		Email:        req.Email,
+		Password:     req.Password,
+		Username:     req.Username,
+		CaptchaID:    req.CaptchaID,
+		CaptchaToken: req.CaptchaToken,
+		CaptchaX:     req.CaptchaX,
+		Protocol:     protocol,
+		Host:         host,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSettingsCheckFailed), errors.Is(err, ErrCaptchaCheckFailed):
@@ -304,7 +319,12 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
 	protocol, host := requestProtocolAndHost(c)
-	pending, err := h.svc.UpdateEmail(c.Request.Context(), userID, req.Email, protocol, host)
+	pending, err := h.svc.UpdateEmail(c.Request.Context(), UpdateEmailRequest{
+		UserID:   userID,
+		NewEmail: req.Email,
+		Protocol: protocol,
+		Host:     host,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
