@@ -81,14 +81,14 @@ type Deps struct {
 
 // Service contains the business logic of the sso domain.
 type Service struct {
-	db        *gorm.DB
+	repo      Repository
 	sso       *config.SSOConfig
 	jwtSecret []byte
 }
 
 // NewService creates an sso service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB, sso: deps.SSO, jwtSecret: deps.JWTSecret}
+	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret}
 }
 
 // Providers returns the list of enabled providers and whether local login is
@@ -174,7 +174,7 @@ func (s *Service) Callback(c *gin.Context, provider, state, code string) (payloa
 	}
 
 	// sso_get_token: find or create local user, then issue JWT
-	user, err := s.FindOrCreateUser(provider, info)
+	user, err := s.FindOrCreateUser(c.Request.Context(), provider, info)
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -478,61 +478,67 @@ func (s *Service) claimsToUserInfo(claims map[string]any) *ssoUserInfo {
 // FindOrCreateUser resolves an SSO identity to a local user: first by exact
 // SSO binding, then by email match, and finally by auto-registering a new
 // guest user. The binding is persisted so future logins skip the fallbacks.
-func (s *Service) FindOrCreateUser(provider string, info *ssoUserInfo) (*model.User, error) {
+func (s *Service) FindOrCreateUser(ctx context.Context, provider string, info *ssoUserInfo) (*model.User, error) {
 	// 1. Exact SSO binding match
-	var binding model.SSOBinding
-	if err := s.db.Where("provider = ? AND provider_id = ?", provider, info.providerID).First(&binding).Error; err == nil {
-		var user model.User
-		if err := s.db.First(&user, binding.UserID).Error; err != nil {
+	if binding, err := s.repo.FindSSOBinding(ctx, provider, info.providerID); err == nil {
+		user, err := s.repo.FindUserByID(ctx, binding.UserID)
+		if err != nil {
 			return nil, errors.New("user account not found")
 		}
 		// Update last login time
 		user.LastLoginAt = time.Now()
-		s.db.Save(&user)
-		return &user, nil
+		if err := s.repo.SaveUser(ctx, user); err != nil {
+			return nil, err
+		}
+		return user, nil
 	}
 
 	// 2. Email match → link to existing account
-	var user model.User
+	var user *model.User
 	if info.email != "" {
-		s.db.Where("email = ?", info.email).First(&user)
-		if user.ID != 0 {
+		if u, err := s.repo.FindUserByEmail(ctx, info.email); err == nil {
+			user = u
 			// Update last login time
 			user.LastLoginAt = time.Now()
-			s.db.Save(&user)
+			if err := s.repo.SaveUser(ctx, user); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	// 3. Auto-register new user
-	if user.ID == 0 {
-		username := s.generateUsername(info.username, info.email)
-		user = model.User{
+	if user == nil {
+		username := s.generateUsername(ctx, info.username, info.email)
+		u := model.User{
 			Username:        username,
 			Email:           info.email,
 			Role:            model.RoleGuest,
 			PasswordVersion: 0,
 			// No password set — this user can only log in via SSO
 		}
-		if err := s.db.Create(&user).Error; err != nil {
+		if err := s.repo.CreateUser(ctx, &u); err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
+		user = &u
 	}
 
 	// Persist binding so future logins skip steps 2-3
-	s.db.Create(&model.SSOBinding{
+	if err := s.repo.CreateBinding(ctx, &model.SSOBinding{
 		UserID:     user.ID,
 		Provider:   provider,
 		ProviderID: info.providerID,
 		Email:      info.email,
 		Name:       info.username,
 		Avatar:     info.avatar,
-	})
+	}); err != nil {
+		return nil, err
+	}
 
-	return &user, nil
+	return user, nil
 }
 
 // generateUsername derives a unique username from the provider name or email.
-func (s *Service) generateUsername(name, email string) string {
+func (s *Service) generateUsername(ctx context.Context, name, email string) string {
 	base := name
 	if base == "" {
 		if idx := strings.Index(email, "@"); idx > 0 {
@@ -553,13 +559,12 @@ func (s *Service) generateUsername(name, email string) string {
 	}
 	candidate := sb.String()
 
-	var count int64
 	for suffix := 0; ; suffix++ {
 		username := candidate
 		if suffix > 0 {
 			username = fmt.Sprintf("%s%d", candidate, suffix)
 		}
-		s.db.Model(&model.User{}).Where("username = ?", username).Count(&count)
+		count, _ := s.repo.CountUsersByUsername(ctx, username)
 		if count == 0 {
 			return username
 		}
