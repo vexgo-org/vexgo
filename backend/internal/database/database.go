@@ -59,15 +59,13 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	}
 	port := cfg.DBPort
 	if port == 0 {
+		port = 3306
 		// If port not set in config, get from env
-		portStr := os.Getenv("DB_PORT")
-		if portStr != "" {
+		if portStr := os.Getenv("DB_PORT"); portStr != "" {
 			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
 				logrus.Warnf("invalid DB_PORT %q, using default MySQL port", portStr)
 				port = 3306
 			}
-		} else {
-			port = 3306
 		}
 	}
 	dbname := cfg.DBName
@@ -124,14 +122,12 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 	}
 	port := cfg.DBPort
 	if port == 0 {
-		portStr := os.Getenv("DB_PORT")
-		if portStr != "" {
+		port = 5432
+		if portStr := os.Getenv("DB_PORT"); portStr != "" {
 			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
 				logrus.Warnf("invalid DB_PORT %q, using default PostgreSQL port", portStr)
 				port = 5432
 			}
-		} else {
-			port = 5432
 		}
 	}
 	dbname := cfg.DBName
@@ -178,7 +174,9 @@ func AutoMigrate(db *gorm.DB) error {
 	// migration. On a fresh database the table does not exist yet and this
 	// is a no-op.
 	if db.Migrator().HasTable(&model.Like{}) {
-		if err := db.Exec("DELETE FROM likes WHERE id NOT IN (SELECT MIN(id) FROM likes GROUP BY post_id, user_id)").Error; err != nil {
+		if err := db.Exec(
+			"DELETE FROM likes WHERE id NOT IN (SELECT MIN(id) FROM likes GROUP BY post_id, user_id)",
+		).Error; err != nil {
 			return fmt.Errorf("deduplicate likes: %w", err)
 		}
 	}

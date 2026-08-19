@@ -171,8 +171,10 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 	}
 }
 
-// OptionalJWTAuth attempts to parse JWT from Authorization header and write user info to context,
-// If not provided or parsing fails, do not block the request (used for public endpoints that can sense logged-in user but don't require authentication).
+// OptionalJWTAuth attempts to parse a JWT from the Authorization header and
+// write the user info to the context. If the token is missing or invalid the
+// request is not blocked (used for public endpoints that can detect a
+// logged-in user without requiring authentication).
 func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
