@@ -200,7 +200,12 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 		limit = 10
 	}
 
-	applications, total, err := h.svc.ListCreatorApplications(c.Request.Context(), actor.Role, status, page, limit)
+	applications, total, err := h.svc.ListCreatorApplications(c.Request.Context(), ListCreatorApplicationsQuery{
+		ActorRole: actor.Role,
+		Status:    status,
+		Page:      page,
+		Limit:     limit,
+	})
 	if err != nil {
 		if errors.Is(err, ErrNoPermissionAccessApps) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -266,7 +271,12 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.ReviewCreatorApplication(c.Request.Context(), actor, uint(id), req.Action, req.Reason)
+	err = h.svc.ReviewCreatorApplication(c.Request.Context(), ReviewCreatorApplicationRequest{
+		Actor:  actor,
+		AppID:  uint(id),
+		Action: req.Action,
+		Reason: req.Reason,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNoPermissionReviewApps):

@@ -18,9 +18,9 @@ type fakeNotifier struct {
 	messages []string
 }
 
-func (f *fakeNotifier) CreateNotification(_ context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
-	f.calls = append(f.calls, notificationType)
-	f.messages = append(f.messages, content)
+func (f *fakeNotifier) CreateNotification(_ context.Context, input model.NotificationInput) error {
+	f.calls = append(f.calls, input.Type)
+	f.messages = append(f.messages, input.Content)
 	return nil
 }
 
@@ -300,11 +300,11 @@ func TestListCreatorApplications_PermissionAndFilter(t *testing.T) {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
 
-	if _, _, err := svc.ListCreatorApplications(ctx, guest.Role, model.CreatorApplicationStatusPending, 1, 10); !errors.Is(err, ErrNoPermissionAccessApps) {
+	if _, _, err := svc.ListCreatorApplications(ctx, ListCreatorApplicationsQuery{ActorRole: guest.Role, Status: model.CreatorApplicationStatusPending, Page: 1, Limit: 10}); !errors.Is(err, ErrNoPermissionAccessApps) {
 		t.Errorf("expected ErrNoPermissionAccessApps, got %v", err)
 	}
 
-	apps, total, err := svc.ListCreatorApplications(ctx, admin.Role, model.CreatorApplicationStatusPending, 1, 10)
+	apps, total, err := svc.ListCreatorApplications(ctx, ListCreatorApplicationsQuery{ActorRole: admin.Role, Status: model.CreatorApplicationStatusPending, Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListCreatorApplications error: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestListCreatorApplications_PermissionAndFilter(t *testing.T) {
 		t.Errorf("expected applicant preloaded")
 	}
 
-	apps, total, err = svc.ListCreatorApplications(ctx, admin.Role, model.CreatorApplicationStatusApproved, 1, 10)
+	apps, total, err = svc.ListCreatorApplications(ctx, ListCreatorApplicationsQuery{ActorRole: admin.Role, Status: model.CreatorApplicationStatusApproved, Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("ListCreatorApplications error: %v", err)
 	}
@@ -336,20 +336,20 @@ func TestReviewCreatorApplication(t *testing.T) {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
 
-	if err := svc.ReviewCreatorApplication(ctx, other, appID, "approve", ""); !errors.Is(err, ErrNoPermissionReviewApps) {
+	if err := svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{Actor: other, AppID: appID, Action: "approve"}); !errors.Is(err, ErrNoPermissionReviewApps) {
 		t.Errorf("expected ErrNoPermissionReviewApps, got %v", err)
 	}
 
-	if err := svc.ReviewCreatorApplication(ctx, super, appID, "maybe", ""); !errors.Is(err, ErrInvalidAction) {
+	if err := svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{Actor: super, AppID: appID, Action: "maybe"}); !errors.Is(err, ErrInvalidAction) {
 		t.Errorf("expected ErrInvalidAction, got %v", err)
 	}
 
-	if err := svc.ReviewCreatorApplication(ctx, super, 99999, "approve", ""); !errors.Is(err, ErrApplicationNotFound) {
+	if err := svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{Actor: super, AppID: 99999, Action: "approve"}); !errors.Is(err, ErrApplicationNotFound) {
 		t.Errorf("expected ErrApplicationNotFound, got %v", err)
 	}
 
 	notifier.calls = nil
-	if err := svc.ReviewCreatorApplication(ctx, super, appID, "approve", ""); err != nil {
+	if err := svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{Actor: super, AppID: appID, Action: "approve"}); err != nil {
 		t.Fatalf("ReviewCreatorApplication error: %v", err)
 	}
 	var u model.User
@@ -363,7 +363,7 @@ func TestReviewCreatorApplication(t *testing.T) {
 		t.Errorf("expected applicant notification, got %v", notifier.calls)
 	}
 
-	if err := svc.ReviewCreatorApplication(ctx, super, appID, "reject", ""); !errors.Is(err, ErrApplicationProcessed) {
+	if err := svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{Actor: super, AppID: appID, Action: "reject"}); !errors.Is(err, ErrApplicationProcessed) {
 		t.Errorf("expected ErrApplicationProcessed, got %v", err)
 	}
 
@@ -371,7 +371,7 @@ func TestReviewCreatorApplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
-	if err := svc.ReviewCreatorApplication(ctx, super, appID2, "reject", "not enough posts"); err != nil {
+	if err := svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{Actor: super, AppID: appID2, Action: "reject", Reason: "not enough posts"}); err != nil {
 		t.Fatalf("ReviewCreatorApplication error: %v", err)
 	}
 	var app model.CreatorApplication

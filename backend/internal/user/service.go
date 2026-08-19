@@ -118,11 +118,10 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		user.Role = newRole
 	case model.RoleAdmin:
 		// Admin can only set user roles to author, contributor, or guest
-		if newRole == model.RoleAuthor || newRole == model.RoleContributor || newRole == model.RoleGuest {
-			user.Role = newRole
-		} else {
+		if newRole != model.RoleAuthor && newRole != model.RoleContributor && newRole != model.RoleGuest {
 			return nil, ErrAdminRoleRestricted
 		}
+		user.Role = newRole
 	default:
 		return nil, ErrNoPermission
 	}
@@ -132,14 +131,12 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, err
 	}
 
-	if err := s.notifier.CreateNotification(ctx,
-		user.ID,
-		"role",
-		"role changed",
-		fmt.Sprintf("Your role has been changed from \"%s\" to \"%s\"", oldRole, newRole),
-		"",
-		"",
-	); err != nil {
+	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+		UserID:  user.ID,
+		Type:    "role",
+		Title:   "role changed",
+		Content: fmt.Sprintf("Your role has been changed from \"%s\" to \"%s\"", oldRole, newRole),
+	}); err != nil {
 		logrus.WithError(err).Warn("failed to create role change notification")
 	}
 
@@ -219,14 +216,14 @@ func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason s
 	admins, err := s.repo.FindAdmins(ctx)
 	if err == nil {
 		for _, admin := range admins {
-			if err := s.notifier.CreateNotification(ctx,
-				admin.ID,
-				"role",
-				"New Role Application",
-				fmt.Sprintf("User %s has applied for %s role", user.Username, targetRole),
-				fmt.Sprintf("%d", application.ID),
-				"creator_application",
-			); err != nil {
+			if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+				UserID:      admin.ID,
+				Type:        "role",
+				Title:       "New Role Application",
+				Content:     fmt.Sprintf("User %s has applied for %s role", user.Username, targetRole),
+				RelatedID:   fmt.Sprintf("%d", application.ID),
+				RelatedType: "creator_application",
+			}); err != nil {
 				logrus.WithError(err).Warn("failed to create role application notification")
 			}
 		}
@@ -235,24 +232,40 @@ func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason s
 	return application.ID, nil
 }
 
+// ListCreatorApplicationsQuery carries the pagination and status filter.
+type ListCreatorApplicationsQuery struct {
+	ActorRole string
+	Status    model.CreatorApplicationStatus
+	Page      int
+	Limit     int
+}
+
 // ListCreatorApplications returns the paginated creator applications with the
 // applicant preloaded, filtered by status.
-func (s *Service) ListCreatorApplications(ctx context.Context, actorRole string, status model.CreatorApplicationStatus, page, limit int) ([]model.CreatorApplication, int64, error) {
-	if !model.IsAdmin(actorRole) {
+func (s *Service) ListCreatorApplications(ctx context.Context, q ListCreatorApplicationsQuery) ([]model.CreatorApplication, int64, error) {
+	if !model.IsAdmin(q.ActorRole) {
 		return nil, 0, ErrNoPermissionAccessApps
 	}
-	offset := (page - 1) * limit
-	return s.repo.ListApplications(ctx, status, offset, limit)
+	offset := (q.Page - 1) * q.Limit
+	return s.repo.ListApplications(ctx, q.Status, offset, q.Limit)
+}
+
+// ReviewCreatorApplicationRequest carries the review action inputs.
+type ReviewCreatorApplicationRequest struct {
+	Actor  model.User
+	AppID  uint
+	Action string
+	Reason string
 }
 
 // ReviewCreatorApplication approves or rejects a pending creator application,
 // upgrading the applicant's role on approval and notifying the applicant.
-func (s *Service) ReviewCreatorApplication(ctx context.Context, actor model.User, appID uint, action, reason string) error {
-	if !model.IsAdmin(actor.Role) {
+func (s *Service) ReviewCreatorApplication(ctx context.Context, req ReviewCreatorApplicationRequest) error {
+	if !model.IsAdmin(req.Actor.Role) {
 		return ErrNoPermissionReviewApps
 	}
 
-	application, err := s.repo.FindApplicationByID(ctx, appID)
+	application, err := s.repo.FindApplicationByID(ctx, req.AppID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrApplicationNotFound
@@ -264,11 +277,11 @@ func (s *Service) ReviewCreatorApplication(ctx context.Context, actor model.User
 		return ErrApplicationProcessed
 	}
 
-	if action != model.CreatorApplicationActionApprove && action != model.CreatorApplicationActionReject {
+	if req.Action != model.CreatorApplicationActionApprove && req.Action != model.CreatorApplicationActionReject {
 		return ErrInvalidAction
 	}
 
-	if action == model.CreatorApplicationActionApprove {
+	if req.Action == model.CreatorApplicationActionApprove {
 		application.Status = model.CreatorApplicationStatusApproved
 		switch application.User.Role {
 		case model.RoleGuest:
@@ -283,15 +296,15 @@ func (s *Service) ReviewCreatorApplication(ctx context.Context, actor model.User
 		application.Status = model.CreatorApplicationStatusRejected
 	}
 
-	application.ReviewerID = &actor.ID
-	application.ReviewReason = reason
+	application.ReviewerID = &req.Actor.ID
+	application.ReviewReason = req.Reason
 
 	if err := s.repo.SaveApplication(ctx, application); err != nil {
 		return err
 	}
 
 	var notificationTitle, notificationContent string
-	if action == model.CreatorApplicationActionApprove {
+	if req.Action == model.CreatorApplicationActionApprove {
 		if application.User.Role == model.RoleAuthor {
 			notificationTitle = "Author Application Approved"
 			notificationContent = "Your author application has been approved. You are now an author."
@@ -302,19 +315,17 @@ func (s *Service) ReviewCreatorApplication(ctx context.Context, actor model.User
 	} else {
 		notificationTitle = "Role Application Rejected"
 		notificationContent = "Your role application has been rejected."
-		if reason != "" {
-			notificationContent += " Reason: " + reason
+		if req.Reason != "" {
+			notificationContent += " Reason: " + req.Reason
 		}
 	}
 
-	if err := s.notifier.CreateNotification(ctx,
-		application.UserID,
-		"role",
-		notificationTitle,
-		notificationContent,
-		"",
-		"",
-	); err != nil {
+	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+		UserID:  application.UserID,
+		Type:    "role",
+		Title:   notificationTitle,
+		Content: notificationContent,
+	}); err != nil {
 		logrus.WithError(err).Warn("failed to create creator application notification")
 	}
 

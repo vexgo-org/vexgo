@@ -190,7 +190,10 @@ func (r *gormRepository) ListApplications(ctx context.Context, status model.Crea
 
 func (r *gormRepository) FindAdmins(ctx context.Context) ([]model.User, error) {
 	var admins []model.User
-	if err := r.db.WithContext(ctx).Where("role IN ?", []string{model.RoleAdmin, model.RoleSuperAdmin}).Find(&admins).Error; err != nil {
+	err := r.db.WithContext(ctx).
+		Where("role IN ?", []string{model.RoleAdmin, model.RoleSuperAdmin}).
+		Find(&admins).Error
+	if err != nil {
 		return nil, err
 	}
 	return admins, nil
