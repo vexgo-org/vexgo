@@ -182,7 +182,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 
 	for _, url := range fileURLs {
 		if err := s.files.Delete(url); err != nil {
-		logrus.WithError(err).WithField("url", url).Warn("Failed to delete media file")
+			logrus.WithError(err).WithField("url", url).Warn("Failed to delete media file")
 		}
 	}
 	return nil
