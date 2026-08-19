@@ -132,12 +132,8 @@ func TestUpdateRole_Permissions(t *testing.T) {
 		t.Errorf("expected ErrModifySuperAdmin, got %v", err)
 	}
 
-	updated, err = svc.UpdateRole(ctx, super, target.ID, model.RoleSuperAdmin)
-	if err != nil {
-		t.Fatalf("UpdateRole error: %v", err)
-	}
-	if updated.Role != model.RoleSuperAdmin {
-		t.Errorf("expected super_admin, got %s", updated.Role)
+	if _, err := svc.UpdateRole(ctx, super, target.ID, model.RoleSuperAdmin); !errors.Is(err, ErrSuperAdminRestricted) {
+		t.Errorf("expected ErrSuperAdminRestricted, got %v", err)
 	}
 
 	if _, err := svc.UpdateRole(ctx, super, target.ID, "not-a-role"); !errors.Is(err, ErrInvalidRole) {
