@@ -16,8 +16,8 @@ type fakeNotifier struct {
 	calls []string
 }
 
-func (f *fakeNotifier) CreateNotification(_ context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
-	f.calls = append(f.calls, notificationType)
+func (f *fakeNotifier) CreateNotification(_ context.Context, input model.NotificationInput) error {
+	f.calls = append(f.calls, input.Type)
 	return nil
 }
 
@@ -338,7 +338,7 @@ func TestList_RoleVisibility(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	posts, total, err := svc.List(ctx, "", 0, 1, 10, "", "", "")
+	posts, total, err := svc.List(ctx, ListQuery{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestList_RoleVisibility(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	_, total, err = svc.List(ctx, contributor.Role, contributor.ID, 1, 10, "", "", "")
+	_, total, err = svc.List(ctx, ListQuery{UserRole: contributor.Role, UserID: contributor.ID, Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestList_GuestViewDenied(t *testing.T) {
 		t.Fatalf("failed to seed settings: %v", err)
 	}
 
-	posts, total, err := svc.List(ctx, "", 0, 1, 10, "", "", "")
+	posts, total, err := svc.List(ctx, ListQuery{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}

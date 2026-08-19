@@ -62,27 +62,37 @@ func (s *Service) allowGuestView(ctx context.Context) bool {
 	return s.repo.GetGuestViewSetting(ctx)
 }
 
+// ListQuery carries the acting user, pagination and filters for List.
+type ListQuery struct {
+	UserRole string
+	UserID   uint
+	Page     int
+	Limit    int
+	Category string
+	Search   string
+}
+
 // List returns the paginated post list with role-based visibility, filters,
 // and per-post like/comment counts.
-func (s *Service) List(ctx context.Context, userRole string, userID uint, page, limit int, categoryID, status, search string) ([]model.Post, int64, error) {
+func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, error) {
 	// If not logged in and guest viewing is not allowed, return empty result
-	if userRole == "" && !s.allowGuestView(ctx) {
+	if q.UserRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, 0, nil
 	}
 
-	posts, total, err := s.repo.List(ctx, userRole, userID, ListFilter{
-		Page: page, Limit: limit, CategoryID: categoryID, Search: search,
+	posts, total, err := s.repo.List(ctx, q.UserRole, q.UserID, ListFilter{
+		Page: q.Page, Limit: q.Limit, CategoryID: q.Category, Search: q.Search,
 	})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	s.populateCounts(ctx, posts, userID)
+	s.populateCounts(ctx, posts, q.UserID)
 
 	// Apply privacy filtering to author information
 	for i := range posts {
-		if !model.IsAdmin(userRole) && posts[i].AuthorID != userID {
-			auth.FilterUserByPrivacy(&posts[i].Author, userID, userRole)
+		if !model.IsAdmin(q.UserRole) && posts[i].AuthorID != q.UserID {
+			auth.FilterUserByPrivacy(&posts[i].Author, q.UserID, q.UserRole)
 		}
 	}
 
@@ -326,50 +336,78 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	return nil
 }
 
+// MyPostsQuery carries the pagination and status filter for MyPosts.
+type MyPostsQuery struct {
+	UserID uint
+	Page   int
+	Limit  int
+	Status string
+}
+
 // MyPosts returns the current user's own posts (excluding rejected).
-func (s *Service) MyPosts(ctx context.Context, userID uint, page, limit int, status string) ([]model.Post, int64, error) {
-	posts, total, err := s.repo.MyPosts(ctx, userID, ListFilter{Page: page, Limit: limit, Status: status})
+func (s *Service) MyPosts(ctx context.Context, q MyPostsQuery) ([]model.Post, int64, error) {
+	posts, total, err := s.repo.MyPosts(ctx, q.UserID, ListFilter{Page: q.Page, Limit: q.Limit, Status: q.Status})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	s.populateCounts(ctx, posts, userID)
+	s.populateCounts(ctx, posts, q.UserID)
 	return posts, total, nil
+}
+
+// DraftsQuery carries the acting user and pagination for Drafts.
+type DraftsQuery struct {
+	UserRole string
+	UserID   uint
+	Page     int
+	Limit    int
 }
 
 // Drafts returns draft posts; admins see all drafts, other users only their own.
-func (s *Service) Drafts(ctx context.Context, userRole string, userID uint, page, limit int) ([]model.Post, int64, error) {
-	posts, total, err := s.repo.Drafts(ctx, userRole, userID, ListFilter{Page: page, Limit: limit})
+func (s *Service) Drafts(ctx context.Context, q DraftsQuery) ([]model.Post, int64, error) {
+	posts, total, err := s.repo.Drafts(ctx, q.UserRole, q.UserID, ListFilter{Page: q.Page, Limit: q.Limit})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	s.populateCounts(ctx, posts, userID)
+	s.populateCounts(ctx, posts, q.UserID)
 	return posts, total, nil
 }
 
+// UserPostsQuery carries the target user, acting user and pagination.
+type UserPostsQuery struct {
+	UserIDStr       string
+	CurrentUserRole string
+	CurrentUserID   uint
+	Page            int
+	Limit           int
+}
+
 // UserPosts returns the posts of a specific user with role-based visibility.
-func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole string, currentUserID uint, page, limit int) ([]model.Post, int64, error) {
-	uid, err := strconv.Atoi(userIDStr)
+func (s *Service) UserPosts(ctx context.Context, q UserPostsQuery) ([]model.Post, int64, error) {
+	uid, err := strconv.Atoi(q.UserIDStr)
 	if err != nil {
 		return nil, 0, ErrBadRequest
 	}
 
-	if currentUserRole == "" && !s.allowGuestView(ctx) {
+	if q.CurrentUserRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, 0, nil
 	}
 
-	posts, total, err := s.repo.UserPosts(ctx, uint(uid), currentUserRole, currentUserID, ListFilter{Page: page, Limit: limit})
+	posts, total, err := s.repo.UserPosts(
+		ctx, uint(uid), q.CurrentUserRole, q.CurrentUserID,
+		ListFilter{Page: q.Page, Limit: q.Limit},
+	)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	s.populateCounts(ctx, posts, currentUserID)
+	s.populateCounts(ctx, posts, q.CurrentUserID)
 
 	// Apply privacy filtering to author information
 	for i := range posts {
-		if !model.IsAdmin(currentUserRole) && uint(uid) != currentUserID {
-			auth.FilterUserByPrivacy(&posts[i].Author, currentUserID, currentUserRole)
+		if !model.IsAdmin(q.CurrentUserRole) && uint(uid) != q.CurrentUserID {
+			auth.FilterUserByPrivacy(&posts[i].Author, q.CurrentUserID, q.CurrentUserRole)
 		}
 	}
 
@@ -454,11 +492,19 @@ func (s *Service) CreateTag(ctx context.Context, name string) (*model.Tag, error
 	return s.repo.FindOrCreateTag(ctx, name)
 }
 
+// ListModerationQuery carries the moderation status, pagination and search.
+type ListModerationQuery struct {
+	Status model.PostStatus
+	Page   int
+	Limit  int
+	Search string
+}
+
 // ListModeration returns the paginated posts with the given status for the
 // moderation queue, with an optional search across title/content/username.
-func (s *Service) ListModeration(ctx context.Context, status model.PostStatus, page, limit int, search string) ([]model.Post, int64, error) {
-	offset := (page - 1) * limit
-	return s.repo.ListModeration(ctx, status, offset, limit, search)
+func (s *Service) ListModeration(ctx context.Context, q ListModerationQuery) ([]model.Post, int64, error) {
+	offset := (q.Page - 1) * q.Limit
+	return s.repo.ListModeration(ctx, q.Status, offset, q.Limit, q.Search)
 }
 
 // Approve approves a post and notifies its author.
@@ -473,10 +519,14 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 		return nil, fmt.Errorf("save post: %w", err)
 	}
 
-	if err := s.notifier.CreateNotification(ctx,
-		post.AuthorID, "review", "Post approved",
-		fmt.Sprintf("Your post \"%s\" has been approved", post.Title), id, "post",
-	); err != nil {
+	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+		UserID:      post.AuthorID,
+		Type:        "review",
+		Title:       "Post approved",
+		Content:     fmt.Sprintf("Your post \"%s\" has been approved", post.Title),
+		RelatedID:   id,
+		RelatedType: "post",
+	}); err != nil {
 		logrus.WithError(err).Warn("failed to create post approved notification")
 	}
 
@@ -496,10 +546,14 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 		return nil, fmt.Errorf("save post: %w", err)
 	}
 
-	if err := s.notifier.CreateNotification(ctx,
-		post.AuthorID, "review", "post rejected",
-		fmt.Sprintf("Your post \"%s\" has been rejected, reason: %s", post.Title, rejectionReason), id, "post",
-	); err != nil {
+	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+		UserID:      post.AuthorID,
+		Type:        "review",
+		Title:       "post rejected",
+		Content:     fmt.Sprintf("Your post \"%s\" has been rejected, reason: %s", post.Title, rejectionReason),
+		RelatedID:   id,
+		RelatedType: "post",
+	}); err != nil {
 		logrus.WithError(err).Warn("failed to create post rejected notification")
 	}
 
@@ -559,11 +613,14 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 	if err == nil && post.AuthorID != userID {
 		user, err := s.repo.FindUserByID(ctx, userID)
 		if err == nil {
-			if err := s.notifier.CreateNotification(ctx,
-				post.AuthorID, "like", "The post received likes",
-				fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
-				strconv.FormatUint(uint64(postID), 10), "post",
-			); err != nil {
+			if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+				UserID:      post.AuthorID,
+				Type:        "like",
+				Title:       "The post received likes",
+				Content:     fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
+				RelatedID:   strconv.FormatUint(uint64(postID), 10),
+				RelatedType: "post",
+			}); err != nil {
 				logrus.WithError(err).Warn("failed to create like notification")
 			}
 		}

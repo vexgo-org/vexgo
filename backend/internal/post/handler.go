@@ -36,7 +36,14 @@ func (h *Handler) GetPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
 
-	posts, total, err := h.svc.List(c.Request.Context(), userRole, userID, page, limit, c.Query("category"), c.Query("status"), c.Query("search"))
+	posts, total, err := h.svc.List(c.Request.Context(), ListQuery{
+		UserRole: userRole,
+		UserID:   userID,
+		Page:     page,
+		Limit:    limit,
+		Category: c.Query("category"),
+		Search:   c.Query("search"),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
 		return
@@ -197,7 +204,12 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.DefaultQuery("status", "")
 
-	posts, total, err := h.svc.MyPosts(c.Request.Context(), userID, page, limit, status)
+	posts, total, err := h.svc.MyPosts(c.Request.Context(), MyPostsQuery{
+		UserID: userID,
+		Page:   page,
+		Limit:  limit,
+		Status: status,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
 		return
@@ -227,7 +239,12 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
 
-	posts, total, err := h.svc.Drafts(c.Request.Context(), userRole, userID, page, limit)
+	posts, total, err := h.svc.Drafts(c.Request.Context(), DraftsQuery{
+		UserRole: userRole,
+		UserID:   userID,
+		Page:     page,
+		Limit:    limit,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch drafts"})
 		return
@@ -258,7 +275,13 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
 
-	posts, total, err := h.svc.UserPosts(c.Request.Context(), userIDStr, userRole, userID, page, limit)
+	posts, total, err := h.svc.UserPosts(c.Request.Context(), UserPostsQuery{
+		UserIDStr:       userIDStr,
+		CurrentUserRole: userRole,
+		CurrentUserID:   userID,
+		Page:            page,
+		Limit:           limit,
+	})
 	if err != nil {
 		if errors.Is(err, ErrBadRequest) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
@@ -408,7 +431,12 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.DefaultQuery("search", "")
 
-	posts, total, err := h.svc.ListModeration(c.Request.Context(), status, page, limit, search)
+	posts, total, err := h.svc.ListModeration(c.Request.Context(), ListModerationQuery{
+		Status: status,
+		Page:   page,
+		Limit:  limit,
+		Search: search,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation posts"})
 		return
