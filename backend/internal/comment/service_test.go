@@ -17,8 +17,8 @@ type fakeNotifier struct {
 	calls []string
 }
 
-func (f *fakeNotifier) CreateNotification(_ context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
-	f.calls = append(f.calls, notificationType)
+func (f *fakeNotifier) CreateNotification(_ context.Context, input model.NotificationInput) error {
+	f.calls = append(f.calls, input.Type)
 	return nil
 }
 
@@ -72,7 +72,7 @@ func TestCreate_AutoApproved(t *testing.T) {
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	comment, count, err := svc.Create(ctx, post.ID, commenter.ID, "nice post", nil)
+	comment, count, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "nice post"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCreate_AutoApproved(t *testing.T) {
 
 	// author commenting on own post → no notification
 	notifier.calls = nil
-	_, _, err = svc.Create(ctx, post.ID, author.ID, "self comment", nil)
+	_, _, err = svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: author.ID, Content: "self comment"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestCreate_ModerationDisabledManualApproval(t *testing.T) {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
 
-	comment, _, err := svc.Create(ctx, post.ID, commenter.ID, "needs review", nil)
+	comment, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "needs review"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestCreate_ModerationRejectsBlockedKeyword(t *testing.T) {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
 
-	comment, _, err := svc.Create(ctx, post.ID, commenter.ID, "buy now spam", nil)
+	comment, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "buy now spam"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestCreate_ReplyNotifiesParentAuthor(t *testing.T) {
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 	replier := seedUser(t, db, "replier", model.RoleGuest)
 
-	_, _, err := svc.Create(ctx, post.ID, commenter.ID, "first", nil)
+	_, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "first"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestCreate_ReplyNotifiesParentAuthor(t *testing.T) {
 	parentID := parent.ID
 
 	notifier.calls = nil
-	_, _, err = svc.Create(ctx, post.ID, replier.ID, "reply", &parentID)
+	_, _, err = svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: replier.ID, Content: "reply", ParentID: &parentID})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -181,10 +181,10 @@ func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
 	commenter.ProfileVisibility = "private"
 	db.Save(&commenter)
 
-	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "published one", nil); err != nil {
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "published one"}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, _, err := svc.Create(ctx, post.ID, author.ID, "pending one", nil); err != nil {
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: author.ID, Content: "pending one"}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	var pending model.Comment
@@ -230,7 +230,7 @@ func TestDelete_Permissions(t *testing.T) {
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "to delete", nil); err != nil {
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "to delete"}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	var comment model.Comment
@@ -264,7 +264,7 @@ func TestSetStatus(t *testing.T) {
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "moderate me", nil); err != nil {
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "moderate me"}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	var comment model.Comment
@@ -292,10 +292,10 @@ func TestListModeration(t *testing.T) {
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "one", nil); err != nil {
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "one"}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "two", nil); err != nil {
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "two"}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 

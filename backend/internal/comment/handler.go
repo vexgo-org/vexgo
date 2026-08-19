@@ -85,7 +85,12 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	comment, count, err := h.svc.Create(c.Request.Context(), postID, userID, req.Content, req.ParentID)
+	comment, count, err := h.svc.Create(c.Request.Context(), CreateRequest{
+		PostID:   postID,
+		UserID:   userID,
+		Content:  req.Content,
+		ParentID: req.ParentID,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
 		return

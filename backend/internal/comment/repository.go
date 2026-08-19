@@ -94,7 +94,11 @@ func (r *gormRepository) SaveModerationConfig(ctx context.Context, config *model
 	return r.db.WithContext(ctx).Save(config).Error
 }
 
-func (r *gormRepository) ListModeration(ctx context.Context, status model.CommentStatus, offset, limit int) ([]model.Comment, int64, error) {
+func (r *gormRepository) ListModeration(
+	ctx context.Context,
+	status model.CommentStatus,
+	offset, limit int,
+) ([]model.Comment, int64, error) {
 	query := r.db.WithContext(ctx).Model(&model.Comment{}).
 		Preload("User").Preload("Post").Where("status = ?", status)
 

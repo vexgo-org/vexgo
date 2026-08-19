@@ -47,12 +47,19 @@ func NewService(deps Deps) *Service {
 	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier}
 }
 
+// defaultModerationPrompt is used by the moderation checker when no custom
+// prompt is configured.
+const defaultModerationPrompt = "Please review the following comment for compliance. " +
+	"If the comment contains illegal content, personal attacks, or inappropriate material, " +
+	"return 'REJECT'; if the comment is compliant, return 'APPROVE'. " +
+	"Only return the result, no explanation.\n\nComment content:\n{{content}}"
+
 // defaultModerationConfig returns the configuration used when no row exists.
 func defaultModerationConfig() model.CommentModerationConfig {
 	return model.CommentModerationConfig{
 		Enabled:            false,
 		ModelName:          "gpt-3.5-turbo",
-		ModerationPrompt:   "Please review the following comment for compliance. If the comment contains illegal content, personal attacks, or inappropriate material, return 'REJECT'; if the comment is compliant, return 'APPROVE'. Only return the result, no explanation.\n\nComment content:\n{{content}}",
+		ModerationPrompt:   defaultModerationPrompt,
 		AutoApproveEnabled: true,
 		MinScoreThreshold:  0.5,
 	}
@@ -73,7 +80,12 @@ func (s *Service) moderationConfig(ctx context.Context) (model.CommentModeration
 
 // ListByPost returns the published comments of a post, applying author privacy
 // filtering for viewers that are neither the author nor an admin.
-func (s *Service) ListByPost(ctx context.Context, postID string, currentUserID uint, currentUserRole string) ([]model.Comment, error) {
+func (s *Service) ListByPost(
+	ctx context.Context,
+	postID string,
+	currentUserID uint,
+	currentUserRole string,
+) ([]model.Comment, error) {
 	comments, err := s.repo.ListByPostID(ctx, postID)
 	if err != nil {
 		return nil, err
@@ -91,22 +103,30 @@ func (s *Service) ListByPost(ctx context.Context, postID string, currentUserID u
 	return comments, nil
 }
 
+// CreateRequest carries the fields for creating a comment.
+type CreateRequest struct {
+	PostID   uint
+	UserID   uint
+	Content  string
+	ParentID *uint
+}
+
 // Create creates a comment, applies moderation, and notifies the post author
 // and (for replies) the parent comment author. It returns the created comment
 // (with author preloaded) and the published comment count for the post.
-func (s *Service) Create(ctx context.Context, postID, userID uint, content string, parentID *uint) (*model.Comment, int64, error) {
+func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment, int64, error) {
 	config, err := s.moderationConfig(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	comment := model.Comment{
-		PostID:  postID,
-		Content: content,
-		UserID:  userID,
+		PostID:  req.PostID,
+		Content: req.Content,
+		UserID:  req.UserID,
 	}
-	if parentID != nil {
-		comment.ParentID = parentID
+	if req.ParentID != nil {
+		comment.ParentID = req.ParentID
 	}
 
 	// Set comment status
@@ -127,7 +147,7 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 
 	// If AI moderation enabled, perform moderation
 	if config.Enabled {
-		approved, _, err := moderateCommentAI(content, config)
+		approved, _, err := moderateCommentAI(req.Content, config)
 		if err != nil {
 			// If AI moderation fails, log error but don't affect comment creation
 			logrus.WithError(err).Warn("AI moderation failed, defaulting to published")
@@ -145,12 +165,12 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 	}
 
 	// Return created comment and updated comment count
-	count, _ := s.repo.CountByPostID(ctx, postID)
+	count, _ := s.repo.CountByPostID(ctx, req.PostID)
 
 	// Create notifications
-	s.notifyPostAuthor(ctx, postID, userID, content)
-	if parentID != nil {
-		s.notifyParentAuthor(ctx, *parentID, userID, content)
+	s.notifyPostAuthor(ctx, req.PostID, req.UserID, req.Content)
+	if req.ParentID != nil {
+		s.notifyParentAuthor(ctx, *req.ParentID, req.UserID, req.Content)
 	}
 
 	return &comment, count, nil
@@ -175,14 +195,14 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 	if len(commentContent) > 50 {
 		commentContent = commentContent[:50] + "..."
 	}
-	if err := s.notifier.CreateNotification(ctx,
-		post.AuthorID,
-		"comment",
-		"Post Commented",
-		fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
-		strconv.FormatUint(uint64(postID), 10),
-		"post",
-	); err != nil {
+	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+		UserID:      post.AuthorID,
+		Type:        "comment",
+		Title:       "Post Commented",
+		Content:     fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
+		RelatedID:   strconv.FormatUint(uint64(postID), 10),
+		RelatedType: "post",
+	}); err != nil {
 		logrus.WithError(err).Warn("failed to create comment notification")
 	}
 }
@@ -206,14 +226,14 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 	if len(replyContent) > 50 {
 		replyContent = replyContent[:50] + "..."
 	}
-	if err := s.notifier.CreateNotification(ctx,
-		parentComment.UserID,
-		"reply",
-		"Comment Replied",
-		fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
-		strconv.FormatUint(uint64(parentID), 10),
-		"comment",
-	); err != nil {
+	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
+		UserID:      parentComment.UserID,
+		Type:        "reply",
+		Title:       "Comment Replied",
+		Content:     fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
+		RelatedID:   strconv.FormatUint(uint64(parentID), 10),
+		RelatedType: "comment",
+	}); err != nil {
 		logrus.WithError(err).Warn("failed to create reply notification")
 	}
 }
@@ -273,7 +293,10 @@ type UpdateModerationConfigRequest struct {
 // UpdateModerationConfig creates or updates the comment moderation
 // configuration. The API key is only overwritten when a non-empty value is
 // provided. The returned configuration has the API key masked.
-func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerationConfigRequest) (model.CommentModerationConfig, error) {
+func (s *Service) UpdateModerationConfig(
+	ctx context.Context,
+	req UpdateModerationConfigRequest,
+) (model.CommentModerationConfig, error) {
 	config, err := s.moderationConfig(ctx)
 	if err != nil {
 		return config, err
@@ -322,7 +345,11 @@ func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerati
 
 // ListModeration returns the paginated comments with the given status
 // (pending/published/rejected) for the moderation queue.
-func (s *Service) ListModeration(ctx context.Context, status model.CommentStatus, page, limit int) ([]model.Comment, int64, error) {
+func (s *Service) ListModeration(
+	ctx context.Context,
+	status model.CommentStatus,
+	page, limit int,
+) ([]model.Comment, int64, error) {
 	offset := (page - 1) * limit
 	return s.repo.ListModeration(ctx, status, offset, limit)
 }
