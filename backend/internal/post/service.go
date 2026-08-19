@@ -18,14 +18,10 @@ import (
 
 // Sentinel errors mapped to HTTP responses by the handler.
 var (
-	// ErrPostNotFound means the post does not exist.
-	ErrPostNotFound = errors.New("post not found")
-	// ErrForbidden means the acting user may not modify this post.
-	ErrForbidden = errors.New("forbidden")
-	// ErrGuestViewDenied means guest viewing is disabled and the caller is anonymous.
+	ErrPostNotFound    = errors.New("post not found")
+	ErrForbidden       = errors.New("forbidden")
 	ErrGuestViewDenied = errors.New("guest view denied")
-	// ErrBadRequest means the request is invalid for the current state.
-	ErrBadRequest = errors.New("bad request")
+	ErrBadRequest      = errors.New("bad request")
 )
 
 // Deps holds the dependencies required by the post domain.
@@ -44,44 +40,36 @@ type FileRemover = model.FileRemover
 
 // Service contains the business logic of the post domain.
 type Service struct {
-	db       *gorm.DB
+	repo     Repository
 	notifier Notifier
 	files    FileRemover
 }
 
 // NewService creates a post service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB, notifier: deps.Notifier, files: deps.Files}
+	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier, files: deps.Files}
 }
 
-// allowGuestView reports whether anonymous viewers may see posts.
 func (s *Service) allowGuestView() bool {
-	var config model.GeneralSettings
-	if err := s.db.First(&config).Error; err != nil {
-		return true // Default to true if config not found
-	}
-	return config.AllowGuestViewPosts
+	return s.repo.GetGuestViewSetting()
 }
 
 // List returns the paginated post list with role-based visibility, filters,
 // and per-post like/comment counts.
 func (s *Service) List(userRole string, userID uint, page, limit int, categoryID, status, search string) ([]model.Post, int64, error) {
-	// If not logged in and guest viewing is not allowed, return empty result
 	if userRole == "" && !s.allowGuestView() {
 		return []model.Post{}, 0, nil
 	}
 
-	query := s.db.Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags")
+	query := s.repo.BaseQuery()
 
-	// Determine visible posts based on user role
+	// Role-based visibility
 	switch userRole {
 	case "", model.RoleGuest:
 		query = query.Where("status = ?", model.PostStatusPublished)
 	case model.RoleContributor:
 		query = query.Where(
-			s.db.Where("status = ?", model.PostStatusPublished).
+			query.Session(&gorm.Session{}).Where("status = ?", model.PostStatusPublished).
 				Or("author_id = ? AND status != ?", userID, model.PostStatusRejected),
 		)
 	case model.RoleAuthor, model.RoleAdmin, model.RoleSuperAdmin:
@@ -93,8 +81,6 @@ func (s *Service) List(userRole string, userID uint, page, limit int, categoryID
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
-
-	// Category filter (by id or name)
 	if categoryID != "" {
 		if cid, err := strconv.Atoi(categoryID); err == nil {
 			query = query.Where("category = ?", cid)
@@ -102,8 +88,6 @@ func (s *Service) List(userRole string, userID uint, page, limit int, categoryID
 			query = query.Where("category = ?", categoryID)
 		}
 	}
-
-	// Search filter
 	if search != "" {
 		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
@@ -135,12 +119,11 @@ func (s *Service) List(userRole string, userID uint, page, limit int, categoryID
 // Get returns a single post with privacy filtering, view-count increment and
 // like/comment counts.
 func (s *Service) Get(id, currentUserRole string, currentUserID uint) (*model.Post, error) {
-	var post model.Post
-	if err := s.db.Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
+	post, err := s.repo.FindByID(id)
+	if err != nil {
 		return nil, fmt.Errorf("post load: %w", err)
 	}
 
-	// If not logged in and guest viewing is not allowed, return 403
 	if currentUserRole == "" && !s.allowGuestView() {
 		return nil, ErrGuestViewDenied
 	}
@@ -149,27 +132,21 @@ func (s *Service) Get(id, currentUserRole string, currentUserID uint) (*model.Po
 		auth.FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
 	}
 
-	// Increment view count (optional)
-	s.db.Model(&post).UpdateColumn("view_count", gorm.Expr("view_count + ?", 1))
+	s.repo.IncrementViewCount(post.ID)
 
-	// Fill likes count and current logged-in user's like status
-	var count int64
-	s.db.Model(&model.Like{}).Where("post_id = ?", post.ID).Count(&count)
+	count, _ := s.repo.CountLikes(post.ID)
 	post.LikesCount = int(count)
 	post.IsLiked = false
 	if currentUserID != 0 {
-		var like model.Like
-		if s.db.Where("post_id = ? AND user_id = ?", post.ID, currentUserID).First(&like).Error == nil {
+		if _, err := s.repo.FindLike(post.ID, currentUserID); err == nil {
 			post.IsLiked = true
 		}
 	}
 
-	// Fill comments count
-	var ccount int64
-	s.db.Model(&model.Comment{}).Where("post_id = ?", post.ID).Count(&ccount)
+	ccount, _ := s.repo.CountComments(post.ID)
 	post.CommentsCount = int(ccount)
 
-	return &post, nil
+	return post, nil
 }
 
 // CreateRequest carries the fields accepted when creating a post.
@@ -185,12 +162,10 @@ type CreateRequest struct {
 
 // Create creates a post, deriving the initial status from the user's role.
 func (s *Service) Create(userRole string, userID uint, req CreateRequest) (*model.Post, error) {
-	// Check if user has permission to create posts
 	if userRole == "" || userRole == model.RoleGuest {
 		return nil, ErrForbidden
 	}
 
-	// Convert category to string regardless of number or string type
 	var catStr string
 	switch v := req.Category.(type) {
 	case string:
@@ -205,7 +180,6 @@ func (s *Service) Create(userRole string, userID uint, req CreateRequest) (*mode
 		catStr = fmt.Sprintf("%v", v)
 	}
 
-	// Determine initial post status based on user role
 	initialStatus := model.PostStatus(req.Status)
 	if initialStatus == "" {
 		switch userRole {
@@ -235,7 +209,7 @@ func (s *Service) Create(userRole string, userID uint, req CreateRequest) (*mode
 		}
 	}
 
-	if err := s.db.Create(&post).Error; err != nil {
+	if err := s.repo.Create(&post); err != nil {
 		return nil, err
 	}
 
@@ -255,14 +229,13 @@ type UpdateRequest struct {
 
 // Update modifies a post when the acting user is its author or an admin.
 func (s *Service) Update(id string, userID uint, req UpdateRequest) (*model.Post, error) {
-	var post model.Post
-	if err := s.db.Preload("Tags").First(&post, id).Error; err != nil {
+	post, err := s.repo.FindByIDPreloadTags(id)
+	if err != nil {
 		return nil, ErrPostNotFound
 	}
 
-	// Permission check
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err == nil {
+	user, err := s.repo.FindUserByID(userID)
+	if err == nil {
 		if user.Role != model.RoleAdmin && user.Role != model.RoleSuperAdmin && post.AuthorID != userID {
 			return nil, ErrForbidden
 		}
@@ -301,27 +274,27 @@ func (s *Service) Update(id string, userID uint, req UpdateRequest) (*model.Post
 	if len(req.Tags) > 0 {
 		tags, err := s.resolveTags(req.Tags)
 		if err == nil {
-			if err := s.db.Model(&post).Association("Tags").Replace(tags); err != nil {
+			if err := s.repo.ReplaceTagsAssociation(post, tags); err != nil {
 				return nil, fmt.Errorf("replace tags: %w", err)
 			}
 			post.Tags = tags
 		}
 	}
 
-	s.db.Save(&post)
-	return &post, nil
+	s.repo.Save(post)
+	return post, nil
 }
 
 // Delete removes a post (author or admin only), cleaning up its files,
 // comments, likes and tag associations.
 func (s *Service) Delete(id string, userID uint) error {
-	var post model.Post
-	if err := s.db.First(&post, id).Error; err != nil {
+	post, err := s.repo.FindByID(id)
+	if err != nil {
 		return ErrPostNotFound
 	}
 
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err == nil {
+	user, err := s.repo.FindUserByID(userID)
+	if err == nil {
 		if user.Role != model.RoleAdmin && user.Role != model.RoleSuperAdmin && post.AuthorID != userID {
 			return ErrForbidden
 		}
@@ -341,28 +314,20 @@ func (s *Service) Delete(id string, userID uint) error {
 	}
 	for url := range uniqueImages {
 		if err := s.files.Delete(url); err != nil {
-			// Log error but continue execution to avoid post deletion failure
 			logrus.WithError(err).WithField("url", url).Warn("Failed to delete image")
 		}
 	}
 
-	// Delete comments associated with this post
-	if err := s.db.Where("post_id = ?", post.ID).Delete(&model.Comment{}).Error; err != nil {
+	if err := s.repo.DeleteCommentsByPostID(post.ID); err != nil {
 		return fmt.Errorf("delete comments: %w", err)
 	}
-
-	// Delete likes associated with this post
-	if err := s.db.Where("post_id = ?", post.ID).Delete(&model.Like{}).Error; err != nil {
+	if err := s.repo.DeleteLikesByPostID(post.ID); err != nil {
 		return fmt.Errorf("delete likes: %w", err)
 	}
-
-	// Clear the many-to-many tags relationship
-	if err := s.db.Model(&post).Association("Tags").Clear(); err != nil {
+	if err := s.repo.ClearTagsAssociation(post); err != nil {
 		return fmt.Errorf("clear tags: %w", err)
 	}
-
-	// Finally delete the post itself
-	if err := s.db.Delete(&post).Error; err != nil {
+	if err := s.repo.Delete(post); err != nil {
 		return fmt.Errorf("delete post: %w", err)
 	}
 
@@ -371,9 +336,7 @@ func (s *Service) Delete(id string, userID uint) error {
 
 // MyPosts returns the current user's own posts (excluding rejected).
 func (s *Service) MyPosts(userID uint, page, limit int, status string) ([]model.Post, int64, error) {
-	query := s.db.Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
+	query := s.repo.BaseQuery().
 		Where("author_id = ? AND status != ?", userID, model.PostStatusRejected)
 
 	if status != "" {
@@ -394,21 +357,16 @@ func (s *Service) MyPosts(userID uint, page, limit int, status string) ([]model.
 	}
 
 	s.populateCounts(posts, userID)
-
 	return posts, total, nil
 }
 
 // Drafts returns draft posts; admins see all drafts, other users only their own.
 func (s *Service) Drafts(userRole string, userID uint, page, limit int) ([]model.Post, int64, error) {
-	query := s.db.Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags")
+	query := s.repo.BaseQuery()
 
 	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
-		// Admins and super admins can see all draft posts
 		query = query.Where("status = ?", model.PostStatusDraft)
 	} else {
-		// Other users can only see their own draft posts
 		query = query.Where("author_id = ? AND status = ?", userID, model.PostStatusDraft)
 	}
 
@@ -426,13 +384,12 @@ func (s *Service) Drafts(userRole string, userID uint, page, limit int) ([]model
 	}
 
 	s.populateCounts(posts, userID)
-
 	return posts, total, nil
 }
 
 // UserPosts returns the posts of a specific user with role-based visibility.
 func (s *Service) UserPosts(userIDStr, currentUserRole string, currentUserID uint, page, limit int) ([]model.Post, int64, error) {
-	userID, err := strconv.Atoi(userIDStr)
+	uid, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		return nil, 0, ErrBadRequest
 	}
@@ -441,17 +398,13 @@ func (s *Service) UserPosts(userIDStr, currentUserRole string, currentUserID uin
 		return []model.Post{}, 0, nil
 	}
 
-	query := s.db.Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
-		Where("author_id = ?", userID)
+	query := s.repo.BaseQuery().Where("author_id = ?", uid)
 
-	// Determine visible posts based on user role
 	switch currentUserRole {
 	case "", model.RoleGuest:
 		query = query.Where("status = ?", model.PostStatusPublished)
 	case model.RoleContributor:
-		if uint(userID) != currentUserID {
+		if uint(uid) != currentUserID {
 			query = query.Where("status = ?", model.PostStatusPublished)
 		} else {
 			query = query.Where("status != ?", model.PostStatusRejected)
@@ -476,7 +429,7 @@ func (s *Service) UserPosts(userIDStr, currentUserRole string, currentUserID uin
 	s.populateCounts(posts, currentUserID)
 
 	for i := range posts {
-		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && uint(userID) != currentUserID {
+		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && uint(uid) != currentUserID {
 			auth.FilterUserByPrivacy(&posts[i].Author, currentUserID, currentUserRole)
 		}
 	}
@@ -491,19 +444,13 @@ func (s *Service) Popular(userRole string, limit int) ([]model.Post, error) {
 	}
 
 	var posts []model.Post
-	s.db.Where("status = ?", model.PostStatusPublished).
-		Preload("Author").
-		Preload("Tags").
-		Find(&posts)
+	s.repo.BaseQuery().Where("status = ?", model.PostStatusPublished).Find(&posts)
 
-	// Calculate likes count for each post
 	for i := range posts {
-		var count int64
-		s.db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
+		count, _ := s.repo.CountLikes(posts[i].ID)
 		posts[i].LikesCount = int(count)
 	}
 
-	// Sort by the sum of likes count multiplied by 5 plus view count
 	for i := 0; i < len(posts); i++ {
 		for j := i + 1; j < len(posts); j++ {
 			scoreI := posts[i].LikesCount*5 + posts[i].ViewCount
@@ -514,7 +461,6 @@ func (s *Service) Popular(userRole string, limit int) ([]model.Post, error) {
 		}
 	}
 
-	// Limit the number of returned items
 	if limit < len(posts) {
 		posts = posts[:limit]
 	}
@@ -529,12 +475,8 @@ func (s *Service) Latest(userRole string, limit int) ([]model.Post, error) {
 	}
 
 	var posts []model.Post
-	s.db.Where("status = ?", model.PostStatusPublished).
-		Order("created_at DESC").
-		Limit(limit).
-		Preload("Author").
-		Preload("Tags").
-		Find(&posts)
+	s.repo.BaseQuery().Where("status = ?", model.PostStatusPublished).
+		Order("created_at DESC").Limit(limit).Find(&posts)
 
 	return posts, nil
 }
@@ -544,24 +486,16 @@ func (s *Service) Categories(userRole string) ([]model.Category, error) {
 	if userRole == "" && !s.allowGuestView() {
 		return []model.Category{}, nil
 	}
-
-	var categories []model.Category
-	if err := s.db.Find(&categories).Error; err != nil {
-		return nil, err
-	}
-	return categories, nil
+	return s.repo.FindAllCategories()
 }
 
 // CreateCategory creates a category.
 func (s *Service) CreateCategory(name, description string) (*model.Category, error) {
-	category := model.Category{
-		Name:        name,
-		Description: description,
-	}
-	if err := s.db.Create(&category).Error; err != nil {
+	category := &model.Category{Name: name, Description: description}
+	if err := s.repo.CreateCategory(category); err != nil {
 		return nil, err
 	}
-	return &category, nil
+	return category, nil
 }
 
 // Tags returns all tags.
@@ -569,62 +503,30 @@ func (s *Service) Tags(userRole string) ([]model.Tag, error) {
 	if userRole == "" && !s.allowGuestView() {
 		return []model.Tag{}, nil
 	}
-
-	var tags []model.Tag
-	if err := s.db.Find(&tags).Error; err != nil {
-		return nil, err
-	}
-	return tags, nil
+	return s.repo.FindAllTags()
 }
 
 // CreateTag creates a tag.
 func (s *Service) CreateTag(name string) (*model.Tag, error) {
-	tag := model.Tag{Name: name}
-	if err := s.db.Create(&tag).Error; err != nil {
-		return nil, err
-	}
-	return &tag, nil
+	return s.repo.FindOrCreateTag(name)
 }
 
 // ListModeration returns the paginated posts with the given status for the
 // moderation queue, with an optional search across title/content/username.
 func (s *Service) ListModeration(status model.PostStatus, page, limit int, search string) ([]model.Post, int64, error) {
-	query := s.db.Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
-		Where("status = ?", status)
-
-	if search != "" {
-		searchTerm := "%" + search + "%"
-		query = query.Joins("LEFT JOIN users ON posts.author_id = users.id").
-			Where("posts.title LIKE ? OR posts.content LIKE ? OR users.username LIKE ?", searchTerm, searchTerm, searchTerm)
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var posts []model.Post
-	if err := query.Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&posts).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return posts, total, nil
+	offset := (page - 1) * limit
+	return s.repo.ListModeration(status, offset, limit, search)
 }
 
 // Approve approves a post and notifies its author.
 func (s *Service) Approve(id string) (*model.Post, error) {
-	var post model.Post
-	if err := s.db.Preload("Tags").First(&post, id).Error; err != nil {
+	post, err := s.repo.FindByIDPreloadTags(id)
+	if err != nil {
 		return nil, ErrPostNotFound
 	}
 
 	post.Status = model.PostStatusPublished
-	s.db.Save(&post)
+	s.repo.Save(post)
 
 	if err := s.notifier.CreateNotification(
 		post.AuthorID,
@@ -637,19 +539,19 @@ func (s *Service) Approve(id string) (*model.Post, error) {
 		logrus.WithError(err).Warn("failed to create post approved notification")
 	}
 
-	return &post, nil
+	return post, nil
 }
 
 // Reject rejects a post with a reason and notifies its author.
 func (s *Service) Reject(id, rejectionReason string) (*model.Post, error) {
-	var post model.Post
-	if err := s.db.First(&post, id).Error; err != nil {
+	post, err := s.repo.FindByID(id)
+	if err != nil {
 		return nil, ErrPostNotFound
 	}
 
 	post.Status = model.PostStatusRejected
 	post.RejectionReason = rejectionReason
-	s.db.Save(&post)
+	s.repo.Save(post)
 
 	if err := s.notifier.CreateNotification(
 		post.AuthorID,
@@ -662,61 +564,57 @@ func (s *Service) Reject(id, rejectionReason string) (*model.Post, error) {
 		logrus.WithError(err).Warn("failed to create post rejected notification")
 	}
 
-	return &post, nil
+	return post, nil
 }
 
 // Resubmit moves a rejected post back to pending.
 func (s *Service) Resubmit(id string) (*model.Post, error) {
-	var post model.Post
-	if err := s.db.Preload("Tags").First(&post, id).Error; err != nil {
+	post, err := s.repo.FindByIDPreloadTags(id)
+	if err != nil {
 		return nil, ErrPostNotFound
 	}
 
-	// Check if post status is rejected
 	if post.Status != model.PostStatusRejected {
 		return nil, ErrBadRequest
 	}
 
 	post.Status = model.PostStatusPending
 	post.RejectionReason = ""
-	s.db.Save(&post)
+	s.repo.Save(post)
 
-	return &post, nil
+	return post, nil
 }
 
 // ToggleLike likes or unlikes a post and notifies the author on like.
 func (s *Service) ToggleLike(postID, userID uint) (isLiked bool, count int64, err error) {
-	var like model.Like
-	if err := s.db.Where("post_id = ? AND user_id = ?", postID, userID).First(&like).Error; err == nil {
+	existing, err := s.repo.FindLike(postID, userID)
+	if err == nil {
 		// Already liked -> unlike
-		if err := s.db.Delete(&like).Error; err != nil {
+		if err := s.repo.DeleteLike(existing); err != nil {
 			return false, 0, err
 		}
-		var c int64
-		s.db.Model(&model.Like{}).Where("post_id = ?", postID).Count(&c)
+		c, _ := s.repo.CountLikes(postID)
 		return false, c, nil
 	}
 
-	like = model.Like{PostID: postID, UserID: userID}
-	s.db.Create(&like)
-	s.db.Model(&model.Like{}).Where("post_id = ?", postID).Count(&count)
+	like := &model.Like{PostID: postID, UserID: userID}
+	s.repo.CreateLike(like)
+	count, _ = s.repo.CountLikes(postID)
 
 	// Create notification for post author
-	var post model.Post
-	if err := s.db.First(&post, postID).Error; err == nil {
-		if post.AuthorID != userID { // Don't notify the user if they are the post author
-			var user model.User
-			if err := s.db.First(&user, userID).Error; err == nil {
-				if err := s.notifier.CreateNotification(
-					post.AuthorID,
-					"like",
-					"The post received likes",
-					fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
-					strconv.FormatUint(uint64(postID), 10),
-					"post",
-				); err != nil {
-					logrus.WithError(err).Warn("failed to create like notification")
-				}
+	post, err := s.repo.FindByID(fmt.Sprintf("%d", postID))
+	if err == nil && post.AuthorID != userID {
+		user, err := s.repo.FindUserByID(userID)
+		if err == nil {
+			if err := s.notifier.CreateNotification(
+				post.AuthorID,
+				"like",
+				"The post received likes",
+				fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
+				strconv.FormatUint(uint64(postID), 10),
+				"post",
+			); err != nil {
+				logrus.WithError(err).Warn("failed to create like notification")
 			}
 		}
 	}
@@ -727,32 +625,28 @@ func (s *Service) ToggleLike(postID, userID uint) (isLiked bool, count int64, er
 // LikeStatus returns whether the user liked the post and the total like count.
 func (s *Service) LikeStatus(postID, userID uint) (isLiked bool, count int64) {
 	if userID != 0 {
-		var like model.Like
-		if s.db.Where("post_id = ? AND user_id = ?", postID, userID).First(&like).Error == nil {
+		if _, err := s.repo.FindLike(postID, userID); err == nil {
 			isLiked = true
 		}
 	}
-	s.db.Model(&model.Like{}).Where("post_id = ?", postID).Count(&count)
+	count, _ = s.repo.CountLikes(postID)
 	return isLiked, count
 }
 
 // populateCounts fills like/comment counts and the current user's like status.
 func (s *Service) populateCounts(posts []model.Post, userID uint) {
 	for i := range posts {
-		var count int64
-		s.db.Model(&model.Like{}).Where("post_id = ?", posts[i].ID).Count(&count)
+		count, _ := s.repo.CountLikes(posts[i].ID)
 		posts[i].LikesCount = int(count)
 
 		posts[i].IsLiked = false
 		if userID != 0 {
-			var like model.Like
-			if s.db.Where("post_id = ? AND user_id = ?", posts[i].ID, userID).First(&like).Error == nil {
+			if _, err := s.repo.FindLike(posts[i].ID, userID); err == nil {
 				posts[i].IsLiked = true
 			}
 		}
 
-		var ccount int64
-		s.db.Model(&model.Comment{}).Where("post_id = ?", posts[i].ID).Count(&ccount)
+		ccount, _ := s.repo.CountComments(posts[i].ID)
 		posts[i].CommentsCount = int(ccount)
 	}
 }
@@ -765,16 +659,11 @@ func (s *Service) resolveTags(names []string) ([]model.Tag, error) {
 		if name == "" {
 			continue
 		}
-		var tag model.Tag
-		if err := s.db.Where("name = ?", name).First(&tag).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				tag = model.Tag{Name: name}
-				s.db.Create(&tag)
-			} else {
-				return nil, err
-			}
+		tag, err := s.repo.FindOrCreateTag(name)
+		if err != nil {
+			return nil, err
 		}
-		tags = append(tags, tag)
+		tags = append(tags, *tag)
 	}
 	return tags, nil
 }
@@ -783,41 +672,32 @@ func (s *Service) resolveTags(names []string) ([]model.Tag, error) {
 func extractImageURLs(content string) []string {
 	var urls []string
 
-	// 1. Match src attribute of <img> tags (HTML)
 	reImg := regexp.MustCompile(`<img[^>]+src=["']([^"']+)["'][^>]*>`)
-	matches := reImg.FindAllStringSubmatch(content, -1)
-	for _, match := range matches {
+	for _, match := range reImg.FindAllStringSubmatch(content, -1) {
 		if len(match) >= 2 {
-			url := strings.TrimSpace(match[1])
-			if url != "" {
+			if url := strings.TrimSpace(match[1]); url != "" {
 				urls = append(urls, url)
 			}
 		}
 	}
 
-	// 2. Match Markdown image syntax: ![alt](url)
 	reMarkdown := regexp.MustCompile(`!\[[^\]]*\]\(([^)]+)\)`)
-	matches = reMarkdown.FindAllStringSubmatch(content, -1)
-	for _, match := range matches {
+	for _, match := range reMarkdown.FindAllStringSubmatch(content, -1) {
 		if len(match) >= 2 {
-			url := strings.TrimSpace(match[1])
-			if url != "" {
+			if url := strings.TrimSpace(match[1]); url != "" {
 				urls = append(urls, url)
 			}
 		}
 	}
 
-	// 3. Match reference-style Markdown images: ![alt][ref]
-	reRef := regexp.MustCompile(`!\[[^\]]*\]\[([^]]+)\]`)
-	matches = reRef.FindAllStringSubmatch(content, -1)
-	for _, match := range matches {
+	reRef := regexp.MustCompile(`!\[[^\]]*\]\[([^\]]+)\]`)
+	for _, match := range reRef.FindAllStringSubmatch(content, -1) {
 		if len(match) >= 2 {
 			ref := strings.TrimSpace(match[1])
 			reDef := regexp.MustCompile(`^\s*\[` + regexp.QuoteMeta(ref) + `\]:\s*(\S+)`)
 			for line := range strings.SplitSeq(content, "\n") {
 				if defMatch := reDef.FindStringSubmatch(line); len(defMatch) >= 2 {
-					url := strings.TrimSpace(defMatch[1])
-					if url != "" {
+					if url := strings.TrimSpace(defMatch[1]); url != "" {
 						urls = append(urls, url)
 					}
 					break
