@@ -158,69 +158,53 @@ func (s *Service) DeleteUser(actor model.User, targetID uint) error {
 		return ErrNoPermissionToDelete
 	}
 
-	tx := s.repo.Begin()
-	if tx.Error != nil {
-		return fmt.Errorf("begin transaction: %w", tx.Error)
-	}
-
-	if err := s.repo.DeleteCommentsByUserIDTx(tx, user.ID); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("delete user comments: %w", err)
-	}
-	if err := s.repo.DeleteLikesByUserIDTx(tx, user.ID); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("delete user likes: %w", err)
-	}
-
-	mediaFiles, err := s.repo.FindMediaByUserIDTx(tx, user.ID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("query user media files: %w", err)
-	}
-	for _, media := range mediaFiles {
-		if err := s.files.Delete(media.URL); err != nil {
-			logrus.WithError(err).WithField("url", media.URL).Warn("Failed to delete media file")
+	return s.repo.Transaction(func(tx *gorm.DB) error {
+		if err := s.repo.DeleteCommentsByUserIDTx(tx, user.ID); err != nil {
+			return fmt.Errorf("delete user comments: %w", err)
 		}
-	}
-	if err := s.repo.DeleteMediaFilesByUserIDTx(tx, user.ID); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("delete user media files: %w", err)
-	}
+		if err := s.repo.DeleteLikesByUserIDTx(tx, user.ID); err != nil {
+			return fmt.Errorf("delete user likes: %w", err)
+		}
 
-	posts, err := s.repo.FindPostsByAuthorIDTx(tx, user.ID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("query user posts: %w", err)
-	}
-	for _, post := range posts {
-		if post.CoverImage != "" {
-			if err := s.files.Delete(post.CoverImage); err != nil {
-				logrus.WithError(err).WithField("url", post.CoverImage).Warn("Failed to delete cover image")
+		mediaFiles, err := s.repo.FindMediaByUserIDTx(tx, user.ID)
+		if err != nil {
+			return fmt.Errorf("query user media files: %w", err)
+		}
+		for _, media := range mediaFiles {
+			if err := s.files.Delete(media.URL); err != nil {
+				logrus.WithError(err).WithField("url", media.URL).Warn("Failed to delete media file")
 			}
 		}
-		if err := s.repo.DeleteCommentsByPostIDTx(tx, post.ID); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("delete post comments: %w", err)
+		if err := s.repo.DeleteMediaFilesByUserIDTx(tx, user.ID); err != nil {
+			return fmt.Errorf("delete user media files: %w", err)
 		}
-		if err := s.repo.DeleteLikesByPostIDTx(tx, post.ID); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("delete post likes: %w", err)
+
+		posts, err := s.repo.FindPostsByAuthorIDTx(tx, user.ID)
+		if err != nil {
+			return fmt.Errorf("query user posts: %w", err)
 		}
-	}
+		for _, post := range posts {
+			if post.CoverImage != "" {
+				if err := s.files.Delete(post.CoverImage); err != nil {
+					logrus.WithError(err).WithField("url", post.CoverImage).Warn("Failed to delete cover image")
+				}
+			}
+			if err := s.repo.DeleteCommentsByPostIDTx(tx, post.ID); err != nil {
+				return fmt.Errorf("delete post comments: %w", err)
+			}
+			if err := s.repo.DeleteLikesByPostIDTx(tx, post.ID); err != nil {
+				return fmt.Errorf("delete post likes: %w", err)
+			}
+		}
 
-	if err := s.repo.DeletePostsByAuthorIDTx(tx, user.ID); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("delete user posts: %w", err)
-	}
-	if err := s.repo.DeleteUserTx(tx, user); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("delete user: %w", err)
-	}
-	if err := tx.Commit().Error; err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
-
-	return nil
+		if err := s.repo.DeletePostsByAuthorIDTx(tx, user.ID); err != nil {
+			return fmt.Errorf("delete user posts: %w", err)
+		}
+		if err := s.repo.DeleteUserTx(tx, user); err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
+		return nil
+	})
 }
 
 // ApplyForCreator submits a creator application for the given user and

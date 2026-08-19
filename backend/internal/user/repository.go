@@ -37,7 +37,7 @@ type Repository interface {
 	FindAdmins() ([]model.User, error)
 
 	// Transaction support
-	Begin() *gorm.DB
+	Transaction(fn func(tx *gorm.DB) error) error
 }
 
 type gormRepository struct {
@@ -185,6 +185,6 @@ func (r *gormRepository) FindAdmins() ([]model.User, error) {
 	return admins, nil
 }
 
-func (r *gormRepository) Begin() *gorm.DB {
-	return r.db.Begin()
+func (r *gormRepository) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
 }
