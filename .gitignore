@@ -21,3 +21,4 @@ frontend/.DS_Store
 uploads/
 
 scripts/api_test.sh
+server

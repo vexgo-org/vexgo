@@ -22,150 +22,145 @@ import (
 )
 
 // Open establishes the database connection based on configuration.
-// Behavior mirrors the previous handler.InitDB connection logic.
-func Open(cfg *config.Config, dataDir string) *gorm.DB {
-	// Determine database type: config file takes priority, fallback to environment variable
+func Open(cfg *config.Config, dataDir string) (*gorm.DB, error) {
 	dbType := cfg.DBType
 	if dbType == "" {
 		dbType = os.Getenv("DB_TYPE")
 	}
-	var err error
-	var db *gorm.DB
 
 	switch dbType {
 	case "mysql":
-		// MySQL connection - use config values with environment fallback
-		user := cfg.DBUser
-		if user == "" {
-			user = os.Getenv("DB_USER")
-		}
-		password := cfg.DBPassword
-		if password == "" {
-			password = os.Getenv("DB_PASSWORD")
-		}
-		host := cfg.DBHost
-		if host == "" {
-			host = os.Getenv("DB_HOST")
-		}
-		port := cfg.DBPort
-		if port == 0 {
-			// If port not set in config, get from env
-			portStr := os.Getenv("DB_PORT")
-			if portStr != "" {
-				if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
-					logrus.Warnf("invalid DB_PORT %q, using default MySQL port", portStr)
-					port = 3306
-				}
-			} else {
-				port = 3306 // default MySQL port
-			}
-		}
-		dbname := cfg.DBName
-		if dbname == "" {
-			dbname = os.Getenv("DB_NAME")
-		}
-
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-			user, password, host, port, dbname)
-
-		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		if err != nil {
-			// Check if the error is "Unknown database" (error code 1049)
-			if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
-				logrus.Printf("Database '%s' not found, attempting to create it.", dbname)
-
-				// DSN without database name to connect to the server
-				serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
-				serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{})
-				if serverErr != nil {
-					logrus.Fatalf("failed to connect to MySQL server to create database: %v", serverErr)
-				}
-
-				// Create the database
-				createDbSQL := fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbname)
-				if execErr := serverDb.Exec(createDbSQL).Error; execErr != nil {
-					logrus.Fatalf("failed to create database '%s': %v", dbname, execErr)
-				}
-				logrus.Printf("Database '%s' created successfully.", dbname)
-
-				// Re-attempt connection to the newly created database
-				db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-				if err != nil {
-					logrus.Fatalf("failed to connect to newly created MySQL database: %v", err)
-				}
-			} else {
-				logrus.Fatalf("failed to connect to MySQL database: %v", err)
-			}
-		}
-		logrus.Println("Successfully connected to MySQL database")
+		return openMySQL(cfg)
 	case "postgres":
-		// PostgreSQL connection - use config values with environment fallback
-		user := cfg.DBUser
-		if user == "" {
-			user = os.Getenv("DB_USER")
-		}
-		password := cfg.DBPassword
-		if password == "" {
-			password = os.Getenv("DB_PASSWORD")
-		}
-		host := cfg.DBHost
-		if host == "" {
-			host = os.Getenv("DB_HOST")
-		}
-		port := cfg.DBPort
-		if port == 0 {
-			// If port not set in config, get from env
-			portStr := os.Getenv("DB_PORT")
-			if portStr != "" {
-				if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
-					logrus.Warnf("invalid DB_PORT %q, using default PostgreSQL port", portStr)
-					port = 5432
-				}
-			} else {
-				port = 5432 // default PostgreSQL port
-			}
-		}
-		dbname := cfg.DBName
-		if dbname == "" {
-			dbname = os.Getenv("DB_NAME")
-		}
-		sslMode := cfg.DBSSLMode
-		if sslMode == "" {
-			sslMode = os.Getenv("DB_SSL_MODE")
-			if sslMode == "" {
-				sslMode = "disable" // default SSL mode
-			}
-		}
-
-		// Build DSN for PostgreSQL
-		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-			host, port, user, password, dbname, sslMode)
-
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-		if err != nil {
-			logrus.Fatalf("failed to connect to PostgreSQL database: %v", err)
-		}
-		logrus.Println("Successfully connected to PostgreSQL database")
+		return openPostgres(cfg)
 	default:
-		// SQLite connection (default)
-		// Use dataDir from config (already set via command line or config file)
-		if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
-			logrus.Fatalf("failed to create data directory: %v", err)
+		return openSQLite(cfg, dataDir)
+	}
+}
+
+func openMySQL(cfg *config.Config) (*gorm.DB, error) {
+	user := cfg.DBUser
+	if user == "" {
+		user = os.Getenv("DB_USER")
+	}
+	password := cfg.DBPassword
+	if password == "" {
+		password = os.Getenv("DB_PASSWORD")
+	}
+	host := cfg.DBHost
+	if host == "" {
+		host = os.Getenv("DB_HOST")
+	}
+	port := cfg.DBPort
+	if port == 0 {
+		portStr := os.Getenv("DB_PORT")
+		if portStr != "" {
+			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
+				logrus.Warnf("invalid DB_PORT %q, using default MySQL port", portStr)
+				port = 3306
+			}
+		} else {
+			port = 3306
 		}
-		dbPath := filepath.Join(dataDir, "blog.db")
-		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
-		if err != nil {
-			logrus.Fatalf("failed to connect to SQLite database: %v", err)
-		}
-		logrus.Println("Successfully connected to SQLite database")
+	}
+	dbname := cfg.DBName
+	if dbname == "" {
+		dbname = os.Getenv("DB_NAME")
 	}
 
-	return db
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		user, password, host, port, dbname)
+
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
+			logrus.Infof("Database '%s' not found, attempting to create it", dbname)
+			serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
+			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{})
+			if serverErr != nil {
+				return nil, fmt.Errorf("connect to MySQL server to create database: %w", serverErr)
+			}
+			createDbSQL := fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbname)
+			if execErr := serverDb.Exec(createDbSQL).Error; execErr != nil {
+				return nil, fmt.Errorf("create database '%s': %w", dbname, execErr)
+			}
+			logrus.Infof("Database '%s' created successfully", dbname)
+			db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+			if err != nil {
+				return nil, fmt.Errorf("connect to newly created MySQL database: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("connect to MySQL database: %w", err)
+		}
+	}
+	logrus.Info("Successfully connected to MySQL database")
+	return db, nil
+}
+
+func openPostgres(cfg *config.Config) (*gorm.DB, error) {
+	user := cfg.DBUser
+	if user == "" {
+		user = os.Getenv("DB_USER")
+	}
+	password := cfg.DBPassword
+	if password == "" {
+		password = os.Getenv("DB_PASSWORD")
+	}
+	host := cfg.DBHost
+	if host == "" {
+		host = os.Getenv("DB_HOST")
+	}
+	port := cfg.DBPort
+	if port == 0 {
+		portStr := os.Getenv("DB_PORT")
+		if portStr != "" {
+			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
+				logrus.Warnf("invalid DB_PORT %q, using default PostgreSQL port", portStr)
+				port = 5432
+			}
+		} else {
+			port = 5432
+		}
+	}
+	dbname := cfg.DBName
+	if dbname == "" {
+		dbname = os.Getenv("DB_NAME")
+	}
+	sslMode := cfg.DBSSLMode
+	if sslMode == "" {
+		sslMode = os.Getenv("DB_SSL_MODE")
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+	}
+
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslMode)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("connect to PostgreSQL database: %w", err)
+	}
+	logrus.Info("Successfully connected to PostgreSQL database")
+	return db, nil
+}
+
+func openSQLite(cfg *config.Config, dataDir string) (*gorm.DB, error) {
+	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("create data directory: %w", err)
+	}
+	dbPath := filepath.Join(dataDir, "blog.db")
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("connect to SQLite database: %w", err)
+	}
+	logrus.Info("Successfully connected to SQLite database")
+	return db, nil
 }
 
 // AutoMigrate creates or updates the database schema for all models.
-func AutoMigrate(db *gorm.DB) {
-	if err := db.AutoMigrate(
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(
 		&model.Post{},
 		&model.User{},
 		&model.Tag{},
@@ -183,126 +178,122 @@ func AutoMigrate(db *gorm.DB) {
 		&model.Message{},
 		&model.Notification{},
 		&model.CreatorApplication{},
-	); err != nil {
-		logrus.Fatalf("auto migrate failed: %v", err)
-	}
+	)
 }
 
-// Seed inserts default records (admin user, SMTP/general/AI/theme settings,
-// default category) if they do not already exist.
-func Seed(db *gorm.DB) {
-	// Create a default super admin (if not exists), store password using bcrypt
+// Seed inserts default records if they do not already exist.
+func Seed(db *gorm.DB) error {
+	// Default super admin
 	var u model.User
 	if err := db.Where("username = ?", "admin").First(&u).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			pwHash, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 			if err != nil {
-				logrus.Printf("failed to hash default admin password: %v", err)
-			} else {
-				u = model.User{
-					Username:          "admin",
-					Email:             "admin@example.com",
-					Password:          string(pwHash),
-					Role:              model.RoleSuperAdmin,
-					EmailVerified:     true,
-					VerificationToken: "",
-					TokenExpiresAt:    nil,
-				}
-				if err := db.Create(&u).Error; err != nil {
-					logrus.Printf("failed to create default admin: %v", err)
-				}
+				return fmt.Errorf("hash admin password: %w", err)
 			}
-
-			// Create default SMTP configuration (if not exists)
-			var smtpConfig model.SMTPConfig
-			if err := db.First(&smtpConfig).Error; err != nil {
-				if err == gorm.ErrRecordNotFound {
-					smtpConfig = model.SMTPConfig{
-						Enabled:   false,
-						Host:      "",
-						Port:      587,
-						Username:  "",
-						Password:  "",
-						FromEmail: "",
-						FromName:  "VexGo",
-					}
-					if err := db.Create(&smtpConfig).Error; err != nil {
-						logrus.Printf("failed to create default smtp config: %v", err)
-					} else {
-						logrus.Println("default smtp config created")
-					}
-				}
+			u = model.User{
+				Username:      "admin",
+				Email:         "admin@example.com",
+				Password:      string(pwHash),
+				Role:          model.RoleSuperAdmin,
+				EmailVerified: true,
 			}
+			if err := db.Create(&u).Error; err != nil {
+				return fmt.Errorf("create default admin: %w", err)
+			}
+			logrus.Info("Default admin user created")
 
-			// Create default general settings (if not exists)
-			var generalSettings model.GeneralSettings
-			if err := db.First(&generalSettings).Error; err != nil {
-				if err == gorm.ErrRecordNotFound {
-					generalSettings = model.GeneralSettings{
-						CaptchaEnabled:      false, // Disable captcha by default
-						RegistrationEnabled: true,  // Allow registration by default
-						AllowGuestViewPosts: true,  // Allow guests to view posts by default
-						SiteName:            "VexGo",
-						SiteDescription:     "",
-						ItemsPerPage:        20,
-					}
-					if err := db.Create(&generalSettings).Error; err != nil {
-						logrus.WithError(err).Error("Failed to create default general settings")
-					} else {
-						logrus.Info("Default general settings created successfully")
-					}
-				}
+			if err := seedSMTP(db); err != nil {
+				return err
+			}
+			if err := seedGeneralSettings(db); err != nil {
+				return err
 			}
 		}
 	}
 
-	// Create default AI configuration (if not exists)
-	var aiConfig model.AIConfig
-	if err := db.First(&aiConfig).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			aiConfig = model.AIConfig{
-				Enabled:     false,
-				Provider:    "openai",
-				ApiEndpoint: "",
-				ApiKey:      "",
-				ModelName:   "gpt-3.5-turbo",
-			}
-			if err := db.Create(&aiConfig).Error; err != nil {
-				logrus.WithError(err).Error("Failed to create default AI config")
-			} else {
-				logrus.Info("Default AI config created successfully")
-			}
-		}
+	if err := seedAIConfig(db); err != nil {
+		return err
+	}
+	if err := seedThemeConfig(db); err != nil {
+		return err
+	}
+	if err := seedCategory(db); err != nil {
+		return err
 	}
 
-	// Create default theme configuration (if not exists)
-	var themeConfig model.ThemeConfig
-	if err := db.First(&themeConfig).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			themeConfig = model.ThemeConfig{
-				ActiveTheme: "default",
-			}
-			if err := db.Create(&themeConfig).Error; err != nil {
-				logrus.WithError(err).Error("Failed to create default theme config")
-			} else {
-				logrus.Info("Default theme config created successfully")
-			}
-		}
-	}
+	return nil
+}
 
-	// Create a default category (if not exists)
-	var defaultCategory model.Category
-	if err := db.Where("name = ?", "Default").First(&defaultCategory).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			defaultCategory = model.Category{
-				Name:        "Default",
-				Description: "Default category for articles without a specified category",
-			}
-			if err := db.Create(&defaultCategory).Error; err != nil {
-				logrus.WithError(err).Error("Failed to create default category")
-			} else {
-				logrus.Info("Default category 'Default' created successfully")
-			}
+func seedSMTP(db *gorm.DB) error {
+	var config model.SMTPConfig
+	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+		config = model.SMTPConfig{Enabled: false, Port: 587, FromName: "VexGo"}
+		if err := db.Create(&config).Error; err != nil {
+			return fmt.Errorf("create default SMTP config: %w", err)
 		}
+		logrus.Info("Default SMTP config created")
 	}
+	return nil
+}
+
+func seedGeneralSettings(db *gorm.DB) error {
+	var config model.GeneralSettings
+	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+		config = model.GeneralSettings{
+			CaptchaEnabled:      false,
+			RegistrationEnabled: true,
+			AllowGuestViewPosts: true,
+			SiteName:            "VexGo",
+			ItemsPerPage:        20,
+		}
+		if err := db.Create(&config).Error; err != nil {
+			return fmt.Errorf("create default general settings: %w", err)
+		}
+		logrus.Info("Default general settings created")
+	}
+	return nil
+}
+
+func seedAIConfig(db *gorm.DB) error {
+	var config model.AIConfig
+	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+		config = model.AIConfig{
+			Enabled:   false,
+			Provider:  "openai",
+			ModelName: "gpt-3.5-turbo",
+		}
+		if err := db.Create(&config).Error; err != nil {
+			return fmt.Errorf("create default AI config: %w", err)
+		}
+		logrus.Info("Default AI config created")
+	}
+	return nil
+}
+
+func seedThemeConfig(db *gorm.DB) error {
+	var config model.ThemeConfig
+	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+		config = model.ThemeConfig{ActiveTheme: "default"}
+		if err := db.Create(&config).Error; err != nil {
+			return fmt.Errorf("create default theme config: %w", err)
+		}
+		logrus.Info("Default theme config created")
+	}
+	return nil
+}
+
+func seedCategory(db *gorm.DB) error {
+	var category model.Category
+	if err := db.Where("name = ?", "Default").First(&category).Error; err == gorm.ErrRecordNotFound {
+		category = model.Category{
+			Name:        "Default",
+			Description: "Default category for articles without a specified category",
+		}
+		if err := db.Create(&category).Error; err != nil {
+			return fmt.Errorf("create default category: %w", err)
+		}
+		logrus.Info("Default category created")
+	}
+	return nil
 }
