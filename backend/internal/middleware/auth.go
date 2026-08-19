@@ -125,23 +125,27 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 		var dbRole string
 		if a.db != nil {
 			var user model.User
-			if err := a.db.First(&user, userID).Error; err == nil {
-				// Check if password version in token matches current user's password version
-				if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
-					if int(tokenPasswordVersion) != user.PasswordVersion {
-						c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Password has been changed, please log in again"})
-						return
-					}
-				}
-				// Check if token was issued before last login to prevent token reuse
-				if tokenIat, ok := claims["iat"].(float64); ok {
-					if int64(tokenIat) < user.LastLoginAt.Unix() {
-						c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token is invalid, please log in again"})
-						return
-					}
-				}
-				dbRole = user.Role
+			if err := a.db.First(&user, userID).Error; err != nil {
+				// The user was deleted after the token was issued; do not
+				// fall back to the token's role claim.
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User no longer exists"})
+				return
 			}
+			// Check if password version in token matches current user's password version
+			if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
+				if int(tokenPasswordVersion) != user.PasswordVersion {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Password has been changed, please log in again"})
+					return
+				}
+			}
+			// Check if token was issued before last login to prevent token reuse
+			if tokenIat, ok := claims["iat"].(float64); ok {
+				if int64(tokenIat) < user.LastLoginAt.Unix() {
+					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token is invalid, please log in again"})
+					return
+				}
+			}
+			dbRole = user.Role
 		}
 
 		c.Set(CtxUserIDKey, userID)
@@ -205,11 +209,14 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 		userID := claimsUserID(claims)
 		validToken := true
 
-		// Verify password version and get latest role
+		// Verify password version and get latest role. A user that no longer
+		// exists makes the token invalid (treated as anonymous).
 		var dbRole string
 		if a.db != nil && userID != 0 {
 			var user model.User
-			if err := a.db.First(&user, userID).Error; err == nil {
+			if err := a.db.First(&user, userID).Error; err != nil {
+				validToken = false
+			} else {
 				// Check if password version in token matches current user's password version
 				if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
 					if int(tokenPasswordVersion) != user.PasswordVersion {

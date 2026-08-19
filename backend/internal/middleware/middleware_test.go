@@ -273,6 +273,64 @@ func TestJWTAuth_TokenBeforeLastLogin(t *testing.T) {
 	}
 }
 
+func TestJWTAuth_DeletedUser(t *testing.T) {
+	db := newTestDB(t)
+	// Token signed for a user id that does not exist in the DB: the token
+	// must be rejected instead of falling back to the role claim.
+	tok := signToken(t, jwt.MapClaims{
+		"user_id":          float64(99999),
+		"username":         "ghost",
+		"role":             model.RoleAdmin,
+		"password_version": float64(1),
+		"iat":              float64(time.Now().Unix()),
+	})
+
+	a := NewAuth(db, testSecret)
+	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	if code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for deleted user, got %d", code)
+	}
+}
+
+func TestOptionalJWTAuth_DeletedUser(t *testing.T) {
+	db := newTestDB(t)
+	tok := signToken(t, jwt.MapClaims{
+		"user_id":          float64(99999),
+		"username":         "ghost",
+		"role":             model.RoleAdmin,
+		"password_version": float64(1),
+		"iat":              float64(time.Now().Unix()),
+	})
+
+	a := NewAuth(db, testSecret)
+	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "Bearer "+tok)
+	if code != http.StatusOK || !cap.passed {
+		t.Fatalf("expected request to pass through, code=%d", code)
+	}
+	if cap.userID != nil {
+		t.Errorf("expected anonymous for deleted user, got userID %v", cap.userID)
+	}
+}
+
+func TestPermission_UsesContextRole(t *testing.T) {
+	// The role comes from the context (as set by JWTAuth), so the DB is not
+	// touched: a nil db must still allow an authorized admin through.
+	a := NewAuth(nil, testSecret)
+	r := gin.New()
+	r.GET("/admin", func(c *gin.Context) {
+		c.Set("userID", uint(7))
+		c.Set("user", map[string]any{"id": uint(7), "username": "admin", "role": model.RoleAdmin})
+		c.Next()
+	}, a.Permission(model.RoleAdmin), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin", nil))
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 using context role, got %d", w.Code)
+	}
+}
+
 func TestJWTAuth_NilDBUsesTokenRole(t *testing.T) {
 	tok := signToken(t, jwt.MapClaims{
 		"user_id":          float64(3),
