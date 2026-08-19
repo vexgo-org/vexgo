@@ -63,15 +63,15 @@ func NewService(deps Deps) *Service {
 }
 
 // ListUsers returns the paginated user list with an optional search term.
-func (s *Service) ListUsers(search string, page, limit int) ([]model.User, int64, error) {
+func (s *Service) ListUsers(ctx context.Context, search string, page, limit int) ([]model.User, int64, error) {
 	offset := (page - 1) * limit
-	return s.repo.ListUsers(search, offset, limit)
+	return s.repo.ListUsers(ctx, search, offset, limit)
 }
 
 // UpdateRole changes the target user's role under the acting user's
 // permissions, and notifies the target user of the change.
-func (s *Service) UpdateRole(actor model.User, targetID uint, newRole string) (*model.User, error) {
-	user, err := s.repo.FindByID(targetID)
+func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uint, newRole string) (*model.User, error) {
+	user, err := s.repo.FindByID(ctx, targetID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
@@ -115,11 +115,11 @@ func (s *Service) UpdateRole(actor model.User, targetID uint, newRole string) (*
 
 	oldRole := user.Role
 	user.Role = newRole
-	if err := s.repo.UpdateUserRole(user); err != nil {
+	if err := s.repo.UpdateUserRole(ctx, user); err != nil {
 		return nil, err
 	}
 
-	if err := s.notifier.CreateNotification(context.Background(),
+	if err := s.notifier.CreateNotification(ctx,
 		user.ID,
 		"role",
 		"role changed",
@@ -135,8 +135,8 @@ func (s *Service) UpdateRole(actor model.User, targetID uint, newRole string) (*
 
 // DeleteUser deletes a user and all their posts, comments, likes and media
 // files inside a transaction.
-func (s *Service) DeleteUser(actor model.User, targetID uint) error {
-	user, err := s.repo.FindByID(targetID)
+func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uint) error {
+	user, err := s.repo.FindByID(ctx, targetID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrUserNotFound
@@ -210,12 +210,12 @@ func (s *Service) DeleteUser(actor model.User, targetID uint) error {
 
 // ApplyForCreator submits a creator application for the given user and
 // notifies all admins. It returns the new application ID.
-func (s *Service) ApplyForCreator(user model.User, reason string) (uint, error) {
+func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason string) (uint, error) {
 	if user.Role != model.RoleGuest && user.Role != model.RoleContributor {
 		return 0, ErrRoleNotEligible
 	}
 
-	if _, err := s.repo.FindPendingApplication(user.ID); err == nil {
+	if _, err := s.repo.FindPendingApplication(ctx, user.ID); err == nil {
 		return 0, ErrAlreadyPending
 	}
 
@@ -224,7 +224,7 @@ func (s *Service) ApplyForCreator(user model.User, reason string) (uint, error) 
 		Status: model.CreatorApplicationStatusPending,
 		Reason: reason,
 	}
-	if err := s.repo.CreateApplication(&application); err != nil {
+	if err := s.repo.CreateApplication(ctx, &application); err != nil {
 		return 0, err
 	}
 
@@ -236,10 +236,10 @@ func (s *Service) ApplyForCreator(user model.User, reason string) (uint, error) 
 		targetRole = model.RoleAuthor
 	}
 
-	admins, err := s.repo.FindAdmins()
+	admins, err := s.repo.FindAdmins(ctx)
 	if err == nil {
 		for _, admin := range admins {
-			if err := s.notifier.CreateNotification(context.Background(),
+			if err := s.notifier.CreateNotification(ctx,
 				admin.ID,
 				"role",
 				"New Role Application",
@@ -257,22 +257,22 @@ func (s *Service) ApplyForCreator(user model.User, reason string) (uint, error) 
 
 // ListCreatorApplications returns the paginated creator applications with the
 // applicant preloaded, filtered by status.
-func (s *Service) ListCreatorApplications(actorRole string, status model.CreatorApplicationStatus, page, limit int) ([]model.CreatorApplication, int64, error) {
+func (s *Service) ListCreatorApplications(ctx context.Context, actorRole string, status model.CreatorApplicationStatus, page, limit int) ([]model.CreatorApplication, int64, error) {
 	if actorRole != model.RoleAdmin && actorRole != model.RoleSuperAdmin {
 		return nil, 0, ErrNoPermissionAccessApps
 	}
 	offset := (page - 1) * limit
-	return s.repo.ListApplications(status, offset, limit)
+	return s.repo.ListApplications(ctx, status, offset, limit)
 }
 
 // ReviewCreatorApplication approves or rejects a pending creator application,
 // upgrading the applicant's role on approval and notifying the applicant.
-func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action, reason string) error {
+func (s *Service) ReviewCreatorApplication(ctx context.Context, actor model.User, appID uint, action, reason string) error {
 	if actor.Role != model.RoleAdmin && actor.Role != model.RoleSuperAdmin {
 		return ErrNoPermissionReviewApps
 	}
 
-	application, err := s.repo.FindApplicationByID(appID)
+	application, err := s.repo.FindApplicationByID(ctx, appID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrApplicationNotFound
@@ -296,7 +296,7 @@ func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action,
 		case model.RoleContributor:
 			application.User.Role = model.RoleAuthor
 		}
-		if err := s.repo.UpdateUserRole(&application.User); err != nil {
+		if err := s.repo.UpdateUserRole(ctx, &application.User); err != nil {
 			return err
 		}
 	} else {
@@ -306,7 +306,7 @@ func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action,
 	application.ReviewerID = &actor.ID
 	application.ReviewReason = reason
 
-	if err := s.repo.SaveApplication(application); err != nil {
+	if err := s.repo.SaveApplication(ctx, application); err != nil {
 		return err
 	}
 
@@ -327,7 +327,7 @@ func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action,
 		}
 	}
 
-	if err := s.notifier.CreateNotification(context.Background(),
+	if err := s.notifier.CreateNotification(ctx,
 		application.UserID,
 		"role",
 		notificationTitle,

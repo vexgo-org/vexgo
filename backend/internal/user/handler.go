@@ -41,7 +41,7 @@ func (h *Handler) GetUserList(c *gin.Context) {
 
 	search := c.DefaultQuery("search", "")
 
-	users, total, err := h.svc.ListUsers(search, page, limit)
+	users, total, err := h.svc.ListUsers(c.Request.Context(), search, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query users"})
 		return
@@ -65,7 +65,7 @@ func (h *Handler) GetUserList(c *gin.Context) {
 
 // UpdateUserRole updates user role
 func (h *Handler) UpdateUserRole(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := currentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -86,7 +86,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	user, err := h.svc.UpdateRole(currentUser, uint(id), req.Role)
+	user, err := h.svc.UpdateRole(c.Request.Context(), actor, uint(id), req.Role)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
@@ -117,7 +117,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 
 // DeleteUser deletes user and all their posts and comments
 func (h *Handler) DeleteUser(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := currentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -130,7 +130,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.DeleteUser(currentUser, uint(id))
+	err = h.svc.DeleteUser(c.Request.Context(), actor, uint(id))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
@@ -152,7 +152,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 
 // ApplyForCreator handles creator application submission
 func (h *Handler) ApplyForCreator(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := currentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -166,7 +166,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 		return
 	}
 
-	applicationID, err := h.svc.ApplyForCreator(currentUser, req.Reason)
+	applicationID, err := h.svc.ApplyForCreator(c.Request.Context(), actor, req.Reason)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrRoleNotEligible):
@@ -187,7 +187,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 
 // GetCreatorApplications gets creator applications for admin review
 func (h *Handler) GetCreatorApplications(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := currentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -205,7 +205,7 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 		limit = 10
 	}
 
-	applications, total, err := h.svc.ListCreatorApplications(currentUser.Role, status, page, limit)
+	applications, total, err := h.svc.ListCreatorApplications(c.Request.Context(), actor.Role, status, page, limit)
 	if err != nil {
 		if errors.Is(err, ErrNoPermissionAccessApps) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -249,7 +249,7 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 
 // ReviewCreatorApplication handles creator application review
 func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := currentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -271,7 +271,7 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.ReviewCreatorApplication(currentUser, uint(id), req.Action, req.Reason)
+	err = h.svc.ReviewCreatorApplication(c.Request.Context(), actor, uint(id), req.Action, req.Reason)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNoPermissionReviewApps):

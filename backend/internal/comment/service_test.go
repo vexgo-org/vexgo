@@ -66,12 +66,13 @@ func seedPost(t *testing.T, db *gorm.DB, authorID uint) model.Post {
 }
 
 func TestCreate_AutoApproved(t *testing.T) {
+	ctx := context.Background()
 	svc, notifier, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	comment, count, err := svc.Create(post.ID, commenter.ID, "nice post", nil)
+	comment, count, err := svc.Create(ctx, post.ID, commenter.ID, "nice post", nil)
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestCreate_AutoApproved(t *testing.T) {
 
 	// author commenting on own post → no notification
 	notifier.calls = nil
-	_, _, err = svc.Create(post.ID, author.ID, "self comment", nil)
+	_, _, err = svc.Create(ctx, post.ID, author.ID, "self comment", nil)
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -97,19 +98,20 @@ func TestCreate_AutoApproved(t *testing.T) {
 }
 
 func TestCreate_ModerationDisabledManualApproval(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, err := svc.UpdateModerationConfig(UpdateModerationConfigRequest{
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
 		Enabled:            false,
 		AutoApproveEnabled: false,
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
 
-	comment, _, err := svc.Create(post.ID, commenter.ID, "needs review", nil)
+	comment, _, err := svc.Create(ctx, post.ID, commenter.ID, "needs review", nil)
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -119,19 +121,20 @@ func TestCreate_ModerationDisabledManualApproval(t *testing.T) {
 }
 
 func TestCreate_ModerationRejectsBlockedKeyword(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, err := svc.UpdateModerationConfig(UpdateModerationConfigRequest{
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
 		Enabled:       true,
 		BlockKeywords: "spam,ad",
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
 
-	comment, _, err := svc.Create(post.ID, commenter.ID, "buy now spam", nil)
+	comment, _, err := svc.Create(ctx, post.ID, commenter.ID, "buy now spam", nil)
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -141,14 +144,14 @@ func TestCreate_ModerationRejectsBlockedKeyword(t *testing.T) {
 }
 
 func TestCreate_ReplyNotifiesParentAuthor(t *testing.T) {
+	ctx := context.Background()
 	svc, notifier, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 	replier := seedUser(t, db, "replier", model.RoleGuest)
 
-	parentID := uint(0)
-	_, _, err := svc.Create(post.ID, commenter.ID, "first", nil)
+	_, _, err := svc.Create(ctx, post.ID, commenter.ID, "first", nil)
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -156,10 +159,10 @@ func TestCreate_ReplyNotifiesParentAuthor(t *testing.T) {
 	if err := db.First(&parent).Error; err != nil {
 		t.Fatalf("failed to load parent: %v", err)
 	}
-	parentID = parent.ID
+	parentID := parent.ID
 
 	notifier.calls = nil
-	_, _, err = svc.Create(post.ID, replier.ID, "reply", &parentID)
+	_, _, err = svc.Create(ctx, post.ID, replier.ID, "reply", &parentID)
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -169,6 +172,7 @@ func TestCreate_ReplyNotifiesParentAuthor(t *testing.T) {
 }
 
 func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
@@ -177,10 +181,10 @@ func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
 	commenter.ProfileVisibility = "private"
 	db.Save(&commenter)
 
-	if _, _, err := svc.Create(post.ID, commenter.ID, "published one", nil); err != nil {
+	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "published one", nil); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, _, err := svc.Create(post.ID, author.ID, "pending one", nil); err != nil {
+	if _, _, err := svc.Create(ctx, post.ID, author.ID, "pending one", nil); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	var pending model.Comment
@@ -190,7 +194,7 @@ func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
 	pending.Status = model.CommentStatusPending
 	db.Save(&pending)
 
-	comments, err := svc.ListByPost("1", 0, "")
+	comments, err := svc.ListByPost(ctx, "1", 0, "")
 	if err != nil {
 		t.Fatalf("ListByPost error: %v", err)
 	}
@@ -201,7 +205,7 @@ func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
 		t.Errorf("expected private email filtered for anonymous viewer")
 	}
 
-	comments, err = svc.ListByPost("1", author.ID, author.Role)
+	comments, err = svc.ListByPost(ctx, "1", author.ID, author.Role)
 	if err != nil {
 		t.Fatalf("ListByPost error: %v", err)
 	}
@@ -210,7 +214,7 @@ func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
 	}
 
 	admin := seedUser(t, db, "admin", model.RoleSuperAdmin)
-	comments, err = svc.ListByPost("1", admin.ID, admin.Role)
+	comments, err = svc.ListByPost(ctx, "1", admin.ID, admin.Role)
 	if err != nil {
 		t.Fatalf("ListByPost error: %v", err)
 	}
@@ -220,12 +224,13 @@ func TestListByPost_PublishedOnlyAndPrivacy(t *testing.T) {
 }
 
 func TestDelete_Permissions(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, _, err := svc.Create(post.ID, commenter.ID, "to delete", nil); err != nil {
+	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "to delete", nil); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	var comment model.Comment
@@ -235,11 +240,11 @@ func TestDelete_Permissions(t *testing.T) {
 	id := comment.ID
 
 	other := seedUser(t, db, "other", model.RoleGuest)
-	if _, err := svc.Delete(strconv.FormatUint(uint64(id), 10), other.ID); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Delete(ctx, strconv.FormatUint(uint64(id), 10), other.ID); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 
-	count, err := svc.Delete(strconv.FormatUint(uint64(id), 10), commenter.ID)
+	count, err := svc.Delete(ctx, strconv.FormatUint(uint64(id), 10), commenter.ID)
 	if err != nil {
 		t.Fatalf("Delete error: %v", err)
 	}
@@ -247,18 +252,19 @@ func TestDelete_Permissions(t *testing.T) {
 		t.Errorf("expected count 0 after delete, got %d", count)
 	}
 
-	if _, err := svc.Delete(strconv.FormatUint(uint64(id), 10), commenter.ID); !errors.Is(err, ErrCommentNotFound) {
+	if _, err := svc.Delete(ctx, strconv.FormatUint(uint64(id), 10), commenter.ID); !errors.Is(err, ErrCommentNotFound) {
 		t.Errorf("expected ErrCommentNotFound, got %v", err)
 	}
 }
 
 func TestSetStatus(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, _, err := svc.Create(post.ID, commenter.ID, "moderate me", nil); err != nil {
+	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "moderate me", nil); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	var comment model.Comment
@@ -266,7 +272,7 @@ func TestSetStatus(t *testing.T) {
 		t.Fatalf("load failed: %v", err)
 	}
 
-	updated, err := svc.SetStatus(strconv.FormatUint(uint64(comment.ID), 10), model.CommentStatusPublished)
+	updated, err := svc.SetStatus(ctx, strconv.FormatUint(uint64(comment.ID), 10), model.CommentStatusPublished)
 	if err != nil {
 		t.Fatalf("SetStatus error: %v", err)
 	}
@@ -274,25 +280,26 @@ func TestSetStatus(t *testing.T) {
 		t.Errorf("expected published, got %s", updated.Status)
 	}
 
-	if _, err := svc.SetStatus("99999", model.CommentStatusPublished); !errors.Is(err, ErrCommentNotFound) {
+	if _, err := svc.SetStatus(ctx, "99999", model.CommentStatusPublished); !errors.Is(err, ErrCommentNotFound) {
 		t.Errorf("expected ErrCommentNotFound, got %v", err)
 	}
 }
 
 func TestListModeration(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
-	if _, _, err := svc.Create(post.ID, commenter.ID, "one", nil); err != nil {
+	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "one", nil); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, _, err := svc.Create(post.ID, commenter.ID, "two", nil); err != nil {
+	if _, _, err := svc.Create(ctx, post.ID, commenter.ID, "two", nil); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	list, total, err := svc.ListModeration(model.CommentStatusPublished, 1, 1)
+	list, total, err := svc.ListModeration(ctx, model.CommentStatusPublished, 1, 1)
 	if err != nil {
 		t.Fatalf("ListModeration error: %v", err)
 	}
@@ -303,7 +310,7 @@ func TestListModeration(t *testing.T) {
 		t.Errorf("expected 1 item per page, got %d", len(list))
 	}
 
-	list, total, err = svc.ListModeration(model.CommentStatusPending, 1, 10)
+	list, total, err = svc.ListModeration(ctx, model.CommentStatusPending, 1, 10)
 	if err != nil {
 		t.Fatalf("ListModeration error: %v", err)
 	}
@@ -313,9 +320,10 @@ func TestListModeration(t *testing.T) {
 }
 
 func TestUpdateModerationConfig_PreservesApiKey(t *testing.T) {
+	ctx := context.Background()
 	svc, _, db := newTestService(t)
 
-	config, err := svc.UpdateModerationConfig(UpdateModerationConfigRequest{
+	config, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
 		Enabled: true,
 		ApiKey:  "secret-key",
 	})
@@ -334,7 +342,7 @@ func TestUpdateModerationConfig_PreservesApiKey(t *testing.T) {
 		t.Errorf("expected stored api key, got %q", stored.ApiKey)
 	}
 
-	_, err = svc.UpdateModerationConfig(UpdateModerationConfigRequest{
+	_, err = svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
 		Enabled: false,
 	})
 	if err != nil {

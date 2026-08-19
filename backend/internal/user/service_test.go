@@ -67,12 +67,13 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 }
 
 func TestUpdateRole_Permissions(t *testing.T) {
+	ctx := context.Background()
 	svc, notifier, _, db := newTestService(t)
 	admin := seedUser(t, db, "admin", model.RoleAdmin)
 	super := seedUser(t, db, "super", model.RoleSuperAdmin)
 	target := seedUser(t, db, "target", model.RoleGuest)
 
-	updated, err := svc.UpdateRole(admin, target.ID, model.RoleAuthor)
+	updated, err := svc.UpdateRole(ctx, admin, target.ID, model.RoleAuthor)
 	if err != nil {
 		t.Fatalf("UpdateRole error: %v", err)
 	}
@@ -83,24 +84,24 @@ func TestUpdateRole_Permissions(t *testing.T) {
 		t.Errorf("expected one role notification, got %v", notifier.calls)
 	}
 
-	if _, err := svc.UpdateRole(admin, target.ID, model.RoleAdmin); !errors.Is(err, ErrAdminRoleRestricted) {
+	if _, err := svc.UpdateRole(ctx, admin, target.ID, model.RoleAdmin); !errors.Is(err, ErrAdminRoleRestricted) {
 		t.Errorf("expected ErrAdminRoleRestricted, got %v", err)
 	}
 
-	if _, err := svc.UpdateRole(admin, admin.ID, model.RoleAuthor); !errors.Is(err, ErrCannotModifySelf) {
+	if _, err := svc.UpdateRole(ctx, admin, admin.ID, model.RoleAuthor); !errors.Is(err, ErrCannotModifySelf) {
 		t.Errorf("expected ErrCannotModifySelf, got %v", err)
 	}
 
 	guest := seedUser(t, db, "guest", model.RoleGuest)
-	if _, err := svc.UpdateRole(guest, target.ID, model.RoleAuthor); !errors.Is(err, ErrNoPermission) {
+	if _, err := svc.UpdateRole(ctx, guest, target.ID, model.RoleAuthor); !errors.Is(err, ErrNoPermission) {
 		t.Errorf("expected ErrNoPermission, got %v", err)
 	}
 
-	if _, err := svc.UpdateRole(admin, super.ID, model.RoleAuthor); !errors.Is(err, ErrModifySuperAdmin) {
+	if _, err := svc.UpdateRole(ctx, admin, super.ID, model.RoleAuthor); !errors.Is(err, ErrModifySuperAdmin) {
 		t.Errorf("expected ErrModifySuperAdmin, got %v", err)
 	}
 
-	updated, err = svc.UpdateRole(super, target.ID, model.RoleSuperAdmin)
+	updated, err = svc.UpdateRole(ctx, super, target.ID, model.RoleSuperAdmin)
 	if err != nil {
 		t.Fatalf("UpdateRole error: %v", err)
 	}
@@ -108,16 +109,17 @@ func TestUpdateRole_Permissions(t *testing.T) {
 		t.Errorf("expected super_admin, got %s", updated.Role)
 	}
 
-	if _, err := svc.UpdateRole(super, target.ID, "not-a-role"); !errors.Is(err, ErrInvalidRole) {
+	if _, err := svc.UpdateRole(ctx, super, target.ID, "not-a-role"); !errors.Is(err, ErrInvalidRole) {
 		t.Errorf("expected ErrInvalidRole, got %v", err)
 	}
 
-	if _, err := svc.UpdateRole(super, 99999, model.RoleAuthor); !errors.Is(err, ErrUserNotFound) {
+	if _, err := svc.UpdateRole(ctx, super, 99999, model.RoleAuthor); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("expected ErrUserNotFound, got %v", err)
 	}
 }
 
 func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
+	ctx := context.Background()
 	svc, _, files, db := newTestService(t)
 	super := seedUser(t, db, "super", model.RoleSuperAdmin)
 	admin := seedUser(t, db, "admin", model.RoleAdmin)
@@ -138,24 +140,24 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 		t.Fatalf("failed to seed media file: %v", err)
 	}
 
-	if err := svc.DeleteUser(admin, otherAdmin.ID); !errors.Is(err, ErrAdminDeleteRestricted) {
+	if err := svc.DeleteUser(ctx, admin, otherAdmin.ID); !errors.Is(err, ErrAdminDeleteRestricted) {
 		t.Errorf("expected ErrAdminDeleteRestricted, got %v", err)
 	}
 
 	guest := seedUser(t, db, "guest", model.RoleGuest)
-	if err := svc.DeleteUser(guest, target.ID); !errors.Is(err, ErrNoPermissionToDelete) {
+	if err := svc.DeleteUser(ctx, guest, target.ID); !errors.Is(err, ErrNoPermissionToDelete) {
 		t.Errorf("expected ErrNoPermissionToDelete, got %v", err)
 	}
 
-	if err := svc.DeleteUser(target, target.ID); !errors.Is(err, ErrCannotDeleteSelf) {
+	if err := svc.DeleteUser(ctx, target, target.ID); !errors.Is(err, ErrCannotDeleteSelf) {
 		t.Errorf("expected ErrCannotDeleteSelf, got %v", err)
 	}
 
-	if err := svc.DeleteUser(super, 99999); !errors.Is(err, ErrUserNotFound) {
+	if err := svc.DeleteUser(ctx, super, 99999); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("expected ErrUserNotFound, got %v", err)
 	}
 
-	if err := svc.DeleteUser(super, target.ID); err != nil {
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
 		t.Fatalf("DeleteUser error: %v", err)
 	}
 	var count int64
@@ -185,11 +187,12 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 }
 
 func TestApplyForCreator(t *testing.T) {
+	ctx := context.Background()
 	svc, notifier, _, db := newTestService(t)
 	guest := seedUser(t, db, "guest", model.RoleGuest)
 	admin := seedUser(t, db, "admin", model.RoleAdmin)
 
-	appID, err := svc.ApplyForCreator(guest, "I want to write")
+	appID, err := svc.ApplyForCreator(ctx, guest, "I want to write")
 	if err != nil {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
@@ -200,35 +203,36 @@ func TestApplyForCreator(t *testing.T) {
 		t.Errorf("expected one admin notification, got %v", notifier.calls)
 	}
 
-	if _, err := svc.ApplyForCreator(guest, "again"); !errors.Is(err, ErrAlreadyPending) {
+	if _, err := svc.ApplyForCreator(ctx, guest, "again"); !errors.Is(err, ErrAlreadyPending) {
 		t.Errorf("expected ErrAlreadyPending, got %v", err)
 	}
 
 	author := seedUser(t, db, "author", model.RoleAuthor)
-	if _, err := svc.ApplyForCreator(author, "nope"); !errors.Is(err, ErrRoleNotEligible) {
+	if _, err := svc.ApplyForCreator(ctx, author, "nope"); !errors.Is(err, ErrRoleNotEligible) {
 		t.Errorf("expected ErrRoleNotEligible, got %v", err)
 	}
 	_ = admin
 }
 
 func TestListCreatorApplications_PermissionAndFilter(t *testing.T) {
+	ctx := context.Background()
 	svc, _, _, db := newTestService(t)
 	admin := seedUser(t, db, "admin", model.RoleAdmin)
 	guest := seedUser(t, db, "guest", model.RoleGuest)
 	other := seedUser(t, db, "other", model.RoleGuest)
 
-	if _, err := svc.ApplyForCreator(guest, "apply 1"); err != nil {
+	if _, err := svc.ApplyForCreator(ctx, guest, "apply 1"); err != nil {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
-	if _, err := svc.ApplyForCreator(other, "apply 2"); err != nil {
+	if _, err := svc.ApplyForCreator(ctx, other, "apply 2"); err != nil {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
 
-	if _, _, err := svc.ListCreatorApplications(guest.Role, model.CreatorApplicationStatusPending, 1, 10); !errors.Is(err, ErrNoPermissionAccessApps) {
+	if _, _, err := svc.ListCreatorApplications(ctx, guest.Role, model.CreatorApplicationStatusPending, 1, 10); !errors.Is(err, ErrNoPermissionAccessApps) {
 		t.Errorf("expected ErrNoPermissionAccessApps, got %v", err)
 	}
 
-	apps, total, err := svc.ListCreatorApplications(admin.Role, model.CreatorApplicationStatusPending, 1, 10)
+	apps, total, err := svc.ListCreatorApplications(ctx, admin.Role, model.CreatorApplicationStatusPending, 1, 10)
 	if err != nil {
 		t.Fatalf("ListCreatorApplications error: %v", err)
 	}
@@ -239,7 +243,7 @@ func TestListCreatorApplications_PermissionAndFilter(t *testing.T) {
 		t.Errorf("expected applicant preloaded")
 	}
 
-	apps, total, err = svc.ListCreatorApplications(admin.Role, model.CreatorApplicationStatusApproved, 1, 10)
+	apps, total, err = svc.ListCreatorApplications(ctx, admin.Role, model.CreatorApplicationStatusApproved, 1, 10)
 	if err != nil {
 		t.Fatalf("ListCreatorApplications error: %v", err)
 	}
@@ -249,30 +253,31 @@ func TestListCreatorApplications_PermissionAndFilter(t *testing.T) {
 }
 
 func TestReviewCreatorApplication(t *testing.T) {
+	ctx := context.Background()
 	svc, notifier, _, db := newTestService(t)
 	super := seedUser(t, db, "super", model.RoleSuperAdmin)
 	guest := seedUser(t, db, "guest", model.RoleGuest)
 	other := seedUser(t, db, "other", model.RoleGuest)
 
-	appID, err := svc.ApplyForCreator(guest, "promote me")
+	appID, err := svc.ApplyForCreator(ctx, guest, "promote me")
 	if err != nil {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
 
-	if err := svc.ReviewCreatorApplication(other, appID, "approve", ""); !errors.Is(err, ErrNoPermissionReviewApps) {
+	if err := svc.ReviewCreatorApplication(ctx, other, appID, "approve", ""); !errors.Is(err, ErrNoPermissionReviewApps) {
 		t.Errorf("expected ErrNoPermissionReviewApps, got %v", err)
 	}
 
-	if err := svc.ReviewCreatorApplication(super, appID, "maybe", ""); !errors.Is(err, ErrInvalidAction) {
+	if err := svc.ReviewCreatorApplication(ctx, super, appID, "maybe", ""); !errors.Is(err, ErrInvalidAction) {
 		t.Errorf("expected ErrInvalidAction, got %v", err)
 	}
 
-	if err := svc.ReviewCreatorApplication(super, 99999, "approve", ""); !errors.Is(err, ErrApplicationNotFound) {
+	if err := svc.ReviewCreatorApplication(ctx, super, 99999, "approve", ""); !errors.Is(err, ErrApplicationNotFound) {
 		t.Errorf("expected ErrApplicationNotFound, got %v", err)
 	}
 
 	notifier.calls = nil
-	if err := svc.ReviewCreatorApplication(super, appID, "approve", ""); err != nil {
+	if err := svc.ReviewCreatorApplication(ctx, super, appID, "approve", ""); err != nil {
 		t.Fatalf("ReviewCreatorApplication error: %v", err)
 	}
 	var u model.User
@@ -286,15 +291,15 @@ func TestReviewCreatorApplication(t *testing.T) {
 		t.Errorf("expected applicant notification, got %v", notifier.calls)
 	}
 
-	if err := svc.ReviewCreatorApplication(super, appID, "reject", ""); !errors.Is(err, ErrApplicationProcessed) {
+	if err := svc.ReviewCreatorApplication(ctx, super, appID, "reject", ""); !errors.Is(err, ErrApplicationProcessed) {
 		t.Errorf("expected ErrApplicationProcessed, got %v", err)
 	}
 
-	appID2, err := svc.ApplyForCreator(other, "promote me too")
+	appID2, err := svc.ApplyForCreator(ctx, other, "promote me too")
 	if err != nil {
 		t.Fatalf("ApplyForCreator error: %v", err)
 	}
-	if err := svc.ReviewCreatorApplication(super, appID2, "reject", "not enough posts"); err != nil {
+	if err := svc.ReviewCreatorApplication(ctx, super, appID2, "reject", "not enough posts"); err != nil {
 		t.Fatalf("ReviewCreatorApplication error: %v", err)
 	}
 	var app model.CreatorApplication
@@ -310,12 +315,13 @@ func TestReviewCreatorApplication(t *testing.T) {
 }
 
 func TestListUsers_SearchAndPagination(t *testing.T) {
+	ctx := context.Background()
 	svc, _, _, db := newTestService(t)
 	seedUser(t, db, "alice", model.RoleGuest)
 	seedUser(t, db, "bob", model.RoleAuthor)
 	seedUser(t, db, "carol", model.RoleAdmin)
 
-	users, total, err := svc.ListUsers("", 1, 10)
+	users, total, err := svc.ListUsers(ctx, "", 1, 10)
 	if err != nil {
 		t.Fatalf("ListUsers error: %v", err)
 	}
@@ -323,7 +329,7 @@ func TestListUsers_SearchAndPagination(t *testing.T) {
 		t.Errorf("expected 3 users, got total=%d len=%d", total, len(users))
 	}
 
-	users, total, err = svc.ListUsers("ali", 1, 10)
+	users, total, err = svc.ListUsers(ctx, "ali", 1, 10)
 	if err != nil {
 		t.Fatalf("ListUsers error: %v", err)
 	}
@@ -331,7 +337,7 @@ func TestListUsers_SearchAndPagination(t *testing.T) {
 		t.Errorf("expected only alice, got total=%d users=%v", total, users)
 	}
 
-	users, total, err = svc.ListUsers("", 2, 2)
+	users, total, err = svc.ListUsers(ctx, "", 2, 2)
 	if err != nil {
 		t.Fatalf("ListUsers error: %v", err)
 	}

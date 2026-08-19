@@ -1,6 +1,8 @@
 package user
 
 import (
+	"context"
+
 	"vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -9,11 +11,11 @@ import (
 // Repository is the persistence interface for the user domain.
 type Repository interface {
 	// Users
-	FindByID(id uint) (*model.User, error)
-	UpdateUser(user *model.User) error
-	UpdateUserRole(user *model.User) error
-	ListUsers(search string, offset, limit int) ([]model.User, int64, error)
-	DeleteUser(user *model.User) error
+	FindByID(ctx context.Context, id uint) (*model.User, error)
+	UpdateUser(ctx context.Context, user *model.User) error
+	UpdateUserRole(ctx context.Context, user *model.User) error
+	ListUsers(ctx context.Context, search string, offset, limit int) ([]model.User, int64, error)
+	DeleteUser(ctx context.Context, user *model.User) error
 
 	// Transaction-scoped cascade deletes
 	DeleteCommentsByUserIDTx(tx *gorm.DB, userID uint) error
@@ -23,18 +25,18 @@ type Repository interface {
 	FindPostsByAuthorIDTx(tx *gorm.DB, authorID uint) ([]model.Post, error)
 	DeleteCommentsByPostIDTx(tx *gorm.DB, postID uint) error
 	DeleteLikesByPostIDTx(tx *gorm.DB, postID uint) error
-	DeletePostsByAuthorIDTx(tx *gorm.DB, authorID uint) error
+	DeletePostsByAuthorIDTx(tx *gorm.DB, postID uint) error
 	DeleteUserTx(tx *gorm.DB, user *model.User) error
 
 	// Creator applications
-	FindPendingApplication(userID uint) (*model.CreatorApplication, error)
-	CreateApplication(app *model.CreatorApplication) error
-	FindApplicationByID(id uint) (*model.CreatorApplication, error)
-	SaveApplication(app *model.CreatorApplication) error
-	ListApplications(status model.CreatorApplicationStatus, offset, limit int) ([]model.CreatorApplication, int64, error)
+	FindPendingApplication(ctx context.Context, userID uint) (*model.CreatorApplication, error)
+	CreateApplication(ctx context.Context, app *model.CreatorApplication) error
+	FindApplicationByID(ctx context.Context, id uint) (*model.CreatorApplication, error)
+	SaveApplication(ctx context.Context, app *model.CreatorApplication) error
+	ListApplications(ctx context.Context, status model.CreatorApplicationStatus, offset, limit int) ([]model.CreatorApplication, int64, error)
 
 	// Admins (for notifications)
-	FindAdmins() ([]model.User, error)
+	FindAdmins(ctx context.Context) ([]model.User, error)
 
 	// Transaction support
 	Transaction(fn func(tx *gorm.DB) error) error
@@ -49,24 +51,24 @@ func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }
 
-func (r *gormRepository) FindByID(id uint) (*model.User, error) {
+func (r *gormRepository) FindByID(ctx context.Context, id uint) (*model.User, error) {
 	var user model.User
-	if err := r.db.First(&user, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (r *gormRepository) UpdateUser(user *model.User) error {
-	return r.db.Save(user).Error
+func (r *gormRepository) UpdateUser(ctx context.Context, user *model.User) error {
+	return r.db.WithContext(ctx).Save(user).Error
 }
 
-func (r *gormRepository) UpdateUserRole(user *model.User) error {
-	return r.db.Model(user).Select("Role").Updates(user).Error
+func (r *gormRepository) UpdateUserRole(ctx context.Context, user *model.User) error {
+	return r.db.WithContext(ctx).Model(user).Select("Role").Updates(user).Error
 }
 
-func (r *gormRepository) ListUsers(search string, offset, limit int) ([]model.User, int64, error) {
-	query := r.db.Model(&model.User{})
+func (r *gormRepository) ListUsers(ctx context.Context, search string, offset, limit int) ([]model.User, int64, error) {
+	query := r.db.WithContext(ctx).Model(&model.User{})
 	if search != "" {
 		searchTerm := "%" + search + "%"
 		query = query.Where("username LIKE ? OR email LIKE ?", searchTerm, searchTerm)
@@ -85,8 +87,8 @@ func (r *gormRepository) ListUsers(search string, offset, limit int) ([]model.Us
 	return users, total, nil
 }
 
-func (r *gormRepository) DeleteUser(user *model.User) error {
-	return r.db.Delete(user).Error
+func (r *gormRepository) DeleteUser(ctx context.Context, user *model.User) error {
+	return r.db.WithContext(ctx).Delete(user).Error
 }
 
 func (r *gormRepository) DeleteCommentsByUserIDTx(tx *gorm.DB, userID uint) error {
@@ -125,41 +127,41 @@ func (r *gormRepository) DeleteLikesByPostIDTx(tx *gorm.DB, postID uint) error {
 	return tx.Where("post_id = ?", postID).Delete(&model.Like{}).Error
 }
 
-func (r *gormRepository) DeletePostsByAuthorIDTx(tx *gorm.DB, authorID uint) error {
-	return tx.Where("author_id = ?", authorID).Delete(&model.Post{}).Error
+func (r *gormRepository) DeletePostsByAuthorIDTx(tx *gorm.DB, postID uint) error {
+	return tx.Where("author_id = ?", postID).Delete(&model.Post{}).Error
 }
 
 func (r *gormRepository) DeleteUserTx(tx *gorm.DB, user *model.User) error {
 	return tx.Delete(user).Error
 }
 
-func (r *gormRepository) FindPendingApplication(userID uint) (*model.CreatorApplication, error) {
+func (r *gormRepository) FindPendingApplication(ctx context.Context, userID uint) (*model.CreatorApplication, error) {
 	var app model.CreatorApplication
-	if err := r.db.Where("user_id = ? AND status = ?", userID, model.CreatorApplicationStatusPending).
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND status = ?", userID, model.CreatorApplicationStatusPending).
 		First(&app).Error; err != nil {
 		return nil, err
 	}
 	return &app, nil
 }
 
-func (r *gormRepository) CreateApplication(app *model.CreatorApplication) error {
-	return r.db.Create(app).Error
+func (r *gormRepository) CreateApplication(ctx context.Context, app *model.CreatorApplication) error {
+	return r.db.WithContext(ctx).Create(app).Error
 }
 
-func (r *gormRepository) FindApplicationByID(id uint) (*model.CreatorApplication, error) {
+func (r *gormRepository) FindApplicationByID(ctx context.Context, id uint) (*model.CreatorApplication, error) {
 	var app model.CreatorApplication
-	if err := r.db.Preload("User").First(&app, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("User").First(&app, id).Error; err != nil {
 		return nil, err
 	}
 	return &app, nil
 }
 
-func (r *gormRepository) SaveApplication(app *model.CreatorApplication) error {
-	return r.db.Save(app).Error
+func (r *gormRepository) SaveApplication(ctx context.Context, app *model.CreatorApplication) error {
+	return r.db.WithContext(ctx).Save(app).Error
 }
 
-func (r *gormRepository) ListApplications(status model.CreatorApplicationStatus, offset, limit int) ([]model.CreatorApplication, int64, error) {
-	query := r.db.Model(&model.CreatorApplication{}).Preload("User")
+func (r *gormRepository) ListApplications(ctx context.Context, status model.CreatorApplicationStatus, offset, limit int) ([]model.CreatorApplication, int64, error) {
+	query := r.db.WithContext(ctx).Model(&model.CreatorApplication{}).Preload("User")
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -177,9 +179,9 @@ func (r *gormRepository) ListApplications(status model.CreatorApplicationStatus,
 	return apps, total, nil
 }
 
-func (r *gormRepository) FindAdmins() ([]model.User, error) {
+func (r *gormRepository) FindAdmins(ctx context.Context) ([]model.User, error) {
 	var admins []model.User
-	if err := r.db.Where("role IN ?", []string{model.RoleAdmin, model.RoleSuperAdmin}).Find(&admins).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("role IN ?", []string{model.RoleAdmin, model.RoleSuperAdmin}).Find(&admins).Error; err != nil {
 		return nil, err
 	}
 	return admins, nil

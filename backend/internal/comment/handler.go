@@ -47,7 +47,7 @@ func (h *Handler) GetComments(c *gin.Context) {
 		}
 	}
 
-	comments, err := h.svc.ListByPost(postID, currentUserID, currentUserRole)
+	comments, err := h.svc.ListByPost(c.Request.Context(), postID, currentUserID, currentUserRole)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments"})
 		return
@@ -103,7 +103,7 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	comment, count, err := h.svc.Create(postID, userID, req.Content, req.ParentID)
+	comment, count, err := h.svc.Create(c.Request.Context(), postID, userID, req.Content, req.ParentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
 		return
@@ -141,7 +141,7 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 		return
 	}
 
-	count, err := h.svc.Delete(id, userID)
+	count, err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCommentNotFound):
@@ -161,7 +161,7 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 
 // GetCommentModerationConfig gets comment moderation configuration
 func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
-	config, err := h.svc.GetModerationConfig()
+	config, err := h.svc.GetModerationConfig(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment moderation configuration"})
 		return
@@ -189,7 +189,7 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateModerationConfig(UpdateModerationConfigRequest{
+	config, err := h.svc.UpdateModerationConfig(c.Request.Context(), UpdateModerationConfigRequest{
 		Enabled:            req.Enabled,
 		ModelProvider:      req.ModelProvider,
 		ApiKey:             req.ApiKey,
@@ -246,7 +246,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 		limitNum = val
 	}
 
-	comments, total, err := h.svc.ListModeration(status, pageNum, limitNum)
+	comments, total, err := h.svc.ListModeration(c.Request.Context(), status, pageNum, limitNum)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation comments"})
 		return
@@ -280,7 +280,7 @@ func (h *Handler) RejectComment(c *gin.Context) {
 
 // setStatus approves or rejects a comment and renders the result.
 func (h *Handler) setStatus(c *gin.Context, status model.CommentStatus, successMsg, failureMsg string) {
-	comment, err := h.svc.SetStatus(c.Param("id"), status)
+	comment, err := h.svc.SetStatus(c.Request.Context(), c.Param("id"), status)
 	if err != nil {
 		if errors.Is(err, ErrCommentNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})
