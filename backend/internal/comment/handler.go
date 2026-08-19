@@ -47,7 +47,11 @@ func (h *Handler) GetComments(c *gin.Context) {
 		}
 	}
 
-	comments, _ := h.svc.ListByPost(postID, currentUserID, currentUserRole)
+	comments, err := h.svc.ListByPost(postID, currentUserID, currentUserRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"comments": comments})
 }
@@ -242,7 +246,11 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 		limitNum = val
 	}
 
-	comments, total, _ := h.svc.ListModeration(status, pageNum, limitNum)
+	comments, total, err := h.svc.ListModeration(status, pageNum, limitNum)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation comments"})
+		return
+	}
 
 	totalPages := (int(total) + limitNum - 1) / limitNum
 	if totalPages == 0 {

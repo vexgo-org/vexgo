@@ -29,7 +29,11 @@ func (h *Handler) GetMessages(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	notifications, total, _ := h.svc.List(uid, page, limit, c.Query("type"), c.Query("is_read"))
+	notifications, total, err := h.svc.List(uid, page, limit, c.Query("type"), c.Query("is_read"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"notifications": notifications,
@@ -110,7 +114,11 @@ func (h *Handler) GetUnreadCount(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	count, _ := h.svc.UnreadCount(uid)
+	count, err := h.svc.UnreadCount(uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch unread count"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"unreadCount": count})
 }

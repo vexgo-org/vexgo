@@ -131,7 +131,11 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 	uid, _ := c.Get("userID")
 	userID := uid.(uint)
 
-	files, _ := h.svc.ListByUser(userID)
+	files, err := h.svc.ListByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch files"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"files": files})
 }

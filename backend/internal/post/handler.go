@@ -207,7 +207,11 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.DefaultQuery("status", "")
 
-	posts, total, _ := h.svc.MyPosts(userID, page, limit, status)
+	posts, total, err := h.svc.MyPosts(userID, page, limit, status)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
+		return
+	}
 
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
@@ -232,7 +236,11 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 
 	userRole, userID := currentUser(c)
 
-	posts, total, _ := h.svc.Drafts(userRole, userID, page, limit)
+	posts, total, err := h.svc.Drafts(userRole, userID, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch drafts"})
+		return
+	}
 
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
@@ -289,7 +297,11 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 	userRole, _ := currentUser(c)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
-	posts, _ := h.svc.Popular(userRole, limit)
+	posts, err := h.svc.Popular(userRole, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch popular posts"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"posts": posts})
 }
@@ -299,7 +311,11 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 	userRole, _ := currentUser(c)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
-	posts, _ := h.svc.Latest(userRole, limit)
+	posts, err := h.svc.Latest(userRole, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch latest posts"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"posts": posts})
 }
@@ -308,7 +324,11 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 func (h *Handler) GetCategories(c *gin.Context) {
 	userRole, _ := currentUser(c)
 
-	categories, _ := h.svc.Categories(userRole)
+	categories, err := h.svc.Categories(userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
@@ -340,7 +360,11 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 func (h *Handler) GetTags(c *gin.Context) {
 	userRole, _ := currentUser(c)
 
-	tags, _ := h.svc.Tags(userRole)
+	tags, err := h.svc.Tags(userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tags"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"tags": tags})
 }
@@ -388,7 +412,11 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.DefaultQuery("search", "")
 
-	posts, total, _ := h.svc.ListModeration(status, page, limit, search)
+	posts, total, err := h.svc.ListModeration(status, page, limit, search)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation posts"})
+		return
+	}
 
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
