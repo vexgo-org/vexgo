@@ -72,7 +72,7 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err == nil {
-		if user.Role != model.RoleAdmin && media.UserID != userID {
+		if !model.IsAdmin(user.Role) && media.UserID != userID {
 			return ErrForbidden
 		}
 	}
