@@ -25,11 +25,10 @@ func (h *Handler) GetMessages(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	// Pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	notifications, total, err := h.svc.List(uid, page, limit, c.Query("type"), c.Query("is_read"))
+	notifications, total, err := h.svc.List(c.Request.Context(), uid, page, limit, c.Query("type"), c.Query("is_read"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
 		return
@@ -58,7 +57,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	rowsAffected, err := h.svc.MarkAsRead(uid, id)
+	rowsAffected, err := h.svc.MarkAsRead(c.Request.Context(), uid, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark message as read"})
 		return
@@ -76,7 +75,7 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	if err := h.svc.MarkAllAsRead(uid); err != nil {
+	if err := h.svc.MarkAllAsRead(c.Request.Context(), uid); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark all messages as read"})
 		return
 	}
@@ -96,7 +95,7 @@ func (h *Handler) DeleteMessage(c *gin.Context) {
 		return
 	}
 
-	rowsAffected, err := h.svc.Delete(uid, id)
+	rowsAffected, err := h.svc.Delete(c.Request.Context(), uid, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message"})
 		return
@@ -114,7 +113,7 @@ func (h *Handler) GetUnreadCount(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
-	count, err := h.svc.UnreadCount(uid)
+	count, err := h.svc.UnreadCount(c.Request.Context(), uid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch unread count"})
 		return

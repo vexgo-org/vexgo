@@ -1,6 +1,7 @@
 package message
 
 import (
+	"context"
 	"testing"
 
 	"vexgo/backend/internal/model"
@@ -36,14 +37,14 @@ func newTestService(t *testing.T) (*Service, Repository) {
 
 func TestCreateNotification(t *testing.T) {
 	svc, repo := newTestService(t)
+	ctx := context.Background()
 
-	err := svc.CreateNotification(1, "comment", "New comment", "someone commented", "42", "post")
+	err := svc.CreateNotification(ctx, 1, "comment", "New comment", "someone commented", "42", "post")
 	if err != nil {
 		t.Fatalf("CreateNotification error: %v", err)
 	}
 
-	// Verify via repository
-	list, total, err := repo.List(1, 0, 10, "", "")
+	list, total, err := repo.List(ctx, 1, 0, 10, "", "")
 	if err != nil {
 		t.Fatalf("repo.List error: %v", err)
 	}
@@ -61,15 +62,15 @@ func TestCreateNotification(t *testing.T) {
 
 func TestList_PaginationAndFilters(t *testing.T) {
 	svc, _ := newTestService(t)
+	ctx := context.Background()
 
 	for range 5 {
-		if err := svc.CreateNotification(1, "comment", "c", "content", "", ""); err != nil {
+		if err := svc.CreateNotification(ctx, 1, "comment", "c", "content", "", ""); err != nil {
 			t.Fatalf("failed to seed: %v", err)
 		}
 	}
 
-	// page 1, limit 2
-	list, total, err := svc.List(1, 1, 2, "", "")
+	list, total, err := svc.List(ctx, 1, 1, 2, "", "")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -80,8 +81,7 @@ func TestList_PaginationAndFilters(t *testing.T) {
 		t.Errorf("expected 2 items on page 1, got %d", len(list))
 	}
 
-	// filter unread only (all are unread since we didn't mark any)
-	list, total, err = svc.List(1, 1, 10, "", "false")
+	list, total, err = svc.List(ctx, 1, 1, 10, "", "false")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -92,8 +92,7 @@ func TestList_PaginationAndFilters(t *testing.T) {
 		t.Errorf("expected 5 unread items, got %d", len(list))
 	}
 
-	// filter by type
-	_, total, err = svc.List(1, 1, 10, "comment", "")
+	_, total, err = svc.List(ctx, 1, 1, 10, "comment", "")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -104,17 +103,19 @@ func TestList_PaginationAndFilters(t *testing.T) {
 
 func TestMarkAsRead(t *testing.T) {
 	svc, repo := newTestService(t)
-	if err := svc.CreateNotification(1, "comment", "t", "c", "", ""); err != nil {
+	ctx := context.Background()
+
+	if err := svc.CreateNotification(ctx, 1, "comment", "t", "c", "", ""); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
 
-	list, _, err := repo.List(1, 0, 10, "", "")
+	list, _, err := repo.List(ctx, 1, 0, 10, "", "")
 	if err != nil || len(list) == 0 {
 		t.Fatalf("load failed: err=%v len=%d", err, len(list))
 	}
 	n := list[0]
 
-	rows, err := svc.MarkAsRead(1, int(n.ID))
+	rows, err := svc.MarkAsRead(ctx, 1, int(n.ID))
 	if err != nil {
 		t.Fatalf("MarkAsRead error: %v", err)
 	}
@@ -122,8 +123,7 @@ func TestMarkAsRead(t *testing.T) {
 		t.Errorf("expected 1 row affected, got %d", rows)
 	}
 
-	// Verify it's read now
-	readList, _, err := repo.List(1, 0, 10, "", "true")
+	readList, _, err := repo.List(ctx, 1, 0, 10, "", "true")
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -131,8 +131,7 @@ func TestMarkAsRead(t *testing.T) {
 		t.Errorf("expected 1 read notification, got %d", len(readList))
 	}
 
-	// other user cannot mark it read
-	rows, err = svc.MarkAsRead(2, int(n.ID))
+	rows, err = svc.MarkAsRead(ctx, 2, int(n.ID))
 	if err != nil {
 		t.Fatalf("MarkAsRead error: %v", err)
 	}
@@ -143,26 +142,27 @@ func TestMarkAsRead(t *testing.T) {
 
 func TestMarkAllAsRead(t *testing.T) {
 	svc, _ := newTestService(t)
-	if err := svc.CreateNotification(1, "comment", "t", "c", "", ""); err != nil {
+	ctx := context.Background()
+
+	if err := svc.CreateNotification(ctx, 1, "comment", "t", "c", "", ""); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
-	if err := svc.CreateNotification(2, "comment", "t", "c", "", ""); err != nil {
+	if err := svc.CreateNotification(ctx, 2, "comment", "t", "c", "", ""); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
 
-	if err := svc.MarkAllAsRead(1); err != nil {
+	if err := svc.MarkAllAsRead(ctx, 1); err != nil {
 		t.Fatalf("MarkAllAsRead error: %v", err)
 	}
 
-	count, err := svc.UnreadCount(1)
+	count, err := svc.UnreadCount(ctx, 1)
 	if err != nil {
 		t.Fatalf("UnreadCount error: %v", err)
 	}
 	if count != 0 {
 		t.Errorf("expected 0 unread for user 1, got %d", count)
 	}
-	// user 2 unaffected
-	count, err = svc.UnreadCount(2)
+	count, err = svc.UnreadCount(ctx, 2)
 	if err != nil {
 		t.Fatalf("UnreadCount error: %v", err)
 	}
@@ -173,18 +173,19 @@ func TestMarkAllAsRead(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	svc, repo := newTestService(t)
-	if err := svc.CreateNotification(1, "comment", "t", "c", "", ""); err != nil {
+	ctx := context.Background()
+
+	if err := svc.CreateNotification(ctx, 1, "comment", "t", "c", "", ""); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
 
-	list, _, err := repo.List(1, 0, 10, "", "")
+	list, _, err := repo.List(ctx, 1, 0, 10, "", "")
 	if err != nil || len(list) == 0 {
 		t.Fatalf("load failed: err=%v len=%d", err, len(list))
 	}
 	n := list[0]
 
-	// wrong user
-	rows, err := svc.Delete(2, int(n.ID))
+	rows, err := svc.Delete(ctx, 2, int(n.ID))
 	if err != nil {
 		t.Fatalf("Delete error: %v", err)
 	}
@@ -192,8 +193,7 @@ func TestDelete(t *testing.T) {
 		t.Errorf("expected 0 rows for foreign user, got %d", rows)
 	}
 
-	// correct user
-	rows, err = svc.Delete(1, int(n.ID))
+	rows, err = svc.Delete(ctx, 1, int(n.ID))
 	if err != nil {
 		t.Fatalf("Delete error: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestDelete(t *testing.T) {
 		t.Errorf("expected 1 row affected, got %d", rows)
 	}
 
-	count, err := svc.UnreadCount(1)
+	count, err := svc.UnreadCount(ctx, 1)
 	if err != nil {
 		t.Fatalf("count failed: %v", err)
 	}

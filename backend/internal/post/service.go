@@ -3,6 +3,7 @@
 package post
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -528,7 +529,7 @@ func (s *Service) Approve(id string) (*model.Post, error) {
 	post.Status = model.PostStatusPublished
 	s.repo.Save(post)
 
-	if err := s.notifier.CreateNotification(
+	if err := s.notifier.CreateNotification(context.Background(),
 		post.AuthorID,
 		"review",
 		"Post approved",
@@ -553,7 +554,7 @@ func (s *Service) Reject(id, rejectionReason string) (*model.Post, error) {
 	post.RejectionReason = rejectionReason
 	s.repo.Save(post)
 
-	if err := s.notifier.CreateNotification(
+	if err := s.notifier.CreateNotification(context.Background(),
 		post.AuthorID,
 		"review",
 		"post rejected",
@@ -606,7 +607,7 @@ func (s *Service) ToggleLike(postID, userID uint) (isLiked bool, count int64, er
 	if err == nil && post.AuthorID != userID {
 		user, err := s.repo.FindUserByID(userID)
 		if err == nil {
-			if err := s.notifier.CreateNotification(
+			if err := s.notifier.CreateNotification(context.Background(),
 				post.AuthorID,
 				"like",
 				"The post received likes",

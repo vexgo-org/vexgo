@@ -1,9 +1,11 @@
 package model
 
+import "context"
+
 // Notifier is the seam for creating notifications; implemented by the
 // message domain and injected so it can be faked in tests.
 type Notifier interface {
-	CreateNotification(userID uint, notificationType, title, content, relatedID, relatedType string) error
+	CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
 }
 
 // FileRemover deletes a stored file by its public URL; implemented by

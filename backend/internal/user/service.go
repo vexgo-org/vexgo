@@ -2,6 +2,7 @@
 package user
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -118,7 +119,7 @@ func (s *Service) UpdateRole(actor model.User, targetID uint, newRole string) (*
 		return nil, err
 	}
 
-	if err := s.notifier.CreateNotification(
+	if err := s.notifier.CreateNotification(context.Background(),
 		user.ID,
 		"role",
 		"role changed",
@@ -238,7 +239,7 @@ func (s *Service) ApplyForCreator(user model.User, reason string) (uint, error) 
 	admins, err := s.repo.FindAdmins()
 	if err == nil {
 		for _, admin := range admins {
-			if err := s.notifier.CreateNotification(
+			if err := s.notifier.CreateNotification(context.Background(),
 				admin.ID,
 				"role",
 				"New Role Application",
@@ -326,7 +327,7 @@ func (s *Service) ReviewCreatorApplication(actor model.User, appID uint, action,
 		}
 	}
 
-	if err := s.notifier.CreateNotification(
+	if err := s.notifier.CreateNotification(context.Background(),
 		application.UserID,
 		"role",
 		notificationTitle,

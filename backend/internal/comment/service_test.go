@@ -1,6 +1,7 @@
 package comment
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"testing"
@@ -16,7 +17,7 @@ type fakeNotifier struct {
 	calls []string
 }
 
-func (f *fakeNotifier) CreateNotification(userID uint, notificationType, title, content, relatedID, relatedType string) error {
+func (f *fakeNotifier) CreateNotification(_ context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
 	f.calls = append(f.calls, notificationType)
 	return nil
 }

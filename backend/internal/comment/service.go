@@ -2,6 +2,7 @@
 package comment
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -172,7 +173,7 @@ func (s *Service) notifyPostAuthor(postID, userID uint, content string) {
 	if len(commentContent) > 50 {
 		commentContent = commentContent[:50] + "..."
 	}
-	if err := s.notifier.CreateNotification(
+	if err := s.notifier.CreateNotification(context.Background(),
 		post.AuthorID,
 		"comment",
 		"Post Commented",
@@ -201,7 +202,7 @@ func (s *Service) notifyParentAuthor(parentID, userID uint, content string) {
 	if len(replyContent) > 50 {
 		replyContent = replyContent[:50] + "..."
 	}
-	if err := s.notifier.CreateNotification(
+	if err := s.notifier.CreateNotification(context.Background(),
 		parentComment.UserID,
 		"reply",
 		"Comment Replied",
