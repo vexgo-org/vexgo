@@ -224,11 +224,11 @@ The notification system uses a **seam interface** (`model.Notifier`) — domain 
 
 The `database.Open()` function supports three backends:
 
-| Backend  | Default   | Production-ready |
-| -------- | --------- | ---------------- |
-| SQLite   | Yes       | For small installs |
-| MySQL    | No        | Yes              |
-| PostgreSQL | No      | Yes              |
+| Backend    | Default | Production-ready   |
+| ---------- | ------- | ------------------ |
+| SQLite     | Yes     | For small installs |
+| MySQL      | No      | Yes                |
+| PostgreSQL | No      | Yes                |
 
 The database type is determined by the `db_type` config field or `DB_TYPE` environment variable. When connecting to MySQL, the server will automatically create the database if it doesn't exist.
 
