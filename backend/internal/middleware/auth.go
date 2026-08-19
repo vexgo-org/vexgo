@@ -12,9 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
-)// Auth holds the database connection used to validate tokens against the
+) // Auth holds the database connection used to validate tokens against the
 // current user state (password version, last login).
-type Auth struct {	db *gorm.DB
+type Auth struct {
+	db *gorm.DB
 }
 
 // NewAuth creates the authentication middleware with the given database.
