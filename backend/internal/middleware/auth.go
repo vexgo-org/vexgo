@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 ) // Auth holds the database connection and JWT secret used to validate tokens.
+
 type Auth struct {
 	db        *gorm.DB
 	jwtSecret []byte
