@@ -34,6 +34,7 @@ type gormRepository struct {
 	db *gorm.DB
 }
 
+// NewRepository creates a GORM-backed settings repository.
 func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }

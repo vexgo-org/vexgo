@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// PostStatus is the lifecycle state of a post.
 type PostStatus string
 
 const (
@@ -15,6 +16,7 @@ const (
 	PostStatusRejected  PostStatus = "rejected"
 )
 
+// Post is a blog article with its author, category, tags and moderation state.
 type Post struct {
 	ID              uint       `json:"id" gorm:"primaryKey"`
 	Title           string     `json:"title" binding:"required" gorm:"size:255"`
@@ -37,11 +39,13 @@ type Post struct {
 	CommentsCount int `json:"commentsCount" gorm:"-"`
 }
 
+// Tag is a label attached to posts via a many-to-many association.
 type Tag struct {
 	ID   uint   `json:"id" gorm:"primaryKey"`
 	Name string `json:"name" gorm:"size:100;uniqueIndex"`
 }
 
+// Category groups posts under a named, optionally described bucket.
 type Category struct {
 	ID          uint   `json:"id" gorm:"primaryKey"`
 	Name        string `json:"name" gorm:"size:100;uniqueIndex"`

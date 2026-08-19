@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// ListFilter 收敛列表查询参数（分页、状态与搜索过滤）。
-// 各查询方法按需使用其中的字段。
+// ListFilter groups the list-query parameters (pagination, status and search
+// filtering). Each query method uses only the fields it needs.
 type ListFilter struct {
 	Page, Limit int
 	CategoryID  string
@@ -76,6 +76,7 @@ type gormRepository struct {
 	db *gorm.DB
 }
 
+// NewRepository creates a GORM-backed post repository.
 func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }

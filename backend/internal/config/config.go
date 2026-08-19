@@ -1,3 +1,6 @@
+// Package config parses server configuration from command-line flags, a YAML
+// config file, environment variables, and built-in defaults, in that order of
+// priority. It also computes runtime secrets (JWT, SSO) from these sources.
 package config
 
 import (

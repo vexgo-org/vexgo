@@ -24,6 +24,7 @@ type gormRepository struct {
 	db *gorm.DB
 }
 
+// NewRepository creates a GORM-backed home repository.
 func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }

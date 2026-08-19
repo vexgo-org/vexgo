@@ -31,16 +31,18 @@ type MailSender interface {
 	ConfirmEmailChange(token string) error
 }
 
-// Mailer email sender
+// Mailer sends transactional emails via SMTP and manages the associated
+// verification / password-reset tokens in the database.
 type Mailer struct {
 	DB *gorm.DB
 }
 
+// MailMessageArgs carries the parts of an outgoing email message.
 type MailMessageArgs struct {
-	To       string
-	Subject  string
-	TextBody string
-	HTMLBody string
+	To       string // recipient address
+	Subject  string // email subject
+	TextBody string // plain-text alternative body
+	HTMLBody string // HTML body
 }
 
 // compile-time check that Mailer satisfies MailSender
@@ -480,6 +482,8 @@ func (m *Mailer) getConfig() (*model.SMTPConfig, error) {
 	return &config, nil
 }
 
+// BuildMailMessage renders a multipart/alternative MIME message with both
+// plain-text and HTML bodies, using the SMTP config for sender details.
 func BuildMailMessage(arg *MailMessageArgs, config *model.SMTPConfig) string {
 	const BOUNDARY = "\r\n\r\n--boundary\r\n"
 

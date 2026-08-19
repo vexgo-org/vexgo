@@ -11,6 +11,7 @@ const (
 	RoleGuest       = "guest"
 )
 
+// User is an account with a role, authentication fields and privacy settings.
 type User struct {
 	ID                uint       `json:"id" gorm:"primaryKey"`
 	Username          string     `json:"username" binding:"required" gorm:"size:100;uniqueIndex"`

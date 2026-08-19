@@ -1,3 +1,5 @@
+// Command vexgo is the VexGo server entry point. It parses configuration,
+// wires the application via the app package, and serves HTTP until shutdown.
 package main
 
 import (

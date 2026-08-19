@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// CommentStatus is the moderation state of a comment.
 type CommentStatus string
 
 const (
