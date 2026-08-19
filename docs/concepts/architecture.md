@@ -28,7 +28,7 @@ backend/
     mailer/                  # SMTP mail building and sending
     message/                 # in-app notifications
     middleware/              # JWT auth, role-based permissions, request logging
-    model/                   # GORM data models + shared interfaces (Notifier, FileRemover)
+    model/                   # GORM data models + shared interfaces (Notifier, FileRemover, Mailer)
     post/                    # post CRUD, categories, tags, likes
     public/                  # embedded frontend, themes, SSR renderer, static routes
     router/                  # route registration (composes every domain)
@@ -69,9 +69,23 @@ type Notifier interface {
 type FileRemover interface {
     Delete(url string) error
 }
+
+// Mailer is the seam for sending transactional email and managing email
+// verification / password-reset tokens; implemented by the mailer domain.
+type Mailer interface {
+    IsEmailEnabled() (bool, error)
+    GenerateVerificationToken(userID uint) (string, error)
+    SendVerificationEmail(toEmail, toName, verificationLink string) error
+    VerifyEmail(token string) error
+    GenerateEmailChangeToken(userID uint, newEmail string) (string, error)
+    SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error
+    GeneratePasswordResetToken(userID uint) (string, error)
+    SendPasswordResetEmail(toEmail, toName, resetLink string) error
+    ConfirmEmailChange(token string) error
+}
 ```
 
-These interfaces allow domains like `post`, `comment`, and `user` to trigger notifications and file cleanup without importing the concrete implementations, keeping the dependency graph acyclic.
+These interfaces allow domains like `post`, `comment`, and `user` to trigger notifications and file cleanup — and `auth`/`verification` to send email — without importing the concrete implementations, keeping the dependency graph acyclic.
 
 ### Composition Root (`internal/app/`)
 
@@ -99,15 +113,18 @@ cmd/vexgo/main.go
 
 Leaf packages (no internal imports):
     model/         ← data models + shared interfaces, imported by every domain
-    config/        ← configuration parsing, imported by app, auth, database, middleware, sso, upload
+    config/        ← configuration parsing, imported by app, auth, database, sso, upload
 
 Shared layer:
     middleware/     ← JWT auth, role permissions, request logging (imports model only)
 
 Cross-domain edges:
     auth/          ← used by comment, post, sso (for privacy filtering)
+    mailer/        ← implements model.Mailer, used by auth and verification for email
     message/       ← implements model.Notifier, used by comment, post, user as notification seam
     upload/        ← implements model.FileRemover, used by user, auth, post for file cleanup
+    verification/  ← used by auth as the captcha-check seam
+    public/        ← used by settings as the theme-renderer seam
 ```
 
 ### Configuration Management

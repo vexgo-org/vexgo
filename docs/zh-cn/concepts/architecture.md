@@ -28,7 +28,7 @@ backend/
     mailer/                  # SMTP 邮件构建与发送
     message/                 # 站内通知
     middleware/              # JWT 认证、角色权限、请求日志
-    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）
+    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover、Mailer）
     post/                    # 文章 CRUD、分类、标签、点赞
     public/                  # 嵌入的前端、主题、SSR 渲染器、静态路由
     router/                  # 路由注册（组合所有领域）
@@ -69,9 +69,22 @@ type Notifier interface {
 type FileRemover interface {
     Delete(url string) error
 }
+
+// Mailer 是发送事务性邮件和管理邮箱验证/密码重置令牌的接缝；由 mailer 领域实现。
+type Mailer interface {
+    IsEmailEnabled() (bool, error)
+    GenerateVerificationToken(userID uint) (string, error)
+    SendVerificationEmail(toEmail, toName, verificationLink string) error
+    VerifyEmail(token string) error
+    GenerateEmailChangeToken(userID uint, newEmail string) (string, error)
+    SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error
+    GeneratePasswordResetToken(userID uint) (string, error)
+    SendPasswordResetEmail(toEmail, toName, resetLink string) error
+    ConfirmEmailChange(token string) error
+}
 ```
 
-这些接口允许 `post`、`comment` 和 `user` 等领域触发通知和文件清理，而无需导入具体实现，从而保持依赖图无环。
+这些接口允许 `post`、`comment` 和 `user` 等领域触发通知和文件清理——`auth`/`verification` 则用于发送邮件——而无需导入具体实现，从而保持依赖图无环。
 
 ### 组合根（`internal/app/`）
 
@@ -99,15 +112,18 @@ cmd/vexgo/main.go
 
 叶子包（无内部导入）：
     model/         ← 数据模型 + 共享接口，被所有领域包导入
-    config/        ← 配置解析，被 app、auth、database、middleware、sso、upload 导入
+    config/        ← 配置解析，被 app、auth、database、sso、upload 导入
 
 共享层：
     middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）
 
 跨领域边：
     auth/          ← 被 comment、post、sso 使用（隐私过滤）
+    mailer/        ← 实现 model.Mailer，被 auth 和 verification 用于发送邮件
     message/       ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
     upload/        ← 实现 model.FileRemover，被 user、auth、post 用于文件清理
+    verification/  ← 被 auth 用作验证码检查接缝
+    public/        ← 被 settings 用作主题渲染器接缝
 ```
 
 ### 配置管理

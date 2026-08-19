@@ -159,7 +159,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 使用 PostgreSQL 配置运行 VexGo：
 
 ```bash
-go run backend/main.go -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo -c examples/config-postgres.yml
 ```
 
 或使用环境变量：
@@ -200,7 +200,7 @@ mysql> FLUSH PRIVILEGES;
 
 ```bash
 cd backend
-go run main.go -c ../examples/config-mysql.yml
+go run ./cmd/vexgo -c ../examples/config-mysql.yml
 ```
 
 > 首次启动时 VexGo 会自动执行数据库迁移——无需手动导入任何东西。
