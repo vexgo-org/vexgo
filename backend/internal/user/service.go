@@ -172,7 +172,11 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 		return ErrNoPermissionToDelete
 	}
 
-	return s.repo.Transaction(func(tx *gorm.DB) error {
+	// Collect file URLs inside the transaction, but delete the files only
+	// after it commits: a rollback must not leave DB rows pointing at
+	// deleted files (or files deleted for rows that were rolled back).
+	var fileURLs []string
+	err = s.repo.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.DeleteCommentsByUserIDTx(tx, user.ID); err != nil {
 			return fmt.Errorf("delete user comments: %w", err)
 		}
@@ -185,9 +189,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 			return fmt.Errorf("query user media files: %w", err)
 		}
 		for _, media := range mediaFiles {
-			if err := s.files.Delete(media.URL); err != nil {
-				logrus.WithError(err).WithField("url", media.URL).Warn("Failed to delete media file")
-			}
+			fileURLs = append(fileURLs, media.URL)
 		}
 		if err := s.repo.DeleteMediaFilesByUserIDTx(tx, user.ID); err != nil {
 			return fmt.Errorf("delete user media files: %w", err)
@@ -199,9 +201,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 		}
 		for _, post := range posts {
 			if post.CoverImage != "" {
-				if err := s.files.Delete(post.CoverImage); err != nil {
-					logrus.WithError(err).WithField("url", post.CoverImage).Warn("Failed to delete cover image")
-				}
+				fileURLs = append(fileURLs, post.CoverImage)
 			}
 			if err := s.repo.DeleteCommentsByPostIDTx(tx, post.ID); err != nil {
 				return fmt.Errorf("delete post comments: %w", err)
@@ -219,6 +219,16 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for _, url := range fileURLs {
+		if err := s.files.Delete(url); err != nil {
+			logrus.WithError(err).WithField("url", url).Warn("Failed to delete media file")
+		}
+	}
+	return nil
 }
 
 // ApplyForCreator submits a creator application for the given user and
