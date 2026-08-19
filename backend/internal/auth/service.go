@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"vexgo/backend/internal/model"
@@ -506,8 +507,14 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return ErrQueryFailed
 	}
 
+	// Only password-reset tokens may reset a password; reject email
+	// verification and email-change tokens so they cannot be cross-used.
+	if !strings.HasPrefix(token, model.TokenPrefixReset) {
+		return ErrInvalidResetToken
+	}
+
 	// Check if token has expired
-	if user.TokenExpiresAt.Before(time.Now()) {
+	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
 		return ErrResetTokenExpired
 	}
 

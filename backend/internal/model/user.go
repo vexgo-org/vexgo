@@ -17,6 +17,15 @@ const (
 	ProfileVisibilityPrivate = "private"
 )
 
+// Verification token prefixes. All token kinds share the verification_token
+// column, so the prefix distinguishes email verification, password reset and
+// email-change tokens and prevents one kind from being used as another.
+const (
+	TokenPrefixVerify      = "verify-"
+	TokenPrefixReset       = "reset-"
+	TokenPrefixEmailChange = "email-change-"
+)
+
 // User is an account with a role, authentication fields and privacy settings.
 type User struct {
 	ID                uint       `json:"id" gorm:"primaryKey"`

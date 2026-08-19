@@ -73,7 +73,7 @@ func NewService(deps Deps) *Service {
 // It returns whether the token was an email change and the user's new email
 // (only meaningful for email changes).
 func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bool, newEmail string, err error) {
-	if strings.HasPrefix(token, "email-change-") {
+	if strings.HasPrefix(token, model.TokenPrefixEmailChange) {
 		logrus.Debug("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
 		if err := s.mailer.ConfirmEmailChange(token); err != nil {
 			logrus.WithError(err).Debug("[VerifyEmail] ConfirmEmailChange failed")

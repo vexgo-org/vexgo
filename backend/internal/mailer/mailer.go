@@ -144,7 +144,7 @@ If you did not register for this account, please ignore this email.
 // GenerateVerificationToken generates verification token
 func (m *Mailer) GenerateVerificationToken(userID uint) (string, error) {
 	// Generate random token (should use more secure method in production)
-	token := fmt.Sprintf("verify-%d-%d", userID, time.Now().UnixNano())
+	token := model.TokenPrefixVerify + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -161,8 +161,14 @@ func (m *Mailer) GenerateVerificationToken(userID uint) (string, error) {
 	return token, nil
 }
 
-// VerifyEmail verifies email address
+// VerifyEmail verifies email address. Only email-verification tokens are
+// accepted: password-reset and email-change tokens are rejected so they
+// cannot be cross-used to verify an email.
 func (m *Mailer) VerifyEmail(token string) error {
+	if strings.HasPrefix(token, model.TokenPrefixReset) || strings.HasPrefix(token, model.TokenPrefixEmailChange) {
+		return fmt.Errorf("invalid verification token")
+	}
+
 	var user model.User
 	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -172,7 +178,7 @@ func (m *Mailer) VerifyEmail(token string) error {
 	}
 
 	// Check if token is expired
-	if user.TokenExpiresAt.Before(time.Now()) {
+	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
 		return fmt.Errorf("verification token has expired")
 	}
 
@@ -289,7 +295,7 @@ If you did not request a password reset, please ignore this email.
 // GeneratePasswordResetToken generates password reset token
 func (m *Mailer) GeneratePasswordResetToken(userID uint) (string, error) {
 	// Generate random token
-	token := fmt.Sprintf("reset-%d-%d", userID, time.Now().UnixNano())
+	token := model.TokenPrefixReset + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -309,7 +315,7 @@ func (m *Mailer) GeneratePasswordResetToken(userID uint) (string, error) {
 // GenerateEmailChangeToken generates email change verification token
 func (m *Mailer) GenerateEmailChangeToken(userID uint, newEmail string) (string, error) {
 	// Generate random token
-	token := fmt.Sprintf("email-change-%d-%d", userID, time.Now().UnixNano())
+	token := model.TokenPrefixEmailChange + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -422,6 +428,12 @@ If you did not request an email change, please ignore this email.
 func (m *Mailer) ConfirmEmailChange(token string) error {
 	logrus.WithField("token", token).Debug("ConfirmEmailChange processing started")
 
+	// Only email-change tokens may confirm an email change.
+	if !strings.HasPrefix(token, model.TokenPrefixEmailChange) {
+		logrus.Warn("Invalid verification token")
+		return fmt.Errorf("invalid verification token")
+	}
+
 	var user model.User
 	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -434,7 +446,7 @@ func (m *Mailer) ConfirmEmailChange(token string) error {
 	logrus.WithFields(logrus.Fields{"userID": user.ID, "username": user.Username, "pendingEmail": user.PendingEmail}).Debug("Found user for email change")
 
 	// Check if token is expired
-	if user.TokenExpiresAt.Before(time.Now()) {
+	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
 		logrus.WithField("expiresAt", user.TokenExpiresAt).Warn("Email change token expired")
 		return fmt.Errorf("verification token has expired")
 	}

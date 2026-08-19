@@ -321,20 +321,21 @@ func TestResetPassword(t *testing.T) {
 		t.Errorf("expected ErrInvalidResetToken, got %v", err)
 	}
 
-	// expired token
+	// expired token (with the correct reset- prefix, so it reaches the
+	// expiry check instead of being rejected by the prefix check)
 	expiredAt := time.Now().Add(-1 * time.Minute)
 	u2 := model.User{
 		Username:          "bob",
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "expired-token",
+		VerificationToken: "reset-expired",
 		TokenExpiresAt:    &expiredAt,
 	}
 	if err := db.Create(&u2).Error; err != nil {
 		t.Fatalf("failed to seed user: %v", err)
 	}
-	if err := svc.ResetPassword(context.Background(), "expired-token", "newpass123"); !errors.Is(err, ErrResetTokenExpired) {
+	if err := svc.ResetPassword(context.Background(), "reset-expired", "newpass123"); !errors.Is(err, ErrResetTokenExpired) {
 		t.Errorf("expected ErrResetTokenExpired, got %v", err)
 	}
 
@@ -348,6 +349,51 @@ func TestResetPassword(t *testing.T) {
 	}
 	if stored.VerificationToken != "" {
 		t.Errorf("expected token cleared")
+	}
+}
+
+func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
+	svc, _, db := newTestService(t)
+	expiresAt := time.Now().Add(5 * time.Minute)
+
+	// Email verification token (valid, unexpired) must NOT reset a password.
+	u1 := model.User{
+		Username:          "alice",
+		Email:             "alice@example.com",
+		Password:          "hash",
+		Role:              model.RoleGuest,
+		VerificationToken: "verify-abc",
+		TokenExpiresAt:    &expiresAt,
+	}
+	if err := db.Create(&u1).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+	if err := svc.ResetPassword(context.Background(), "verify-abc", "newpass123"); !errors.Is(err, ErrInvalidResetToken) {
+		t.Errorf("expected ErrInvalidResetToken for verification token, got %v", err)
+	}
+
+	// Email-change token must NOT reset a password either.
+	u2 := model.User{
+		Username:          "bob",
+		Email:             "bob@example.com",
+		Password:          "hash",
+		Role:              model.RoleGuest,
+		VerificationToken: "email-change-abc",
+		TokenExpiresAt:    &expiresAt,
+	}
+	if err := db.Create(&u2).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+	if err := svc.ResetPassword(context.Background(), "email-change-abc", "newpass123"); !errors.Is(err, ErrInvalidResetToken) {
+		t.Errorf("expected ErrInvalidResetToken for email-change token, got %v", err)
+	}
+
+	// The rejected tokens are left untouched (not consumed).
+	for _, token := range []string{"verify-abc", "email-change-abc"} {
+		var stored model.User
+		if err := db.Where("verification_token = ?", token).First(&stored).Error; err != nil {
+			t.Fatalf("token %q unexpectedly cleared: %v", token, err)
+		}
 	}
 }
 

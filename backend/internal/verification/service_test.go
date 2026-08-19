@@ -127,6 +127,33 @@ func TestVerifyEmail_EmailChangeUnknownToken(t *testing.T) {
 	}
 }
 
+func TestVerifyEmail_RejectsResetToken(t *testing.T) {
+	svc, db := newTestService(t)
+	expiresAt := time.Now().Add(5 * time.Minute)
+	u := model.User{
+		Username:          "alice",
+		Email:             "alice@example.com",
+		VerificationToken: "reset-abc",
+		TokenExpiresAt:    &expiresAt,
+		EmailVerified:     false,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+
+	// A password-reset token must not be usable to verify an email.
+	if _, _, err := svc.VerifyEmail(context.Background(), "reset-abc"); err == nil {
+		t.Errorf("expected error for password-reset token")
+	}
+	var after model.User
+	if err := db.First(&after, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if after.EmailVerified {
+		t.Errorf("email must not be verified by a reset token")
+	}
+}
+
 func TestGenerateCaptcha(t *testing.T) {
 	svc, db := newTestService(t)
 	captcha, err := svc.GenerateCaptcha(context.Background())
