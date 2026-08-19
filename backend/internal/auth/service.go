@@ -59,11 +59,8 @@ type Deps struct {
 	Files     FileRemover
 }
 
-// FileRemover deletes a stored file by its public URL; implemented by
-// upload.Storage. Used to clean up old avatars on profile updates.
-type FileRemover interface {
-	Delete(url string) error
-}
+// FileRemover is an alias for model.FileRemover kept for backward compatibility.
+type FileRemover = model.FileRemover
 
 // Service contains the business logic of the auth domain.
 type Service struct {

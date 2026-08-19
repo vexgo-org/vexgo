@@ -48,15 +48,11 @@ type Deps struct {
 	Files    FileRemover
 }
 
-// Notifier is the seam for creating notifications; implemented by the message domain.
-type Notifier interface {
-	CreateNotification(userID uint, notificationType, title, content, relatedID, relatedType string) error
-}
+// Notifier is an alias for model.Notifier kept for backward compatibility.
+type Notifier = model.Notifier
 
-// FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
-type FileRemover interface {
-	Delete(url string) error
-}
+// FileRemover is an alias for model.FileRemover kept for backward compatibility.
+type FileRemover = model.FileRemover
 
 // Service contains the business logic of the user domain.
 type Service struct {

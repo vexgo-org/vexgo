@@ -30,11 +30,8 @@ type Deps struct {
 	Notifier Notifier
 }
 
-// Notifier is the seam for creating notifications. It is implemented by the
-// message domain and injected so it can be faked in tests.
-type Notifier interface {
-	CreateNotification(userID uint, notificationType, title, content, relatedID, relatedType string) error
-}
+// Notifier is an alias for model.Notifier kept for backward compatibility.
+type Notifier = model.Notifier
 
 // Service contains the business logic of the comment domain.
 type Service struct {
