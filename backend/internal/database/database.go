@@ -22,7 +22,9 @@ import (
 )
 
 // Open establishes the database connection based on configuration.
+// Behavior mirrors the previous handler.InitDB connection logic.
 func Open(cfg *config.Config, dataDir string) (*gorm.DB, error) {
+	// Determine database type: config file takes priority, fallback to environment variable
 	dbType := cfg.DBType
 	if dbType == "" {
 		dbType = os.Getenv("DB_TYPE")
@@ -30,14 +32,18 @@ func Open(cfg *config.Config, dataDir string) (*gorm.DB, error) {
 
 	switch dbType {
 	case "mysql":
+		// MySQL connection - use config values with environment fallback
 		return openMySQL(cfg)
 	case "postgres":
+		// PostgreSQL connection - use config values with environment fallback
 		return openPostgres(cfg)
 	default:
+		// SQLite connection (default)
 		return openSQLite(cfg, dataDir)
 	}
 }
 
+// openMySQL connects to a MySQL database, creating it if it does not exist.
 func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	user := cfg.DBUser
 	if user == "" {
@@ -53,6 +59,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	}
 	port := cfg.DBPort
 	if port == 0 {
+		// If port not set in config, get from env
 		portStr := os.Getenv("DB_PORT")
 		if portStr != "" {
 			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
@@ -73,18 +80,22 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
+		// Check if the error is "Unknown database" (error code 1049)
 		if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
 			logrus.Infof("Database '%s' not found, attempting to create it", dbname)
+			// DSN without database name to connect to the server
 			serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
 			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{})
 			if serverErr != nil {
 				return nil, fmt.Errorf("connect to MySQL server to create database: %w", serverErr)
 			}
+			// Create the database
 			createDbSQL := fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbname)
 			if execErr := serverDb.Exec(createDbSQL).Error; execErr != nil {
 				return nil, fmt.Errorf("create database '%s': %w", dbname, execErr)
 			}
 			logrus.Infof("Database '%s' created successfully", dbname)
+			// Re-attempt connection to the newly created database
 			db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 			if err != nil {
 				return nil, fmt.Errorf("connect to newly created MySQL database: %w", err)
@@ -97,6 +108,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
+// openPostgres connects to a PostgreSQL database.
 func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 	user := cfg.DBUser
 	if user == "" {
@@ -145,6 +157,7 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 	return db, nil
 }
 
+// openSQLite connects to an SQLite database stored in dataDir.
 func openSQLite(cfg *config.Config, dataDir string) (*gorm.DB, error) {
 	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)
@@ -181,9 +194,10 @@ func AutoMigrate(db *gorm.DB) error {
 	)
 }
 
-// Seed inserts default records if they do not already exist.
+// Seed inserts default records (admin user, SMTP/general/AI/theme settings,
+// default category) if they do not already exist.
 func Seed(db *gorm.DB) error {
-	// Default super admin
+	// Create a default super admin (if not exists), store password using bcrypt
 	var u model.User
 	if err := db.Where("username = ?", "admin").First(&u).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -203,21 +217,26 @@ func Seed(db *gorm.DB) error {
 			}
 			logrus.Info("Default admin user created")
 
+			// Create default SMTP configuration (if not exists)
 			if err := seedSMTP(db); err != nil {
 				return err
 			}
+			// Create default general settings (if not exists)
 			if err := seedGeneralSettings(db); err != nil {
 				return err
 			}
 		}
 	}
 
+	// Create default AI configuration (if not exists)
 	if err := seedAIConfig(db); err != nil {
 		return err
 	}
+	// Create default theme configuration (if not exists)
 	if err := seedThemeConfig(db); err != nil {
 		return err
 	}
+	// Create a default category (if not exists)
 	if err := seedCategory(db); err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ import (
 
 // Repository is the persistence interface for the post domain.
 type Repository interface {
+	// Posts
 	FindByID(ctx context.Context, id string) (*model.Post, error)
 	FindByIDPreloadTags(ctx context.Context, id string) (*model.Post, error)
 	Create(ctx context.Context, post *model.Post) error
@@ -19,11 +20,13 @@ type Repository interface {
 
 	BaseQuery(ctx context.Context) *gorm.DB
 
+	// Likes
 	CountLikes(ctx context.Context, postID uint) (int64, error)
 	FindLike(ctx context.Context, postID, userID uint) (*model.Like, error)
 	CreateLike(ctx context.Context, like *model.Like) error
 	DeleteLike(ctx context.Context, like *model.Like) error
 
+	// Comments
 	CountComments(ctx context.Context, postID uint) (int64, error)
 	DeleteCommentsByPostID(ctx context.Context, postID uint) error
 	DeleteLikesByPostID(ctx context.Context, postID uint) error
@@ -47,6 +50,7 @@ type Repository interface {
 	BatchFindLikedPostIDs(ctx context.Context, postIDs []uint, userID uint) (map[uint]bool, error)
 }
 
+// gormRepository is the GORM-backed implementation of Repository.
 type gormRepository struct {
 	db *gorm.DB
 }

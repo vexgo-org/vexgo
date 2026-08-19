@@ -11,15 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Handler exposes the post domain over HTTP.
 type Handler struct {
 	svc *Service
 	mw  *middleware.Auth
 }
 
+// NewHandler creates a post HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
+// currentUser extracts the role and id of the current user from the context.
 func currentUser(c *gin.Context) (role string, id uint) {
 	u, ok := middleware.CurrentUser(c)
 	if !ok {
@@ -28,6 +31,7 @@ func currentUser(c *gin.Context) (role string, id uint) {
 	return u.Role, u.ID
 }
 
+// GetPosts returns the post list.
 func (h *Handler) GetPosts(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page < 1 {
@@ -62,6 +66,7 @@ func (h *Handler) GetPosts(c *gin.Context) {
 	})
 }
 
+// GetPost returns a single post.
 func (h *Handler) GetPost(c *gin.Context) {
 	id := c.Param("id")
 	userRole, userID := currentUser(c)
@@ -79,13 +84,17 @@ func (h *Handler) GetPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"post": post})
 }
 
+// CreatePost creates a post.
 func (h *Handler) CreatePost(c *gin.Context) {
+	// Check if user is logged in
 	userIDVal, exists := c.Get("userID")
 	if !exists || userIDVal == nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，请先登录"})
 		return
 	}
 	userID := userIDVal.(uint)
+
+	// Get user role information from context
 	userRole, _ := currentUser(c)
 
 	var req struct {
@@ -123,6 +132,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Post created successfully", "post": post})
 }
 
+// UpdatePost updates a post (author or admin only).
 func (h *Handler) UpdatePost(c *gin.Context) {
 	id := c.Param("id")
 	userIDVal, _ := c.Get("userID")
@@ -166,6 +176,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "post": post})
 }
 
+// DeletePost deletes a post (author or admin only).
 func (h *Handler) DeletePost(c *gin.Context) {
 	id := c.Param("id")
 	userIDVal, _ := c.Get("userID")
@@ -187,6 +198,7 @@ func (h *Handler) DeletePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
 }
 
+// GetMyPosts returns the current user's own posts.
 func (h *Handler) GetMyPosts(c *gin.Context) {
 	userIDVal, _ := c.Get("userID")
 	userID := userIDVal.(uint)
@@ -217,6 +229,7 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 	})
 }
 
+// GetDraftPosts returns draft posts.
 func (h *Handler) GetDraftPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -245,6 +258,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 	})
 }
 
+// GetUserPosts returns the posts of a specific user.
 func (h *Handler) GetUserPosts(c *gin.Context) {
 	userIDStr := c.Param("id")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -278,6 +292,7 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	})
 }
 
+// GetPopularPosts returns popular posts.
 func (h *Handler) GetPopularPosts(c *gin.Context) {
 	userRole, _ := currentUser(c)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
@@ -291,6 +306,7 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"posts": posts})
 }
 
+// GetLatestPosts returns the latest posts.
 func (h *Handler) GetLatestPosts(c *gin.Context) {
 	userRole, _ := currentUser(c)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
@@ -304,6 +320,7 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"posts": posts})
 }
 
+// GetCategories returns the category list.
 func (h *Handler) GetCategories(c *gin.Context) {
 	userRole, _ := currentUser(c)
 
@@ -316,6 +333,7 @@ func (h *Handler) GetCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
+// CreateCategory creates a category.
 func (h *Handler) CreateCategory(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name" binding:"required"`
@@ -338,6 +356,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	})
 }
 
+// GetTags returns the tag list.
 func (h *Handler) GetTags(c *gin.Context) {
 	userRole, _ := currentUser(c)
 
@@ -350,6 +369,7 @@ func (h *Handler) GetTags(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tags": tags})
 }
 
+// CreateTag creates a tag.
 func (h *Handler) CreateTag(c *gin.Context) {
 	var req struct {
 		Name string `json:"name" binding:"required"`
@@ -371,18 +391,22 @@ func (h *Handler) CreateTag(c *gin.Context) {
 	})
 }
 
+// GetPendingPosts gets pending posts for moderation.
 func (h *Handler) GetPendingPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusPending)
 }
 
+// GetApprovedPosts gets approved posts list.
 func (h *Handler) GetApprovedPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusPublished)
 }
 
+// GetRejectedPosts gets rejected posts list.
 func (h *Handler) GetRejectedPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusRejected)
 }
 
+// listModeration renders the moderation queue for a given post status.
 func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -410,6 +434,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	})
 }
 
+// ApprovePost approves a post.
 func (h *Handler) ApprovePost(c *gin.Context) {
 	post, err := h.svc.Approve(c.Request.Context(), c.Param("id"))
 	if err != nil {
@@ -424,6 +449,7 @@ func (h *Handler) ApprovePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post approved", "post": post})
 }
 
+// RejectPost rejects a post.
 func (h *Handler) RejectPost(c *gin.Context) {
 	var req struct {
 		RejectionReason string `json:"rejectionReason"`
@@ -446,6 +472,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post has been rejected", "post": post})
 }
 
+// ResubmitPost resubmits a rejected post for moderation.
 func (h *Handler) ResubmitPost(c *gin.Context) {
 	post, err := h.svc.Resubmit(c.Request.Context(), c.Param("id"))
 	if err != nil {
@@ -463,6 +490,7 @@ func (h *Handler) ResubmitPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post resubmitted for moderation", "post": post})
 }
 
+// ToggleLike likes or unlikes a post.
 func (h *Handler) ToggleLike(c *gin.Context) {
 	postIDStr := c.Param("postId")
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
@@ -484,6 +512,7 @@ func (h *Handler) ToggleLike(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Like removed", "postId": postID, "isLiked": false, "likesCount": count})
 }
 
+// GetLikeStatus returns the like status of a post (public, optional login).
 func (h *Handler) GetLikeStatus(c *gin.Context) {
 	postIDStr := c.Param("postId")
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)

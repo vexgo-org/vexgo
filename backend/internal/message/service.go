@@ -37,7 +37,8 @@ func (s *Service) List(ctx context.Context, userID uint, page, limit int, messag
 	return s.repo.List(ctx, userID, offset, limit, messageType, isRead)
 }
 
-// MarkAsRead marks a single notification as read.
+// MarkAsRead marks a single notification as read. It returns the number of
+// rows affected (0 when the notification does not belong to the user).
 func (s *Service) MarkAsRead(ctx context.Context, userID uint, id int) (int64, error) {
 	return s.repo.MarkAsRead(ctx, userID, id)
 }
@@ -47,7 +48,8 @@ func (s *Service) MarkAllAsRead(ctx context.Context, userID uint) error {
 	return s.repo.MarkAllAsRead(ctx, userID)
 }
 
-// Delete removes a notification owned by the user.
+// Delete removes a notification owned by the user. It returns the number of
+// rows affected (0 when the notification does not belong to the user).
 func (s *Service) Delete(ctx context.Context, userID uint, id int) (int64, error) {
 	return s.repo.Delete(ctx, userID, id)
 }
@@ -57,7 +59,8 @@ func (s *Service) UnreadCount(ctx context.Context, userID uint) (int64, error) {
 	return s.repo.UnreadCount(ctx, userID)
 }
 
-// CreateNotification creates a notification for a user.
+// CreateNotification creates a notification for a user. It is called by other
+// domains (post, comment, user) when an event of interest occurs.
 func (s *Service) CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
 	n := &model.Notification{
 		UserID:      userID,

@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Repository is the persistence interface for the comment domain.
 type Repository interface {
 	ListByPostID(ctx context.Context, postID string) ([]model.Comment, error)
 	Create(ctx context.Context, comment *model.Comment) error
@@ -22,6 +23,7 @@ type Repository interface {
 	ListModeration(ctx context.Context, status model.CommentStatus, offset, limit int) ([]model.Comment, int64, error)
 }
 
+// gormRepository is the GORM-backed implementation of Repository.
 type gormRepository struct {
 	db *gorm.DB
 }

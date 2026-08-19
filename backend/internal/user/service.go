@@ -14,9 +14,11 @@ import (
 
 // Sentinel errors mapped to HTTP responses by the handler.
 var (
+	// User lookup errors.
 	ErrUserNotFound        = errors.New("user not found")
 	ErrApplicationNotFound = errors.New("application not found")
 
+	// UpdateRole errors.
 	ErrCannotModifySelf    = errors.New("cannot modify own role")
 	ErrModifySuperAdmin    = errors.New("no permission to modify super admin role")
 	ErrInvalidRole         = errors.New("invalid role")
@@ -24,6 +26,7 @@ var (
 	ErrAdminRoleRestricted = errors.New("admin can only set user roles to author, contributor, or guest")
 	ErrNoPermission        = errors.New("no permission to modify user role")
 
+	// DeleteUser errors.
 	ErrCannotDeleteSelf      = errors.New("cannot delete yourself")
 	ErrAdminDeleteRestricted = errors.New("admin can only delete users with role author, contributor, or guest")
 	ErrNoPermissionToDelete  = errors.New("no permission to delete user")
@@ -79,13 +82,16 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, err
 	}
 
+	// Cannot modify own role
 	if user.ID == actor.ID {
 		return nil, ErrCannotModifySelf
 	}
+	// Cannot modify super admin's role (unless current user is also super admin)
 	if user.Role == model.RoleSuperAdmin && actor.Role != model.RoleSuperAdmin {
 		return nil, ErrModifySuperAdmin
 	}
 
+	// Validate role is valid
 	validRoles := map[string]bool{
 		model.RoleSuperAdmin:  true,
 		model.RoleAdmin:       true,
@@ -97,6 +103,9 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, ErrInvalidRole
 	}
 
+	// Permission check
+	// Super admin can set any role (including making other users super admin)
+	// But cannot downgrade own super admin privileges
 	switch actor.Role {
 	case model.RoleSuperAdmin:
 		if user.ID == actor.ID && newRole != model.RoleSuperAdmin {
@@ -104,6 +113,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		}
 		user.Role = newRole
 	case model.RoleAdmin:
+		// Admin can only set user roles to author, contributor, or guest
 		if newRole == model.RoleAuthor || newRole == model.RoleContributor || newRole == model.RoleGuest {
 			user.Role = newRole
 		} else {
@@ -113,6 +123,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		return nil, ErrNoPermission
 	}
 
+	// Save updates
 	oldRole := user.Role
 	user.Role = newRole
 	if err := s.repo.UpdateUserRole(ctx, user); err != nil {

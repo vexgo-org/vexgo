@@ -17,13 +17,19 @@ import (
 	"gorm.io/gorm"
 )
 
+// Sentinel errors mapped to HTTP responses by the handler.
 var (
-	ErrPostNotFound    = errors.New("post not found")
-	ErrForbidden       = errors.New("forbidden")
+	// ErrPostNotFound means the post does not exist.
+	ErrPostNotFound = errors.New("post not found")
+	// ErrForbidden means the acting user may not modify this post.
+	ErrForbidden = errors.New("forbidden")
+	// ErrGuestViewDenied means guest viewing is disabled and the caller is anonymous.
 	ErrGuestViewDenied = errors.New("guest view denied")
-	ErrBadRequest      = errors.New("bad request")
+	// ErrBadRequest means the request is invalid for the current state.
+	ErrBadRequest = errors.New("bad request")
 )
 
+// Deps holds the dependencies required by the post domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
@@ -31,32 +37,41 @@ type Deps struct {
 	Files     FileRemover
 }
 
+// Notifier is the seam for creating notifications; implemented by the message domain.
+// FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
 type (
 	Notifier    = model.Notifier
 	FileRemover = model.FileRemover
 )
 
+// Service contains the business logic of the post domain.
 type Service struct {
 	repo     Repository
 	notifier Notifier
 	files    FileRemover
 }
 
+// NewService creates a post service with the given dependencies.
 func NewService(deps Deps) *Service {
 	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier, files: deps.Files}
 }
 
+// allowGuestView reports whether anonymous viewers may see posts.
 func (s *Service) allowGuestView(ctx context.Context) bool {
 	return s.repo.GetGuestViewSetting(ctx)
 }
 
+// List returns the paginated post list with role-based visibility, filters,
+// and per-post like/comment counts.
 func (s *Service) List(ctx context.Context, userRole string, userID uint, page, limit int, categoryID, status, search string) ([]model.Post, int64, error) {
+	// If not logged in and guest viewing is not allowed, return empty result
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, 0, nil
 	}
 
 	query := s.repo.BaseQuery(ctx)
 
+	// Determine visible posts based on user role
 	switch userRole {
 	case "", model.RoleGuest:
 		query = query.Where("status = ?", model.PostStatusPublished)
@@ -71,9 +86,7 @@ func (s *Service) List(ctx context.Context, userRole string, userID uint, page, 
 		query = query.Where("status = ?", model.PostStatusPublished)
 	}
 
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
+	// Category filter (by id or name)
 	if categoryID != "" {
 		if cid, err := strconv.Atoi(categoryID); err == nil {
 			query = query.Where("category = ?", cid)
@@ -81,6 +94,8 @@ func (s *Service) List(ctx context.Context, userRole string, userID uint, page, 
 			query = query.Where("category = ?", categoryID)
 		}
 	}
+
+	// Search filter
 	if search != "" {
 		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
@@ -100,6 +115,7 @@ func (s *Service) List(ctx context.Context, userRole string, userID uint, page, 
 
 	s.populateCounts(ctx, posts, userID)
 
+	// Apply privacy filtering to author information
 	for i := range posts {
 		if userRole != model.RoleAdmin && userRole != model.RoleSuperAdmin && posts[i].AuthorID != userID {
 			auth.FilterUserByPrivacy(&posts[i].Author, userID, userRole)
@@ -109,12 +125,15 @@ func (s *Service) List(ctx context.Context, userRole string, userID uint, page, 
 	return posts, total, nil
 }
 
+// Get returns a single post with privacy filtering, view-count increment and
+// like/comment counts.
 func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("post load: %w", err)
 	}
 
+	// If not logged in and guest viewing is not allowed, return 403
 	if currentUserRole == "" && !s.allowGuestView(ctx) {
 		return nil, ErrGuestViewDenied
 	}
@@ -123,8 +142,10 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 		auth.FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
 	}
 
+	// Increment view count (optional)
 	s.repo.IncrementViewCount(ctx, post.ID)
 
+	// Fill likes count and current logged-in user's like status
 	count, _ := s.repo.CountLikes(ctx, post.ID)
 	post.LikesCount = int(count)
 	post.IsLiked = false
@@ -134,12 +155,14 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 		}
 	}
 
+	// Fill comments count
 	ccount, _ := s.repo.CountComments(ctx, post.ID)
 	post.CommentsCount = int(ccount)
 
 	return post, nil
 }
 
+// CreateRequest carries the fields accepted when creating a post.
 type CreateRequest struct {
 	Title      string
 	Content    string
@@ -150,11 +173,14 @@ type CreateRequest struct {
 	Status     model.PostStatus
 }
 
+// Create creates a post, deriving the initial status from the user's role.
 func (s *Service) Create(ctx context.Context, userRole string, userID uint, req CreateRequest) (*model.Post, error) {
+	// Check if user has permission to create posts
 	if userRole == "" || userRole == model.RoleGuest {
 		return nil, ErrForbidden
 	}
 
+	// Convert category to string regardless of number or string type
 	var catStr string
 	switch v := req.Category.(type) {
 	case string:
@@ -169,6 +195,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		catStr = fmt.Sprintf("%v", v)
 	}
 
+	// Determine initial post status based on user role
 	initialStatus := model.PostStatus(req.Status)
 	if initialStatus == "" {
 		switch userRole {
@@ -205,6 +232,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	return &post, nil
 }
 
+// UpdateRequest carries the fields accepted when updating a post.
 type UpdateRequest struct {
 	Title      string
 	Content    string
@@ -215,12 +243,14 @@ type UpdateRequest struct {
 	Status     model.PostStatus
 }
 
+// Update modifies a post when the acting user is its author or an admin.
 func (s *Service) Update(ctx context.Context, id string, userID uint, req UpdateRequest) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
 		return nil, ErrPostNotFound
 	}
 
+	// Permission check
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err == nil {
 		if user.Role != model.RoleAdmin && user.Role != model.RoleSuperAdmin && post.AuthorID != userID {
@@ -272,12 +302,15 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 	return post, nil
 }
 
+// Delete removes a post (author or admin only), cleaning up its files,
+// comments, likes and tag associations.
 func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return ErrPostNotFound
 	}
 
+	// Permission check
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err == nil {
 		if user.Role != model.RoleAdmin && user.Role != model.RoleSuperAdmin && post.AuthorID != userID {
@@ -285,6 +318,7 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 		}
 	}
 
+	// Collect and delete image files (cover + content images)
 	var imagesToDelete []string
 	if post.CoverImage != "" {
 		imagesToDelete = append(imagesToDelete, post.CoverImage)
@@ -301,15 +335,22 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 		}
 	}
 
+	// Delete comments associated with this post
 	if err := s.repo.DeleteCommentsByPostID(ctx, post.ID); err != nil {
 		return fmt.Errorf("delete comments: %w", err)
 	}
+
+	// Delete likes associated with this post
 	if err := s.repo.DeleteLikesByPostID(ctx, post.ID); err != nil {
 		return fmt.Errorf("delete likes: %w", err)
 	}
+
+	// Clear the many-to-many tags relationship
 	if err := s.repo.ClearTagsAssociation(ctx, post); err != nil {
 		return fmt.Errorf("clear tags: %w", err)
 	}
+
+	// Finally delete the post itself
 	if err := s.repo.Delete(ctx, post); err != nil {
 		return fmt.Errorf("delete post: %w", err)
 	}
@@ -317,6 +358,7 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	return nil
 }
 
+// MyPosts returns the current user's own posts (excluding rejected).
 func (s *Service) MyPosts(ctx context.Context, userID uint, page, limit int, status string) ([]model.Post, int64, error) {
 	query := s.repo.BaseQuery(ctx).
 		Where("author_id = ? AND status != ?", userID, model.PostStatusRejected)
@@ -342,12 +384,15 @@ func (s *Service) MyPosts(ctx context.Context, userID uint, page, limit int, sta
 	return posts, total, nil
 }
 
+// Drafts returns draft posts; admins see all drafts, other users only their own.
 func (s *Service) Drafts(ctx context.Context, userRole string, userID uint, page, limit int) ([]model.Post, int64, error) {
 	query := s.repo.BaseQuery(ctx)
 
 	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
+		// Admins and super admins can see all draft posts
 		query = query.Where("status = ?", model.PostStatusDraft)
 	} else {
+		// Other users can only see their own draft posts
 		query = query.Where("author_id = ? AND status = ?", userID, model.PostStatusDraft)
 	}
 
@@ -368,6 +413,7 @@ func (s *Service) Drafts(ctx context.Context, userRole string, userID uint, page
 	return posts, total, nil
 }
 
+// UserPosts returns the posts of a specific user with role-based visibility.
 func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole string, currentUserID uint, page, limit int) ([]model.Post, int64, error) {
 	uid, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -380,6 +426,7 @@ func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole stri
 
 	query := s.repo.BaseQuery(ctx).Where("author_id = ?", uid)
 
+	// Determine visible posts based on user role
 	switch currentUserRole {
 	case "", model.RoleGuest:
 		query = query.Where("status = ?", model.PostStatusPublished)
@@ -408,6 +455,7 @@ func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole stri
 
 	s.populateCounts(ctx, posts, currentUserID)
 
+	// Apply privacy filtering to author information
 	for i := range posts {
 		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && uint(uid) != currentUserID {
 			auth.FilterUserByPrivacy(&posts[i].Author, currentUserID, currentUserRole)
@@ -417,6 +465,7 @@ func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole stri
 	return posts, total, nil
 }
 
+// Popular returns the top posts by likes*5 + views, limited to published posts.
 func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]model.Post, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, nil
@@ -425,11 +474,13 @@ func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]mo
 	var posts []model.Post
 	s.repo.BaseQuery(ctx).Where("status = ?", model.PostStatusPublished).Find(&posts)
 
+	// Calculate likes count for each post
 	for i := range posts {
 		count, _ := s.repo.CountLikes(ctx, posts[i].ID)
 		posts[i].LikesCount = int(count)
 	}
 
+	// Sort by the sum of likes count multiplied by 5 plus view count
 	for i := 0; i < len(posts); i++ {
 		for j := i + 1; j < len(posts); j++ {
 			scoreI := posts[i].LikesCount*5 + posts[i].ViewCount
@@ -440,6 +491,7 @@ func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]mo
 		}
 	}
 
+	// Limit the number of returned items
 	if limit < len(posts) {
 		posts = posts[:limit]
 	}
@@ -447,6 +499,7 @@ func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]mo
 	return posts, nil
 }
 
+// Latest returns the most recent published posts.
 func (s *Service) Latest(ctx context.Context, userRole string, limit int) ([]model.Post, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, nil
@@ -459,6 +512,7 @@ func (s *Service) Latest(ctx context.Context, userRole string, limit int) ([]mod
 	return posts, nil
 }
 
+// Categories returns all categories.
 func (s *Service) Categories(ctx context.Context, userRole string) ([]model.Category, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return []model.Category{}, nil
@@ -466,6 +520,7 @@ func (s *Service) Categories(ctx context.Context, userRole string) ([]model.Cate
 	return s.repo.FindAllCategories(ctx)
 }
 
+// CreateCategory creates a category.
 func (s *Service) CreateCategory(ctx context.Context, name, description string) (*model.Category, error) {
 	category := &model.Category{Name: name, Description: description}
 	if err := s.repo.CreateCategory(ctx, category); err != nil {
@@ -474,6 +529,7 @@ func (s *Service) CreateCategory(ctx context.Context, name, description string) 
 	return category, nil
 }
 
+// Tags returns all tags.
 func (s *Service) Tags(ctx context.Context, userRole string) ([]model.Tag, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return []model.Tag{}, nil
@@ -481,15 +537,19 @@ func (s *Service) Tags(ctx context.Context, userRole string) ([]model.Tag, error
 	return s.repo.FindAllTags(ctx)
 }
 
+// CreateTag creates a tag.
 func (s *Service) CreateTag(ctx context.Context, name string) (*model.Tag, error) {
 	return s.repo.FindOrCreateTag(ctx, name)
 }
 
+// ListModeration returns the paginated posts with the given status for the
+// moderation queue, with an optional search across title/content/username.
 func (s *Service) ListModeration(ctx context.Context, status model.PostStatus, page, limit int, search string) ([]model.Post, int64, error) {
 	offset := (page - 1) * limit
 	return s.repo.ListModeration(ctx, status, offset, limit, search)
 }
 
+// Approve approves a post and notifies its author.
 func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
@@ -509,6 +569,7 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 	return post, nil
 }
 
+// Reject rejects a post with a reason and notifies its author.
 func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*model.Post, error) {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -529,12 +590,14 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 	return post, nil
 }
 
+// Resubmit moves a rejected post back to pending.
 func (s *Service) Resubmit(ctx context.Context, id string) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
 		return nil, ErrPostNotFound
 	}
 
+	// Check if post status is rejected
 	if post.Status != model.PostStatusRejected {
 		return nil, ErrBadRequest
 	}
@@ -546,9 +609,11 @@ func (s *Service) Resubmit(ctx context.Context, id string) (*model.Post, error) 
 	return post, nil
 }
 
+// ToggleLike likes or unlikes a post and notifies the author on like.
 func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked bool, count int64, err error) {
 	existing, err := s.repo.FindLike(ctx, postID, userID)
 	if err == nil {
+		// Already liked -> unlike
 		if err := s.repo.DeleteLike(ctx, existing); err != nil {
 			return false, 0, err
 		}
@@ -560,6 +625,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 	s.repo.CreateLike(ctx, like)
 	count, _ = s.repo.CountLikes(ctx, postID)
 
+	// Create notification for post author
 	post, err := s.repo.FindByID(ctx, fmt.Sprintf("%d", postID))
 	if err == nil && post.AuthorID != userID {
 		user, err := s.repo.FindUserByID(ctx, userID)
@@ -577,6 +643,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 	return true, count, nil
 }
 
+// LikeStatus returns whether the user liked the post and the total like count.
 func (s *Service) LikeStatus(ctx context.Context, postID, userID uint) (isLiked bool, count int64) {
 	if userID != 0 {
 		if _, err := s.repo.FindLike(ctx, postID, userID); err == nil {
@@ -587,6 +654,8 @@ func (s *Service) LikeStatus(ctx context.Context, postID, userID uint) (isLiked 
 	return isLiked, count
 }
 
+// populateCounts fills like/comment counts and the current user's like status
+// for a batch of posts using batch queries to avoid N+1.
 func (s *Service) populateCounts(ctx context.Context, posts []model.Post, userID uint) {
 	if len(posts) == 0 {
 		return
@@ -611,6 +680,7 @@ func (s *Service) populateCounts(ctx context.Context, posts []model.Post, userID
 	}
 }
 
+// resolveTags takes names and returns Tag models (creating missing ones).
 func (s *Service) resolveTags(ctx context.Context, names []string) ([]model.Tag, error) {
 	var tags []model.Tag
 	for _, name := range names {
@@ -627,9 +697,11 @@ func (s *Service) resolveTags(ctx context.Context, names []string) ([]model.Tag,
 	return tags, nil
 }
 
+// extractImageURLs returns all image URLs referenced in HTML or Markdown content.
 func extractImageURLs(content string) []string {
 	var urls []string
 
+	// 1. Match src attribute of <img> tags (HTML)
 	reImg := regexp.MustCompile(`<img[^>]+src=["']([^"']+)["'][^>]*>`)
 	for _, match := range reImg.FindAllStringSubmatch(content, -1) {
 		if len(match) >= 2 {
@@ -639,6 +711,7 @@ func extractImageURLs(content string) []string {
 		}
 	}
 
+	// 2. Match Markdown image syntax: ![alt](url)
 	reMarkdown := regexp.MustCompile(`!\[[^\]]*\]\(([^)]+)\)`)
 	for _, match := range reMarkdown.FindAllStringSubmatch(content, -1) {
 		if len(match) >= 2 {
@@ -648,6 +721,7 @@ func extractImageURLs(content string) []string {
 		}
 	}
 
+	// 3. Match reference-style Markdown images: ![alt][ref]
 	reRef := regexp.MustCompile(`!\[[^\]]*\]\[([^\]]+)\]`)
 	for _, match := range reRef.FindAllStringSubmatch(content, -1) {
 		if len(match) >= 2 {

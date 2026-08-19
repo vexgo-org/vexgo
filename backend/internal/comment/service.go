@@ -15,29 +15,39 @@ import (
 	"gorm.io/gorm"
 )
 
+// Sentinel errors mapped to HTTP responses by the handler.
 var (
+	// ErrCommentNotFound means the comment does not exist.
 	ErrCommentNotFound = errors.New("comment not found")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrForbidden       = errors.New("forbidden")
+	// ErrUserNotFound means the acting user does not exist.
+	ErrUserNotFound = errors.New("user not found")
+	// ErrForbidden means the acting user may not modify this comment.
+	ErrForbidden = errors.New("forbidden")
 )
 
+// Deps holds the dependencies required by the comment domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Notifier  Notifier
 }
 
+// Notifier is the seam for creating notifications. It is implemented by the
+// message domain and injected so it can be faked in tests.
 type Notifier = model.Notifier
 
+// Service contains the business logic of the comment domain.
 type Service struct {
 	repo     Repository
 	notifier Notifier
 }
 
+// NewService creates a comment service with the given dependencies.
 func NewService(deps Deps) *Service {
 	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier}
 }
 
+// defaultModerationConfig returns the configuration used when no row exists.
 func defaultModerationConfig() model.CommentModerationConfig {
 	return model.CommentModerationConfig{
 		Enabled:            false,
@@ -48,6 +58,8 @@ func defaultModerationConfig() model.CommentModerationConfig {
 	}
 }
 
+// moderationConfig loads the comment moderation configuration, falling back to
+// the default values when no row exists.
 func (s *Service) moderationConfig(ctx context.Context) (model.CommentModerationConfig, error) {
 	config, err := s.repo.GetModerationConfig(ctx)
 	if err != nil {
@@ -59,14 +71,18 @@ func (s *Service) moderationConfig(ctx context.Context) (model.CommentModeration
 	return config, nil
 }
 
+// ListByPost returns the published comments of a post, applying author privacy
+// filtering for viewers that are neither the author nor an admin.
 func (s *Service) ListByPost(ctx context.Context, postID string, currentUserID uint, currentUserRole string) ([]model.Comment, error) {
 	comments, err := s.repo.ListByPostID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
 
+	// Apply privacy filtering to comment authors
 	for i := range comments {
 		author := &comments[i].User
+		// If not admin and not viewing own comment, apply privacy filtering
 		if currentUserRole != model.RoleAdmin && currentUserRole != model.RoleSuperAdmin && author.ID != currentUserID {
 			auth.FilterUserByPrivacy(author, currentUserID, currentUserRole)
 		}
@@ -75,6 +91,9 @@ func (s *Service) ListByPost(ctx context.Context, postID string, currentUserID u
 	return comments, nil
 }
 
+// Create creates a comment, applies moderation, and notifies the post author
+// and (for replies) the parent comment author. It returns the created comment
+// (with author preloaded) and the published comment count for the post.
 func (s *Service) Create(ctx context.Context, postID, userID uint, content string, parentID *uint) (*model.Comment, int64, error) {
 	config, err := s.moderationConfig(ctx)
 	if err != nil {
@@ -90,11 +109,15 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 		comment.ParentID = parentID
 	}
 
+	// Set comment status
 	if config.Enabled {
+		// If AI moderation enabled, set to pending status first
 		comment.Status = model.CommentStatusPending
 	} else if config.AutoApproveEnabled {
+		// If AI moderation not enabled, decide whether to auto-approve based on config
 		comment.Status = model.CommentStatusPublished
 	} else {
+		// Still requires manual moderation
 		comment.Status = model.CommentStatusPending
 	}
 
@@ -102,9 +125,11 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 		return nil, 0, err
 	}
 
+	// If AI moderation enabled, perform moderation
 	if config.Enabled {
 		approved, _, err := moderateCommentAI(content, config)
 		if err != nil {
+			// If AI moderation fails, log error but don't affect comment creation
 			logrus.WithError(err).Warn("AI moderation failed, defaulting to published")
 			comment.Status = model.CommentStatusPublished
 		} else if approved {
@@ -113,14 +138,19 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 			comment.Status = model.CommentStatusRejected
 		}
 
+		// Update comment status
 		if err := s.repo.Save(ctx, &comment); err != nil {
 			return nil, 0, err
 		}
 	}
 
+	// Return created comment and updated comment count
 	count, _ := s.repo.CountByPostID(ctx, postID)
+
+	// Preload author information
 	s.repo.FindByID(ctx, fmt.Sprintf("%d", comment.ID))
 
+	// Create notifications
 	s.notifyPostAuthor(ctx, postID, userID, content)
 	if parentID != nil {
 		s.notifyParentAuthor(ctx, *parentID, userID, content)
@@ -129,11 +159,13 @@ func (s *Service) Create(ctx context.Context, postID, userID uint, content strin
 	return &comment, count, nil
 }
 
+// notifyPostAuthor notifies the post author unless they wrote the comment.
 func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, content string) {
 	post, err := s.repo.FindPostByID(ctx, postID)
 	if err != nil {
 		return
 	}
+	// Don't notify the commenter if they are the post author
 	if post.AuthorID == userID {
 		return
 	}
@@ -141,24 +173,30 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 	if err != nil {
 		return
 	}
+	// Truncate comment content to first 50 characters
 	commentContent := content
 	if len(commentContent) > 50 {
 		commentContent = commentContent[:50] + "..."
 	}
 	if err := s.notifier.CreateNotification(ctx,
-		post.AuthorID, "comment", "Post Commented",
+		post.AuthorID,
+		"comment",
+		"Post Commented",
 		fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
-		strconv.FormatUint(uint64(postID), 10), "post",
+		strconv.FormatUint(uint64(postID), 10),
+		"post",
 	); err != nil {
 		logrus.WithError(err).Warn("failed to create comment notification")
 	}
 }
 
+// notifyParentAuthor notifies the parent comment author unless they wrote the reply.
 func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint, content string) {
 	parentComment, err := s.repo.FindByID(ctx, fmt.Sprintf("%d", parentID))
 	if err != nil {
 		return
 	}
+	// Don't notify the commenter if they are the parent comment author
 	if parentComment.UserID == userID {
 		return
 	}
@@ -166,19 +204,25 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 	if err != nil {
 		return
 	}
+	// Truncate reply content to first 50 characters
 	replyContent := content
 	if len(replyContent) > 50 {
 		replyContent = replyContent[:50] + "..."
 	}
 	if err := s.notifier.CreateNotification(ctx,
-		parentComment.UserID, "reply", "Comment Replied",
+		parentComment.UserID,
+		"reply",
+		"Comment Replied",
 		fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
-		strconv.FormatUint(uint64(parentID), 10), "comment",
+		strconv.FormatUint(uint64(parentID), 10),
+		"comment",
 	); err != nil {
 		logrus.WithError(err).Warn("failed to create reply notification")
 	}
 }
 
+// Delete removes a comment when the acting user is its author or an admin.
+// It returns the remaining comment count for the post.
 func (s *Service) Delete(ctx context.Context, commentID string, userID uint) (int64, error) {
 	comment, err := s.repo.FindByID(ctx, commentID)
 	if err != nil {
@@ -190,6 +234,7 @@ func (s *Service) Delete(ctx context.Context, commentID string, userID uint) (in
 		return 0, ErrUserNotFound
 	}
 
+	// Admins or super admins can delete any comment, authors can delete their own comments
 	if !model.IsAdmin(*user) && comment.UserID != userID {
 		return 0, ErrForbidden
 	}
@@ -198,19 +243,24 @@ func (s *Service) Delete(ctx context.Context, commentID string, userID uint) (in
 		return 0, err
 	}
 
+	// Return comment count after deletion for frontend sync
 	count, _ := s.repo.CountByPostID(ctx, comment.PostID)
 	return count, nil
 }
 
+// GetModerationConfig returns the moderation configuration with the API key masked.
 func (s *Service) GetModerationConfig(ctx context.Context) (model.CommentModerationConfig, error) {
 	config, err := s.moderationConfig(ctx)
 	if err != nil {
 		return config, err
 	}
+
+	// Don't return sensitive information like API key
 	config.ApiKey = ""
 	return config, nil
 }
 
+// UpdateModerationConfigRequest carries the fields accepted by the admin API.
 type UpdateModerationConfigRequest struct {
 	Enabled            bool
 	ModelProvider      string
@@ -223,6 +273,9 @@ type UpdateModerationConfigRequest struct {
 	MinScoreThreshold  float64
 }
 
+// UpdateModerationConfig creates or updates the comment moderation
+// configuration. The API key is only overwritten when a non-empty value is
+// provided. The returned configuration has the API key masked.
 func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerationConfigRequest) (model.CommentModerationConfig, error) {
 	config, err := s.moderationConfig(ctx)
 	if err != nil {
@@ -233,6 +286,7 @@ func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerati
 	isCreate := errors.Is(getErr, gorm.ErrRecordNotFound)
 
 	if isCreate {
+		// Create new configuration
 		config = model.CommentModerationConfig{
 			Enabled:            req.Enabled,
 			ModelProvider:      req.ModelProvider,
@@ -245,6 +299,7 @@ func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerati
 			MinScoreThreshold:  req.MinScoreThreshold,
 		}
 	} else {
+		// Update existing configuration
 		config.Enabled = req.Enabled
 		config.ModelProvider = req.ModelProvider
 		config.ApiEndpoint = req.ApiEndpoint
@@ -253,6 +308,7 @@ func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerati
 		config.BlockKeywords = req.BlockKeywords
 		config.AutoApproveEnabled = req.AutoApproveEnabled
 		config.MinScoreThreshold = req.MinScoreThreshold
+		// Only update if new API key is provided
 		if req.ApiKey != "" {
 			config.ApiKey = req.ApiKey
 		}
@@ -262,15 +318,19 @@ func (s *Service) UpdateModerationConfig(ctx context.Context, req UpdateModerati
 		return config, err
 	}
 
+	// Don't return sensitive information
 	config.ApiKey = ""
 	return config, nil
 }
 
+// ListModeration returns the paginated comments with the given status
+// (pending/published/rejected) for the moderation queue.
 func (s *Service) ListModeration(ctx context.Context, status model.CommentStatus, page, limit int) ([]model.Comment, int64, error) {
 	offset := (page - 1) * limit
 	return s.repo.ListModeration(ctx, status, offset, limit)
 }
 
+// SetStatus approves or rejects a comment.
 func (s *Service) SetStatus(ctx context.Context, id string, status model.CommentStatus) (*model.Comment, error) {
 	comment, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -288,11 +348,14 @@ func (s *Service) SetStatus(ctx context.Context, id string, status model.Comment
 	return comment, nil
 }
 
+// moderateCommentAI performs keyword-based moderation. It is intentionally
+// simple; a real AI API call can replace it later.
 func moderateCommentAI(content string, config model.CommentModerationConfig) (bool, string, error) {
 	if !config.Enabled {
-		return true, "", nil
+		return true, "", nil // if not enabled, auto approve
 	}
 
+	// Check blocked keywords
 	if config.BlockKeywords != "" {
 		keywords := strings.SplitSeq(config.BlockKeywords, ",")
 		for keyword := range keywords {
@@ -303,6 +366,7 @@ func moderateCommentAI(content string, config model.CommentModerationConfig) (bo
 		}
 	}
 
+	// Simulate AI moderation logic (should be replaced with real AI API call in production)
 	lowerContent := strings.ToLower(content)
 	if strings.Contains(lowerContent, "垃圾") || strings.Contains(lowerContent, "spam") ||
 		strings.Contains(lowerContent, "广告") || strings.Contains(lowerContent, "ad") {
