@@ -2,11 +2,21 @@ package post
 
 import (
 	"context"
+	"strconv"
 
 	"vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
 )
+
+// ListFilter 收敛列表查询参数（分页、状态与搜索过滤）。
+// 各查询方法按需使用其中的字段。
+type ListFilter struct {
+	Page, Limit int
+	CategoryID  string
+	Status      string
+	Search      string
+}
 
 // Repository is the persistence interface for the post domain.
 type Repository interface {
@@ -18,7 +28,18 @@ type Repository interface {
 	Delete(ctx context.Context, post *model.Post) error
 	IncrementViewCount(ctx context.Context, postID uint) error
 
-	BaseQuery(ctx context.Context) *gorm.DB
+	// List queries posts with role-based visibility, filters and pagination.
+	List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error)
+	// MyPosts queries the current user's own posts (excluding rejected).
+	MyPosts(ctx context.Context, userID uint, f ListFilter) ([]model.Post, int64, error)
+	// Drafts queries draft posts; admins see all, other users only their own.
+	Drafts(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error)
+	// UserPosts queries a user's posts with role-based visibility.
+	UserPosts(ctx context.Context, authorID uint, userRole string, currentUserID uint, f ListFilter) ([]model.Post, int64, error)
+	// Popular returns all published posts; scoring/sorting happens in the service.
+	Popular(ctx context.Context) ([]model.Post, error)
+	// Latest returns the most recent published posts.
+	Latest(ctx context.Context, limit int) ([]model.Post, error)
 
 	// Likes
 	CountLikes(ctx context.Context, postID uint) (int64, error)
@@ -92,8 +113,122 @@ func (r *gormRepository) IncrementViewCount(ctx context.Context, postID uint) er
 		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error
 }
 
-func (r *gormRepository) BaseQuery(ctx context.Context) *gorm.DB {
+// baseQuery returns the post model query with author and tags preloaded.
+func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
 	return r.db.WithContext(ctx).Model(&model.Post{}).Preload("Author").Preload("Tags")
+}
+
+// listPage runs the shared count + paginate + order pattern for list queries.
+func (r *gormRepository) listPage(query *gorm.DB, page, limit int) ([]model.Post, int64, error) {
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var posts []model.Post
+	if err := query.Order("created_at DESC").
+		Offset((page - 1) * limit).
+		Limit(limit).
+		Find(&posts).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return posts, total, nil
+}
+
+// applyListVisibility narrows the query to posts visible to the given role.
+func applyListVisibility(query *gorm.DB, userRole string, userID uint) *gorm.DB {
+	switch userRole {
+	case "", model.RoleGuest:
+		return query.Where("status = ?", model.PostStatusPublished)
+	case model.RoleContributor:
+		return query.Where(
+			query.Session(&gorm.Session{}).Where("status = ?", model.PostStatusPublished).
+				Or("author_id = ? AND status != ?", userID, model.PostStatusRejected),
+		)
+	case model.RoleAuthor, model.RoleAdmin, model.RoleSuperAdmin:
+		return query.Where("status != ?", model.PostStatusRejected)
+	default:
+		return query.Where("status = ?", model.PostStatusPublished)
+	}
+}
+
+// applyUserPostsVisibility narrows a user's posts to those visible to the
+// acting role; contributors see all of their own posts.
+func applyUserPostsVisibility(query *gorm.DB, userRole string, authorID, currentUserID uint) *gorm.DB {
+	switch userRole {
+	case "", model.RoleGuest:
+		return query.Where("status = ?", model.PostStatusPublished)
+	case model.RoleContributor:
+		if authorID != currentUserID {
+			return query.Where("status = ?", model.PostStatusPublished)
+		}
+		return query.Where("status != ?", model.PostStatusRejected)
+	default:
+		return query.Where("status != ?", model.PostStatusRejected)
+	}
+}
+
+func (r *gormRepository) List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {
+	query := applyListVisibility(r.baseQuery(ctx), userRole, userID)
+
+	// Category filter (by id or name)
+	if f.CategoryID != "" {
+		if cid, err := strconv.Atoi(f.CategoryID); err == nil {
+			query = query.Where("category = ?", cid)
+		} else {
+			query = query.Where("category = ?", f.CategoryID)
+		}
+	}
+
+	// Search filter
+	if f.Search != "" {
+		query = query.Where("title LIKE ? OR content LIKE ?", "%"+f.Search+"%", "%"+f.Search+"%")
+	}
+
+	return r.listPage(query, f.Page, f.Limit)
+}
+
+func (r *gormRepository) MyPosts(ctx context.Context, userID uint, f ListFilter) ([]model.Post, int64, error) {
+	query := r.baseQuery(ctx).Where("author_id = ? AND status != ?", userID, model.PostStatusRejected)
+
+	if f.Status != "" {
+		query = query.Where("status = ?", f.Status)
+	}
+
+	return r.listPage(query, f.Page, f.Limit)
+}
+
+func (r *gormRepository) Drafts(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {
+	query := r.baseQuery(ctx)
+
+	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
+		// Admins and super admins can see all draft posts
+		query = query.Where("status = ?", model.PostStatusDraft)
+	} else {
+		// Other users can only see their own draft posts
+		query = query.Where("author_id = ? AND status = ?", userID, model.PostStatusDraft)
+	}
+
+	return r.listPage(query, f.Page, f.Limit)
+}
+
+func (r *gormRepository) UserPosts(ctx context.Context, authorID uint, userRole string, currentUserID uint, f ListFilter) ([]model.Post, int64, error) {
+	query := applyUserPostsVisibility(r.baseQuery(ctx).Where("author_id = ?", authorID), userRole, authorID, currentUserID)
+	return r.listPage(query, f.Page, f.Limit)
+}
+
+func (r *gormRepository) Popular(ctx context.Context) ([]model.Post, error) {
+	var posts []model.Post
+	err := r.baseQuery(ctx).Where("status = ?", model.PostStatusPublished).Find(&posts).Error
+	return posts, err
+}
+
+func (r *gormRepository) Latest(ctx context.Context, limit int) ([]model.Post, error) {
+	var posts []model.Post
+	err := r.baseQuery(ctx).Where("status = ?", model.PostStatusPublished).
+		Order("created_at DESC").Limit(limit).Find(&posts).Error
+	return posts, err
 }
 
 func (r *gormRepository) CountLikes(ctx context.Context, postID uint) (int64, error) {

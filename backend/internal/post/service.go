@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -69,47 +70,10 @@ func (s *Service) List(ctx context.Context, userRole string, userID uint, page, 
 		return []model.Post{}, 0, nil
 	}
 
-	query := s.repo.BaseQuery(ctx)
-
-	// Determine visible posts based on user role
-	switch userRole {
-	case "", model.RoleGuest:
-		query = query.Where("status = ?", model.PostStatusPublished)
-	case model.RoleContributor:
-		query = query.Where(
-			query.Session(&gorm.Session{}).Where("status = ?", model.PostStatusPublished).
-				Or("author_id = ? AND status != ?", userID, model.PostStatusRejected),
-		)
-	case model.RoleAuthor, model.RoleAdmin, model.RoleSuperAdmin:
-		query = query.Where("status != ?", model.PostStatusRejected)
-	default:
-		query = query.Where("status = ?", model.PostStatusPublished)
-	}
-
-	// Category filter (by id or name)
-	if categoryID != "" {
-		if cid, err := strconv.Atoi(categoryID); err == nil {
-			query = query.Where("category = ?", cid)
-		} else {
-			query = query.Where("category = ?", categoryID)
-		}
-	}
-
-	// Search filter
-	if search != "" {
-		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var posts []model.Post
-	if err := query.Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&posts).Error; err != nil {
+	posts, total, err := s.repo.List(ctx, userRole, userID, ListFilter{
+		Page: page, Limit: limit, CategoryID: categoryID, Search: search,
+	})
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -364,23 +328,8 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 
 // MyPosts returns the current user's own posts (excluding rejected).
 func (s *Service) MyPosts(ctx context.Context, userID uint, page, limit int, status string) ([]model.Post, int64, error) {
-	query := s.repo.BaseQuery(ctx).
-		Where("author_id = ? AND status != ?", userID, model.PostStatusRejected)
-
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var posts []model.Post
-	if err := query.Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&posts).Error; err != nil {
+	posts, total, err := s.repo.MyPosts(ctx, userID, ListFilter{Page: page, Limit: limit, Status: status})
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -390,26 +339,8 @@ func (s *Service) MyPosts(ctx context.Context, userID uint, page, limit int, sta
 
 // Drafts returns draft posts; admins see all drafts, other users only their own.
 func (s *Service) Drafts(ctx context.Context, userRole string, userID uint, page, limit int) ([]model.Post, int64, error) {
-	query := s.repo.BaseQuery(ctx)
-
-	if userRole != "" && (userRole == model.RoleAdmin || userRole == model.RoleSuperAdmin) {
-		// Admins and super admins can see all draft posts
-		query = query.Where("status = ?", model.PostStatusDraft)
-	} else {
-		// Other users can only see their own draft posts
-		query = query.Where("author_id = ? AND status = ?", userID, model.PostStatusDraft)
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var posts []model.Post
-	if err := query.Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&posts).Error; err != nil {
+	posts, total, err := s.repo.Drafts(ctx, userRole, userID, ListFilter{Page: page, Limit: limit})
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -428,32 +359,8 @@ func (s *Service) UserPosts(ctx context.Context, userIDStr, currentUserRole stri
 		return []model.Post{}, 0, nil
 	}
 
-	query := s.repo.BaseQuery(ctx).Where("author_id = ?", uid)
-
-	// Determine visible posts based on user role
-	switch currentUserRole {
-	case "", model.RoleGuest:
-		query = query.Where("status = ?", model.PostStatusPublished)
-	case model.RoleContributor:
-		if uint(uid) != currentUserID {
-			query = query.Where("status = ?", model.PostStatusPublished)
-		} else {
-			query = query.Where("status != ?", model.PostStatusRejected)
-		}
-	default:
-		query = query.Where("status != ?", model.PostStatusRejected)
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var posts []model.Post
-	if err := query.Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&posts).Error; err != nil {
+	posts, total, err := s.repo.UserPosts(ctx, uint(uid), currentUserRole, currentUserID, ListFilter{Page: page, Limit: limit})
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -475,25 +382,30 @@ func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]mo
 		return []model.Post{}, nil
 	}
 
-	var posts []model.Post
-	s.repo.BaseQuery(ctx).Where("status = ?", model.PostStatusPublished).Find(&posts)
+	posts, err := s.repo.Popular(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	// Calculate likes count for each post
+	// Batch fetch like counts to avoid N+1 queries
+	ids := make([]uint, len(posts))
 	for i := range posts {
-		count, _ := s.repo.CountLikes(ctx, posts[i].ID)
-		posts[i].LikesCount = int(count)
+		ids[i] = posts[i].ID
+	}
+	counts, err := s.repo.BatchCountLikesByPostIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range posts {
+		posts[i].LikesCount = int(counts[posts[i].ID])
 	}
 
 	// Sort by the sum of likes count multiplied by 5 plus view count
-	for i := 0; i < len(posts); i++ {
-		for j := i + 1; j < len(posts); j++ {
-			scoreI := posts[i].LikesCount*5 + posts[i].ViewCount
-			scoreJ := posts[j].LikesCount*5 + posts[j].ViewCount
-			if scoreJ > scoreI {
-				posts[i], posts[j] = posts[j], posts[i]
-			}
-		}
-	}
+	sort.Slice(posts, func(i, j int) bool {
+		scoreI := posts[i].LikesCount*5 + posts[i].ViewCount
+		scoreJ := posts[j].LikesCount*5 + posts[j].ViewCount
+		return scoreI > scoreJ
+	})
 
 	// Limit the number of returned items
 	if limit < len(posts) {
@@ -509,11 +421,7 @@ func (s *Service) Latest(ctx context.Context, userRole string, limit int) ([]mod
 		return []model.Post{}, nil
 	}
 
-	var posts []model.Post
-	s.repo.BaseQuery(ctx).Where("status = ?", model.PostStatusPublished).
-		Order("created_at DESC").Limit(limit).Find(&posts)
-
-	return posts, nil
+	return s.repo.Latest(ctx, limit)
 }
 
 // Categories returns all categories.
