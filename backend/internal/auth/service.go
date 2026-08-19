@@ -100,7 +100,7 @@ func (s *Service) captchaEnabled(ctx context.Context) (bool, error) {
 // Login authenticates a user by email and password and returns a signed JWT
 // together with the user record. Captcha is enforced when enabled.
 func (s *Service) Login(ctx context.Context, email, password, captchaID, captchaToken string, captchaX int) (string, *model.User, error) {
-	logrus.Info("User login attempt started")
+	logrus.Debug("User login attempt started")
 
 	if err := s.verifyCaptcha(ctx, &verifyCaptchaArgs{
 		Token:     captchaToken,
@@ -154,7 +154,7 @@ type RegisterResult struct {
 // RequiresVerification is set. protocol and host are used to build the
 // verification link.
 func (s *Service) Register(ctx context.Context, email, password, username, captchaID, captchaToken string, captchaX int, protocol, host string) (*RegisterResult, error) {
-	logrus.Info("User registration attempt started")
+	logrus.Debug("User registration attempt started")
 
 	// Check if registration is allowed
 	settings, err := s.repo.GetGeneralSettings(ctx)
@@ -211,7 +211,7 @@ func (s *Service) Register(ctx context.Context, email, password, username, captc
 		"username": username,
 		"email":    email,
 		"role":     model.RoleGuest,
-	}).Info("Creating new user")
+	}).Debug("Creating new user")
 	if err := s.repo.CreateUser(ctx, &newUser); err != nil {
 		logrus.WithFields(logrus.Fields{
 			"username": username,
