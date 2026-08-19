@@ -11,6 +11,7 @@ import (
 	"vexgo/backend/internal/config"
 	"vexgo/backend/internal/database"
 	"vexgo/backend/internal/home"
+	"vexgo/backend/internal/mailer"
 	"vexgo/backend/internal/message"
 	"vexgo/backend/internal/post"
 	"vexgo/backend/internal/public"
@@ -96,11 +97,14 @@ func New(cfg *config.Config) (*App, error) {
 		Verification: verification.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
+			Mailer:    mailer.NewMailer(db),
 		},
 		Auth: auth.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Files:     storage,
+			Mailer:    mailer.NewMailer(db),
+			Captcha:   verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret, Mailer: mailer.NewMailer(db)}),
 		},
 		SSO: sso.Deps{
 			DB:        db,
