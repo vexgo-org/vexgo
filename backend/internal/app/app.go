@@ -13,6 +13,7 @@ import (
 	"vexgo/backend/internal/home"
 	"vexgo/backend/internal/mailer"
 	"vexgo/backend/internal/message"
+	"vexgo/backend/internal/middleware"
 	"vexgo/backend/internal/post"
 	"vexgo/backend/internal/public"
 	"vexgo/backend/internal/router"
@@ -58,7 +59,11 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("seed database: %w", err)
 	}
 
-	r := gin.Default()
+	// gin.New (no default logger) + explicit recovery: request logging is done
+	// once by middleware.RequestLogger below, avoiding double log lines.
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestLogger())
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
 	logrus.WithField("baseURL", renderer.BaseURL()).Info("Base URL set for server-side rendering")

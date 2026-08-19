@@ -37,7 +37,6 @@ type Deps struct {
 // RegisterAPIRoutes registers all routes under /api.
 func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	api := r.Group("/api")
-	api.Use(middleware.RequestLogger())
 	api.Use(middleware.NewAuth(deps.DB, deps.JWTSecret).OptionalJWTAuth())
 
 	message.NewHandler(deps.Message).RegisterRoutes(api)
