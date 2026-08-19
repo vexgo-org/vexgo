@@ -19,7 +19,7 @@ type Handler struct {
 
 // NewHandler creates a post HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // currentUser extracts the role and id of the current user from the context.

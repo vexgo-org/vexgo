@@ -43,9 +43,10 @@ var (
 
 // Deps holds the dependencies required by the user domain.
 type Deps struct {
-	DB       *gorm.DB
-	Notifier Notifier
-	Files    FileRemover
+	DB        *gorm.DB
+	JWTSecret []byte
+	Notifier  Notifier
+	Files     FileRemover
 }
 
 // Notifier is an alias for model.Notifier kept for backward compatibility.

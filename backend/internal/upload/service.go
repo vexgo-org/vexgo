@@ -21,8 +21,9 @@ var (
 
 // Deps holds the dependencies required by the upload domain.
 type Deps struct {
-	DB      *gorm.DB
-	Storage Storage
+	DB        *gorm.DB
+	JWTSecret []byte
+	Storage   Storage
 }
 
 // Service contains the business logic of the upload domain.

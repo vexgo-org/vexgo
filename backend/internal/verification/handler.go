@@ -18,7 +18,7 @@ type Handler struct {
 
 // NewHandler creates a verification HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // VerifyEmail verifies email (supports initial verification and email change)

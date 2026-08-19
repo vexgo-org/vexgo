@@ -9,30 +9,27 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// init is called before main to load environment variables from a .env file.
-func init() {
-	// The path is relative to where the go binary is run.
+// loadDotEnv loads environment variables from a .env file (best-effort).
+// It is called at the start of ParseFlags so that env vars are available
+// before config construction.
+func loadDotEnv() {
 	if err := godotenv.Load("../.env"); err != nil {
 		logrus.Info("No .env file found, will use environment variables from the system")
 	}
 }
 
-// JWTSecret holds the HMAC secret used to sign tokens.
-var JWTSecret []byte
-
-// FrontendURL holds the frontend application URL for constructing links.
-var FrontendURL string
-
-// Init loads config values from environment and validates them.
-// If jwtSecret is provided, it will be used instead of environment variable.
-func Init(jwtSecret string) {
-	s := jwtSecret
-	if s == "" {
-		// Fallback to environment variable if no config value provided
-		s = os.Getenv("JWT_SECRET")
+// ComputeJWTSecret ensures cfg.JWTSecret is populated. It checks, in order:
+//   - cfg.JWTSecret already set (from config file or flag)
+//   - JWT_SECRET environment variable
+//   - random 256-bit key (development fallback)
+func (cfg *Config) ComputeJWTSecret() {
+	if len(cfg.JWTSecret) > 0 {
+		logrus.Infof("JWT secret loaded from config (length: %d bytes)", len(cfg.JWTSecret))
+		return
 	}
+
+	s := os.Getenv("JWT_SECRET")
 	if s == "" {
-		// Generate a secure random key in the development environment.
 		logrus.Warn("JWT_SECRET not set — generating a random secret for development")
 		key := make([]byte, 32) // 256 bits
 		if _, err := rand.Read(key); err != nil {
@@ -40,15 +37,15 @@ func Init(jwtSecret string) {
 		}
 		s = hex.EncodeToString(key)
 	}
-	JWTSecret = []byte(s)
-	logrus.Infof("JWT secret initialized with length: %d bytes", len(JWTSecret))
+	cfg.JWTSecret = []byte(s)
+	logrus.Infof("JWT secret initialized (length: %d bytes)", len(cfg.JWTSecret))
 
 	// Load frontend URL
-	FrontendURL = os.Getenv("FRONTEND_URL")
-	if FrontendURL == "" {
-		FrontendURL = "http://localhost:5173" // Default development environment address
-		logrus.Warnf("FRONTEND_URL not set — using default: %s", FrontendURL)
+	cfg.FrontendURL = os.Getenv("FRONTEND_URL")
+	if cfg.FrontendURL == "" {
+		cfg.FrontendURL = "http://localhost:5173"
+		logrus.Warnf("FRONTEND_URL not set — using default: %s", cfg.FrontendURL)
 	} else {
-		logrus.Infof("Frontend URL set to: %s", FrontendURL)
+		logrus.Infof("Frontend URL set to: %s", cfg.FrontendURL)
 	}
 }

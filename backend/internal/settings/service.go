@@ -46,8 +46,9 @@ var (
 
 // Deps holds the dependencies required by the settings domain.
 type Deps struct {
-	DB     *gorm.DB
-	Themes *public.Renderer
+	DB        *gorm.DB
+	JWTSecret []byte
+	Themes    *public.Renderer
 }
 
 // Service contains the business logic of the settings domain.

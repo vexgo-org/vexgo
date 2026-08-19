@@ -26,8 +26,9 @@ var (
 
 // Deps holds the dependencies required by the comment domain.
 type Deps struct {
-	DB       *gorm.DB
-	Notifier Notifier
+	DB        *gorm.DB
+	JWTSecret []byte
+	Notifier  Notifier
 }
 
 // Notifier is an alias for model.Notifier kept for backward compatibility.

@@ -6,21 +6,20 @@ import (
 	"net/http"
 	"strings"
 
-	"vexgo/backend/internal/config"
 	"vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
-) // Auth holds the database connection used to validate tokens against the
-// current user state (password version, last login).
+) // Auth holds the database connection and JWT secret used to validate tokens.
 type Auth struct {
-	db *gorm.DB
+	db        *gorm.DB
+	jwtSecret []byte
 }
 
-// NewAuth creates the authentication middleware with the given database.
-func NewAuth(db *gorm.DB) *Auth {
-	return &Auth{db: db}
+// NewAuth creates the authentication middleware with the given database and JWT secret.
+func NewAuth(db *gorm.DB, jwtSecret []byte) *Auth {
+	return &Auth{db: db, jwtSecret: jwtSecret}
 }
 
 // CurrentUser extracts the authenticated user from the gin context.
@@ -78,7 +77,7 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrTokenUnverifiable
 			}
-			return config.JWTSecret, nil
+			return a.jwtSecret, nil
 		})
 
 		if err != nil || !token.Valid {
@@ -156,7 +155,7 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrTokenUnverifiable
 			}
-			return config.JWTSecret, nil
+			return a.jwtSecret, nil
 		})
 
 		if err != nil || !token.Valid {

@@ -52,7 +52,8 @@ var (
 
 // Deps holds the dependencies required by the verification domain.
 type Deps struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	JWTSecret []byte
 }
 
 // Service contains the business logic of the verification domain.

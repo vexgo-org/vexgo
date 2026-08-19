@@ -24,17 +24,16 @@ import (
 )
 
 func main() {
-	// 1. Parse command line arguments
+	// 1. Parse command line arguments (also loads .env)
 	cfg := config.ParseFlags()
 
 	// 2. Setup logging
 	setupLogging(cfg.LogLevel)
 
-	// 3. Initialize configuration (load JWT secret, etc., support config files and environment variables)
-	config.Init(cfg.JWTSecret)
-
-	// 3.1 Load SSO configuration from config file (overrides environment variables)
-	config.LoadFromConfig(cfg)
+	// 3. Compute derived config (JWT secret, SSO from env/file)
+	cfg.ComputeJWTSecret()
+	cfg.LoadSSOFromEnv()
+	cfg.LoadSSOFromConfig()
 
 	// 4. Initialize file storage: local disk by default, S3-compatible when enabled
 	var storage upload.Storage = upload.NewLocalStorage(cfg.DataDir)
@@ -68,31 +67,26 @@ func main() {
 		logrus.Info("Using local file storage")
 	}
 
-	// 5. Initialize database connection (ensure database driver and connection string are configured correctly)
+	// 5. Initialize database connection
 	db := database.Open(cfg, cfg.DataDir)
 	database.AutoMigrate(db)
 	database.Seed(db)
 
-	// 6. Create Gin engine instance (includes Logger and Recovery middleware by default)
+	// 6. Create Gin engine instance
 	r := gin.Default()
 
-	// 6.1 Create the SSR renderer with the injected database, base URL and data dir
+	// 6.1 Create the SSR renderer
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
 	logrus.WithField("baseURL", renderer.BaseURL()).Info("Base URL set for server-side rendering")
 
-	// Configure trusted proxies based on environment/configuration
-	// If BEHIND_REVERSE_PROXY=true, use TRUSTED_PROXIES list or common defaults
-	// If BEHIND_REVERSE_PROXY=false, disable proxy trust (no warning)
+	// Configure trusted proxies
 	if cfg.BehindReverseProxy {
 		if len(cfg.TrustedProxies) > 0 {
-			// Use explicitly configured trusted proxies
 			if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 				logrus.WithError(err).Fatal("Invalid trusted proxies configuration")
 			}
 			logrus.WithField("proxies", cfg.TrustedProxies).Info("Trusted proxies configured")
 		} else {
-			// Use common defaults: trust all private IP ranges and localhost
-			// This is a reasonable default for self-hosted behind reverse proxy
 			defaultProxies := []string{
 				"127.0.0.1",
 				"::1",
@@ -106,60 +100,68 @@ func main() {
 			logrus.WithField("proxies", defaultProxies).Info("Trusted proxies set to common private networks (behind reverse proxy)")
 		}
 	} else {
-		// Not behind a reverse proxy, disable trust
 		if err := r.SetTrustedProxies(nil); err != nil {
 			logrus.WithError(err).Fatal("Failed to disable trusted proxies")
 		}
 		logrus.Info("No trusted proxies configured (not behind reverse proxy)")
 	}
 
-	// ===================== Core API routing group (all endpoints under /api) =====================
-	// All API routing definitions have been moved to router.RegisterAPIRoutes to avoid cluttering main.go.
+	// ===================== Core API routing group =====================
 	router.RegisterAPIRoutes(r, router.Deps{
-		DB:      db,
-		Message: message.Deps{DB: db},
+		DB:        db,
+		JWTSecret: cfg.JWTSecret,
+		Message: message.Deps{
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+		},
 		Comment: comment.Deps{
-			DB:       db,
-			Notifier: message.NewService(message.Deps{DB: db}),
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+			Notifier:  message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret}),
 		},
 		Post: post.Deps{
-			DB:       db,
-			Notifier: message.NewService(message.Deps{DB: db}),
-			Files:    storage,
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+			Notifier:  message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret}),
+			Files:     storage,
 		},
 		Upload: upload.Deps{
-			DB:      db,
-			Storage: storage,
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+			Storage:   storage,
 		},
 		User: user.Deps{
-			DB:       db,
-			Notifier: message.NewService(message.Deps{DB: db}),
-			Files:    storage,
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+			Notifier:  message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret}),
+			Files:     storage,
 		},
 		Verification: verification.Deps{
-			DB: db,
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
 		},
 		Auth: auth.Deps{
 			DB:        db,
-			JWTSecret: config.JWTSecret,
+			JWTSecret: cfg.JWTSecret,
 			Files:     storage,
 		},
 		SSO: sso.Deps{
 			DB:        db,
-			SSO:       &config.SSO,
-			JWTSecret: config.JWTSecret,
+			SSO:       &cfg.SSO,
+			JWTSecret: cfg.JWTSecret,
 		},
 		Home: home.Deps{
-			DB: db,
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
 		},
 		Settings: settings.Deps{
-			DB:     db,
-			Themes: renderer,
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+			Themes:    renderer,
 		},
 	})
 
 	// ===================== Static file hosting =====================
-	// Register all static routes (assets, uploads, SPA fallback) via the renderer
 	renderer.RegisterStaticRoutes(r, cfg.S3Enabled)
 
 	// 7. Start the server

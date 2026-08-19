@@ -9,7 +9,8 @@ import (
 
 // Deps holds the dependencies required by the message domain.
 type Deps struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	JWTSecret []byte
 }
 
 // Service contains the business logic of the message domain.

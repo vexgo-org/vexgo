@@ -21,6 +21,7 @@ import (
 // Deps aggregates the dependencies of every domain package.
 type Deps struct {
 	DB           *gorm.DB
+	JWTSecret    []byte
 	Message      message.Deps
 	Comment      comment.Deps
 	Post         post.Deps
@@ -37,7 +38,7 @@ type Deps struct {
 func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	api := r.Group("/api")
 	api.Use(middleware.RequestLogger())
-	api.Use(middleware.NewAuth(deps.DB).OptionalJWTAuth())
+	api.Use(middleware.NewAuth(deps.DB, deps.JWTSecret).OptionalJWTAuth())
 
 	message.NewHandler(deps.Message).RegisterRoutes(api)
 	comment.NewHandler(deps.Comment).RegisterRoutes(api)

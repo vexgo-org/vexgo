@@ -18,7 +18,7 @@ type Handler struct {
 
 // NewHandler creates an auth HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // requestProtocolAndHost derives the protocol and host for building absolute

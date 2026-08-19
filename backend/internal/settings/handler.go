@@ -26,7 +26,7 @@ type Handler struct {
 
 // NewHandler creates a settings HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB), themes: deps.Themes}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret), themes: deps.Themes}
 }
 
 // GetSMTPConfig gets SMTP configuration

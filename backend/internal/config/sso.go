@@ -66,92 +66,119 @@ type SSOConfig struct {
 	AllowLocalLogin bool // ALLOW_LOCAL_LOGIN (default: true)
 }
 
-// LoadFromConfig loads SSO configuration from Config.
-// Config file values take priority over environment variables.
-// This should be called after Init() in main.go to override
-// environment variables with config file values.
-func LoadFromConfig(cfg *Config) {
-	// Only update fields that were explicitly set in the config file.
-	// This preserves the priority: command line > config file > environment.
-	// String fields fall back to the merged cfg value (file > env); bool
-	// fields consult cfg.fileSet so an explicit `false` in the file can
-	// override an environment `true`.
+// LoadSSOFromEnv populates cfg.SSO from environment variables.
+// This is the baseline; config file values override via LoadFromConfig.
+func (cfg *Config) LoadSSOFromEnv() {
+	cfg.SSO = SSOConfig{
+		BaseURL: os.Getenv("BASE_URL"),
+		GitHub: SSOProviderConfig{
+			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+		},
+		Google: SSOProviderConfig{
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		},
+		OIDC: OIDCConfig{
+			Enabled:   parseBool("OIDC_ENABLED", false),
+			IssuerURL: os.Getenv("OIDC_ISSUER_URL"),
+			SSOProviderConfig: SSOProviderConfig{
+				ClientID:     os.Getenv("OIDC_CLIENT_ID"),
+				ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
+			},
+			AuthURL:       os.Getenv("OIDC_AUTH_URL"),
+			TokenURL:      os.Getenv("OIDC_TOKEN_URL"),
+			UserInfoURL:   os.Getenv("OIDC_USERINFO_URL"),
+			Scopes:        parseScopes("OIDC_SCOPES", []string{"openid", "profile", "email"}),
+			EmailClaim:    envDefault("OIDC_EMAIL_CLAIM", "email"),
+			NameClaim:     envDefault("OIDC_NAME_CLAIM", "name"),
+			GroupClaim:    envDefault("OIDC_GROUP_CLAIM", "groups"),
+			AllowedGroups: parseCommaSeparated("OIDC_ALLOWED_GROUPS"),
+			AutoRedirect:  parseBool("OIDC_AUTO_REDIRECT", false),
+			VerifyEmail:   parseBool("OIDC_VERIFY_EMAIL", false),
+		},
+		AllowLocalLogin: parseBool("ALLOW_LOCAL_LOGIN", true),
+	}
+}
 
+// LoadSSOFromConfig applies config file values over the env-loaded SSO.
+// Only fields explicitly set in the config file are applied.
+func (cfg *Config) LoadSSOFromConfig() {
 	// GitHub OAuth
 	if cfg.fileSet["github_client_id"] || cfg.GitHubClientID != "" {
-		SSO.GitHub.ClientID = cfg.GitHubClientID
+		cfg.SSO.GitHub.ClientID = cfg.GitHubClientID
 	}
 	if cfg.fileSet["github_client_secret"] || cfg.GitHubClientSecret != "" {
-		SSO.GitHub.ClientSecret = cfg.GitHubClientSecret
+		cfg.SSO.GitHub.ClientSecret = cfg.GitHubClientSecret
 	}
 
 	// Google OAuth
 	if cfg.fileSet["google_client_id"] || cfg.GoogleClientID != "" {
-		SSO.Google.ClientID = cfg.GoogleClientID
+		cfg.SSO.Google.ClientID = cfg.GoogleClientID
 	}
 	if cfg.fileSet["google_client_secret"] || cfg.GoogleClientSecret != "" {
-		SSO.Google.ClientSecret = cfg.GoogleClientSecret
+		cfg.SSO.Google.ClientSecret = cfg.GoogleClientSecret
 	}
 
 	// OIDC Enabled
 	if cfg.fileSet["oidc_enabled"] {
-		SSO.OIDC.Enabled = cfg.OIDCEnabled
+		cfg.SSO.OIDC.Enabled = cfg.OIDCEnabled
 	}
 
 	// OIDC Client credentials
 	if cfg.OIDCClientID != "" {
-		SSO.OIDC.ClientID = cfg.OIDCClientID
+		cfg.SSO.OIDC.ClientID = cfg.OIDCClientID
 	}
 	if cfg.OIDCClientSecret != "" {
-		SSO.OIDC.ClientSecret = cfg.OIDCClientSecret
+		cfg.SSO.OIDC.ClientSecret = cfg.OIDCClientSecret
 	}
 
 	// OIDC endpoints
 	if cfg.OIDCIssuerURL != "" {
-		SSO.OIDC.IssuerURL = cfg.OIDCIssuerURL
+		cfg.SSO.OIDC.IssuerURL = cfg.OIDCIssuerURL
 	}
 	if cfg.OIDCAuthURL != "" {
-		SSO.OIDC.AuthURL = cfg.OIDCAuthURL
+		cfg.SSO.OIDC.AuthURL = cfg.OIDCAuthURL
 	}
 	if cfg.OIDCTokenURL != "" {
-		SSO.OIDC.TokenURL = cfg.OIDCTokenURL
+		cfg.SSO.OIDC.TokenURL = cfg.OIDCTokenURL
 	}
 	if cfg.OIDCUserInfoURL != "" {
-		SSO.OIDC.UserInfoURL = cfg.OIDCUserInfoURL
+		cfg.SSO.OIDC.UserInfoURL = cfg.OIDCUserInfoURL
 	}
 
 	// OIDC Scopes
 	if cfg.OIDCScopes != "" {
-		SSO.OIDC.Scopes = strings.Fields(cfg.OIDCScopes)
+		cfg.SSO.OIDC.Scopes = strings.Fields(cfg.OIDCScopes)
 	}
 
 	// OIDC Claim names
 	if cfg.OIDCEmailClaim != "" {
-		SSO.OIDC.EmailClaim = cfg.OIDCEmailClaim
+		cfg.SSO.OIDC.EmailClaim = cfg.OIDCEmailClaim
 	}
 	if cfg.OIDCNameClaim != "" {
-		SSO.OIDC.NameClaim = cfg.OIDCNameClaim
+		cfg.SSO.OIDC.NameClaim = cfg.OIDCNameClaim
 	}
 	if cfg.OIDCGroupClaim != "" {
-		SSO.OIDC.GroupClaim = cfg.OIDCGroupClaim
+		cfg.SSO.OIDC.GroupClaim = cfg.OIDCGroupClaim
 	}
 
 	// OIDC Allowed groups
 	if cfg.OIDCAllowedGroups != "" {
-		SSO.OIDC.AllowedGroups = parseCommaSeparatedFromString(cfg.OIDCAllowedGroups)
+		cfg.SSO.OIDC.AllowedGroups = parseCommaSeparatedFromString(cfg.OIDCAllowedGroups)
 	}
 
 	// OIDC UX options
 	if cfg.fileSet["oidc_auto_redirect"] {
-		SSO.OIDC.AutoRedirect = cfg.OIDCAutoRedirect
+		cfg.SSO.OIDC.AutoRedirect = cfg.OIDCAutoRedirect
 	}
 	if cfg.fileSet["oidc_verify_email"] {
-		SSO.OIDC.VerifyEmail = cfg.OIDCVerifyEmail
+		cfg.SSO.OIDC.VerifyEmail = cfg.OIDCVerifyEmail
 	}
 
 	// Global options
 	if cfg.fileSet["allow_local_login"] {
-		SSO.AllowLocalLogin = cfg.AllowLocalLogin
+		cfg.SSO.AllowLocalLogin = cfg.AllowLocalLogin
 	}
 }
 
@@ -168,79 +195,6 @@ func parseCommaSeparatedFromString(s string) []string {
 		}
 	}
 	return result
-}
-
-// SSOConfig is the global SSO configuration, populated from environment
-// variables at process startup. A provider is enabled when its CLIENT_ID
-// (or OIDC_ENABLED) is non-empty / true.
-//
-// ── GitHub ───────────────────────────────────────────────────────────────────
-//
-//	GITHUB_CLIENT_ID        GitHub OAuth App Client ID
-//	GITHUB_CLIENT_SECRET    GitHub OAuth App Client Secret
-//
-// ── Google ───────────────────────────────────────────────────────────────────
-//
-//	GOOGLE_CLIENT_ID        Google OAuth 2.0 Client ID
-//	GOOGLE_CLIENT_SECRET    Google OAuth 2.0 Client Secret
-//
-// ── OIDC ─────────────────────────────────────────────────────────────────────
-//
-//	OIDC_ENABLED            Enable OIDC login (default: false)
-//	OIDC_ISSUER_URL         Issuer URL for OIDC discovery
-//	                        e.g. https://auth.example.com/realms/myrealm
-//	                        Tip: verify at <issuer>/.well-known/openid-configuration
-//	OIDC_CLIENT_ID          Client ID
-//	OIDC_CLIENT_SECRET      Client Secret
-//
-//	Manual endpoint override (only when OIDC discovery is unavailable):
-//	OIDC_AUTH_URL           Authorization endpoint
-//	OIDC_TOKEN_URL          Token endpoint
-//	OIDC_USERINFO_URL       UserInfo endpoint (optional fallback)
-//
-//	OIDC_SCOPES             Space-separated extra scopes (default: "openid profile email")
-//	                        e.g. "openid profile email groups"
-//	OIDC_EMAIL_CLAIM        Claim name for email    (default: "email")
-//	OIDC_NAME_CLAIM         Claim name for username (default: "name")
-//	OIDC_GROUP_CLAIM        Claim name for groups   (default: "groups")
-//	OIDC_ALLOWED_GROUPS     Comma-separated groups permitted to log in
-//	                        e.g. "admins,developers"  (empty = allow all)
-//	OIDC_AUTO_REDIRECT      Redirect to OIDC provider automatically (default: false)
-//	OIDC_VERIFY_EMAIL       Require email_verified=true in token    (default: false)
-//
-// ── Global ───────────────────────────────────────────────────────────────────
-//
-//	ALLOW_LOCAL_LOGIN       Allow password-based login (default: true)
-//	                        Set false to enforce SSO-only access
-var SSO = SSOConfig{
-	BaseURL: os.Getenv("BASE_URL"),
-	GitHub: SSOProviderConfig{
-		ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
-		ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
-	},
-	Google: SSOProviderConfig{
-		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-	},
-	OIDC: OIDCConfig{
-		Enabled:   parseBool("OIDC_ENABLED", false),
-		IssuerURL: os.Getenv("OIDC_ISSUER_URL"),
-		SSOProviderConfig: SSOProviderConfig{
-			ClientID:     os.Getenv("OIDC_CLIENT_ID"),
-			ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
-		},
-		AuthURL:       os.Getenv("OIDC_AUTH_URL"),
-		TokenURL:      os.Getenv("OIDC_TOKEN_URL"),
-		UserInfoURL:   os.Getenv("OIDC_USERINFO_URL"),
-		Scopes:        parseScopes("OIDC_SCOPES", []string{"openid", "profile", "email"}),
-		EmailClaim:    envDefault("OIDC_EMAIL_CLAIM", "email"),
-		NameClaim:     envDefault("OIDC_NAME_CLAIM", "name"),
-		GroupClaim:    envDefault("OIDC_GROUP_CLAIM", "groups"),
-		AllowedGroups: parseCommaSeparated("OIDC_ALLOWED_GROUPS"),
-		AutoRedirect:  parseBool("OIDC_AUTO_REDIRECT", false),
-		VerifyEmail:   parseBool("OIDC_VERIFY_EMAIL", false),
-	},
-	AllowLocalLogin: parseBool("ALLOW_LOCAL_LOGIN", true),
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
