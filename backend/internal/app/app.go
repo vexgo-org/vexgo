@@ -70,6 +70,12 @@ func New(cfg *config.Config) (*App, error) {
 
 	configureProxies(r, cfg)
 
+	// Shared service instances: construct each once and reuse it across the
+	// domains that depend on it.
+	messageSvc := message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret})
+	mailerSvc := mailer.NewMailer(db)
+	verificationSvc := verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret, Mailer: mailerSvc})
+
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
 		JWTSecret: cfg.JWTSecret,
@@ -80,12 +86,12 @@ func New(cfg *config.Config) (*App, error) {
 		Comment: comment.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Notifier:  message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret}),
+			Notifier:  messageSvc,
 		},
 		Post: post.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Notifier:  message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret}),
+			Notifier:  messageSvc,
 			Files:     storage,
 		},
 		Upload: upload.Deps{
@@ -96,20 +102,20 @@ func New(cfg *config.Config) (*App, error) {
 		User: user.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Notifier:  message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret}),
+			Notifier:  messageSvc,
 			Files:     storage,
 		},
 		Verification: verification.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Mailer:    mailer.NewMailer(db),
+			Mailer:    mailerSvc,
 		},
 		Auth: auth.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Files:     storage,
-			Mailer:    mailer.NewMailer(db),
-			Captcha:   verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret, Mailer: mailer.NewMailer(db)}),
+			Mailer:    mailerSvc,
+			Captcha:   verificationSvc,
 		},
 		SSO: sso.Deps{
 			DB:        db,
