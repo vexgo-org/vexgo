@@ -152,6 +152,44 @@ func TestJWTAuth_InvalidToken(t *testing.T) {
 	}
 }
 
+func TestJWTAuth_MissingUserIDClaim(t *testing.T) {
+	// A signed token without a user_id claim must be rejected with 401,
+	// not panic on a bare type assertion.
+	tok := signToken(t, jwt.MapClaims{
+		"username": "bob",
+		"role":     model.RoleGuest,
+	})
+	a := NewAuth(nil, testSecret)
+	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	if code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", code)
+	}
+}
+
+func TestOptionalJWTAuth_MissingUserIDClaim(t *testing.T) {
+	// A signed token without a user_id claim must not panic; the request
+	// passes through and no user is written to the context.
+	tok := signToken(t, jwt.MapClaims{
+		"username": "bob",
+		"role":     model.RoleGuest,
+	})
+	a := NewAuth(nil, testSecret)
+	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "Bearer "+tok)
+	if code != http.StatusOK || !cap.passed {
+		t.Fatalf("expected request to pass through, code=%d", code)
+	}
+	if cap.userID != nil {
+		t.Errorf("expected no userID set, got %v", cap.userID)
+	}
+	userMap, ok := cap.user.(map[string]any)
+	if !ok {
+		t.Fatalf("expected user map in context, got %T", cap.user)
+	}
+	if userMap["id"] != uint(0) {
+		t.Errorf("expected zero user id, got %v", userMap["id"])
+	}
+}
+
 func TestJWTAuth_ValidToken(t *testing.T) {
 	db := newTestDB(t)
 	// PasswordVersion carries gorm:"default:1", so a freshly created user
