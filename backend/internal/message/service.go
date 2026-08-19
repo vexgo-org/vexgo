@@ -30,11 +30,20 @@ func newServiceWithRepo(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
+// ListQuery carries the pagination and filter parameters for List.
+type ListQuery struct {
+	UserID      uint
+	Page        int
+	Limit       int
+	MessageType string
+	IsRead      string
+}
+
 // List returns the paginated notifications of a user, optionally filtered by
 // type and read status.
-func (s *Service) List(ctx context.Context, userID uint, page, limit int, messageType, isRead string) ([]model.Notification, int64, error) {
-	offset := (page - 1) * limit
-	return s.repo.List(ctx, userID, offset, limit, messageType, isRead)
+func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Notification, int64, error) {
+	offset := (q.Page - 1) * q.Limit
+	return s.repo.List(ctx, q.UserID, offset, q.Limit, q.MessageType, q.IsRead)
 }
 
 // MarkAsRead marks a single notification as read. It returns the number of
@@ -61,14 +70,14 @@ func (s *Service) UnreadCount(ctx context.Context, userID uint) (int64, error) {
 
 // CreateNotification creates a notification for a user. It is called by other
 // domains (post, comment, user) when an event of interest occurs.
-func (s *Service) CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error {
+func (s *Service) CreateNotification(ctx context.Context, input model.NotificationInput) error {
 	n := &model.Notification{
-		UserID:      userID,
-		Type:        notificationType,
-		Title:       title,
-		Content:     content,
-		RelatedID:   relatedID,
-		RelatedType: relatedType,
+		UserID:      input.UserID,
+		Type:        input.Type,
+		Title:       input.Title,
+		Content:     input.Content,
+		RelatedID:   input.RelatedID,
+		RelatedType: input.RelatedType,
 		IsRead:      false,
 	}
 	return s.repo.Create(ctx, n)

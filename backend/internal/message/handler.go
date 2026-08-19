@@ -27,7 +27,13 @@ func (h *Handler) GetMessages(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	notifications, total, err := h.svc.List(c.Request.Context(), uid, page, limit, c.Query("type"), c.Query("is_read"))
+	notifications, total, err := h.svc.List(c.Request.Context(), ListQuery{
+		UserID:      uid,
+		Page:        page,
+		Limit:       limit,
+		MessageType: c.Query("type"),
+		IsRead:      c.Query("is_read"),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
 		return

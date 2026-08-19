@@ -39,7 +39,7 @@ func TestCreateNotification(t *testing.T) {
 	svc, repo := newTestService(t)
 	ctx := context.Background()
 
-	err := svc.CreateNotification(ctx, 1, "comment", "New comment", "someone commented", "42", "post")
+	err := svc.CreateNotification(ctx, model.NotificationInput{UserID: 1, Type: "comment", Title: "New comment", Content: "someone commented", RelatedID: "42", RelatedType: "post"})
 	if err != nil {
 		t.Fatalf("CreateNotification error: %v", err)
 	}
@@ -65,12 +65,12 @@ func TestList_PaginationAndFilters(t *testing.T) {
 	ctx := context.Background()
 
 	for range 5 {
-		if err := svc.CreateNotification(ctx, 1, "comment", "c", "content", "", ""); err != nil {
+		if err := svc.CreateNotification(ctx, model.NotificationInput{UserID: 1, Type: "comment", Title: "c", Content: "content"}); err != nil {
 			t.Fatalf("failed to seed: %v", err)
 		}
 	}
 
-	list, total, err := svc.List(ctx, 1, 1, 2, "", "")
+	list, total, err := svc.List(ctx, ListQuery{UserID: 1, Page: 1, Limit: 2})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestList_PaginationAndFilters(t *testing.T) {
 		t.Errorf("expected 2 items on page 1, got %d", len(list))
 	}
 
-	list, total, err = svc.List(ctx, 1, 1, 10, "", "false")
+	list, total, err = svc.List(ctx, ListQuery{UserID: 1, Page: 1, Limit: 10, IsRead: "false"})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestList_PaginationAndFilters(t *testing.T) {
 		t.Errorf("expected 5 unread items, got %d", len(list))
 	}
 
-	_, total, err = svc.List(ctx, 1, 1, 10, "comment", "")
+	_, total, err = svc.List(ctx, ListQuery{UserID: 1, Page: 1, Limit: 10, MessageType: "comment"})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestMarkAsRead(t *testing.T) {
 	svc, repo := newTestService(t)
 	ctx := context.Background()
 
-	if err := svc.CreateNotification(ctx, 1, "comment", "t", "c", "", ""); err != nil {
+	if err := svc.CreateNotification(ctx, model.NotificationInput{UserID: 1, Type: "comment", Title: "t", Content: "c"}); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
 
@@ -144,10 +144,10 @@ func TestMarkAllAsRead(t *testing.T) {
 	svc, _ := newTestService(t)
 	ctx := context.Background()
 
-	if err := svc.CreateNotification(ctx, 1, "comment", "t", "c", "", ""); err != nil {
+	if err := svc.CreateNotification(ctx, model.NotificationInput{UserID: 1, Type: "comment", Title: "t", Content: "c"}); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
-	if err := svc.CreateNotification(ctx, 2, "comment", "t", "c", "", ""); err != nil {
+	if err := svc.CreateNotification(ctx, model.NotificationInput{UserID: 2, Type: "comment", Title: "t", Content: "c"}); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
 
@@ -175,7 +175,7 @@ func TestDelete(t *testing.T) {
 	svc, repo := newTestService(t)
 	ctx := context.Background()
 
-	if err := svc.CreateNotification(ctx, 1, "comment", "t", "c", "", ""); err != nil {
+	if err := svc.CreateNotification(ctx, model.NotificationInput{UserID: 1, Type: "comment", Title: "t", Content: "c"}); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
 
