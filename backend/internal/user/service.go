@@ -19,12 +19,12 @@ var (
 	ErrApplicationNotFound = errors.New("application not found")
 
 	// UpdateRole errors.
-	ErrCannotModifySelf    = errors.New("cannot modify own role")
-	ErrModifySuperAdmin    = errors.New("no permission to modify super admin role")
-	ErrInvalidRole         = errors.New("invalid role")
-	ErrSuperAdminOwnRole   = errors.New("super admin cannot modify own role")
-	ErrAdminRoleRestricted = errors.New("admin can only set user roles to author, contributor, or guest")
-	ErrNoPermission        = errors.New("no permission to modify user role")
+	ErrCannotModifySelf     = errors.New("cannot modify own role")
+	ErrModifySuperAdmin     = errors.New("no permission to modify super admin role")
+	ErrInvalidRole          = errors.New("invalid role")
+	ErrSuperAdminRestricted = errors.New("super admin cannot modify others as super admin")
+	ErrAdminRoleRestricted  = errors.New("admin can only set user roles to author, contributor, or guest")
+	ErrNoPermission         = errors.New("no permission to modify user role")
 
 	// DeleteUser errors.
 	ErrCannotDeleteSelf      = errors.New("cannot delete yourself")
@@ -108,12 +108,12 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 	oldRole := user.Role
 
 	// Permission check
-	// Super admin can set any role (including making other users super admin)
+	// Super admin can set any role expect super admin (super admin is only one)
 	// But cannot downgrade own super admin privileges
 	switch actor.Role {
 	case model.RoleSuperAdmin:
-		if user.ID == actor.ID && newRole != model.RoleSuperAdmin {
-			return nil, ErrSuperAdminOwnRole
+		if newRole == model.RoleSuperAdmin {
+			return nil, ErrSuperAdminRestricted
 		}
 		user.Role = newRole
 	case model.RoleAdmin:

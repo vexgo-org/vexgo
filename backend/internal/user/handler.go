@@ -92,7 +92,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrInvalidRole):
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrSuperAdminOwnRole):
+		case errors.Is(err, ErrSuperAdminRestricted):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrAdminRoleRestricted):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
