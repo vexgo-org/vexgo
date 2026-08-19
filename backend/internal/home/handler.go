@@ -28,7 +28,7 @@ func (h *Handler) GetStats(c *gin.Context) {
 		}
 	}
 
-	stats := h.svc.Stats(userRole)
+	stats := h.svc.Stats(c.Request.Context(), userRole)
 
 	c.JSON(http.StatusOK, gin.H{
 		"stats": gin.H{
