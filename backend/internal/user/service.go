@@ -134,7 +134,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:  user.ID,
 		Type:    "role",
-		Title:   "role changed",
+		Title:   "Role Changed",
 		Content: fmt.Sprintf("Your role has been changed from \"%s\" to \"%s\"", oldRole, newRole),
 	}); err != nil {
 		logrus.WithError(err).Warn("failed to create role change notification")
