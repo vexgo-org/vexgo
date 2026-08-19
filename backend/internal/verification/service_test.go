@@ -127,6 +127,44 @@ func TestVerifyEmail_EmailChangeUnknownToken(t *testing.T) {
 	}
 }
 
+func TestVerifyEmail_EmailChangeReturnsNewEmail(t *testing.T) {
+	svc, db := newTestService(t)
+	expiresAt := time.Now().Add(5 * time.Minute)
+	u := model.User{
+		Username:          "alice",
+		Email:             "old@example.com",
+		VerificationToken: "email-change-abc",
+		TokenExpiresAt:    &expiresAt,
+		PendingEmail:      "new@example.com",
+		EmailVerified:     true,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+
+	emailChange, newEmail, err := svc.VerifyEmail(context.Background(), "email-change-abc")
+	if err != nil {
+		t.Fatalf("VerifyEmail error: %v", err)
+	}
+	if !emailChange {
+		t.Errorf("expected email-change verification")
+	}
+	if newEmail != "new@example.com" {
+		t.Errorf("expected pending email returned, got %q", newEmail)
+	}
+
+	var after model.User
+	if err := db.First(&after, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if after.Email != "new@example.com" {
+		t.Errorf("expected email updated, got %q", after.Email)
+	}
+	if after.VerificationToken != "" || after.PendingEmail != "" {
+		t.Errorf("expected token and pending email cleared")
+	}
+}
+
 func TestVerifyEmail_RejectsResetToken(t *testing.T) {
 	svc, db := newTestService(t)
 	expiresAt := time.Now().Add(5 * time.Minute)

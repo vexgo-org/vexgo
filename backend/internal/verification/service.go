@@ -75,17 +75,22 @@ func NewService(deps Deps) *Service {
 func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bool, newEmail string, err error) {
 	if strings.HasPrefix(token, model.TokenPrefixEmailChange) {
 		logrus.Debug("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
+		// The pending email must be read before the token is consumed:
+		// ConfirmEmailChange clears verification_token together with
+		// pending_email, so a lookup afterwards can never find the user.
+		user, err := s.repo.FindUserByToken(ctx, token)
+		if err != nil {
+			logrus.WithError(err).Debug("[VerifyEmail] FindUserByToken failed")
+			return false, "", err
+		}
+		pendingEmail := user.PendingEmail
+
 		if err := s.mailer.ConfirmEmailChange(token); err != nil {
 			logrus.WithError(err).Debug("[VerifyEmail] ConfirmEmailChange failed")
 			return false, "", err
 		}
 		logrus.Debug("[VerifyEmail] ConfirmEmailChange succeeded")
-		// Query user information after change
-		user, err := s.repo.FindUserByToken(ctx, token)
-		if err == nil {
-			return true, user.Email, nil
-		}
-		return true, "", nil
+		return true, pendingEmail, nil
 	}
 
 	logrus.Debug("[VerifyEmail] Normal email verification token, calling VerifyEmail")
