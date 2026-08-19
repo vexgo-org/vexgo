@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	"vexgo/backend/internal/app"
 	"vexgo/backend/internal/config"
 
@@ -14,7 +12,7 @@ func main() {
 
 	application, err := app.New(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
+		logrus.WithError(err).Fatal("Failed to initialize application")
 	}
 
 	if err := application.Run(); err != nil {
