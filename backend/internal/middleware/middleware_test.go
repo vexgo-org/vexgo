@@ -101,6 +101,20 @@ func TestCurrentUser(t *testing.T) {
 	if _, ok := CurrentUser(wrong); ok {
 		t.Errorf("expected ok=false when user is not a map")
 	}
+
+	// missing key
+	missing, _ := gin.CreateTestContext(httptest.NewRecorder())
+	missing.Set("user", map[string]any{"id": uint(7), "username": "alice"})
+	if _, ok := CurrentUser(missing); ok {
+		t.Errorf("expected ok=false when a key is missing")
+	}
+
+	// wrong-typed key
+	badType, _ := gin.CreateTestContext(httptest.NewRecorder())
+	badType.Set("user", map[string]any{"id": "7", "username": "alice", "role": model.RoleAdmin})
+	if _, ok := CurrentUser(badType); ok {
+		t.Errorf("expected ok=false when a key has the wrong type")
+	}
 }
 
 func TestCurrentUserID(t *testing.T) {

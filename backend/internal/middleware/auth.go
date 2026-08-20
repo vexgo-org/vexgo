@@ -31,8 +31,9 @@ func NewAuth(db *gorm.DB, jwtSecret []byte) *Auth {
 }
 
 // CurrentUser extracts the authenticated user from the gin context.
-// It returns the user and true when a valid JWT was parsed; otherwise
-// it returns a zero-value User and false.
+// It returns the user and true when the context holds a complete user
+// record (id, username and role); otherwise it returns a zero-value User
+// and false.
 func CurrentUser(c *gin.Context) (model.User, bool) {
 	userContext, exists := c.Get(CtxUserKey)
 	if !exists {
@@ -42,9 +43,18 @@ func CurrentUser(c *gin.Context) (model.User, bool) {
 	if !ok {
 		return model.User{}, false
 	}
-	id, _ := userMap["id"].(uint)
-	username, _ := userMap["username"].(string)
-	role, _ := userMap["role"].(string)
+	id, ok := userMap["id"].(uint)
+	if !ok {
+		return model.User{}, false
+	}
+	username, ok := userMap["username"].(string)
+	if !ok {
+		return model.User{}, false
+	}
+	role, ok := userMap["role"].(string)
+	if !ok {
+		return model.User{}, false
+	}
 	return model.User{ID: id, Username: username, Role: role}, true
 }
 

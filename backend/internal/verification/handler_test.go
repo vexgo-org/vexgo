@@ -32,7 +32,7 @@ func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 	// through to a 500 — this test locks in the uint assertion.
 	r := gin.New()
 	r.GET("/verification-status", func(c *gin.Context) {
-		c.Set("user", map[string]any{"id": u.ID})
+		c.Set("user", map[string]any{"id": u.ID, "username": u.Username, "role": u.Role})
 		h.GetVerificationStatus(c)
 	})
 
@@ -64,7 +64,7 @@ func TestGetVerificationStatus_UserNotFound(t *testing.T) {
 
 	r := gin.New()
 	r.GET("/verification-status", func(c *gin.Context) {
-		c.Set("user", map[string]any{"id": uint(99999)})
+		c.Set("user", map[string]any{"id": uint(99999), "username": "ghost", "role": model.RoleGuest})
 		h.GetVerificationStatus(c)
 	})
 
