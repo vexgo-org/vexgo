@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
+	"net/url"
 	"strings"
 	"time"
 
@@ -50,6 +50,11 @@ var (
 	ErrUpdatePassword     = errors.New("failed to update password")
 	ErrGenerateResetToken = errors.New("failed to generate reset token")
 	ErrSendResetEmail     = errors.New("failed to send email")
+)
+
+const (
+	verificationLinkPath string = "/verify-email"
+	resetLinkPath        string = "/reset-password"
 )
 
 // Deps holds the dependencies required by the auth domain.
@@ -275,7 +280,7 @@ func (s *Service) sendVerificationEmail(user *model.User, protocol, host string)
 		return false
 	}
 
-	verificationLink := fmt.Sprintf("%s://%s/verify-email?token=%s", protocol, host, token)
+	verificationLink := buildLinkWithToken(protocol, host, verificationLinkPath, token)
 	if err := s.mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
 		logrus.WithField("email", user.Email).WithError(err).Error("Failed to send verification email")
 		return false
@@ -452,7 +457,7 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 		}
 
 		// Build verification link
-		verificationLink := fmt.Sprintf("%s://%s/verify-email?token=%s", req.Protocol, req.Host, token)
+		verificationLink := buildLinkWithToken(req.Protocol, req.Host, verificationLinkPath, token)
 
 		// Send confirmation email
 		if err := s.mailer.SendEmailChangeEmail(user.Email, user.Username, req.NewEmail, verificationLink); err != nil {
@@ -493,7 +498,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, protocol, hos
 	}
 
 	// Build reset link - use request protocol and hostname
-	resetLink := fmt.Sprintf("%s://%s/reset-password?token=%s", protocol, host, token)
+	resetLink := buildLinkWithToken(protocol, host, resetLinkPath, token)
 
 	// Send email
 	if err := s.mailer.SendPasswordResetEmail(user.Email, user.Username, resetLink); err != nil {
@@ -625,4 +630,16 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// If captcha already used, pre-verification successful, pass directly
 
 	return nil
+}
+
+func buildLinkWithToken(protocol, host, path, token string) string {
+	u := url.URL{
+		Scheme: protocol,
+		Host:   host,
+		Path:   path,
+		RawQuery: url.Values{
+			"token": []string{token},
+		}.Encode(),
+	}
+	return u.String()
 }
