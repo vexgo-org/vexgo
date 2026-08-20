@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -259,7 +260,12 @@ func (s *Service) callbackURI(c *gin.Context, provider string) string {
 	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s/api/sso/%s/callback", scheme, c.Request.Host, provider)
+
+	u := url.URL{
+		Scheme: scheme,
+		Host:   c.Request.Host,
+	}
+	return u.JoinPath("api", "sso", provider, "callback").String()
 }
 
 // ─────────────────────────────────────────────
