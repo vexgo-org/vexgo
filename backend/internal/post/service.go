@@ -196,9 +196,10 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 
 	if len(req.Tags) > 0 {
 		tags, err := s.resolveTags(ctx, req.Tags)
-		if err == nil {
-			post.Tags = tags
+		if err != nil {
+			return nil, fmt.Errorf("resolve tags: %w", err)
 		}
+		post.Tags = tags
 	}
 
 	if err := s.repo.Create(ctx, &post); err != nil {
@@ -228,10 +229,11 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 
 	// Permission check
 	user, err := s.repo.FindUserByID(ctx, userID)
-	if err == nil {
-		if !model.IsAdmin(user.Role) && post.AuthorID != userID {
-			return nil, ErrForbidden
-		}
+	if err != nil {
+		return nil, ErrForbidden
+	}
+	if !model.IsAdmin(user.Role) && post.AuthorID != userID {
+		return nil, ErrForbidden
 	}
 
 	if req.Title != "" {
@@ -266,12 +268,13 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 
 	if len(req.Tags) > 0 {
 		tags, err := s.resolveTags(ctx, req.Tags)
-		if err == nil {
-			if err := s.repo.ReplaceTagsAssociation(ctx, post, tags); err != nil {
-				return nil, fmt.Errorf("replace tags: %w", err)
-			}
-			post.Tags = tags
+		if err != nil {
+			return nil, fmt.Errorf("resolve tags: %w", err)
 		}
+		if err := s.repo.ReplaceTagsAssociation(ctx, post, tags); err != nil {
+			return nil, fmt.Errorf("replace tags: %w", err)
+		}
+		post.Tags = tags
 	}
 
 	if err := s.repo.Save(ctx, post); err != nil {
@@ -290,10 +293,11 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 
 	// Permission check
 	user, err := s.repo.FindUserByID(ctx, userID)
-	if err == nil {
-		if !model.IsAdmin(user.Role) && post.AuthorID != userID {
-			return ErrForbidden
-		}
+	if err != nil {
+		return ErrForbidden
+	}
+	if !model.IsAdmin(user.Role) && post.AuthorID != userID {
+		return ErrForbidden
 	}
 
 	// Collect and delete image files (cover + content images)
