@@ -57,7 +57,7 @@ type capture struct {
 
 // runAuth executes a single middleware against a request and returns the
 // HTTP status plus the context values the middleware set.
-func runAuth(t *testing.T, a *Auth, mw gin.HandlerFunc, header string) (int, capture) {
+func runAuth(t *testing.T, mw gin.HandlerFunc, header string) (int, capture) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -130,7 +130,7 @@ func TestCurrentUserID(t *testing.T) {
 
 func TestJWTAuth_NoHeader(t *testing.T) {
 	a := NewAuth(nil, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "")
+	code, _ := runAuth(t, a.JWTAuth(), "")
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}
@@ -138,7 +138,7 @@ func TestJWTAuth_NoHeader(t *testing.T) {
 
 func TestJWTAuth_BadFormat(t *testing.T) {
 	a := NewAuth(nil, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "Basic abc")
+	code, _ := runAuth(t, a.JWTAuth(), "Basic abc")
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}
@@ -146,7 +146,7 @@ func TestJWTAuth_BadFormat(t *testing.T) {
 
 func TestJWTAuth_InvalidToken(t *testing.T) {
 	a := NewAuth(nil, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer not-a-jwt")
+	code, _ := runAuth(t, a.JWTAuth(), "Bearer not-a-jwt")
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}
@@ -160,7 +160,7 @@ func TestJWTAuth_MissingUserIDClaim(t *testing.T) {
 		"role":     model.RoleGuest,
 	})
 	a := NewAuth(nil, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	code, _ := runAuth(t, a.JWTAuth(), "Bearer "+tok)
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}
@@ -174,7 +174,7 @@ func TestOptionalJWTAuth_MissingUserIDClaim(t *testing.T) {
 		"role":     model.RoleGuest,
 	})
 	a := NewAuth(nil, testSecret)
-	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "Bearer "+tok)
+	code, cap := runAuth(t, a.OptionalJWTAuth(), "Bearer "+tok)
 	if code != http.StatusOK || !cap.passed {
 		t.Fatalf("expected request to pass through, code=%d", code)
 	}
@@ -207,7 +207,7 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 	})
 
 	a := NewAuth(db, testSecret)
-	code, cap := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	code, cap := runAuth(t, a.JWTAuth(), "Bearer "+tok)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body: %s)", code, cap.body)
 	}
@@ -242,7 +242,7 @@ func TestJWTAuth_PasswordChanged(t *testing.T) {
 	})
 
 	a := NewAuth(db, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	code, _ := runAuth(t, a.JWTAuth(), "Bearer "+tok)
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}
@@ -267,7 +267,7 @@ func TestJWTAuth_TokenBeforeLastLogin(t *testing.T) {
 	})
 
 	a := NewAuth(db, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	code, _ := runAuth(t, a.JWTAuth(), "Bearer "+tok)
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}
@@ -286,7 +286,7 @@ func TestJWTAuth_DeletedUser(t *testing.T) {
 	})
 
 	a := NewAuth(db, testSecret)
-	code, _ := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	code, _ := runAuth(t, a.JWTAuth(), "Bearer "+tok)
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for deleted user, got %d", code)
 	}
@@ -303,7 +303,7 @@ func TestOptionalJWTAuth_DeletedUser(t *testing.T) {
 	})
 
 	a := NewAuth(db, testSecret)
-	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "Bearer "+tok)
+	code, cap := runAuth(t, a.OptionalJWTAuth(), "Bearer "+tok)
 	if code != http.StatusOK || !cap.passed {
 		t.Fatalf("expected request to pass through, code=%d", code)
 	}
@@ -341,7 +341,7 @@ func TestJWTAuth_NilDBUsesTokenRole(t *testing.T) {
 	})
 
 	a := NewAuth(nil, testSecret)
-	code, cap := runAuth(t, a, a.JWTAuth(), "Bearer "+tok)
+	code, cap := runAuth(t, a.JWTAuth(), "Bearer "+tok)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
 	}
@@ -356,7 +356,7 @@ func TestJWTAuth_NilDBUsesTokenRole(t *testing.T) {
 
 func TestOptionalJWTAuth_NoHeader(t *testing.T) {
 	a := NewAuth(nil, testSecret)
-	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "")
+	code, cap := runAuth(t, a.OptionalJWTAuth(), "")
 	if code != http.StatusOK || !cap.passed {
 		t.Errorf("expected request to pass through, code=%d", code)
 	}
@@ -367,7 +367,7 @@ func TestOptionalJWTAuth_NoHeader(t *testing.T) {
 
 func TestOptionalJWTAuth_InvalidToken(t *testing.T) {
 	a := NewAuth(nil, testSecret)
-	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "Bearer garbage")
+	code, cap := runAuth(t, a.OptionalJWTAuth(), "Bearer garbage")
 	if code != http.StatusOK || !cap.passed {
 		t.Errorf("expected request to pass through, code=%d", code)
 	}
@@ -391,7 +391,7 @@ func TestOptionalJWTAuth_ValidToken(t *testing.T) {
 	})
 
 	a := NewAuth(db, testSecret)
-	code, cap := runAuth(t, a, a.OptionalJWTAuth(), "Bearer "+tok)
+	code, cap := runAuth(t, a.OptionalJWTAuth(), "Bearer "+tok)
 	if code != http.StatusOK || !cap.passed {
 		t.Fatalf("expected request to pass through, code=%d", code)
 	}
@@ -402,7 +402,7 @@ func TestOptionalJWTAuth_ValidToken(t *testing.T) {
 
 func TestPermission_NoUserID(t *testing.T) {
 	a := NewAuth(nil, testSecret)
-	code, _ := runAuth(t, a, a.Permission(model.RoleAdmin), "")
+	code, _ := runAuth(t, a.Permission(model.RoleAdmin), "")
 	if code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", code)
 	}

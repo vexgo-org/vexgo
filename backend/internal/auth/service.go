@@ -247,7 +247,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 
 	// Send a verification email when SMTP is enabled; otherwise the account
 	// is immediately usable.
-	if s.sendVerificationEmail(ctx, &newUser, req.Protocol, req.Host) {
+	if s.sendVerificationEmail(&newUser, req.Protocol, req.Host) {
 		return &RegisterResult{User: &newUser, RequiresVerification: true}, nil
 	}
 
@@ -258,7 +258,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 // created user. It returns true when the message was sent (so registration
 // requires verification); failures are logged and reported as false so a
 // transient SMTP error does not block registration.
-func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) bool {
+func (s *Service) sendVerificationEmail(user *model.User, protocol, host string) bool {
 	enabled, err := s.mailer.IsEmailEnabled()
 	if err != nil {
 		logrus.WithField("email", user.Email).WithError(err).Warn("Failed to check if SMTP is enabled")

@@ -39,7 +39,7 @@ func Open(cfg *config.Config, dataDir string) (*gorm.DB, error) {
 		return openPostgres(cfg)
 	default:
 		// SQLite connection (default)
-		return openSQLite(cfg, dataDir)
+		return openSQLite(dataDir)
 	}
 }
 
@@ -154,7 +154,7 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 }
 
 // openSQLite connects to an SQLite database stored in dataDir.
-func openSQLite(cfg *config.Config, dataDir string) (*gorm.DB, error) {
+func openSQLite(dataDir string) (*gorm.DB, error) {
 	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)
 	}
