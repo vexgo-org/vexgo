@@ -218,7 +218,7 @@
       "author": "vexgo",
       "version": "1.0.0",
       "description": "vexgo default theme",
-      "url": "https://github.com/vexgo/vexgo"
+      "url": "https://github.com/vexgo-org/vexgo"
     }
   ]
 }

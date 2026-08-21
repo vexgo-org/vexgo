@@ -107,7 +107,7 @@ func (r *Renderer) GetAvailableThemes() []ThemeInfo {
 		Author:      "vexgo",
 		Version:     "1.0.0",
 		Description: "vexgo default theme",
-		URL:         "https://github.com/vexgo/vexgo",
+		URL:         "https://github.com/vexgo-org/vexgo",
 	})
 
 	// Scan themes directory
