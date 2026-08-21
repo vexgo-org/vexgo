@@ -3,8 +3,8 @@
 package main
 
 import (
-	"vexgo/backend/internal/app"
-	"vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/app"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
 
 	"github.com/sirupsen/logrus"
 )

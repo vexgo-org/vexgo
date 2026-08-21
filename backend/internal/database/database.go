@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"vexgo/backend/internal/config"
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/sirupsen/logrus"
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

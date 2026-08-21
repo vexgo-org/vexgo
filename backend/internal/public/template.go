@@ -6,7 +6,7 @@ import (
 	"html/template"
 	"strings"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // PostTemplateData represents template data for post pages

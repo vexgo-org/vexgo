@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"vexgo/backend/internal/model"
-	"vexgo/backend/internal/public"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/public"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"

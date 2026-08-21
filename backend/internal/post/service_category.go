@@ -3,7 +3,7 @@ package post
 import (
 	"context"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // Categories returns all categories.

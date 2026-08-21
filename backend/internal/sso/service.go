@@ -16,9 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"vexgo/backend/internal/auth"
-	"vexgo/backend/internal/config"
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"

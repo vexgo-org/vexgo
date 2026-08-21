@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"vexgo/backend/internal/mailer"
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"

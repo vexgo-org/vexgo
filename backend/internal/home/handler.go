@@ -3,7 +3,7 @@ package home
 import (
 	"net/http"
 
-	"vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

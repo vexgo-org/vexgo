@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"

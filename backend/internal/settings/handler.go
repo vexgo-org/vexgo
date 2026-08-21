@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vexgo/backend/internal/middleware"
-	"vexgo/backend/internal/public"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/public"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

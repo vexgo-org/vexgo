@@ -183,7 +183,7 @@ Follow these principles:
 - format with `gofumpt` (`-extra` enabled) and lint with `golangci-lint` (errcheck, govet, ineffassign, staticcheck, unused)
 - propagate errors explicitly and add context where it helps; do not swallow errors
 - respect the `backend/internal` package boundaries and keep the dependency graph clean (for example, `model` must not import application logic, and `config` must stay a pure setup module)
-- use the `vexgo` module path in imports (`vexgo/backend/internal/...`)
+- use the `vexgo` module path in imports (`github.com/vexgo-org/vexgo/backend/internal/...`)
 - pass dependencies explicitly (see `router.Deps` and the `Deps` structs in each domain) instead of relying on global mutable state
 - keep services database-agnostic: depend on the domain `Repository` interface, put GORM queries in `repository.go`, and use the shared seams in `model/interfaces.go` (`Notifier`, `FileRemover`, `Mailer`) for cross-domain calls
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"slices"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )

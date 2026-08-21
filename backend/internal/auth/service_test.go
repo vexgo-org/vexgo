@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"vexgo/backend/internal/mailer"
-	"vexgo/backend/internal/model"
-	"vexgo/backend/internal/verification"
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/glebarez/sqlite"
 	"github.com/golang-jwt/jwt/v5"

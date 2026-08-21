@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
 )

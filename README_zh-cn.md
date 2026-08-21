@@ -557,13 +557,13 @@ repository.go → 持久化接口 + GORM 实现（访问数据库）
 
 handler 不直接接触 GORM；service 依赖 `Repository` 接口、与数据库解耦（可用 fake 做单元测试）；repository 封装全部 SQL/GORM 查询（含避免 N+1 的批量操作）。`context.Context` 贯穿三层。
 
-导入使用模块路径 `vexgo/backend/internal/<package>`，例如：
+导入使用模块路径 `github.com/vexgo-org/vexgo/backend/internal/<package>`，例如：
 
 ```go
 import (
-    "vexgo/backend/internal/model"
-    "vexgo/backend/internal/post"
-    "vexgo/backend/internal/router"
+    "github.com/vexgo-org/vexgo/backend/internal/model"
+    "github.com/vexgo-org/vexgo/backend/internal/post"
+    "github.com/vexgo-org/vexgo/backend/internal/router"
 )
 ```
 

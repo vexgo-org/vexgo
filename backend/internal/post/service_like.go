@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/sirupsen/logrus"
 )

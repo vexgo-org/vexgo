@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"vexgo/backend/internal/mailer"
-	"vexgo/backend/internal/model"
-	"vexgo/backend/internal/public"
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/public"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"

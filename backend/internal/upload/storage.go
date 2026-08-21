@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"

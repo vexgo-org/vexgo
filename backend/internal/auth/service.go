@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"

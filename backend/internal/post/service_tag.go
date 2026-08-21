@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // Tags returns all tags.

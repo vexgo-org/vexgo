@@ -557,13 +557,13 @@ repository.go → persistence interface + GORM implementation (calls database)
 
 Handlers never touch GORM, services are database-agnostic behind a `Repository` interface (unit-testable with fakes), and repositories encapsulate all SQL/GORM queries including batch operations for N+1 prevention. `context.Context` is propagated through all three layers.
 
-Imports use the module path `vexgo/backend/internal/<package>`, for example:
+Imports use the module path `github.com/vexgo-org/vexgo/backend/internal/<package>`, for example:
 
 ```go
 import (
-    "vexgo/backend/internal/model"
-    "vexgo/backend/internal/post"
-    "vexgo/backend/internal/router"
+    "github.com/vexgo-org/vexgo/backend/internal/model"
+    "github.com/vexgo-org/vexgo/backend/internal/post"
+    "github.com/vexgo-org/vexgo/backend/internal/router"
 )
 ```
 

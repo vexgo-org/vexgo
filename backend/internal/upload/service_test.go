@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
