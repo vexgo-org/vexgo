@@ -6,7 +6,7 @@ import "context"
 // the values that were previously passed as positional arguments.
 type NotificationInput struct {
 	UserID      uint
-	Type        string
+	Type        NotificationType
 	Title       string
 	Content     string
 	RelatedID   string

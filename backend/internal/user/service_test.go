@@ -14,7 +14,7 @@ import (
 
 // fakeNotifier records notification calls instead of touching the DB.
 type fakeNotifier struct {
-	calls    []string
+	calls    []model.NotificationType
 	messages []string
 }
 

@@ -13,7 +13,7 @@ import (
 )
 
 type fakeNotifier struct {
-	calls []string
+	calls []model.NotificationType
 }
 
 func (f *fakeNotifier) CreateNotification(_ context.Context, input model.NotificationInput) error {
