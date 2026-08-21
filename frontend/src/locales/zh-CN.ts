@@ -905,4 +905,15 @@ export const zhCN = {
       rejected: "已拒绝",
     },
   },
+
+  // Image Cropper
+  imageCropper: {
+    cropMode: {
+      cropProfilePictureCircle: "裁剪头像（圆形）",
+      cropCoverImage: "裁剪封面（保持比例）",
+    },
+    confirm: "确定",
+    zoom: "缩放：",
+    help: "拖动图片以移动，滚轮缩放",
+  },
 };

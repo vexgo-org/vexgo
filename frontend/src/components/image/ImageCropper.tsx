@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/I18nContext";
 
 type Props = {
   file: File;
@@ -27,6 +28,7 @@ export const ImageCropper: React.FC<Props> = ({
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [scale, setScale] = useState(1);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -128,7 +130,7 @@ export const ImageCropper: React.FC<Props> = ({
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error("裁剪失败"));
+            reject(new Error("failed to crop image"));
             return;
           }
           const ext = /png/i.test(mime)
@@ -156,14 +158,16 @@ export const ImageCropper: React.FC<Props> = ({
       <div className="bg-white rounded shadow-lg p-4 max-w-4xl w-full flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between mb-3 shrink-0">
           <h3 className="text-lg font-medium">
-            {circle ? "裁剪头像（圆形）" : "裁剪封面（保持比例）"}
+            {circle
+              ? t("imageCropper.cropMode.cropProfilePictureCircle")
+              : t("imageCropper.cropMode.cropCoverImage")}
           </h3>
           <div className="flex gap-2">
             <button className="btn" onClick={onCancel}>
-              取消
+              {t("common.cancel")}
             </button>
             <button className="btn btn-primary" onClick={() => doCrop()}>
-              {circle ? "确定并上传头像" : "确定并上传"}
+              {t("imageCropper.confirm")}
             </button>
           </div>
         </div>
@@ -245,7 +249,7 @@ export const ImageCropper: React.FC<Props> = ({
           </div>
 
           <div className="mt-3 flex items-center gap-3 shrink-0">
-            <label className="text-sm">缩放：</label>
+            <label className="text-sm">{t("imageCropper.zoom")}</label>
             <input
               type="range"
               min={0.2}
@@ -255,7 +259,7 @@ export const ImageCropper: React.FC<Props> = ({
               onChange={(e) => setScale(Number(e.target.value))}
             />
             <span className="text-xs text-gray-500">
-              拖动图片以移动，滚轮缩放
+              {t("imageCropper.help")}
             </span>
           </div>
         </div>

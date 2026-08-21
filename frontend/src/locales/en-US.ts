@@ -949,4 +949,15 @@ export const enUS = {
       rejected: "Rejected",
     },
   },
+
+  // Image Cropper
+  imageCropper: {
+    cropMode: {
+      cropProfilePictureCircle: "Crop Profile Picture (Circle)",
+      cropCoverImage: "Crop Cover Image (Fixed Aspect Ratio)",
+    },
+    confirm: "Confirm",
+    zoom: "Zoom: ",
+    help: "Drag to move. Scroll to zoom",
+  },
 };
