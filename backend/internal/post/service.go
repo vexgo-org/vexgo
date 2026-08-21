@@ -75,9 +75,9 @@ type ListQuery struct {
 // List returns the paginated post list with role-based visibility, filters,
 // and per-post like/comment counts.
 func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, error) {
-	// If not logged in and guest viewing is not allowed, return empty result
+	// If not logged in and guest viewing is not allowed, deny access
 	if q.UserRole == "" && !s.allowGuestView(ctx) {
-		return []model.Post{}, 0, nil
+		return nil, 0, ErrGuestViewDenied
 	}
 
 	posts, total, err := s.repo.List(ctx, q.UserRole, q.UserID, ListFilter{
@@ -421,7 +421,7 @@ func (s *Service) UserPosts(ctx context.Context, q UserPostsQuery) ([]model.Post
 // Popular returns the top posts by likes*5 + views, limited to published posts.
 func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]model.Post, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
-		return []model.Post{}, nil
+		return nil, ErrGuestViewDenied
 	}
 
 	posts, err := s.repo.Popular(ctx)

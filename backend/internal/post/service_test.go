@@ -368,11 +368,11 @@ func TestList_GuestViewDenied(t *testing.T) {
 	}
 
 	posts, total, err := svc.List(ctx, ListQuery{Page: 1, Limit: 10})
-	if err != nil {
-		t.Fatalf("List error: %v", err)
+	if !errors.Is(err, ErrGuestViewDenied) {
+		t.Fatalf("expected ErrGuestViewDenied, got %v", err)
 	}
-	if total != 0 || len(posts) != 0 {
-		t.Errorf("expected empty result when guest view denied, got total=%d", total)
+	if posts != nil || total != 0 {
+		t.Errorf("expected no posts when guest view denied, got posts=%+v total=%d", posts, total)
 	}
 
 	author := seedUser(t, db, "author", model.RoleAuthor)

@@ -45,6 +45,10 @@ func (h *Handler) GetPosts(c *gin.Context) {
 		Search:   c.Query("search"),
 	})
 	if err != nil {
+		if errors.Is(err, ErrGuestViewDenied) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view posts"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
 		return
 	}
@@ -315,6 +319,10 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 
 	posts, err := h.svc.Popular(c.Request.Context(), userRole, limit)
 	if err != nil {
+		if errors.Is(err, ErrGuestViewDenied) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view popular posts"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch popular posts"})
 		return
 	}
