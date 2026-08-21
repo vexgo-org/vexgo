@@ -111,7 +111,7 @@ func TestUpdateRole_Permissions(t *testing.T) {
 	if updated.Role != model.RoleAuthor {
 		t.Errorf("expected author, got %s", updated.Role)
 	}
-	if len(notifier.calls) != 1 || notifier.calls[0] != "role" {
+	if len(notifier.calls) != 1 || notifier.calls[0] != model.NotificationTypeRole {
 		t.Errorf("expected one role notification, got %v", notifier.calls)
 	}
 
@@ -267,7 +267,7 @@ func TestApplyForCreator(t *testing.T) {
 	if appID == 0 {
 		t.Errorf("expected non-zero application id")
 	}
-	if len(notifier.calls) != 1 || notifier.calls[0] != "role" {
+	if len(notifier.calls) != 1 || notifier.calls[0] != model.NotificationTypeRole {
 		t.Errorf("expected one admin notification, got %v", notifier.calls)
 	}
 

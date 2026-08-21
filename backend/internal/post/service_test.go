@@ -241,7 +241,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 	if approved.Status != model.PostStatusPublished {
 		t.Errorf("expected published, got %s", approved.Status)
 	}
-	if len(notifier.calls) == 0 || notifier.calls[0] != "review" {
+	if len(notifier.calls) == 0 || notifier.calls[0] != model.NotificationTypeReview {
 		t.Errorf("expected review notification, got %v", notifier.calls)
 	}
 
@@ -284,7 +284,7 @@ func TestToggleLike(t *testing.T) {
 	if !isLiked || count != 1 {
 		t.Errorf("expected liked with count 1, got isLiked=%v count=%d", isLiked, count)
 	}
-	if len(notifier.calls) != 1 || notifier.calls[0] != "like" {
+	if len(notifier.calls) != 1 || notifier.calls[0] != model.NotificationTypeLike {
 		t.Errorf("expected like notification, got %v", notifier.calls)
 	}
 

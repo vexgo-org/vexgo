@@ -44,7 +44,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 		if err == nil {
 			if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 				UserID:      post.AuthorID,
-				Type:        "like",
+				Type:        model.NotificationTypeLike,
 				Title:       "The post received likes",
 				Content:     fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
 				RelatedID:   strconv.FormatUint(uint64(postID), 10),

@@ -38,7 +38,7 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:      post.AuthorID,
-		Type:        "review",
+		Type:        model.NotificationTypeReview,
 		Title:       "Post approved",
 		Content:     fmt.Sprintf("Your post \"%s\" has been approved", post.Title),
 		RelatedID:   id,
@@ -65,7 +65,7 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:      post.AuthorID,
-		Type:        "review",
+		Type:        model.NotificationTypeReview,
 		Title:       "post rejected",
 		Content:     fmt.Sprintf("Your post \"%s\" has been rejected, reason: %s", post.Title, rejectionReason),
 		RelatedID:   id,

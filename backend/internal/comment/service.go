@@ -197,7 +197,7 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 	}
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:      post.AuthorID,
-		Type:        "comment",
+		Type:        model.NotificationTypeComment,
 		Title:       "Post Commented",
 		Content:     fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
 		RelatedID:   strconv.FormatUint(uint64(postID), 10),
@@ -228,7 +228,7 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 	}
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:      parentComment.UserID,
-		Type:        "reply",
+		Type:        model.NotificationTypeReply,
 		Title:       "Comment Replied",
 		Content:     fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
 		RelatedID:   strconv.FormatUint(uint64(parentID), 10),

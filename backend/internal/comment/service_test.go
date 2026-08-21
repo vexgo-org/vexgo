@@ -82,7 +82,7 @@ func TestCreate_AutoApproved(t *testing.T) {
 	if count != 1 {
 		t.Errorf("expected count 1, got %d", count)
 	}
-	if len(notifier.calls) != 1 || notifier.calls[0] != "comment" {
+	if len(notifier.calls) != 1 || notifier.calls[0] != model.NotificationTypeComment {
 		t.Errorf("expected one comment notification, got %v", notifier.calls)
 	}
 

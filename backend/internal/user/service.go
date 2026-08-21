@@ -125,7 +125,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:  user.ID,
-		Type:    "role",
+		Type:    model.NotificationTypeRole,
 		Title:   "Role Changed",
 		Content: fmt.Sprintf("Your role has been changed from \"%s\" to \"%s\"", oldRole, newRole),
 	}); err != nil {
@@ -210,7 +210,7 @@ func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason s
 		for _, admin := range admins {
 			if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 				UserID:      admin.ID,
-				Type:        "role",
+				Type:        model.NotificationTypeRole,
 				Title:       "New Role Application",
 				Content:     fmt.Sprintf("User %s has applied for %s role", user.Username, targetRole),
 				RelatedID:   fmt.Sprintf("%d", application.ID),
@@ -314,7 +314,7 @@ func (s *Service) ReviewCreatorApplication(ctx context.Context, req ReviewCreato
 
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:  application.UserID,
-		Type:    "role",
+		Type:    model.NotificationTypeRole,
 		Title:   notificationTitle,
 		Content: notificationContent,
 	}); err != nil {
