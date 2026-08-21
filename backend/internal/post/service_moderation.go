@@ -66,7 +66,7 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:      post.AuthorID,
 		Type:        model.NotificationTypeReview,
-		Title:       "post rejected",
+		Title:       "Post Rejected",
 		Content:     fmt.Sprintf("Your post \"%s\" has been rejected, reason: %s", post.Title, rejectionReason),
 		RelatedID:   id,
 		RelatedType: model.NotificationRelatedTypePost,
