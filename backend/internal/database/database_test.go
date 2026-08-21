@@ -124,7 +124,6 @@ func TestAutoMigrate_CreatesAllTables(t *testing.T) {
 		&model.AIConfig{},
 		&model.SSOBinding{},
 		&model.ThemeConfig{},
-		&model.Message{},
 		&model.Notification{},
 		&model.CreatorApplication{},
 	} {

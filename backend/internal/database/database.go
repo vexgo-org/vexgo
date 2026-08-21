@@ -196,7 +196,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.AIConfig{},
 		&model.SSOBinding{},
 		&model.ThemeConfig{},
-		&model.Message{},
 		&model.Notification{},
 		&model.CreatorApplication{},
 	)
