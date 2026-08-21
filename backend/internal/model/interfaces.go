@@ -10,7 +10,7 @@ type NotificationInput struct {
 	Title       string
 	Content     string
 	RelatedID   string
-	RelatedType string
+	RelatedType NotificationRelatedType
 }
 
 // Notifier is the seam for creating notifications; implemented by the

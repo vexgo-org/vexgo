@@ -42,7 +42,7 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 		Title:       "Post approved",
 		Content:     fmt.Sprintf("Your post \"%s\" has been approved", post.Title),
 		RelatedID:   id,
-		RelatedType: "post",
+		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
 		logrus.WithError(err).Warn("failed to create post approved notification")
 	}
@@ -69,7 +69,7 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 		Title:       "post rejected",
 		Content:     fmt.Sprintf("Your post \"%s\" has been rejected, reason: %s", post.Title, rejectionReason),
 		RelatedID:   id,
-		RelatedType: "post",
+		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
 		logrus.WithError(err).Warn("failed to create post rejected notification")
 	}

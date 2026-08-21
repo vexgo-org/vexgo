@@ -201,7 +201,7 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 		Title:       "Post Commented",
 		Content:     fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
 		RelatedID:   strconv.FormatUint(uint64(postID), 10),
-		RelatedType: "post",
+		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
 		logrus.WithError(err).Warn("failed to create comment notification")
 	}
@@ -232,7 +232,7 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 		Title:       "Comment Replied",
 		Content:     fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
 		RelatedID:   strconv.FormatUint(uint64(parentID), 10),
-		RelatedType: "comment",
+		RelatedType: model.NotificationRelatedTypeComment,
 	}); err != nil {
 		logrus.WithError(err).Warn("failed to create reply notification")
 	}

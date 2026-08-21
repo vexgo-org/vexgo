@@ -45,7 +45,7 @@ func TestCreateNotification(t *testing.T) {
 		Title:       "New comment",
 		Content:     "someone commented",
 		RelatedID:   "42",
-		RelatedType: "post",
+		RelatedType: model.NotificationRelatedTypePost,
 	})
 	if err != nil {
 		t.Fatalf("CreateNotification error: %v", err)

@@ -48,7 +48,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 				Title:       "The post received likes",
 				Content:     fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
 				RelatedID:   strconv.FormatUint(uint64(postID), 10),
-				RelatedType: "post",
+				RelatedType: model.NotificationRelatedTypePost,
 			}); err != nil {
 				logrus.WithError(err).Warn("failed to create like notification")
 			}
