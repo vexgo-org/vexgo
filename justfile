@@ -1,3 +1,5 @@
+set shell := ["bash", "-O", "globstar", "-c"]
+
 format:
     # Run formatter.
     gofumpt -w -extra .
