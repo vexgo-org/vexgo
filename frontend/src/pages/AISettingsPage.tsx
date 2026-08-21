@@ -277,7 +277,7 @@ export function AISettingsPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="modelName">
-                模型名称{" "}
+                {t("aiSettings.modelName")}{" "}
                 {config.enabled && <span className="text-red-500">*</span>}
               </Label>
               <Button
@@ -290,7 +290,9 @@ export function AISettingsPage() {
                 <RefreshCw
                   className={`w-4 h-4 mr-2 ${fetchingModels ? "animate-spin" : ""}`}
                 />
-                {fetchingModels ? "获取中..." : "获取模型列表"}
+                {fetchingModels
+                  ? t("aiSettings.fetchingModels")
+                  : t("aiSettings.fetchModels")}
               </Button>
             </div>
 
@@ -303,7 +305,7 @@ export function AISettingsPage() {
                 disabled={saving}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择模型">
+                  <SelectValue placeholder={t("aiSettings.selectModel")}>
                     {selectedModel ? (
                       <div className="flex items-center gap-2">
                         <span>{selectedModel.id}</span>
@@ -322,7 +324,7 @@ export function AISettingsPage() {
                       <div className="flex flex-col">
                         <span>{model.id}</span>
                         <span className="text-xs text-muted-foreground">
-                          提供商: {model.owned_by}
+                          {t("aiSettings.provider")}: {model.owned_by}
                         </span>
                       </div>
                     </SelectItem>
@@ -336,20 +338,20 @@ export function AISettingsPage() {
                 onChange={(e) =>
                   setConfig({ ...config, modelName: e.target.value })
                 }
-                placeholder="例如: gpt-3.5-turbo, gpt-4"
+                placeholder={t("aiSettings.modelNamePlaceholder")}
                 disabled={saving}
               />
             )}
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {models.length > 0
-                  ? `共 ${models.length} 个可用模型`
-                  : '点击"获取模型列表"从API获取可用模型'}
+                {t("aiSettings.availableModelCount", {
+                  count: models.length,
+                })}
               </span>
               {selectedModel && (
                 <span className="text-green-600">
-                  已选择: {selectedModel.id}
+                  {t("aiSettings.selectedModel", { model: selectedModel.id })}
                 </span>
               )}
             </div>
@@ -359,7 +361,9 @@ export function AISettingsPage() {
           <div className="flex gap-3 pt-4 border-t">
             <Button onClick={handleSave} disabled={saving} className="flex-1">
               <Save className="w-4 h-4 mr-2" />
-              {saving ? "保存中..." : "保存配置"}
+              {saving
+                ? t("aiSettings.saving")
+                : t("generalSettings.saveSettings")}
             </Button>
             <Button
               variant="outline"
@@ -368,7 +372,7 @@ export function AISettingsPage() {
               className="flex-1"
             >
               <TestTube className="w-4 h-4 mr-2" />
-              {testing ? "测试中..." : "测试连接"}
+              {testing ? t("aiSettings.testing") : t("aiSettings.testAI")}
             </Button>
           </div>
         </CardContent>
@@ -377,30 +381,31 @@ export function AISettingsPage() {
       {/* Help info */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base">配置说明</CardTitle>
+          <CardTitle className="text-base">
+            {t("aiSettings.helpInfo.title")}
+          </CardTitle>
         </CardHeader>
         <CardContent className="text-sm space-y-2">
           <div>
-            <strong>OpenAI 官方 API:</strong>
+            <strong>{t("aiSettings.helpInfo.openai.title")}</strong>
             <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-              <li>Base Url: https://api.openai.com/v1</li>
-              <li>需要有效的 API 密钥（从 OpenAI 平台获取）</li>
-              <li>支持的模型: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview 等</li>
+              <li>{t("aiSettings.helpInfo.openai.baseUrl")}</li>
+              <li>{t("aiSettings.helpInfo.openai.apiKey")}</li>
+              <li>{t("aiSettings.helpInfo.openai.supportedModels")}</li>
             </ul>
           </div>
           <div className="pt-2">
-            <strong>自定义兼容接口:</strong>
+            <strong>{t("aiSettings.helpInfo.custom.title")}</strong>
             <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-              <li>支持任何 OpenAI 兼容的 API 接口</li>
-              <li>例如: 本地部署的 Ollama, vLLM, 或其他中转服务</li>
-              <li>确保端点 URL 指向 chat/completions 接口</li>
+              <li>{t("aiSettings.helpInfo.custom.compatible")}</li>
+              <li>{t("aiSettings.helpInfo.custom.examples")}</li>
+              <li>{t("aiSettings.helpInfo.custom.endpoint")}</li>
             </ul>
           </div>
           <div className="pt-2">
-            <strong>测试功能:</strong>
+            <strong>{t("aiSettings.helpInfo.test.title")}</strong>
             <p className="text-muted-foreground mt-1">
-              点击"测试连接"按钮，系统会发送一个简单的测试请求到 AI
-              API，验证配置是否正确。
+              {t("aiSettings.helpInfo.test.description")}
             </p>
           </div>
         </CardContent>
