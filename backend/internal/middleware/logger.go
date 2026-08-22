@@ -48,13 +48,13 @@ func RequestLogger() gin.HandlerFunc {
 			slog.Int("status", status),
 			slog.String("duration", duration.String()),
 			slog.String("ip", c.ClientIP()),
-			slog.String("user_agent", c.Request.UserAgent()),
+			slog.String("userAgent", c.Request.UserAgent()),
 			slog.String("referer", c.Request.Referer()),
 		}
 
 		// Add user ID if available
 		if userID != "anonymous" {
-			fields = append(fields, slog.Any("user_id", userID))
+			fields = append(fields, slog.Any("userID", userID))
 		}
 
 		// Add error info if status >= 400

@@ -215,11 +215,11 @@ func configureProxies(r *gin.Engine, cfg *config.Config) {
 func setupLogging(levelStr string) {
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(levelStr)); err != nil {
-		slog.Warn("invalid log level, fallback to info level", "level", level, "err", err)
+		slog.Warn("invalid log level, fallback to info level", "level", levelStr, "err", err)
 		level = slog.LevelInfo
 	}
 
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 	})
 
