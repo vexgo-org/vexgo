@@ -35,7 +35,7 @@ type ListQuery struct {
 	UserID           uint
 	Page             int
 	Limit            int
-	NotificationType string
+	NotificationType model.NotificationType
 	IsRead           string
 }
 

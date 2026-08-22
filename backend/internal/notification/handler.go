@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +32,7 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 		UserID:           uid,
 		Page:             page,
 		Limit:            limit,
-		NotificationType: c.Query("type"),
+		NotificationType: model.NotificationType(c.Query("type")),
 		IsRead:           c.Query("is_read"),
 	})
 	if err != nil {

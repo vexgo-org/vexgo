@@ -10,7 +10,7 @@ import (
 
 // Repository is the persistence interface for the notification domain.
 type Repository interface {
-	List(ctx context.Context, userID uint, offset, limit int, notificationType, isRead string) ([]model.Notification, int64, error)
+	List(ctx context.Context, userID uint, offset, limit int, notificationType model.NotificationType, isRead string) ([]model.Notification, int64, error)
 	MarkAsRead(ctx context.Context, userID uint, id int) (int64, error)
 	MarkAllAsRead(ctx context.Context, userID uint) error
 	Delete(ctx context.Context, userID uint, id int) (int64, error)
@@ -27,7 +27,7 @@ func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }
 
-func (r *gormRepository) List(ctx context.Context, userID uint, offset, limit int, notificationType, isRead string) ([]model.Notification, int64, error) {
+func (r *gormRepository) List(ctx context.Context, userID uint, offset, limit int, notificationType model.NotificationType, isRead string) ([]model.Notification, int64, error) {
 	query := r.db.WithContext(ctx).Model(&model.Notification{}).Where("user_id = ?", userID)
 
 	if notificationType != "" {
