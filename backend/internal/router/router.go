@@ -2,17 +2,17 @@
 package router
 
 import (
-	"vexgo/backend/internal/auth"
-	"vexgo/backend/internal/comment"
-	"vexgo/backend/internal/home"
-	"vexgo/backend/internal/message"
-	"vexgo/backend/internal/middleware"
-	"vexgo/backend/internal/post"
-	"vexgo/backend/internal/settings"
-	"vexgo/backend/internal/sso"
-	"vexgo/backend/internal/upload"
-	"vexgo/backend/internal/user"
-	"vexgo/backend/internal/verification"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/comment"
+	"github.com/vexgo-org/vexgo/backend/internal/home"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/notification"
+	"github.com/vexgo-org/vexgo/backend/internal/post"
+	"github.com/vexgo-org/vexgo/backend/internal/settings"
+	"github.com/vexgo-org/vexgo/backend/internal/sso"
+	"github.com/vexgo-org/vexgo/backend/internal/upload"
+	"github.com/vexgo-org/vexgo/backend/internal/user"
+	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -21,7 +21,8 @@ import (
 // Deps aggregates the dependencies of every domain package.
 type Deps struct {
 	DB           *gorm.DB
-	Message      message.Deps
+	JWTSecret    []byte
+	Notification notification.Deps
 	Comment      comment.Deps
 	Post         post.Deps
 	Upload       upload.Deps
@@ -36,10 +37,9 @@ type Deps struct {
 // RegisterAPIRoutes registers all routes under /api.
 func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	api := r.Group("/api")
-	api.Use(middleware.RequestLogger())
-	api.Use(middleware.NewAuth(deps.DB).OptionalJWTAuth())
+	api.Use(middleware.NewAuth(deps.DB, deps.JWTSecret).OptionalJWTAuth())
 
-	message.NewHandler(deps.Message).RegisterRoutes(api)
+	notification.NewHandler(deps.Notification).RegisterRoutes(api)
 	comment.NewHandler(deps.Comment).RegisterRoutes(api)
 	post.NewHandler(deps.Post).RegisterRoutes(api)
 	upload.NewHandler(deps.Upload).RegisterRoutes(api)

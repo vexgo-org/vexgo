@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
-	"vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,7 +21,7 @@ type Handler struct {
 
 // NewHandler creates an upload HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // getFileExtension returns the extension of a filename (including the dot).
@@ -51,12 +51,7 @@ func generateFilename(originalName string) string {
 
 // UploadFile uploads a single file (requires login) and records it in the database.
 func (h *Handler) UploadFile(c *gin.Context) {
-	var userID uint = 0
-	if uid, ok := c.Get("userID"); ok {
-		if id, ok2 := uid.(uint); ok2 {
-			userID = id
-		}
-	}
+	userID := middleware.CurrentUserID(c)
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -74,7 +69,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 	}
 	defer src.Close()
 
-	media, err := h.svc.Upload(userID, filename, file.Size, src)
+	media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to upload: %v", err)})
 		return
@@ -88,12 +83,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 
 // UploadFiles uploads multiple files (requires login) and records them in the database.
 func (h *Handler) UploadFiles(c *gin.Context) {
-	var userID uint = 0
-	if uid, ok := c.Get("userID"); ok {
-		if id, ok2 := uid.(uint); ok2 {
-			userID = id
-		}
-	}
+	userID := middleware.CurrentUserID(c)
 
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -112,7 +102,7 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 			continue
 		}
 
-		media, err := h.svc.Upload(userID, filename, file.Size, src)
+		media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
 		src.Close()
 		if err != nil {
 			continue
@@ -128,10 +118,13 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 
 // GetMyFiles returns the current user's uploaded files.
 func (h *Handler) GetMyFiles(c *gin.Context) {
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	files, _ := h.svc.ListByUser(userID)
+	files, err := h.svc.ListByUser(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch files"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"files": files})
 }
@@ -140,10 +133,9 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 func (h *Handler) DeleteFile(c *gin.Context) {
 	id := c.Param("id")
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	err := h.svc.Delete(id, userID)
+	err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):

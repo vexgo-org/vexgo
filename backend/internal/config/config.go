@@ -1,3 +1,6 @@
+// Package config parses server configuration from command-line flags, a YAML
+// config file, environment variables, and built-in defaults, in that order of
+// priority. It also computes runtime secrets (JWT, SSO) from these sources.
 package config
 
 import (
@@ -8,15 +11,15 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/sirupsen/logrus"
 )
 
 // Config holds the server configuration from command line arguments and/or config file
 type Config struct {
-	Addr      string // Address to listen on (e.g., "0.0.0.0" or "127.0.0.1")
-	Port      int    // Port to listen on
-	DataDir   string // Data directory for storing sqlite database and media files
-	JWTSecret string `yaml:"jwt_secret"` // JWT secret key for signing tokens
-	LogLevel  string `yaml:"log_level"`  // Logging level: "debug", "info", "warn", "error", "fatal", "panic"
+	Addr     string // Address to listen on (e.g., "0.0.0.0" or "127.0.0.1")
+	Port     int    // Port to listen on
+	DataDir  string // Data directory for storing sqlite database and media files
+	LogLevel string `yaml:"log_level"` // Logging level: "debug", "info", "warn", "error", "fatal", "panic"
 
 	// Database configuration
 	DBType     string `yaml:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"
@@ -57,6 +60,11 @@ type Config struct {
 	// Trusted proxies configuration
 	TrustedProxies     []string `yaml:"trusted_proxies"`      // List of trusted proxy IPs/CIDRs (empty = trust none)
 	BehindReverseProxy bool     `yaml:"behind_reverse_proxy"` // Whether the server is behind a reverse proxy (default: false)
+
+	// Runtime secrets (populated by ParseFlags)
+	JWTSecret   []byte    `yaml:"-"`
+	FrontendURL string    `yaml:"frontend_url"`
+	SSO         SSOConfig `yaml:"-"`
 
 	// S3 configuration
 	S3Enabled                  bool   `yaml:"s3_enabled"`                      // Enable S3 storage
@@ -132,6 +140,8 @@ type fileConfig struct {
 // ParseFlags parses command line flags and returns the server configuration.
 // Priority: command line flags > config file > environment variables > defaults.
 func ParseFlags() *Config {
+	loadDotEnv()
+
 	configFile := flag.String("c", "", "Path to configuration file (YAML format)")
 	addr := flag.String("addr", "", "Address to listen on")
 	port := flag.Int("port", 0, "Port to listen on")
@@ -155,7 +165,7 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 		if err := loadConfigFile(configFile, file); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to load config file %s: %v\n", configFile, err)
 		} else {
-			fmt.Printf("Loaded configuration from %s\n", configFile)
+			logrus.Infof("Loaded configuration from %s", configFile)
 			applyFileConfig(cfg, file)
 		}
 	}
@@ -178,11 +188,10 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 // falling back to defaults when a variable is unset or invalid.
 func newConfigFromEnv() *Config {
 	return &Config{
-		Addr:      envString("ADDR", "0.0.0.0"),
-		Port:      envInt("PORT", 3001),
-		DataDir:   envString("DATA_DIR", "./data"),
-		JWTSecret: envString("JWT_SECRET", ""),
-		LogLevel:  envString("LOG_LEVEL", "info"),
+		Addr:     envString("ADDR", "0.0.0.0"),
+		Port:     envInt("PORT", 3001),
+		DataDir:  envString("DATA_DIR", "./data"),
+		LogLevel: envString("LOG_LEVEL", "info"),
 
 		DBType:     envString("DB_TYPE", ""),
 		DBHost:     envString("DB_HOST", ""),
@@ -286,7 +295,7 @@ func applyFileConfig(cfg *Config, f *fileConfig) {
 		cfg.DataDir = f.DataDir
 	}
 	if f.JWTSecret != "" {
-		cfg.JWTSecret = f.JWTSecret
+		cfg.JWTSecret = []byte(f.JWTSecret)
 	}
 	if f.LogLevel != "" {
 		cfg.LogLevel = f.LogLevel

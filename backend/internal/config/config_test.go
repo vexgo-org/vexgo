@@ -111,54 +111,47 @@ func TestPriorityFlagsOverrideConfigFileAndEnv(t *testing.T) {
 }
 
 func TestLoadFromConfigBoolFalse(t *testing.T) {
-	// Snapshot the global SSO state and restore it after the test.
-	orig := SSO
-	defer func() { SSO = orig }()
-
 	t.Setenv("OIDC_ENABLED", "true")
 	t.Setenv("OIDC_AUTO_REDIRECT", "true")
 
 	path := writeConfig(t, "oidc_enabled: false\noidc_auto_redirect: false\n")
 	cfg := buildConfig("", 0, "", path)
-	LoadFromConfig(cfg)
+	cfg.LoadSSOFromEnv()
+	cfg.LoadSSOFromConfig()
 
-	if SSO.OIDC.Enabled {
+	if cfg.SSO.OIDC.Enabled {
 		t.Fatal("config file oidc_enabled: false should disable OIDC in SSO")
 	}
-	if SSO.OIDC.AutoRedirect {
+	if cfg.SSO.OIDC.AutoRedirect {
 		t.Fatal("config file oidc_auto_redirect: false should disable auto redirect in SSO")
 	}
 }
 
 func TestLoadFromConfigStringOverrides(t *testing.T) {
-	orig := SSO
-	defer func() { SSO = orig }()
-
 	t.Setenv("GITHUB_CLIENT_ID", "env-id")
 	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
 
 	path := writeConfig(t, "github_client_id: file-id\n")
 	cfg := buildConfig("", 0, "", path)
-	LoadFromConfig(cfg)
+	cfg.LoadSSOFromEnv()
+	cfg.LoadSSOFromConfig()
 
-	if SSO.GitHub.ClientID != "file-id" {
-		t.Fatalf("config file should override env for github client id, got %s", SSO.GitHub.ClientID)
+	if cfg.SSO.GitHub.ClientID != "file-id" {
+		t.Fatalf("config file should override env for github client id, got %s", cfg.SSO.GitHub.ClientID)
 	}
 	// Not set in the file: falls back to the env-merged cfg value.
-	if SSO.GitHub.ClientSecret != "env-secret" {
-		t.Fatalf("env value should be preserved when file does not set it, got %s", SSO.GitHub.ClientSecret)
+	if cfg.SSO.GitHub.ClientSecret != "env-secret" {
+		t.Fatalf("env value should be preserved when file does not set it, got %s", cfg.SSO.GitHub.ClientSecret)
 	}
 }
 
 func TestEnvWithoutConfigFileStillPopulatesSSO(t *testing.T) {
-	orig := SSO
-	defer func() { SSO = orig }()
-
 	t.Setenv("GITHUB_CLIENT_ID", "env-id")
 	cfg := buildConfig("", 0, "", "")
-	LoadFromConfig(cfg)
+	cfg.LoadSSOFromEnv()
+	cfg.LoadSSOFromConfig()
 
-	if SSO.GitHub.ClientID != "env-id" {
-		t.Fatalf("env-only config should populate SSO, got %s", SSO.GitHub.ClientID)
+	if cfg.SSO.GitHub.ClientID != "env-id" {
+		t.Fatalf("env-only config should populate SSO, got %s", cfg.SSO.GitHub.ClientID)
 	}
 }

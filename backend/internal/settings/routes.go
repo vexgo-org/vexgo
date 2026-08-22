@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -8,7 +10,7 @@ import (
 // Route paths and middleware chains are identical to the original registration
 // in the legacy handler package.
 func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
-	admin := h.mw.Permission("admin", "super_admin")
+	admin := h.mw.Permission(model.RoleAdmin, model.RoleSuperAdmin)
 
 	api.GET("/themes", h.GetThemes)
 	api.GET("/theme/:id/preview", h.GetThemePreview)

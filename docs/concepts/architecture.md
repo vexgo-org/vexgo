@@ -13,51 +13,138 @@ A **theme system** lets the backend server-side-render public pages with uploade
 
 ## Backend Layout
 
-The backend follows a domain-oriented layout under `backend/internal`:
+The backend follows a domain-oriented layout under `backend/internal` with a composition root for bootstrapping:
 
 ```text
 backend/
-  main.go            # entry point: flags, config, storage, DB, router, static routes
+  cmd/vexgo/main.go         # entry point: parses flags, delegates to app package
   internal/
-    auth/            # registration, login, JWT, profile, password reset
-    comment/         # comments and AI-powered moderation
-    config/          # flag / env / config-file parsing, JWT, S3, SSO setup (pure setup)
-    database/        # connection, auto-migration, seeding
-    home/            # site statistics
-    mailer/          # SMTP mail building and sending
-    message/         # in-app notifications
-    middleware/      # JWT auth, role-based permissions, request logging
-    model/           # GORM data models (post, user, tag, category, like, comment, ...)
-    post/            # post CRUD, categories, tags, likes
-    public/          # embedded frontend, themes, SSR renderer, static routes
-    router/          # route registration (composes every domain)
-    settings/        # admin configuration (SMTP, AI, general, theme)
-    sso/             # GitHub / Google / OIDC login
-    upload/          # file upload (local disk or S3)
-    user/            # user management, roles, creator applications
-    verification/    # email verification and sliding-puzzle captcha
+    app/                     # composition root: wires all dependencies together
+    auth/                    # registration, login, JWT, profile, password reset
+    comment/                 # comments and AI-powered moderation
+    config/                  # flag / env / config-file parsing, JWT, S3, SSO setup
+    database/                # connection, auto-migration, seeding
+    home/                    # site statistics
+    mailer/                  # SMTP mail building and sending
+    notification/            # in-app notifications
+    middleware/              # JWT auth, role-based permissions, request logging
+    model/                   # GORM data models + shared interfaces (Notifier, FileRemover, Mailer)
+    post/                    # post CRUD, categories, tags, likes
+    public/                  # embedded frontend, themes, SSR renderer, static routes
+    router/                  # route registration (composes every domain)
+    settings/                # admin configuration (SMTP, AI, general, theme)
+    sso/                     # GitHub / Google / OIDC login
+    upload/                  # file upload (local disk or S3)
+    user/                    # user management, roles, creator applications
+    verification/            # email verification and sliding-puzzle captcha
 ```
 
-Imports use the module path `vexgo/backend/internal/<package>`, for example:
+### Layered Architecture (per domain)
+
+Each domain package follows a consistent three-layer pattern:
+
+```text
+handler.go    → HTTP request parsing, response rendering (calls service)
+service.go    → business logic, cross-domain orchestration (calls repository)
+repository.go → persistence interface + GORM implementation (calls database)
+```
+
+This separation ensures that:
+
+- **Handlers** never touch GORM directly — they delegate to the service.
+- **Services** are database-agnostic behind a `Repository` interface, making them unit-testable with fakes.
+- **Repositories** encapsulate all SQL/GORM queries, including batch operations for N+1 prevention.
+
+### Shared Interfaces (`model/interfaces.go`)
+
+Cross-domain seams are defined in the `model` package as small interfaces:
 
 ```go
-import (
-    "vexgo/backend/internal/model"
-    "vexgo/backend/internal/post"
-    "vexgo/backend/internal/router"
-)
+// Notifier is the seam for creating notifications; implemented by the notification domain.
+type Notifier interface {
+    CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
+}
+
+// FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
+type FileRemover interface {
+    Delete(url string) error
+}
+
+// Mailer is the seam for sending transactional email and managing email
+// verification / password-reset tokens; implemented by the mailer domain.
+type Mailer interface {
+    IsEmailEnabled() (bool, error)
+    GenerateVerificationToken(userID uint) (string, error)
+    SendVerificationEmail(toEmail, toName, verificationLink string) error
+    VerifyEmail(token string) error
+    GenerateEmailChangeToken(userID uint, newEmail string) (string, error)
+    SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error
+    GeneratePasswordResetToken(userID uint) (string, error)
+    SendPasswordResetEmail(toEmail, toName, resetLink string) error
+    ConfirmEmailChange(token string) error
+}
 ```
+
+These interfaces allow domains like `post`, `comment`, and `user` to trigger notifications and file cleanup — and `auth`/`verification` to send email — without importing the concrete implementations, keeping the dependency graph acyclic.
+
+### Composition Root (`internal/app/`)
+
+The `internal/app/app.go` package is the composition root (also called the "wiring" layer). It:
+
+1. Parses flags and loads configuration via `config.ParseFlags()`.
+2. Computes runtime secrets (JWT, SSO).
+3. Opens the database and runs migrations/seeding.
+4. Creates storage (local or S3).
+5. Instantiates every domain's dependencies and wires them into the router.
+
+`cmd/vexgo/main.go` is a thin entry point that calls `app.New(cfg)` and `app.Run()`.
 
 ### Dependency Rules
 
 The package layout keeps the dependency graph **acyclic**:
 
-- **Leaf packages** — `config/` and `model/` import no other backend module. `model` is imported by every domain package; `config` by `auth`, `database`, `middleware`, `sso`, and `upload`.
-- **Shared layer** — `middleware/` (JWT auth, role permissions, request logging) depends only on `config` and `model`.
-- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` depends on `verification`; `settings` depends on `public` (themes) and `mailer` (SMTP); `database` depends on `config` and `model`.
-- **Wiring** — `backend/main.go` is the single entry point: it opens the database, creates storage and the `public.Renderer`, then wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})`.
+```text
+cmd/vexgo/main.go
+    └─→ internal/app          ← composition root, imports everything
+            ├─→ config         ← flag/env/file parsing (no domain imports)
+            ├─→ database       ← Open/AutoMigrate/Seed (imports config, model)
+            ├─→ router         ← route registration (imports all domain handlers)
+            └─→ internal/*     ← domain packages
 
-This structure keeps packages testable in isolation and prevents circular imports as the codebase grows.
+Leaf packages (no internal imports):
+    model/         ← data models + shared interfaces, imported by every domain
+    config/        ← configuration parsing, imported by app, auth, database, sso, upload
+
+Shared layer:
+    middleware/     ← JWT auth, role permissions, request logging (imports model only)
+
+Cross-domain edges:
+    auth/          ← used by comment, post, sso (for privacy filtering)
+    mailer/        ← implements model.Mailer, used by auth and verification for email
+    notification/  ← implements model.Notifier, used by comment, post, user as notification seam
+    upload/        ← implements model.FileRemover, used by user, auth, post for file cleanup
+    verification/  ← used by auth as the captcha-check seam
+    public/        ← used by settings as the theme-renderer seam
+```
+
+### Configuration Management
+
+Configuration is loaded through a three-layer priority chain:
+
+```text
+command line flags  →  config file (YAML)  →  environment variables  →  defaults
+     (highest)                                                (lowest)
+```
+
+The `config.Config` struct holds all runtime values. There are **no global variables** — the JWT secret, SSO config, and frontend URL are fields on `Config`, not package-level vars.
+
+### context.Context Propagation
+
+All service and repository methods accept `context.Context` as their first parameter. Handlers pass `c.Request.Context()` from the Gin request context, enabling:
+
+- Request-scoped cancellation and timeouts
+- Distributed tracing propagation
+- GORM `WithContext()` for query cancellation
 
 ## Users, Roles, and Permissions
 
@@ -144,7 +231,27 @@ The callback URLs are:
 
 ## Notifications
 
-In-app notifications are stored per user. Events such as comments, likes, replies, post reviews, and role changes create messages in the recipient's inbox, exposed through the `/messages` API.
+In-app notifications are stored per user. Events such as comments, likes, replies, post reviews, and role changes create notifications in the recipient's inbox, exposed through the `/notifications` API.
+
+The notification system uses a **seam interface** (`model.Notifier`) — domain packages call `notifier.CreateNotification()` without importing the notification package. The concrete implementation is injected at startup by the composition root.
+
+## Database
+
+### Connection
+
+The `database.Open()` function supports three backends:
+
+| Backend    | Default | Production-ready   |
+| ---------- | ------- | ------------------ |
+| SQLite     | Yes     | For small installs |
+| MySQL      | No      | Yes                |
+| PostgreSQL | No      | Yes                |
+
+The database type is determined by the `db_type` config field or `DB_TYPE` environment variable. When connecting to MySQL, the server will automatically create the database if it doesn't exist.
+
+### Migrations and Seeding
+
+`database.AutoMigrate()` creates or updates the schema for all models. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they don't already exist.
 
 ## Request Flow
 
@@ -160,13 +267,59 @@ Gin router (internal/router)
 Middleware chain: logger → optional JWT auth → role permission check
       │
       ▼
-Domain handler (e.g. internal/post) → service → GORM → database
-      │
+Domain handler (e.g. internal/post/handler.go)
+      │  passes c.Request.Context()
+      ▼
+Domain service (e.g. internal/post/service.go)
+      │  calls repository methods
+      ▼
+Repository (e.g. internal/post/repository.go)
+      │  GORM queries with .WithContext(ctx)
       ▼
 JSON response (or SSR-rendered HTML for theme pages)
 ```
 
-The JWT middleware validates the token and sets the user in the Gin context; the permission middleware checks the database role against the endpoint's required roles. `super_admin` always passes.
+The JWT middleware validates the token and sets the user in the Gin context via `middleware.CurrentUser(c)` / `middleware.CurrentUserID(c)` helpers. The permission middleware checks the database role against the endpoint's required roles. `super_admin` always passes.
+
+### Performance: Batch Queries
+
+For list endpoints that display per-post like/comment counts, the post domain uses **batch queries** instead of N+1:
+
+```text
+// Before (N+1): 3 queries per post
+for _, post := range posts {
+    repo.CountLikes(ctx, post.ID)       // query 1
+    repo.CountComments(ctx, post.ID)    // query 2
+    repo.FindLike(ctx, post.ID, userID) // query 3
+}
+
+// After (batch): 3 queries total
+likesCounts    := repo.BatchCountLikesByPostIDs(ctx, postIDs)       // 1 query with GROUP BY
+commentsCounts := repo.BatchCountCommentsByPostIDs(ctx, postIDs)    // 1 query with GROUP BY
+likedPosts     := repo.BatchFindLikedPostIDs(ctx, postIDs, userID)  // 1 query with IN
+```
+
+This reduces the query count from `3 × N` to exactly **3 queries** regardless of page size.
+
+## Testing
+
+Each domain package has its own `_test.go` files. The test infrastructure:
+
+- Uses **in-memory SQLite** (`glebarez/sqlite`) for fast, isolated database tests.
+- Fakes cross-domain dependencies (`fakeNotifier`, `fakeFiles`) to avoid coupling tests to other domains.
+- Each test creates a fresh database with `AutoMigrate()` and seeds only the data it needs.
+
+To run the full test suite:
+
+```bash
+cd backend && go test ./...
+```
+
+To check coverage:
+
+```bash
+cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/notification/...
+```
 
 ## Related Reading
 

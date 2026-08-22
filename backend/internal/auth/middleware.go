@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
 
 	"github.com/gin-gonic/gin"
 )

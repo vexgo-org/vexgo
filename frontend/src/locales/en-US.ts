@@ -598,7 +598,7 @@ export const enUS = {
     home: "Home",
     writePost: "Write Post",
     myPosts: "My Posts",
-    messages: "Messages",
+    notifications: "Notifications",
     adminPanel: "Admin Panel",
     searchPlaceholder: "Search articles...",
     login: "Login",
@@ -873,9 +873,9 @@ export const enUS = {
     permissionDenied: "Permission denied, cannot access write post page",
   },
 
-  // Message Center Page
-  messageCenter: {
-    title: "Message Center",
+  // Notification Center Page
+  notificationCenter: {
+    title: "Notification Center",
     markAllAsRead: "Mark All as Read",
     tabs: {
       all: "All",
@@ -888,21 +888,22 @@ export const enUS = {
     unreadBadge: "Unread",
     view: "View",
     empty: {
-      noMessages: "No messages",
-      noMessagesDesc: "When you receive new messages, they will appear here",
-      noUnreadMessages: "No unread messages",
-      allRead: "All messages have been read",
-      noCommentMessages: "No comment messages",
-      noCommentMessagesDesc:
+      noNotifications: "No notifications",
+      noNotificationsDesc:
+        "When you receive new notifications, they will appear here",
+      noUnreadNotifications: "No unread notifications",
+      allRead: "All notifications have been read",
+      noCommentNotifications: "No comment notifications",
+      noCommentNotificationsDesc:
         "You will receive notifications when someone comments on your posts",
-      noLikeMessages: "No like messages",
-      noLikeMessagesDesc:
+      noLikeNotifications: "No like notifications",
+      noLikeNotificationsDesc:
         "You will receive notifications when someone likes your posts",
-      noReviewMessages: "No review messages",
-      noReviewMessagesDesc:
+      noReviewNotifications: "No review notifications",
+      noReviewNotificationsDesc:
         "You will receive notifications when your post review status changes",
-      noRoleMessages: "No role messages",
-      noRoleMessagesDesc:
+      noRoleNotifications: "No role notifications",
+      noRoleNotificationsDesc:
         "You will receive notifications when your role changes",
     },
   },

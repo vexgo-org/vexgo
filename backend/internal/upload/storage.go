@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -99,7 +99,7 @@ func (s *S3Storage) Upload(reader io.Reader, filename, contentType string) (stri
 	}
 
 	url := s.cfg.GetURL(filename)
-	fmt.Printf("Uploaded file, generated URL: %s\n", url)
+	logrus.WithField("url", url).Debug("File uploaded successfully")
 	return url, nil
 }
 
@@ -123,6 +123,7 @@ func (s *S3Storage) Delete(url string) error {
 	return fmt.Errorf("invalid S3 key from URL: %s", url)
 }
 
+// remove deletes the object with the given key from the configured bucket.
 func (s *S3Storage) remove(key string) error {
 	return s.client.RemoveObject(context.TODO(), s.cfg.Bucket, key, minio.RemoveObjectOptions{})
 }

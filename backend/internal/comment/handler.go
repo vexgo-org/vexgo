@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +19,7 @@ type Handler struct {
 
 // NewHandler creates a comment HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // GetComments gets comments for a specific post
@@ -26,27 +27,14 @@ func (h *Handler) GetComments(c *gin.Context) {
 	postID := c.Param("id")
 
 	// Get current user information (for privacy filtering)
-	var currentUserRole string
-	var currentUserID uint
-	if uidVal, exists := c.Get("userID"); exists {
-		switch v := uidVal.(type) {
-		case uint:
-			currentUserID = v
-		case int:
-			currentUserID = uint(v)
-		case float64:
-			currentUserID = uint(v)
-		}
-	}
-	if userContext, exists := c.Get("user"); exists {
-		if userMap, ok := userContext.(map[string]any); ok {
-			if role, ok := userMap["role"].(string); ok {
-				currentUserRole = role
-			}
-		}
-	}
+	u, _ := middleware.CurrentUser(c)
+	currentUserID, currentUserRole := u.ID, u.Role
 
-	comments, _ := h.svc.ListByPost(postID, currentUserID, currentUserRole)
+	comments, err := h.svc.ListByPost(c.Request.Context(), postID, currentUserID, currentUserRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"comments": comments})
 }
@@ -90,15 +78,19 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID, ok := uid.(uint)
-	if !ok {
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
 		// Reject unauthenticated request
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
 	}
 
-	comment, count, err := h.svc.Create(postID, userID, req.Content, req.ParentID)
+	comment, count, err := h.svc.Create(c.Request.Context(), CreateRequest{
+		PostID:   postID,
+		UserID:   userID,
+		Content:  req.Content,
+		ParentID: req.ParentID,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
 		return
@@ -108,7 +100,7 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		"message":            "Comment created successfully",
 		"comment":            comment,
 		"commentsCount":      count,
-		"requiresModeration": comment.Status == "pending",
+		"requiresModeration": comment.Status == model.CommentStatusPending,
 	})
 }
 
@@ -117,26 +109,13 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 	id := c.Param("id")
 
 	// Get current operating user ID
-	uid, exists := c.Get("userID")
-	if !exists {
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
 	}
 
-	var userID uint
-	switch v := uid.(type) {
-	case uint:
-		userID = v
-	case int:
-		userID = uint(v)
-	case float64:
-		userID = uint(v)
-	default:
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user information"})
-		return
-	}
-
-	count, err := h.svc.Delete(id, userID)
+	count, err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCommentNotFound):
@@ -156,7 +135,7 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 
 // GetCommentModerationConfig gets comment moderation configuration
 func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
-	config, err := h.svc.GetModerationConfig()
+	config, err := h.svc.GetModerationConfig(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment moderation configuration"})
 		return
@@ -184,7 +163,7 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateModerationConfig(UpdateModerationConfigRequest{
+	config, err := h.svc.UpdateModerationConfig(c.Request.Context(), UpdateModerationConfigRequest{
 		Enabled:            req.Enabled,
 		ModelProvider:      req.ModelProvider,
 		ApiKey:             req.ApiKey,
@@ -208,21 +187,21 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 
 // GetPendingComments gets pending comments for moderation
 func (h *Handler) GetPendingComments(c *gin.Context) {
-	h.listModeration(c, "pending")
+	h.listModeration(c, model.CommentStatusPending)
 }
 
 // GetApprovedComments gets approved comments
 func (h *Handler) GetApprovedComments(c *gin.Context) {
-	h.listModeration(c, "published")
+	h.listModeration(c, model.CommentStatusPublished)
 }
 
 // GetRejectedComments gets rejected comments
 func (h *Handler) GetRejectedComments(c *gin.Context) {
-	h.listModeration(c, "rejected")
+	h.listModeration(c, model.CommentStatusRejected)
 }
 
 // listModeration renders the moderation queue for a given comment status.
-func (h *Handler) listModeration(c *gin.Context, status string) {
+func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 	page, _ := c.GetQuery("page")
 	if page == "" {
 		page = "1"
@@ -241,7 +220,11 @@ func (h *Handler) listModeration(c *gin.Context, status string) {
 		limitNum = val
 	}
 
-	comments, total, _ := h.svc.ListModeration(status, pageNum, limitNum)
+	comments, total, err := h.svc.ListModeration(c.Request.Context(), status, pageNum, limitNum)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation comments"})
+		return
+	}
 
 	totalPages := (int(total) + limitNum - 1) / limitNum
 	if totalPages == 0 {
@@ -261,17 +244,17 @@ func (h *Handler) listModeration(c *gin.Context, status string) {
 
 // ApproveComment approves a comment
 func (h *Handler) ApproveComment(c *gin.Context) {
-	h.setStatus(c, "published", "Comment approved", "Failed to approve comment")
+	h.setStatus(c, model.CommentStatusPublished, "Comment approved", "Failed to approve comment")
 }
 
 // RejectComment rejects a comment
 func (h *Handler) RejectComment(c *gin.Context) {
-	h.setStatus(c, "rejected", "Comment rejected", "Failed to reject comment")
+	h.setStatus(c, model.CommentStatusRejected, "Comment rejected", "Failed to reject comment")
 }
 
 // setStatus approves or rejects a comment and renders the result.
-func (h *Handler) setStatus(c *gin.Context, status, successMsg, failureMsg string) {
-	comment, err := h.svc.SetStatus(c.Param("id"), status)
+func (h *Handler) setStatus(c *gin.Context, status model.CommentStatus, successMsg, failureMsg string) {
+	comment, err := h.svc.SetStatus(c.Request.Context(), c.Param("id"), status)
 	if err != nil {
 		if errors.Is(err, ErrCommentNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})

@@ -2,11 +2,12 @@ package public
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/fs"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 // AssetManifest holds the mapping of logical asset names to their hashed filenames
@@ -41,7 +42,7 @@ func LoadAssetManifest() error {
 
 	parsed, err := parseViteManifest(manifestData)
 	if err != nil {
-		fmt.Printf("Warning: failed to parse Vite manifest: %v, falling back to directory scan\n", err)
+		logrus.WithError(err).Warn("Failed to parse Vite manifest, falling back to directory scan")
 		return buildAssetManifest()
 	}
 	manifest = parsed
@@ -166,13 +167,13 @@ func buildAssetManifestFromURLs(urls []string, referenced map[string]bool) Asset
 
 		if ext == ".css" {
 			if existing, ok := m.CSS[assetName]; ok && existing != assetURL && !referenced[assetURL] {
-				fmt.Printf("Warning: duplicate CSS asset %q (%s and %s), using %s\n", assetName, existing, assetURL, existing)
+				logrus.WithFields(logrus.Fields{"asset": assetName, "existing": existing, "duplicate": assetURL}).Warn("Duplicate CSS asset")
 				continue
 			}
 			m.CSS[assetName] = assetURL
 		} else {
 			if existing, ok := m.JS[assetName]; ok && existing != assetURL && !referenced[assetURL] {
-				fmt.Printf("Warning: duplicate JS asset %q (%s and %s), using %s\n", assetName, existing, assetURL, existing)
+				logrus.WithFields(logrus.Fields{"asset": assetName, "existing": existing, "duplicate": assetURL}).Warn("Duplicate JS asset")
 				continue
 			}
 			m.JS[assetName] = assetURL

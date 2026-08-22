@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   lint:
-    name: lint
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -30,6 +30,9 @@ jobs:
           pnpm install
           pnpm run build
           cd ..
+
+      - name: Install gopls
+        run: go install golang.org/x/tools/gopls@latest
 
       - name: Install formatters
         run: |
@@ -64,3 +67,13 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
+
+      - name: Run gopls
+        run: |
+          shopt -s globstar nullglob
+          output="$(gopls check -severity=hint ./**/*.go)"
+
+          if [[ -n "$output" ]]; then
+            printf '%s\n' "$output"
+            exit 1
+          fi

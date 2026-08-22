@@ -2,24 +2,25 @@
 package home
 
 import (
-	"vexgo/backend/internal/model"
+	"context"
 
 	"gorm.io/gorm"
 )
 
 // Deps holds the dependencies required by the home domain.
 type Deps struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	JWTSecret []byte
 }
 
 // Service contains the business logic of the home domain.
 type Service struct {
-	db *gorm.DB
+	repo Repository
 }
 
 // NewService creates a home service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB}
+	return &Service{repo: NewRepository(deps.DB)}
 }
 
 // Stats holds the aggregate site counters returned by /api/stats.
@@ -33,11 +34,11 @@ type Stats struct {
 
 // Stats returns the aggregate site statistics. When the caller is anonymous
 // and guest viewing is disabled, all counters are zero.
-func (s *Service) Stats(userRole string) Stats {
+func (s *Service) Stats(ctx context.Context, userRole string) Stats {
 	// Check if guest viewing is allowed
 	var allowGuestView bool
-	var config model.GeneralSettings
-	if err := s.db.First(&config).Error; err != nil {
+	config, err := s.repo.GetGeneralSettings(ctx)
+	if err != nil {
 		// Default to true if config not found
 		allowGuestView = true
 	} else {
@@ -49,12 +50,11 @@ func (s *Service) Stats(userRole string) Stats {
 		return Stats{}
 	}
 
-	var postsCount, usersCount, categoriesCount, tagsCount, commentsCount int64
-	s.db.Model(&model.Post{}).Count(&postsCount)
-	s.db.Model(&model.User{}).Count(&usersCount)
-	s.db.Model(&model.Category{}).Count(&categoriesCount)
-	s.db.Model(&model.Tag{}).Count(&tagsCount)
-	s.db.Model(&model.Comment{}).Count(&commentsCount)
+	postsCount, _ := s.repo.CountPosts(ctx)
+	usersCount, _ := s.repo.CountUsers(ctx)
+	categoriesCount, _ := s.repo.CountCategories(ctx)
+	tagsCount, _ := s.repo.CountTags(ctx)
+	commentsCount, _ := s.repo.CountComments(ctx)
 
 	return Stats{
 		Posts:      postsCount,

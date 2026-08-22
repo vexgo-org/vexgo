@@ -4,7 +4,7 @@
 package auth
 
 import (
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // FilterUserByPrivacy filters user information based on privacy settings:
@@ -13,12 +13,12 @@ import (
 func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
 	// Check if viewer is the user themselves or an admin
 	isSelf := viewerID == user.ID
-	isAdmin := viewerRole == model.RoleAdmin || viewerRole == model.RoleSuperAdmin
+	isAdmin := model.IsAdmin(viewerRole)
 
 	// If not self and not admin, filter according to privacy settings
 	if !isSelf && !isAdmin {
 		// First check profile visibility setting
-		if user.ProfileVisibility == "private" {
+		if user.ProfileVisibility == model.ProfileVisibilityPrivate {
 			// If set to private, hide all personal information
 			user.Email = ""
 			user.Birthday = ""

@@ -1,6 +1,8 @@
 package comment
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,7 +14,7 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.POST("/comments", h.mw.JWTAuth(), h.CreateComment)
 	api.DELETE("/comments/:id", h.mw.JWTAuth(), h.DeleteComment)
 
-	admin := h.mw.Permission("admin", "super_admin")
+	admin := h.mw.Permission(model.RoleAdmin, model.RoleSuperAdmin)
 	api.GET("/moderation/comments/pending", h.mw.JWTAuth(), admin, h.GetPendingComments)
 	api.GET("/moderation/comments/approved", h.mw.JWTAuth(), admin, h.GetApprovedComments)
 	api.GET("/moderation/comments/rejected", h.mw.JWTAuth(), admin, h.GetRejectedComments)

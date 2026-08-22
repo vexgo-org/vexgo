@@ -18,7 +18,7 @@
 - [评论](#评论)
 - [点赞](#点赞)
 - [文件上传](#文件上传)
-- [消息（通知）](#消息-通知)
+- [通知](#通知)
 - [审核](#审核)
 - [用户管理](#用户管理)
 - [创作者申请](#创作者申请)
@@ -218,7 +218,7 @@
       "author": "vexgo",
       "version": "1.0.0",
       "description": "vexgo default theme",
-      "url": "https://github.com/vexgo/vexgo"
+      "url": "https://github.com/vexgo-org/vexgo"
     }
   ]
 }
@@ -976,9 +976,9 @@ SSO 回调端点；提供商重定向到这里。
 
 ---
 
-## 消息（通知）
+## 通知
 
-### GET /messages
+### GET /notifications
 
 获取当前用户的通知（需要认证）。
 
@@ -986,7 +986,7 @@ SSO 回调端点；提供商重定向到这里。
 
 - `page`（int，默认：1）
 - `limit`（int，默认：10）
-- `type`（string，可选）：按消息类型筛选（`comment`、`like`、`reply`、`review`、`role`）
+- `type`（string，可选）：按通知类型筛选（`comment`、`like`、`reply`、`review`、`role`）
 - `is_read`（string，可选）：按已读状态筛选（`true` 或 `false`）
 
 **响应：**
@@ -1013,7 +1013,7 @@ SSO 回调端点；提供商重定向到这里。
 
 ---
 
-### GET /messages/unread-count
+### GET /notifications/unread-count
 
 获取当前用户的未读通知数（需要认证）。
 
@@ -1025,38 +1025,38 @@ SSO 回调端点；提供商重定向到这里。
 
 ---
 
-### PUT /messages/:id/read
+### PUT /notifications/:id/read
 
-将消息标记为已读（需要认证）。
+将通知标记为已读（需要认证）。
 
 **响应：**
 
 ```json
-{ "message": "Message marked as read" }
+{ "message": "Notification marked as read" }
 ```
 
 ---
 
-### PUT /messages/read-all
+### PUT /notifications/read-all
 
-将所有消息标记为已读（需要认证）。
+将所有通知标记为已读（需要认证）。
 
 **响应：**
 
 ```json
-{ "message": "All messages marked as read" }
+{ "message": "All notifications marked as read" }
 ```
 
 ---
 
-### DELETE /messages/:id
+### DELETE /notifications/:id
 
-删除消息（需要认证；仅消息所有者）。
+删除通知（需要认证；仅通知所有者）。
 
 **响应：**
 
 ```json
-{ "message": "Message deleted" }
+{ "message": "Notification deleted" }
 ```
 
 ---

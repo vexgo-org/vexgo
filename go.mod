@@ -1,4 +1,4 @@
-module vexgo
+module github.com/vexgo-org/vexgo
 
 go 1.25.0
 

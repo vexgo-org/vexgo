@@ -1,6 +1,8 @@
 package post
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,7 +33,7 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 
 	api.POST("/likes/:postId", h.mw.JWTAuth(), h.ToggleLike)
 
-	admin := h.mw.Permission("admin", "super_admin")
+	admin := h.mw.Permission(model.RoleAdmin, model.RoleSuperAdmin)
 	api.GET("/moderation/pending", h.mw.JWTAuth(), admin, h.GetPendingPosts)
 	api.GET("/moderation/approved", h.mw.JWTAuth(), admin, h.GetApprovedPosts)
 	api.GET("/moderation/rejected", h.mw.JWTAuth(), admin, h.GetRejectedPosts)

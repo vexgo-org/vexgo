@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,29 +19,7 @@ type Handler struct {
 
 // NewHandler creates a post HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
-}
-
-// currentUser extracts the role and id of the current user from the context.
-func currentUser(c *gin.Context) (role string, id uint) {
-	if uidVal, exists := c.Get("userID"); exists {
-		switch v := uidVal.(type) {
-		case uint:
-			id = v
-		case int:
-			id = uint(v)
-		case float64:
-			id = uint(v)
-		}
-	}
-	if userContext, exists := c.Get("user"); exists {
-		if userMap, ok := userContext.(map[string]any); ok {
-			if r, ok := userMap["role"].(string); ok {
-				role = r
-			}
-		}
-	}
-	return role, id
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // GetPosts returns the post list.
@@ -54,10 +33,22 @@ func (h *Handler) GetPosts(c *gin.Context) {
 		limit = 10
 	}
 
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
-	posts, total, err := h.svc.List(userRole, userID, page, limit, c.Query("category"), c.Query("status"), c.Query("search"))
+	posts, total, err := h.svc.List(c.Request.Context(), ListQuery{
+		UserRole: userRole,
+		UserID:   userID,
+		Page:     page,
+		Limit:    limit,
+		Category: c.Query("category"),
+		Search:   c.Query("search"),
+	})
 	if err != nil {
+		if errors.Is(err, ErrGuestViewDenied) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view posts"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
 		return
 	}
@@ -81,15 +72,16 @@ func (h *Handler) GetPosts(c *gin.Context) {
 // GetPost returns a single post.
 func (h *Handler) GetPost(c *gin.Context) {
 	id := c.Param("id")
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
-	post, err := h.svc.Get(id, userRole, userID)
+	post, err := h.svc.Get(c.Request.Context(), id, userRole, userID)
 	if err != nil {
 		if errors.Is(err, ErrGuestViewDenied) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view this post"})
 			return
 		}
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "postId": id, "details": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "postId": id})
 		return
 	}
 
@@ -99,15 +91,15 @@ func (h *Handler) GetPost(c *gin.Context) {
 // CreatePost creates a post.
 func (h *Handler) CreatePost(c *gin.Context) {
 	// Check if user is logged in
-	userIDVal, exists := c.Get("userID")
-	if !exists || userIDVal == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，请先登录"})
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Please log in first"})
 		return
 	}
-	userID := userIDVal.(uint)
 
-	// Get user role information from context, fall back to DB lookup in service
-	userRole, _ := currentUser(c)
+	// Get user role information from context
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 
 	var req struct {
 		Title      string   `json:"title" binding:"required"`
@@ -123,18 +115,18 @@ func (h *Handler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.svc.Create(userRole, userID, CreateRequest{
+	post, err := h.svc.Create(c.Request.Context(), userRole, userID, CreateRequest{
 		Title:      req.Title,
 		Content:    req.Content,
 		Category:   req.Category,
 		Tags:       req.Tags,
 		Excerpt:    req.Excerpt,
 		CoverImage: req.CoverImage,
-		Status:     req.Status,
+		Status:     model.PostStatus(req.Status),
 	})
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "权限不足，无法创建文章"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a post"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post"})
@@ -147,8 +139,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 // UpdatePost updates a post (author or admin only).
 func (h *Handler) UpdatePost(c *gin.Context) {
 	id := c.Param("id")
-	userIDVal, _ := c.Get("userID")
-	userID := userIDVal.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	var req struct {
 		Title      string   `json:"title"`
@@ -164,14 +155,14 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.svc.Update(id, userID, UpdateRequest{
+	post, err := h.svc.Update(c.Request.Context(), id, userID, UpdateRequest{
 		Title:      req.Title,
 		Content:    req.Content,
 		Category:   req.Category,
 		Tags:       req.Tags,
 		Excerpt:    req.Excerpt,
 		CoverImage: req.CoverImage,
-		Status:     req.Status,
+		Status:     model.PostStatus(req.Status),
 	})
 	if err != nil {
 		switch {
@@ -191,10 +182,9 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 // DeletePost deletes a post (author or admin only).
 func (h *Handler) DeletePost(c *gin.Context) {
 	id := c.Param("id")
-	userIDVal, _ := c.Get("userID")
-	userID := userIDVal.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	err := h.svc.Delete(id, userID)
+	err := h.svc.Delete(c.Request.Context(), id, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPostNotFound):
@@ -212,14 +202,22 @@ func (h *Handler) DeletePost(c *gin.Context) {
 
 // GetMyPosts returns the current user's own posts.
 func (h *Handler) GetMyPosts(c *gin.Context) {
-	userIDVal, _ := c.Get("userID")
-	userID := userIDVal.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.DefaultQuery("status", "")
 
-	posts, total, _ := h.svc.MyPosts(userID, page, limit, status)
+	posts, total, err := h.svc.MyPosts(c.Request.Context(), MyPostsQuery{
+		UserID: userID,
+		Page:   page,
+		Limit:  limit,
+		Status: status,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
+		return
+	}
 
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
@@ -242,9 +240,19 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
-	posts, total, _ := h.svc.Drafts(userRole, userID, page, limit)
+	posts, total, err := h.svc.Drafts(c.Request.Context(), DraftsQuery{
+		UserRole: userRole,
+		UserID:   userID,
+		Page:     page,
+		Limit:    limit,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch drafts"})
+		return
+	}
 
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
@@ -268,9 +276,16 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	userRole, userID := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
 
-	posts, total, err := h.svc.UserPosts(userIDStr, userRole, userID, page, limit)
+	posts, total, err := h.svc.UserPosts(c.Request.Context(), UserPostsQuery{
+		UserIDStr:       userIDStr,
+		CurrentUserRole: userRole,
+		CurrentUserID:   userID,
+		Page:            page,
+		Limit:           limit,
+	})
 	if err != nil {
 		if errors.Is(err, ErrBadRequest) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
@@ -298,29 +313,48 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 
 // GetPopularPosts returns popular posts.
 func (h *Handler) GetPopularPosts(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
-	posts, _ := h.svc.Popular(userRole, limit)
+	posts, err := h.svc.Popular(c.Request.Context(), userRole, limit)
+	if err != nil {
+		if errors.Is(err, ErrGuestViewDenied) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view popular posts"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch popular posts"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"posts": posts})
 }
 
 // GetLatestPosts returns the latest posts.
 func (h *Handler) GetLatestPosts(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
-	posts, _ := h.svc.Latest(userRole, limit)
+	posts, err := h.svc.Latest(c.Request.Context(), userRole, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch latest posts"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"posts": posts})
 }
 
 // GetCategories returns the category list.
 func (h *Handler) GetCategories(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 
-	categories, _ := h.svc.Categories(userRole)
+	categories, err := h.svc.Categories(c.Request.Context(), userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
@@ -336,7 +370,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	category, err := h.svc.CreateCategory(req.Name, req.Description)
+	category, err := h.svc.CreateCategory(c.Request.Context(), req.Name, req.Description)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
 		return
@@ -350,9 +384,14 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 
 // GetTags returns the tag list.
 func (h *Handler) GetTags(c *gin.Context) {
-	userRole, _ := currentUser(c)
+	u, _ := middleware.CurrentUser(c)
+	userRole := u.Role
 
-	tags, _ := h.svc.Tags(userRole)
+	tags, err := h.svc.Tags(c.Request.Context(), userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tags"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"tags": tags})
 }
@@ -367,7 +406,7 @@ func (h *Handler) CreateTag(c *gin.Context) {
 		return
 	}
 
-	tag, err := h.svc.CreateTag(req.Name)
+	tag, err := h.svc.CreateTag(c.Request.Context(), req.Name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		return
@@ -381,26 +420,35 @@ func (h *Handler) CreateTag(c *gin.Context) {
 
 // GetPendingPosts gets pending posts for moderation.
 func (h *Handler) GetPendingPosts(c *gin.Context) {
-	h.listModeration(c, "pending")
+	h.listModeration(c, model.PostStatusPending)
 }
 
 // GetApprovedPosts gets approved posts list.
 func (h *Handler) GetApprovedPosts(c *gin.Context) {
-	h.listModeration(c, "published")
+	h.listModeration(c, model.PostStatusPublished)
 }
 
 // GetRejectedPosts gets rejected posts list.
 func (h *Handler) GetRejectedPosts(c *gin.Context) {
-	h.listModeration(c, "rejected")
+	h.listModeration(c, model.PostStatusRejected)
 }
 
 // listModeration renders the moderation queue for a given post status.
-func (h *Handler) listModeration(c *gin.Context, status string) {
+func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.DefaultQuery("search", "")
 
-	posts, total, _ := h.svc.ListModeration(status, page, limit, search)
+	posts, total, err := h.svc.ListModeration(c.Request.Context(), ListModerationQuery{
+		Status: status,
+		Page:   page,
+		Limit:  limit,
+		Search: search,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation posts"})
+		return
+	}
 
 	totalPages := (int(total) + limit - 1) / limit
 	if totalPages == 0 {
@@ -420,7 +468,7 @@ func (h *Handler) listModeration(c *gin.Context, status string) {
 
 // ApprovePost approves a post.
 func (h *Handler) ApprovePost(c *gin.Context) {
-	post, err := h.svc.Approve(c.Param("id"))
+	post, err := h.svc.Approve(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
@@ -443,7 +491,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.svc.Reject(c.Param("id"), req.RejectionReason)
+	post, err := h.svc.Reject(c.Request.Context(), c.Param("id"), req.RejectionReason)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
@@ -458,7 +506,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 
 // ResubmitPost resubmits a rejected post for moderation.
 func (h *Handler) ResubmitPost(c *gin.Context) {
-	post, err := h.svc.Resubmit(c.Param("id"))
+	post, err := h.svc.Resubmit(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPostNotFound):
@@ -480,10 +528,9 @@ func (h *Handler) ToggleLike(c *gin.Context) {
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
 	postID := uint(id64)
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	isLiked, count, err := h.svc.ToggleLike(postID, userID)
+	isLiked, count, err := h.svc.ToggleLike(c.Request.Context(), postID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove like"})
 		return
@@ -502,12 +549,9 @@ func (h *Handler) GetLikeStatus(c *gin.Context) {
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
 	postID := uint(id64)
 
-	var userID uint
-	if uid, exists := c.Get("userID"); exists {
-		userID = uid.(uint)
-	}
+	userID := middleware.CurrentUserID(c)
 
-	isLiked, count := h.svc.LikeStatus(postID, userID)
+	isLiked, count := h.svc.LikeStatus(c.Request.Context(), postID, userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"postId":     postID,

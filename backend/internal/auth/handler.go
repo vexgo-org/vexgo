@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -18,7 +18,7 @@ type Handler struct {
 
 // NewHandler creates an auth HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // requestProtocolAndHost derives the protocol and host for building absolute
@@ -51,12 +51,18 @@ func (h *Handler) Login(c *gin.Context) {
 
 	logrus.WithField("email", req.Email).Debug("Login request parsed successfully")
 
-	token, user, err := h.svc.Login(req.Email, req.Password, req.CaptchaID, req.CaptchaToken, req.CaptchaX)
+	token, user, err := h.svc.Login(c.Request.Context(), LoginRequest{
+		Email:        req.Email,
+		Password:     req.Password,
+		CaptchaID:    req.CaptchaID,
+		CaptchaToken: req.CaptchaToken,
+		CaptchaX:     req.CaptchaX,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaCheckFailed):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrCaptchaRequiredLogin):
+		case errors.Is(err, ErrCaptchaRequired):
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrCaptchaNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -118,14 +124,23 @@ func (h *Handler) Register(c *gin.Context) {
 	}).Debug("Registration request parsed successfully")
 
 	protocol, host := requestProtocolAndHost(c)
-	result, err := h.svc.Register(req.Email, req.Password, req.Username, req.CaptchaID, req.CaptchaToken, req.CaptchaX, protocol, host)
+	result, err := h.svc.Register(c.Request.Context(), RegisterRequest{
+		Email:        req.Email,
+		Password:     req.Password,
+		Username:     req.Username,
+		CaptchaID:    req.CaptchaID,
+		CaptchaToken: req.CaptchaToken,
+		CaptchaX:     req.CaptchaX,
+		Protocol:     protocol,
+		Host:         host,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSettingsCheckFailed), errors.Is(err, ErrCaptchaCheckFailed):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrRegistrationDisabled):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrCaptchaRequiredReg):
+		case errors.Is(err, ErrCaptchaRequired):
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrCaptchaNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -165,25 +180,22 @@ func (h *Handler) Register(c *gin.Context) {
 
 // GetCurrentUser gets the current logged-in user's information
 func (h *Handler) GetCurrentUser(c *gin.Context) {
-	if uid, ok := c.Get("userID"); ok {
-		userID, ok := uid.(uint)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
-			return
-		}
-		user, err := h.svc.GetCurrentUser(userID)
-		if err != nil {
-			if errors.Is(err, ErrUserNotFound) {
-				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"user": user})
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
 		return
 	}
-	c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+
+	user, err := h.svc.GetCurrentUser(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
 // UpdateProfile updates the current user's profile
@@ -200,10 +212,9 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	user, err := h.svc.UpdateProfile(userID, UpdateProfileRequest{
+	user, err := h.svc.UpdateProfile(c.Request.Context(), userID, UpdateProfileRequest{
 		Username: req.Username,
 		Avatar:   req.Avatar,
 		Birthday: req.Birthday,
@@ -233,10 +244,9 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	err := h.svc.ChangePassword(userID, req.OldPassword, req.NewPassword)
+	err := h.svc.ChangePassword(c.Request.Context(), userID, req.OldPassword, req.NewPassword)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
@@ -268,10 +278,9 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
-	user, err := h.svc.UpdateSettings(userID, UpdateSettingsRequest{
+	user, err := h.svc.UpdateSettings(c.Request.Context(), userID, UpdateSettingsRequest{
 		ProfileVisibility: req.ProfileVisibility,
 		HideEmail:         req.HideEmail,
 		HideBirthday:      req.HideBirthday,
@@ -307,11 +316,15 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 		return
 	}
 
-	uid, _ := c.Get("userID")
-	userID := uid.(uint)
+	userID := middleware.CurrentUserID(c)
 
 	protocol, host := requestProtocolAndHost(c)
-	pending, err := h.svc.UpdateEmail(userID, req.Email, protocol, host)
+	pending, err := h.svc.UpdateEmail(c.Request.Context(), UpdateEmailRequest{
+		UserID:   userID,
+		NewEmail: req.Email,
+		Protocol: protocol,
+		Host:     host,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
@@ -355,7 +368,7 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 	}
 
 	protocol, host := requestProtocolAndHost(c)
-	err := h.svc.RequestPasswordReset(req.Email, protocol, host)
+	err := h.svc.RequestPasswordReset(c.Request.Context(), req.Email, protocol, host)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrGenerateResetToken):
@@ -383,7 +396,7 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.ResetPassword(req.Token, req.Password)
+	err := h.svc.ResetPassword(c.Request.Context(), req.Token, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidResetToken):

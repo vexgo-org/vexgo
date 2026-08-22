@@ -23,7 +23,7 @@ import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 import { CommentModerationPage } from "@/pages/CommentModerationPage";
 import { CommentConfigPage } from "@/pages/CommentConfigPage";
 import { AISettingsPage } from "@/pages/AISettingsPage";
-import { MessageCenterPage } from "@/pages/MessageCenterPage";
+import { NotificationCenterPage } from "@/pages/NotificationCenterPage";
 import { CreatorApplicationReviewPage } from "@/pages/CreatorApplicationReviewPage";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
@@ -105,10 +105,10 @@ function App() {
                 }
               />
               <Route
-                path="/messages"
+                path="/notifications"
                 element={
                   <ProtectedRoute>
-                    <MessageCenterPage />
+                    <NotificationCenterPage />
                   </ProtectedRoute>
                 }
               />

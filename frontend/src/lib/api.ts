@@ -306,28 +306,31 @@ export const configApi = {
     }>("/themes"),
 };
 
-// Message-related APIs
-export const messagesApi = {
-  getMessages: (params?: {
+// Notification-related APIs
+export const notificationsApi = {
+  getNotifications: (params?: {
     page?: number;
     limit?: number;
     type?: string;
     is_read?: string;
   }) =>
-    api.get<{ notifications: unknown[]; pagination: unknown }>("/messages", {
-      params,
-    }),
+    api.get<{ notifications: unknown[]; pagination: unknown }>(
+      "/notifications",
+      {
+        params,
+      },
+    ),
 
   getUnreadCount: () =>
-    api.get<{ unreadCount: number }>("/messages/unread-count"),
+    api.get<{ unreadCount: number }>("/notifications/unread-count"),
 
   markAsRead: (id: string) =>
-    api.put<{ message: string }>(`/messages/${id}/read`),
+    api.put<{ message: string }>(`/notifications/${id}/read`),
 
-  markAllAsRead: () => api.put<{ message: string }>("/messages/read-all"),
+  markAllAsRead: () => api.put<{ message: string }>("/notifications/read-all"),
 
-  deleteMessage: (id: string) =>
-    api.delete<{ message: string }>(`/messages/${id}`),
+  deleteNotification: (id: string) =>
+    api.delete<{ message: string }>(`/notifications/${id}`),
 };
 
 export default api;

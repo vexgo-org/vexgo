@@ -11,13 +11,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"vexgo/backend/internal/auth"
-	"vexgo/backend/internal/config"
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/coreos/go-oidc"
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,8 @@ var (
 	stateCache = make(map[string]stateEntry) // key: "provider_state"
 )
 
+// generateState creates a random one-time state for CSRF protection and
+// stores it keyed by provider, bound to the client IP and requested method.
 func generateState(provider, ip, method string) string {
 	b := make([]byte, stateLength)
 	rand.Read(b)
@@ -58,6 +61,9 @@ func generateState(provider, ip, method string) string {
 	return state
 }
 
+// verifyState consumes and validates a state previously issued by
+// generateState: it must exist, match the client IP and not be expired.
+// The stored method is returned on success.
 func verifyState(provider, ip, state string) (method string, ok bool) {
 	key := provider + "_" + state
 	stateMu.Lock()
@@ -81,14 +87,14 @@ type Deps struct {
 
 // Service contains the business logic of the sso domain.
 type Service struct {
-	db        *gorm.DB
+	repo      Repository
 	sso       *config.SSOConfig
 	jwtSecret []byte
 }
 
 // NewService creates an sso service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{db: deps.DB, sso: deps.SSO, jwtSecret: deps.JWTSecret}
+	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret}
 }
 
 // Providers returns the list of enabled providers and whether local login is
@@ -174,7 +180,7 @@ func (s *Service) Callback(c *gin.Context, provider, state, code string) (payloa
 	}
 
 	// sso_get_token: find or create local user, then issue JWT
-	user, err := s.FindOrCreateUser(provider, info)
+	user, err := s.FindOrCreateUser(c.Request.Context(), provider, info)
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -189,6 +195,7 @@ func (s *Service) Callback(c *gin.Context, provider, state, code string) (payloa
 // OAuth2 configs (built per-request to allow dynamic redirect URI)
 // ─────────────────────────────────────────────
 
+// githubOAuth2Config builds the oauth2.Config for GitHub OAuth.
 func (s *Service) githubOAuth2Config(redirectURI string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     s.sso.GitHub.ClientID,
@@ -199,6 +206,7 @@ func (s *Service) githubOAuth2Config(redirectURI string) *oauth2.Config {
 	}
 }
 
+// googleOAuth2Config builds the oauth2.Config for Google OAuth.
 func (s *Service) googleOAuth2Config(redirectURI string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     s.sso.Google.ClientID,
@@ -252,7 +260,12 @@ func (s *Service) callbackURI(c *gin.Context, provider string) string {
 	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s/api/sso/%s/callback", scheme, c.Request.Host, provider)
+
+	u := url.URL{
+		Scheme: scheme,
+		Host:   c.Request.Host,
+	}
+	return u.JoinPath("api", "sso", provider, "callback").String()
 }
 
 // ─────────────────────────────────────────────
@@ -266,6 +279,8 @@ type ssoUserInfo struct {
 	avatar     string
 }
 
+// exchange delegates the OAuth2 code exchange to the matching provider
+// implementation and returns the normalized user info.
 func (s *Service) exchange(c *gin.Context, provider, code, redirectURI string) (*ssoUserInfo, error) {
 	switch provider {
 	case "github":
@@ -279,6 +294,8 @@ func (s *Service) exchange(c *gin.Context, provider, code, redirectURI string) (
 	}
 }
 
+// exchangeGitHub exchanges the code with GitHub and fetches the user profile,
+// falling back to the emails endpoint when the primary email is not exposed.
 func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*ssoUserInfo, error) {
 	tok, err := s.githubOAuth2Config(redirectURI).Exchange(c.Request.Context(), code)
 	if err != nil {
@@ -316,6 +333,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 	return info, nil
 }
 
+// exchangeGoogle exchanges the code with Google and fetches the userinfo.
 func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*ssoUserInfo, error) {
 	tok, err := s.googleOAuth2Config(redirectURI).Exchange(c.Request.Context(), code)
 	if err != nil {
@@ -344,6 +362,9 @@ func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*sso
 	return info, nil
 }
 
+// exchangeOIDC exchanges the code with the OIDC provider, preferring id_token
+// claims over a userinfo call, and enforces the verify-email and
+// allowed-groups policies when configured.
 func (s *Service) exchangeOIDC(c *gin.Context, code, redirectURI string) (*ssoUserInfo, error) {
 	oidcCfg := s.sso.OIDC
 
@@ -445,6 +466,8 @@ func parseOIDCIDTokenClaims(rawIDToken string) (map[string]any, error) {
 	return claims, nil
 }
 
+// claimsToUserInfo maps OIDC claims to ssoUserInfo, honoring the configured
+// claim names for email and display name.
 func (s *Service) claimsToUserInfo(claims map[string]any) *ssoUserInfo {
 	cfg := s.sso.OIDC
 	info := &ssoUserInfo{}
@@ -478,61 +501,67 @@ func (s *Service) claimsToUserInfo(claims map[string]any) *ssoUserInfo {
 // FindOrCreateUser resolves an SSO identity to a local user: first by exact
 // SSO binding, then by email match, and finally by auto-registering a new
 // guest user. The binding is persisted so future logins skip the fallbacks.
-func (s *Service) FindOrCreateUser(provider string, info *ssoUserInfo) (*model.User, error) {
+func (s *Service) FindOrCreateUser(ctx context.Context, provider string, info *ssoUserInfo) (*model.User, error) {
 	// 1. Exact SSO binding match
-	var binding model.SSOBinding
-	if err := s.db.Where("provider = ? AND provider_id = ?", provider, info.providerID).First(&binding).Error; err == nil {
-		var user model.User
-		if err := s.db.First(&user, binding.UserID).Error; err != nil {
+	if binding, err := s.repo.FindSSOBinding(ctx, provider, info.providerID); err == nil {
+		user, err := s.repo.FindUserByID(ctx, binding.UserID)
+		if err != nil {
 			return nil, errors.New("user account not found")
 		}
 		// Update last login time
 		user.LastLoginAt = time.Now()
-		s.db.Save(&user)
-		return &user, nil
+		if err := s.repo.SaveUser(ctx, user); err != nil {
+			return nil, err
+		}
+		return user, nil
 	}
 
 	// 2. Email match → link to existing account
-	var user model.User
+	var user *model.User
 	if info.email != "" {
-		s.db.Where("email = ?", info.email).First(&user)
-		if user.ID != 0 {
+		if u, err := s.repo.FindUserByEmail(ctx, info.email); err == nil {
+			user = u
 			// Update last login time
 			user.LastLoginAt = time.Now()
-			s.db.Save(&user)
+			if err := s.repo.SaveUser(ctx, user); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	// 3. Auto-register new user
-	if user.ID == 0 {
-		username := s.generateUsername(info.username, info.email)
-		user = model.User{
+	if user == nil {
+		username := s.generateUsername(ctx, info.username, info.email)
+		u := model.User{
 			Username:        username,
 			Email:           info.email,
 			Role:            model.RoleGuest,
 			PasswordVersion: 0,
 			// No password set — this user can only log in via SSO
 		}
-		if err := s.db.Create(&user).Error; err != nil {
+		if err := s.repo.CreateUser(ctx, &u); err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
+		user = &u
 	}
 
 	// Persist binding so future logins skip steps 2-3
-	s.db.Create(&model.SSOBinding{
+	if err := s.repo.CreateBinding(ctx, &model.SSOBinding{
 		UserID:     user.ID,
 		Provider:   provider,
 		ProviderID: info.providerID,
 		Email:      info.email,
 		Name:       info.username,
 		Avatar:     info.avatar,
-	})
+	}); err != nil {
+		return nil, err
+	}
 
-	return &user, nil
+	return user, nil
 }
 
 // generateUsername derives a unique username from the provider name or email.
-func (s *Service) generateUsername(name, email string) string {
+func (s *Service) generateUsername(ctx context.Context, name, email string) string {
 	base := name
 	if base == "" {
 		if idx := strings.Index(email, "@"); idx > 0 {
@@ -553,13 +582,12 @@ func (s *Service) generateUsername(name, email string) string {
 	}
 	candidate := sb.String()
 
-	var count int64
 	for suffix := 0; ; suffix++ {
 		username := candidate
 		if suffix > 0 {
 			username = fmt.Sprintf("%s%d", candidate, suffix)
 		}
-		s.db.Model(&model.User{}).Where("username = ?", username).Count(&count)
+		count, _ := s.repo.CountUsersByUsername(ctx, username)
 		if count == 0 {
 			return username
 		}
@@ -589,6 +617,8 @@ func apiGet(url, accessToken, scheme string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// fetchGitHubPrimaryEmail returns the primary, verified email address from
+// GitHub's /user/emails endpoint, or an empty string when unavailable.
 func fetchGitHubPrimaryEmail(accessToken string) string {
 	body, err := apiGet("https://api.github.com/user/emails", accessToken, "token")
 	if err != nil {
@@ -612,6 +642,7 @@ func fetchGitHubPrimaryEmail(accessToken string) string {
 	return ""
 }
 
+// isValidMethod reports whether the SSO flow method is supported.
 func isValidMethod(method string) bool {
 	return method == "sso_get_token" || method == "get_sso_id"
 }

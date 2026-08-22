@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -8,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
-func newTestService(t *testing.T) (*Service, string) {
+func newTestService(t *testing.T) (*Service, string, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -31,7 +32,7 @@ func newTestService(t *testing.T) (*Service, string) {
 
 	dataDir := t.TempDir()
 	svc := NewService(Deps{DB: db, Storage: NewLocalStorage(dataDir)})
-	return svc, dataDir
+	return svc, dataDir, db
 }
 
 func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
@@ -44,10 +45,10 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 }
 
 func TestUpload_WritesFileAndRecord(t *testing.T) {
-	svc, dataDir := newTestService(t)
-	user := seedUser(t, svc.db, "uploader", model.RoleContributor)
+	svc, dataDir, db := newTestService(t)
+	user := seedUser(t, db, "uploader", model.RoleContributor)
 
-	media, err := svc.Upload(user.ID, "photo.jpg", 42, strings.NewReader("jpeg-data"))
+	media, err := svc.Upload(context.Background(), user.ID, "photo.jpg", 42, strings.NewReader("jpeg-data"))
 	if err != nil {
 		t.Fatalf("Upload error: %v", err)
 	}
@@ -69,24 +70,24 @@ func TestUpload_WritesFileAndRecord(t *testing.T) {
 
 	// record persisted
 	var stored model.MediaFile
-	if err := svc.db.First(&stored, media.ID).Error; err != nil {
+	if err := db.First(&stored, media.ID).Error; err != nil {
 		t.Fatalf("media record not saved: %v", err)
 	}
 }
 
 func TestListByUser(t *testing.T) {
-	svc, _ := newTestService(t)
-	u1 := seedUser(t, svc.db, "a", model.RoleContributor)
-	u2 := seedUser(t, svc.db, "b", model.RoleContributor)
+	svc, _, db := newTestService(t)
+	u1 := seedUser(t, db, "a", model.RoleContributor)
+	u2 := seedUser(t, db, "b", model.RoleContributor)
 
-	if _, err := svc.Upload(u1.ID, "1.jpg", 1, strings.NewReader("a")); err != nil {
+	if _, err := svc.Upload(context.Background(), u1.ID, "1.jpg", 1, strings.NewReader("a")); err != nil {
 		t.Fatalf("Upload error: %v", err)
 	}
-	if _, err := svc.Upload(u2.ID, "2.jpg", 1, strings.NewReader("b")); err != nil {
+	if _, err := svc.Upload(context.Background(), u2.ID, "2.jpg", 1, strings.NewReader("b")); err != nil {
 		t.Fatalf("Upload error: %v", err)
 	}
 
-	files, err := svc.ListByUser(u1.ID)
+	files, err := svc.ListByUser(context.Background(), u1.ID)
 	if err != nil {
 		t.Fatalf("ListByUser error: %v", err)
 	}
@@ -96,11 +97,11 @@ func TestListByUser(t *testing.T) {
 }
 
 func TestDelete_PermissionsAndFileRemoval(t *testing.T) {
-	svc, dataDir := newTestService(t)
-	owner := seedUser(t, svc.db, "owner", model.RoleContributor)
-	other := seedUser(t, svc.db, "other", model.RoleGuest)
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	other := seedUser(t, db, "other", model.RoleGuest)
 
-	media, err := svc.Upload(owner.ID, "del.jpg", 1, strings.NewReader("x"))
+	media, err := svc.Upload(context.Background(), owner.ID, "del.jpg", 1, strings.NewReader("x"))
 	if err != nil {
 		t.Fatalf("Upload error: %v", err)
 	}
@@ -108,19 +109,19 @@ func TestDelete_PermissionsAndFileRemoval(t *testing.T) {
 	idStr := strconv.FormatUint(uint64(media.ID), 10)
 
 	// other user cannot delete
-	if err := svc.Delete(idStr, other.ID); !errors.Is(err, ErrForbidden) {
+	if err := svc.Delete(context.Background(), idStr, other.ID); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 
 	// owner can delete → file removed from disk and DB
-	if err := svc.Delete(idStr, owner.ID); err != nil {
+	if err := svc.Delete(context.Background(), idStr, owner.ID); err != nil {
 		t.Fatalf("Delete error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, "media", filepath.Base(media.URL))); !os.IsNotExist(err) {
 		t.Errorf("expected file removed from disk")
 	}
 	var count int64
-	if err := svc.db.Model(&model.MediaFile{}).Count(&count).Error; err != nil {
+	if err := db.Model(&model.MediaFile{}).Count(&count).Error; err != nil {
 		t.Fatalf("count error: %v", err)
 	}
 	if count != 0 {
@@ -128,7 +129,7 @@ func TestDelete_PermissionsAndFileRemoval(t *testing.T) {
 	}
 
 	// not found
-	if err := svc.Delete(idStr, owner.ID); !errors.Is(err, ErrNotFound) {
+	if err := svc.Delete(context.Background(), idStr, owner.ID); !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }

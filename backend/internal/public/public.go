@@ -6,7 +6,6 @@ package public
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -15,9 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -107,7 +107,7 @@ func (r *Renderer) GetAvailableThemes() []ThemeInfo {
 		Author:      "vexgo",
 		Version:     "1.0.0",
 		Description: "vexgo default theme",
-		URL:         "https://github.com/vexgo/vexgo",
+		URL:         "https://github.com/vexgo-org/vexgo",
 	})
 
 	// Scan themes directory
@@ -249,7 +249,7 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	// Initialize asset manifest for dynamic asset loading
 	if err := LoadAssetManifest(); err != nil {
 		// Log error but continue with fallback to hardcoded paths
-		fmt.Printf("Warning: Failed to load asset manifest: %v\n", err)
+		logrus.WithError(err).Warn("Failed to load asset manifest")
 	}
 
 	// Serve local uploads if S3 is not enabled
@@ -354,7 +354,12 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 
 		// Server-side rendering with proper data initialization
 		var posts []model.Post
-		r.db.Preload("Author").Preload("Tags").Where("status = ?", "published").Order("created_at DESC").Limit(10).Find(&posts)
+		r.db.Preload("Author").
+			Preload("Tags").
+			Where("status = ?", model.PostStatusPublished).
+			Order("created_at DESC").
+			Limit(10).
+			Find(&posts)
 		// Always render, even with empty posts or query errors
 		html, renderErr := RenderIndexHTML(posts, r.baseURL)
 		if renderErr == nil {

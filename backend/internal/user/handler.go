@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"vexgo/backend/internal/middleware"
-	"vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,26 +19,7 @@ type Handler struct {
 
 // NewHandler creates a user HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB)}
-}
-
-// currentUser extracts the acting user from the JWT context.
-func currentUser(c *gin.Context) (model.User, bool) {
-	userContext, exists := c.Get("user")
-	if !exists {
-		return model.User{}, false
-	}
-	userMap, ok := userContext.(map[string]any)
-	if !ok {
-		return model.User{}, false
-	}
-	id, ok := userMap["id"].(uint)
-	if !ok {
-		return model.User{}, false
-	}
-	username, _ := userMap["username"].(string)
-	role, _ := userMap["role"].(string)
-	return model.User{ID: id, Username: username, Role: role}, true
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
 // GetUserList gets user list
@@ -55,7 +36,7 @@ func (h *Handler) GetUserList(c *gin.Context) {
 
 	search := c.DefaultQuery("search", "")
 
-	users, total, err := h.svc.ListUsers(search, page, limit)
+	users, total, err := h.svc.ListUsers(c.Request.Context(), search, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query users"})
 		return
@@ -79,7 +60,7 @@ func (h *Handler) GetUserList(c *gin.Context) {
 
 // UpdateUserRole updates user role
 func (h *Handler) UpdateUserRole(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -100,7 +81,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	user, err := h.svc.UpdateRole(currentUser, uint(id), req.Role)
+	user, err := h.svc.UpdateRole(c.Request.Context(), actor, uint(id), req.Role)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
@@ -111,7 +92,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrInvalidRole):
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrSuperAdminOwnRole):
+		case errors.Is(err, ErrSuperAdminRestricted):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrAdminRoleRestricted):
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -131,7 +112,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 
 // DeleteUser deletes user and all their posts and comments
 func (h *Handler) DeleteUser(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -144,7 +125,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.DeleteUser(currentUser, uint(id))
+	err = h.svc.DeleteUser(c.Request.Context(), actor, uint(id))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
@@ -166,7 +147,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 
 // ApplyForCreator handles creator application submission
 func (h *Handler) ApplyForCreator(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -180,7 +161,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 		return
 	}
 
-	applicationID, err := h.svc.ApplyForCreator(currentUser, req.Reason)
+	applicationID, err := h.svc.ApplyForCreator(c.Request.Context(), actor, req.Reason)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrRoleNotEligible):
@@ -201,7 +182,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 
 // GetCreatorApplications gets creator applications for admin review
 func (h *Handler) GetCreatorApplications(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -209,7 +190,8 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	status := c.DefaultQuery("status", "pending")
+	statusStr := c.DefaultQuery("status", string(model.CreatorApplicationStatusPending))
+	status := model.CreatorApplicationStatus(statusStr)
 
 	if page < 1 {
 		page = 1
@@ -218,7 +200,12 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 		limit = 10
 	}
 
-	applications, total, err := h.svc.ListCreatorApplications(currentUser.Role, status, page, limit)
+	applications, total, err := h.svc.ListCreatorApplications(c.Request.Context(), ListCreatorApplicationsQuery{
+		ActorRole: actor.Role,
+		Status:    status,
+		Page:      page,
+		Limit:     limit,
+	})
 	if err != nil {
 		if errors.Is(err, ErrNoPermissionAccessApps) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -262,7 +249,7 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 
 // ReviewCreatorApplication handles creator application review
 func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
-	currentUser, ok := currentUser(c)
+	actor, ok := middleware.CurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
 		return
@@ -284,7 +271,12 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.ReviewCreatorApplication(currentUser, uint(id), req.Action, req.Reason)
+	err = h.svc.ReviewCreatorApplication(c.Request.Context(), ReviewCreatorApplicationRequest{
+		Actor:  actor,
+		AppID:  uint(id),
+		Action: req.Action,
+		Reason: req.Reason,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNoPermissionReviewApps):

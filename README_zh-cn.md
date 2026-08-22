@@ -20,7 +20,7 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 - **🛡️ AI 内容审核**：可配置提示词、关键词拦截和评分阈值的自动评论审核
 - **🖼️ 媒体管理**：内置文件存储，支持 S3 兼容服务
 - **🎨 主题系统**：服务端渲染主题，可在管理面板切换和上传
-- **🔔 通知**：点赞、评论等事件的站内消息收件箱
+- **🔔 通知**：点赞、评论等事件的站内通知收件箱
 - **🔑 SSO**：支持 GitHub、Google 及任意 OpenID Connect 提供商登录
 - **🌐 自托管**：完全控制您的数据和部署
 
@@ -449,7 +449,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 然后使用以下命令启动后端：
 
 ```bash
-go run backend/main.go -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo -c examples/config-postgres.yml
 ```
 
 ### MySQL
@@ -476,7 +476,7 @@ mysql> FLUSH PRIVILEGES;
 
 ```bash
 cd backend
-go run main.go -c ../examples/config-mysql.yml
+go run ./cmd/vexgo -c ../examples/config-mysql.yml
 ```
 
 ## 开发环境
@@ -514,28 +514,29 @@ cd frontend
 pnpm install
 pnpm run build
 cd ../backend
-go run main.go
+go run ./cmd/vexgo
 ```
 
 然后访问 http://127.0.0.1:3001。默认超级管理员账号：`admin@example.com` / `password`——请在个人资料页面修改密码。
 
 ### 后端结构
 
-后端采用领域化布局，代码位于 `backend/internal` 下：
+后端采用领域化布局，代码位于 `backend/internal` 下，并通过组合根（composition root）完成装配：
 
 ```text
 backend/
-  main.go            # 入口：命令行参数、配置、存储、数据库、路由、静态资源
+  cmd/vexgo/main.go  # 入口：解析命令行参数，委托给 app.New()
   internal/
+    app/             # 组合根：装配存储、数据库与所有领域模块
     auth/            # 注册、登录、JWT、个人资料、密码重置
     comment/         # 评论与 AI 审核
     config/          # 命令行 / 环境变量 / 配置文件解析，JWT、S3、SSO 初始化（纯配置，不依赖后端模块）
     database/        # 数据库连接、自动迁移、种子数据
     home/            # 站点统计
     mailer/          # SMTP 邮件构建与发送
-    message/         # 站内通知
+    notification/    # 站内通知
     middleware/      # JWT 认证、角色权限、请求日志
-    model/           # GORM 数据模型（post、user、tag、category、like、comment 等）
+    model/           # GORM 数据模型 + 共享接口（Notifier、FileRemover、Mailer）
     post/            # 文章 CRUD、分类、标签、点赞
     public/          # 内嵌前端、主题、SSR 渲染、静态路由
     router/          # 路由注册（组合所有领域模块）
@@ -546,22 +547,32 @@ backend/
     verification/    # 邮箱验证与滑块验证码
 ```
 
-导入使用模块路径 `vexgo/backend/internal/<package>`，例如：
+每个领域包内部遵循一致的三层结构：
+
+```text
+handler.go    → HTTP 请求解析、响应渲染（调用 service）
+service.go    → 业务逻辑、跨域编排（调用 repository）
+repository.go → 持久化接口 + GORM 实现（访问数据库）
+```
+
+handler 不直接接触 GORM；service 依赖 `Repository` 接口、与数据库解耦（可用 fake 做单元测试）；repository 封装全部 SQL/GORM 查询（含避免 N+1 的批量操作）。`context.Context` 贯穿三层。
+
+导入使用模块路径 `github.com/vexgo-org/vexgo/backend/internal/<package>`，例如：
 
 ```go
 import (
-    "vexgo/backend/internal/model"
-    "vexgo/backend/internal/post"
-    "vexgo/backend/internal/router"
+    "github.com/vexgo-org/vexgo/backend/internal/model"
+    "github.com/vexgo-org/vexgo/backend/internal/post"
+    "github.com/vexgo-org/vexgo/backend/internal/router"
 )
 ```
 
 ### 依赖事实
 
-- **叶子包** — `config/` 和 `model/` 不导入任何其他后端模块。`model` 被所有领域包引用（另有 `database`、`mailer`、`middleware`、`public`）；`config` 被 `auth`、`database`、`middleware`、`sso`、`upload` 引用。
+- **叶子包** — `config/` 和 `model/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`、`Mailer`）；`config` 被 `app`、`auth`、`database`、`middleware`、`sso`、`upload` 引用。
 - **共享层** — `middleware/`（JWT 认证、角色权限、请求日志）只依赖 `config` 和 `model`。
-- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`auth` 自身依赖 `verification`；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。依赖图无环。
-- **接线** — `backend/main.go` 是唯一入口：打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
+- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`auth` 自身依赖 `verification`；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`、`mailer` 实现 `Mailer`。依赖图无环。
+- **接线** — `backend/cmd/vexgo/main.go` 是极简入口：解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根——打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
 
 ### 贡献指南
 

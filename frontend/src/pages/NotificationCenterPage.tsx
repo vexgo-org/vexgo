@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { messagesApi } from "@/lib/api";
+import { notificationsApi } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { CreatorApplicationButton } from "@/components/CreatorApplicationButton";
 
@@ -24,12 +24,12 @@ import {
   Users,
 } from "lucide-react";
 
-// Message types
-type MessageType = "comment" | "like" | "reply" | "review" | "role";
+// Notification types
+type NotificationType = "comment" | "like" | "reply" | "review" | "role";
 
-type Message = {
+type Notification = {
   id: string;
-  type: MessageType;
+  type: NotificationType;
   title: string;
   content: string;
   relatedId: string;
@@ -43,14 +43,14 @@ type Message = {
   };
 };
 
-export function MessageCenterPage() {
+export function NotificationCenterPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
 
-  // Message data
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Notification data
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const [loading, setLoading] = useState(false);
 
@@ -59,14 +59,14 @@ export function MessageCenterPage() {
   // Check whether the user is a guest
   const isGuest = user?.role === "guest";
 
-  // Fetch messages from the API
+  // Fetch notifications from the API
   useEffect(() => {
-    const fetchMessages = async () => {
+    const fetchNotifications = async () => {
       setLoading(true);
       try {
-        const response = await messagesApi.getMessages();
+        const response = await notificationsApi.getNotifications();
         // Convert the backend data format to the frontend format
-        interface Notification {
+        interface RawNotification {
           id: number;
           type: string;
           title: string;
@@ -77,11 +77,11 @@ export function MessageCenterPage() {
           is_read: boolean;
         }
 
-        const formattedMessages = (
-          response.data.notifications as Notification[]
+        const formattedNotifications = (
+          response.data.notifications as RawNotification[]
         ).map((notification) => ({
           id: notification.id.toString(),
-          type: notification.type as MessageType,
+          type: notification.type as NotificationType,
           title: notification.title,
           content: notification.content,
           relatedId: notification.related_id,
@@ -91,7 +91,7 @@ export function MessageCenterPage() {
           // The backend may not include sender info, so leave it empty for now
           sender: undefined,
         }));
-        setMessages(formattedMessages);
+        setNotifications(formattedNotifications);
       } catch (error) {
         console.error(t("errors.networkError"), error);
       } finally {
@@ -99,29 +99,31 @@ export function MessageCenterPage() {
       }
     };
 
-    fetchMessages();
+    fetchNotifications();
   }, [t]);
 
-  // Filter messages by tab
-  const filteredMessages = messages.filter((message) => {
+  // Filter notifications by tab
+  const filteredNotifications = notifications.filter((notification) => {
     if (activeTab === "all") return true;
-    if (activeTab === "unread") return !message.isRead;
+    if (activeTab === "unread") return !notification.isRead;
     if (activeTab === "comment")
-      return message.type === "comment" || message.type === "reply";
-    if (activeTab === "like") return message.type === "like";
-    if (activeTab === "review") return message.type === "review";
-    if (activeTab === "role") return message.type === "role";
+      return notification.type === "comment" || notification.type === "reply";
+    if (activeTab === "like") return notification.type === "like";
+    if (activeTab === "review") return notification.type === "review";
+    if (activeTab === "role") return notification.type === "role";
     return true;
   });
 
-  // Mark a message as read
+  // Mark a notification as read
   const markAsRead = async (id: string) => {
     try {
-      await messagesApi.markAsRead(id);
+      await notificationsApi.markAsRead(id);
       // Update the local state
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === id ? { ...message, isRead: true } : message,
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === id
+            ? { ...notification, isRead: true }
+            : notification,
         ),
       );
     } catch (error) {
@@ -132,22 +134,24 @@ export function MessageCenterPage() {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      await messagesApi.markAllAsRead();
+      await notificationsApi.markAllAsRead();
       // Update the local state
-      setMessages((prev) =>
-        prev.map((message) => ({ ...message, isRead: true })),
+      setNotifications((prev) =>
+        prev.map((notification) => ({ ...notification, isRead: true })),
       );
     } catch (error) {
       console.error(t("errors.networkError"), error);
     }
   };
 
-  // Delete a message
-  const deleteMessage = async (id: string) => {
+  // Delete a notification
+  const deleteNotification = async (id: string) => {
     try {
-      await messagesApi.deleteMessage(id);
+      await notificationsApi.deleteNotification(id);
       // Update the local state
-      setMessages((prev) => prev.filter((message) => message.id !== id));
+      setNotifications((prev) =>
+        prev.filter((notification) => notification.id !== id),
+      );
     } catch (error) {
       console.error(t("errors.networkError"), error);
     }
@@ -166,8 +170,8 @@ export function MessageCenterPage() {
     }
   };
 
-  // Get the status icon for a message type
-  const getStatusIcon = (type: MessageType) => {
+  // Get the status icon for a notification type
+  const getStatusIcon = (type: NotificationType) => {
     switch (type) {
       case "review":
         return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -181,7 +185,7 @@ export function MessageCenterPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">{t("messageCenter.title")}</h1>
+        <h1 className="text-2xl font-bold">{t("notificationCenter.title")}</h1>
         <div className="flex items-center gap-2">
           {isGuest && <CreatorApplicationButton />}
           {isAdmin && (
@@ -195,25 +199,31 @@ export function MessageCenterPage() {
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={markAllAsRead}>
-            {t("messageCenter.markAllAsRead")}
+            {t("notificationCenter.markAllAsRead")}
           </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-6">
-          <TabsTrigger value="all">{t("messageCenter.tabs.all")}</TabsTrigger>
+          <TabsTrigger value="all">
+            {t("notificationCenter.tabs.all")}
+          </TabsTrigger>
           <TabsTrigger value="unread">
-            {t("messageCenter.tabs.unread")}
+            {t("notificationCenter.tabs.unread")}
           </TabsTrigger>
           <TabsTrigger value="comment">
-            {t("messageCenter.tabs.comment")}
+            {t("notificationCenter.tabs.comment")}
           </TabsTrigger>
-          <TabsTrigger value="like">{t("messageCenter.tabs.like")}</TabsTrigger>
+          <TabsTrigger value="like">
+            {t("notificationCenter.tabs.like")}
+          </TabsTrigger>
           <TabsTrigger value="review">
-            {t("messageCenter.tabs.review")}
+            {t("notificationCenter.tabs.review")}
           </TabsTrigger>
-          <TabsTrigger value="role">{t("messageCenter.tabs.role")}</TabsTrigger>
+          <TabsTrigger value="role">
+            {t("notificationCenter.tabs.role")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -221,41 +231,46 @@ export function MessageCenterPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  {t("messageCenter.empty.noMessages")}
+                  {t("notificationCenter.empty.noNotifications")}
                 </h3>
                 <p className="text-muted-foreground">
-                  {t("messageCenter.empty.noMessagesDesc")}
+                  {t("notificationCenter.empty.noNotificationsDesc")}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredMessages.map((message) => (
+            filteredNotifications.map((notification) => (
               <Card
-                key={message.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${message.isRead ? "" : "border-l-4 border-primary"}`}
+                key={notification.id}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
                 onClick={() => {
-                  markAsRead(message.id);
-                  if (message.relatedId) {
-                    navigateToRelated(message.relatedId, message.relatedType);
+                  markAsRead(notification.id);
+                  if (notification.relatedId) {
+                    navigateToRelated(
+                      notification.relatedId,
+                      notification.relatedType,
+                    );
                   }
                 }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      {message.sender ? (
+                      {notification.sender ? (
                         <Avatar className="h-10 w-10">
                           <AvatarImage
-                            src={message.sender.avatar}
-                            alt={message.sender.username}
+                            src={notification.sender.avatar}
+                            alt={notification.sender.username}
                           />
                           <AvatarFallback>
-                            {message.sender.username.charAt(0).toUpperCase()}
+                            {notification.sender.username
+                              .charAt(0)
+                              .toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       ) : (
@@ -266,40 +281,42 @@ export function MessageCenterPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{message.title}</h3>
+                        <h3 className="font-medium text-sm">
+                          {notification.title}
+                        </h3>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.createdAt).toLocaleString()}
+                          {new Date(notification.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {message.content}
+                        {notification.content}
                       </p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {!message.isRead && (
+                          {!notification.isRead && (
                             <Badge variant="secondary" className="text-xs">
-                              {t("messageCenter.unreadBadge")}
+                              {t("notificationCenter.unreadBadge")}
                             </Badge>
                           )}
-                          {getStatusIcon(message.type)}
+                          {getStatusIcon(notification.type)}
                         </div>
                         <div className="flex items-center gap-2">
-                          {message.type !== "role" && (
+                          {notification.type !== "role" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-8 px-2"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (message.relatedId) {
+                                if (notification.relatedId) {
                                   navigateToRelated(
-                                    message.relatedId,
-                                    message.relatedType,
+                                    notification.relatedId,
+                                    notification.relatedType,
                                   );
                                 }
                               }}
                             >
-                              {t("messageCenter.view")}{" "}
+                              {t("notificationCenter.view")}{" "}
                               <ArrowRight className="w-3 h-3 ml-1" />
                             </Button>
                           )}
@@ -309,7 +326,7 @@ export function MessageCenterPage() {
                             className="h-8 w-8 text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteMessage(message.id);
+                              deleteNotification(notification.id);
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -330,41 +347,46 @@ export function MessageCenterPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Eye className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  {t("messageCenter.empty.noUnreadMessages")}
+                  {t("notificationCenter.empty.noUnreadNotifications")}
                 </h3>
                 <p className="text-muted-foreground">
-                  {t("messageCenter.empty.allRead")}
+                  {t("notificationCenter.empty.allRead")}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredMessages.map((message) => (
+            filteredNotifications.map((notification) => (
               <Card
-                key={message.id}
+                key={notification.id}
                 className="border-l-4 border-primary cursor-pointer transition-all duration-200 hover:shadow-md"
                 onClick={() => {
-                  markAsRead(message.id);
-                  if (message.relatedId) {
-                    navigateToRelated(message.relatedId, message.relatedType);
+                  markAsRead(notification.id);
+                  if (notification.relatedId) {
+                    navigateToRelated(
+                      notification.relatedId,
+                      notification.relatedType,
+                    );
                   }
                 }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      {message.sender ? (
+                      {notification.sender ? (
                         <Avatar className="h-10 w-10">
                           <AvatarImage
-                            src={message.sender.avatar}
-                            alt={message.sender.username}
+                            src={notification.sender.avatar}
+                            alt={notification.sender.username}
                           />
                           <AvatarFallback>
-                            {message.sender.username.charAt(0).toUpperCase()}
+                            {notification.sender.username
+                              .charAt(0)
+                              .toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       ) : (
@@ -375,35 +397,37 @@ export function MessageCenterPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{message.title}</h3>
+                        <h3 className="font-medium text-sm">
+                          {notification.title}
+                        </h3>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.createdAt).toLocaleString()}
+                          {new Date(notification.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {message.content}
+                        {notification.content}
                       </p>
                       <div className="flex items-center justify-between">
                         <Badge variant="secondary" className="text-xs">
-                          {t("messageCenter.unreadBadge")}
+                          {t("notificationCenter.unreadBadge")}
                         </Badge>
                         <div className="flex items-center gap-2">
-                          {message.type !== "role" && (
+                          {notification.type !== "role" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-8 px-2"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (message.relatedId) {
+                                if (notification.relatedId) {
                                   navigateToRelated(
-                                    message.relatedId,
-                                    message.relatedType,
+                                    notification.relatedId,
+                                    notification.relatedType,
                                   );
                                 }
                               }}
                             >
-                              {t("messageCenter.view")}{" "}
+                              {t("notificationCenter.view")}{" "}
                               <ArrowRight className="w-3 h-3 ml-1" />
                             </Button>
                           )}
@@ -413,7 +437,7 @@ export function MessageCenterPage() {
                             className="h-8 w-8 text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteMessage(message.id);
+                              deleteNotification(notification.id);
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -433,41 +457,46 @@ export function MessageCenterPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  {t("messageCenter.empty.noCommentMessages")}
+                  {t("notificationCenter.empty.noCommentNotifications")}
                 </h3>
                 <p className="text-muted-foreground">
-                  {t("messageCenter.empty.noCommentMessagesDesc")}
+                  {t("notificationCenter.empty.noCommentNotificationsDesc")}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredMessages.map((message) => (
+            filteredNotifications.map((notification) => (
               <Card
-                key={message.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${message.isRead ? "" : "border-l-4 border-primary"}`}
+                key={notification.id}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
                 onClick={() => {
-                  markAsRead(message.id);
-                  if (message.relatedId) {
-                    navigateToRelated(message.relatedId, message.relatedType);
+                  markAsRead(notification.id);
+                  if (notification.relatedId) {
+                    navigateToRelated(
+                      notification.relatedId,
+                      notification.relatedType,
+                    );
                   }
                 }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      {message.sender ? (
+                      {notification.sender ? (
                         <Avatar className="h-10 w-10">
                           <AvatarImage
-                            src={message.sender.avatar}
-                            alt={message.sender.username}
+                            src={notification.sender.avatar}
+                            alt={notification.sender.username}
                           />
                           <AvatarFallback>
-                            {message.sender.username.charAt(0).toUpperCase()}
+                            {notification.sender.username
+                              .charAt(0)
+                              .toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       ) : (
@@ -478,18 +507,20 @@ export function MessageCenterPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{message.title}</h3>
+                        <h3 className="font-medium text-sm">
+                          {notification.title}
+                        </h3>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.createdAt).toLocaleString()}
+                          {new Date(notification.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {message.content}
+                        {notification.content}
                       </p>
                       <div className="flex items-center justify-between">
-                        {!message.isRead && (
+                        {!notification.isRead && (
                           <Badge variant="secondary" className="text-xs">
-                            {t("messageCenter.unreadBadge")}
+                            {t("notificationCenter.unreadBadge")}
                           </Badge>
                         )}
                         <div className="flex items-center gap-2">
@@ -499,15 +530,15 @@ export function MessageCenterPage() {
                             className="h-8 px-2"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (message.relatedId) {
+                              if (notification.relatedId) {
                                 navigateToRelated(
-                                  message.relatedId,
-                                  message.relatedType,
+                                  notification.relatedId,
+                                  notification.relatedType,
                                 );
                               }
                             }}
                           >
-                            {t("messageCenter.view")}{" "}
+                            {t("notificationCenter.view")}{" "}
                             <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
@@ -516,7 +547,7 @@ export function MessageCenterPage() {
                             className="h-8 w-8 text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteMessage(message.id);
+                              deleteNotification(notification.id);
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -536,41 +567,46 @@ export function MessageCenterPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <ThumbsUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  {t("messageCenter.empty.noLikeMessages")}
+                  {t("notificationCenter.empty.noLikeNotifications")}
                 </h3>
                 <p className="text-muted-foreground">
-                  {t("messageCenter.empty.noLikeMessagesDesc")}
+                  {t("notificationCenter.empty.noLikeNotificationsDesc")}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredMessages.map((message) => (
+            filteredNotifications.map((notification) => (
               <Card
-                key={message.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${message.isRead ? "" : "border-l-4 border-primary"}`}
+                key={notification.id}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
                 onClick={() => {
-                  markAsRead(message.id);
-                  if (message.relatedId) {
-                    navigateToRelated(message.relatedId, message.relatedType);
+                  markAsRead(notification.id);
+                  if (notification.relatedId) {
+                    navigateToRelated(
+                      notification.relatedId,
+                      notification.relatedType,
+                    );
                   }
                 }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      {message.sender ? (
+                      {notification.sender ? (
                         <Avatar className="h-10 w-10">
                           <AvatarImage
-                            src={message.sender.avatar}
-                            alt={message.sender.username}
+                            src={notification.sender.avatar}
+                            alt={notification.sender.username}
                           />
                           <AvatarFallback>
-                            {message.sender.username.charAt(0).toUpperCase()}
+                            {notification.sender.username
+                              .charAt(0)
+                              .toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       ) : (
@@ -581,18 +617,20 @@ export function MessageCenterPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{message.title}</h3>
+                        <h3 className="font-medium text-sm">
+                          {notification.title}
+                        </h3>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.createdAt).toLocaleString()}
+                          {new Date(notification.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {message.content}
+                        {notification.content}
                       </p>
                       <div className="flex items-center justify-between">
-                        {!message.isRead && (
+                        {!notification.isRead && (
                           <Badge variant="secondary" className="text-xs">
-                            {t("messageCenter.unreadBadge")}
+                            {t("notificationCenter.unreadBadge")}
                           </Badge>
                         )}
                         <div className="flex items-center gap-2">
@@ -602,15 +640,15 @@ export function MessageCenterPage() {
                             className="h-8 px-2"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (message.relatedId) {
+                              if (notification.relatedId) {
                                 navigateToRelated(
-                                  message.relatedId,
-                                  message.relatedType,
+                                  notification.relatedId,
+                                  notification.relatedType,
                                 );
                               }
                             }}
                           >
-                            {t("messageCenter.view")}{" "}
+                            {t("notificationCenter.view")}{" "}
                             <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
@@ -619,7 +657,7 @@ export function MessageCenterPage() {
                             className="h-8 w-8 text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteMessage(message.id);
+                              deleteNotification(notification.id);
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -639,27 +677,30 @@ export function MessageCenterPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  {t("messageCenter.empty.noReviewMessages")}
+                  {t("notificationCenter.empty.noReviewNotifications")}
                 </h3>
                 <p className="text-muted-foreground">
-                  {t("messageCenter.empty.noReviewMessagesDesc")}
+                  {t("notificationCenter.empty.noReviewNotificationsDesc")}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredMessages.map((message) => (
+            filteredNotifications.map((notification) => (
               <Card
-                key={message.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${message.isRead ? "" : "border-l-4 border-primary"}`}
+                key={notification.id}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
                 onClick={() => {
-                  markAsRead(message.id);
-                  if (message.relatedId) {
-                    navigateToRelated(message.relatedId, message.relatedType);
+                  markAsRead(notification.id);
+                  if (notification.relatedId) {
+                    navigateToRelated(
+                      notification.relatedId,
+                      notification.relatedType,
+                    );
                   }
                 }}
               >
@@ -672,18 +713,20 @@ export function MessageCenterPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{message.title}</h3>
+                        <h3 className="font-medium text-sm">
+                          {notification.title}
+                        </h3>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.createdAt).toLocaleString()}
+                          {new Date(notification.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {message.content}
+                        {notification.content}
                       </p>
                       <div className="flex items-center justify-between">
-                        {!message.isRead && (
+                        {!notification.isRead && (
                           <Badge variant="secondary" className="text-xs">
-                            {t("messageCenter.unreadBadge")}
+                            {t("notificationCenter.unreadBadge")}
                           </Badge>
                         )}
                         <div className="flex items-center gap-2">
@@ -693,15 +736,15 @@ export function MessageCenterPage() {
                             className="h-8 px-2"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (message.relatedId) {
+                              if (notification.relatedId) {
                                 navigateToRelated(
-                                  message.relatedId,
-                                  message.relatedType,
+                                  notification.relatedId,
+                                  notification.relatedType,
                                 );
                               }
                             }}
                           >
-                            {t("messageCenter.view")}{" "}
+                            {t("notificationCenter.view")}{" "}
                             <ArrowRight className="w-3 h-3 ml-1" />
                           </Button>
                           <Button
@@ -710,7 +753,7 @@ export function MessageCenterPage() {
                             className="h-8 w-8 text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteMessage(message.id);
+                              deleteNotification(notification.id);
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -730,25 +773,25 @@ export function MessageCenterPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMessages.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <UserPlus className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  {t("messageCenter.empty.noRoleMessages")}
+                  {t("notificationCenter.empty.noRoleNotifications")}
                 </h3>
                 <p className="text-muted-foreground">
-                  {t("messageCenter.empty.noRoleMessagesDesc")}
+                  {t("notificationCenter.empty.noRoleNotificationsDesc")}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredMessages.map((message) => (
+            filteredNotifications.map((notification) => (
               <Card
-                key={message.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${message.isRead ? "" : "border-l-4 border-primary"}`}
+                key={notification.id}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
                 onClick={() => {
-                  markAsRead(message.id);
+                  markAsRead(notification.id);
                 }}
               >
                 <CardContent className="p-4">
@@ -760,18 +803,20 @@ export function MessageCenterPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">{message.title}</h3>
+                        <h3 className="font-medium text-sm">
+                          {notification.title}
+                        </h3>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(message.createdAt).toLocaleString()}
+                          {new Date(notification.createdAt).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
-                        {message.content}
+                        {notification.content}
                       </p>
                       <div className="flex items-center justify-between">
-                        {!message.isRead && (
+                        {!notification.isRead && (
                           <Badge variant="secondary" className="text-xs">
-                            {t("messageCenter.unreadBadge")}
+                            {t("notificationCenter.unreadBadge")}
                           </Badge>
                         )}
                         <Button
@@ -780,7 +825,7 @@ export function MessageCenterPage() {
                           className="h-8 w-8 text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            deleteMessage(message.id);
+                            deleteNotification(notification.id);
                           }}
                         >
                           <Trash2 className="w-4 h-4" />

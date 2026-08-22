@@ -21,7 +21,7 @@ func RequestLogger() gin.HandlerFunc {
 		}
 
 		// Get user ID from context if available
-		userID, exists := c.Get("userID")
+		userID, exists := c.Get(CtxUserIDKey)
 		if !exists {
 			userID = "anonymous"
 		}

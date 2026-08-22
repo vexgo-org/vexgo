@@ -13,6 +13,12 @@ const (
 	CreatorApplicationStatusRejected CreatorApplicationStatus = "rejected"
 )
 
+// CreatorApplication review actions.
+const (
+	CreatorApplicationActionApprove = "approve"
+	CreatorApplicationActionReject  = "reject"
+)
+
 // CreatorApplication creator application model
 type CreatorApplication struct {
 	ID           uint                     `gorm:"primaryKey" json:"id"`

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vexgo/backend/internal/middleware"
-	"vexgo/backend/internal/public"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/public"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -26,12 +26,12 @@ type Handler struct {
 
 // NewHandler creates a settings HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB), themes: deps.Themes}
+	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret), themes: deps.Themes}
 }
 
 // GetSMTPConfig gets SMTP configuration
 func (h *Handler) GetSMTPConfig(c *gin.Context) {
-	config, err := h.svc.GetSMTPConfig()
+	config, err := h.svc.GetSMTPConfig(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get SMTP config"})
 		return
@@ -57,7 +57,7 @@ func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateSMTPConfig(SMTPConfigRequest{
+	config, err := h.svc.UpdateSMTPConfig(c.Request.Context(), SMTPConfigRequest{
 		Enabled:   req.Enabled,
 		Host:      req.Host,
 		Port:      req.Port,
@@ -78,7 +78,7 @@ func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
 // TestSMTP tests SMTP configuration
 func (h *Handler) TestSMTP(c *gin.Context) {
 	// Get current admin user email (from JWT token)
-	userContext, exists := c.Get("user")
+	userContext, exists := c.Get(middleware.CtxUserKey)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -90,7 +90,7 @@ func (h *Handler) TestSMTP(c *gin.Context) {
 		adminEmail, _ = userMap["email"].(string)
 	}
 
-	recipientEmail, err := h.svc.TestSMTP(adminEmail)
+	recipientEmail, err := h.svc.TestSMTP(c.Request.Context(), adminEmail)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSMTPNotConfigured):
@@ -111,7 +111,7 @@ func (h *Handler) TestSMTP(c *gin.Context) {
 
 // GetGeneralSettings gets general settings
 func (h *Handler) GetGeneralSettings(c *gin.Context) {
-	config, err := h.svc.GetGeneralSettings()
+	config, err := h.svc.GetGeneralSettings(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get general settings"})
 		return
@@ -136,7 +136,7 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateGeneralSettings(GeneralSettingsRequest{
+	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest{
 		CaptchaEnabled:      req.CaptchaEnabled,
 		RegistrationEnabled: req.RegistrationEnabled,
 		AllowGuestViewPosts: req.AllowGuestViewPosts,
@@ -158,7 +158,7 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 
 // GetAIConfig gets AI configuration
 func (h *Handler) GetAIConfig(c *gin.Context) {
-	config, err := h.svc.GetAIConfig()
+	config, err := h.svc.GetAIConfig(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI config"})
 		return
@@ -181,7 +181,7 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateAIConfig(AIConfigRequest{
+	config, err := h.svc.UpdateAIConfig(c.Request.Context(), AIConfigRequest{
 		Enabled:     req.Enabled,
 		Provider:    req.Provider,
 		ApiEndpoint: req.ApiEndpoint,
@@ -202,12 +202,12 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 // TestAI tests AI configuration connection
 func (h *Handler) TestAI(c *gin.Context) {
 	// Get current admin user information (from JWT token)
-	if _, exists := c.Get("user"); !exists {
+	if _, exists := c.Get(middleware.CtxUserKey); !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
-	result, err := h.svc.TestAI()
+	result, err := h.svc.TestAI(c.Request.Context())
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrAINotConfigured):
@@ -228,7 +228,7 @@ func (h *Handler) TestAI(c *gin.Context) {
 
 // GetAIModels gets available AI model list
 func (h *Handler) GetAIModels(c *gin.Context) {
-	result, err := h.svc.AIModels()
+	result, err := h.svc.AIModels(c.Request.Context())
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrAINotConfigured):
@@ -280,7 +280,7 @@ func (h *Handler) GetThemePreview(c *gin.Context) {
 
 // GetThemeConfig returns the currently active theme stored in the database
 func (h *Handler) GetThemeConfig(c *gin.Context) {
-	activeTheme, err := h.svc.GetThemeConfig()
+	activeTheme, err := h.svc.GetThemeConfig(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get theme config"})
 		return
@@ -298,7 +298,7 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 		return
 	}
 
-	activeTheme, err := h.svc.UpdateThemeConfig(req.ActiveTheme)
+	activeTheme, err := h.svc.UpdateThemeConfig(c.Request.Context(), req.ActiveTheme)
 	if err != nil {
 		if errors.Is(err, ErrThemeNotFound) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

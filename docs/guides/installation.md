@@ -382,7 +382,7 @@ cd ..
 # Build the backend
 cd backend
 go mod download
-go build -o vexgo .
+go build -o vexgo ./cmd/vexgo
 cd ..
 ```
 

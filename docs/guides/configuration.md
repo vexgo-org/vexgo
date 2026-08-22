@@ -159,7 +159,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 Run VexGo with the PostgreSQL config:
 
 ```bash
-go run backend/main.go -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo -c examples/config-postgres.yml
 ```
 
 Or with environment variables:
@@ -200,7 +200,7 @@ Run VexGo with the MySQL config:
 
 ```bash
 cd backend
-go run main.go -c ../examples/config-mysql.yml
+go run ./cmd/vexgo -c ../examples/config-mysql.yml
 ```
 
 > On the first start, VexGo runs database migrations automatically — there's nothing to import manually.
