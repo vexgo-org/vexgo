@@ -3,11 +3,10 @@ package post
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/sirupsen/logrus"
 )
 
 // ToggleLike likes or unlikes a post and notifies the author on like.
@@ -50,7 +49,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 				RelatedID:   strconv.FormatUint(uint64(postID), 10),
 				RelatedType: model.NotificationRelatedTypePost,
 			}); err != nil {
-				logrus.WithError(err).Warn("failed to create like notification")
+				slog.Warn("failed to create like notification", "err", err)
 			}
 		}
 	}

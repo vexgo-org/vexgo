@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,7 +15,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // Handler exposes the settings domain over HTTP.
@@ -529,7 +529,7 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 	if err != nil {
 		// Clean up partial installation
 		if err := os.RemoveAll(targetThemeDir); err != nil {
-			logrus.WithError(err).Warn("failed to clean up partial theme installation")
+			slog.Warn("failed to clean up partial theme installation", "err", err)
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to copy theme files"})
 		return

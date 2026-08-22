@@ -3,10 +3,9 @@ package post
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/sirupsen/logrus"
 )
 
 // ListModerationQuery carries the moderation status, pagination and search.
@@ -44,7 +43,7 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 		RelatedID:   id,
 		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to create post approved notification")
+		slog.Warn("failed to create post approved notification", "err", err)
 	}
 
 	return post, nil
@@ -71,7 +70,7 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 		RelatedID:   id,
 		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to create post rejected notification")
+		slog.Warn("failed to create post rejected notification", "err", err)
 	}
 
 	return post, nil

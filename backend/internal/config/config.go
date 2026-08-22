@@ -6,12 +6,12 @@ package config
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"github.com/sirupsen/logrus"
 )
 
 // Config holds the server configuration from command line arguments and/or config file
@@ -19,7 +19,7 @@ type Config struct {
 	Addr     string // Address to listen on (e.g., "0.0.0.0" or "127.0.0.1")
 	Port     int    // Port to listen on
 	DataDir  string // Data directory for storing sqlite database and media files
-	LogLevel string `yaml:"log_level"` // Logging level: "debug", "info", "warn", "error", "fatal", "panic"
+	LogLevel string `yaml:"log_level"` // Logging level: "debug", "info", "warn", "error"
 
 	// Database configuration
 	DBType     string `yaml:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"
@@ -165,7 +165,7 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 		if err := loadConfigFile(configFile, file); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to load config file %s: %v\n", configFile, err)
 		} else {
-			logrus.Infof("Loaded configuration from %s", configFile)
+			slog.Info("loaded configuration", "configFile", configFile)
 			applyFileConfig(cfg, file)
 		}
 	}

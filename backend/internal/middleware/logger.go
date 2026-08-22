@@ -1,11 +1,11 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // RequestLogger is a Gin middleware that logs HTTP requests and responses
@@ -27,12 +27,12 @@ func RequestLogger() gin.HandlerFunc {
 		}
 
 		// Log request start
-		logrus.WithFields(logrus.Fields{
-			"method": c.Request.Method,
-			"path":   path,
-			"userID": userID,
-			"ip":     c.ClientIP(),
-		}).Debug("Request started")
+		slog.Debug("request started",
+			"method", c.Request.Method,
+			"path", path,
+			"userID", userID,
+			"ip", c.ClientIP(),
+		)
 
 		// Process request
 		c.Next()
@@ -42,38 +42,39 @@ func RequestLogger() gin.HandlerFunc {
 
 		// Log response
 		status := c.Writer.Status()
-		fields := logrus.Fields{
-			"method":    c.Request.Method,
-			"path":      path,
-			"status":    status,
-			"duration":  duration.String(),
-			"ip":        c.ClientIP(),
-			"userAgent": c.Request.UserAgent(),
-			"referer":   c.Request.Referer(),
+		fields := []slog.Attr{
+			slog.String("method", c.Request.Method),
+			slog.String("path", path),
+			slog.Int("status", status),
+			slog.String("duration", duration.String()),
+			slog.String("ip", c.ClientIP()),
+			slog.String("userAgent", c.Request.UserAgent()),
+			slog.String("referer", c.Request.Referer()),
 		}
 
 		// Add user ID if available
 		if userID != "anonymous" {
-			fields["userID"] = userID
+			fields = append(fields, slog.Any("userID", userID))
 		}
 
 		// Add error info if status >= 400
 		if status >= http.StatusBadRequest {
 			errorMessages := c.Errors.Errors()
 			if len(errorMessages) > 0 {
-				fields["errors"] = errorMessages
+				fields = append(fields, slog.Any("errors", errorMessages))
 			}
 		}
 
 		// Log based on status code
-		if status >= http.StatusInternalServerError {
-			logrus.WithFields(fields).Error("Request completed with server error")
-		} else if status >= http.StatusBadRequest {
-			logrus.WithFields(fields).Warn("Request completed with client error")
-		} else if status >= http.StatusMultipleChoices {
-			logrus.WithFields(fields).Info("Request completed with redirection")
-		} else {
-			logrus.WithFields(fields).Info("Request completed successfully")
+		switch {
+		case status >= http.StatusInternalServerError:
+			slog.LogAttrs(c.Request.Context(), slog.LevelError, "request completed with server error", fields...)
+		case status >= http.StatusBadRequest:
+			slog.LogAttrs(c.Request.Context(), slog.LevelWarn, "request completed with client error", fields...)
+		case status >= http.StatusMultipleChoices:
+			slog.LogAttrs(c.Request.Context(), slog.LevelInfo, "request completed with redirection", fields...)
+		default:
+			slog.LogAttrs(c.Request.Context(), slog.LevelInfo, "request completed successfully", fields...)
 		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"log/slog"
 	"mime"
 	"net/http"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -249,7 +249,7 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	// Initialize asset manifest for dynamic asset loading
 	if err := LoadAssetManifest(); err != nil {
 		// Log error but continue with fallback to hardcoded paths
-		logrus.WithError(err).Warn("Failed to load asset manifest")
+		slog.Warn("failed to load asset manifest", "err", err)
 	}
 
 	// Serve local uploads if S3 is not enabled

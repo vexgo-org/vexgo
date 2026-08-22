@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/sirupsen/logrus"
 )
 
 // Storage abstracts the file backend (S3-compatible or local disk). It is an
@@ -74,7 +74,7 @@ func NewS3Storage(cfg *config.S3Config) (*S3Storage, error) {
 		return nil, fmt.Errorf("bucket %s does not exist", cfg.Bucket)
 	}
 
-	logrus.Info("S3 storage initialized successfully")
+	slog.Info("s3 storage initialized successfully")
 	return &S3Storage{client: client, cfg: cfg}, nil
 }
 
@@ -99,7 +99,7 @@ func (s *S3Storage) Upload(reader io.Reader, filename, contentType string) (stri
 	}
 
 	url := s.cfg.GetURL(filename)
-	logrus.WithField("url", url).Debug("File uploaded successfully")
+	slog.Debug("file uploaded successfully", "url", url)
 	return url, nil
 }
 

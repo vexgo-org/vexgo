@@ -71,15 +71,15 @@ For a full annotated config file, see [examples/config.yml](https://github.com/v
 
 Every setting can also be provided as an environment variable. This is the natural fit for Docker and systemd deployments.
 
-| Variable               | Default   | Description                                        |
-| ---------------------- | --------- | -------------------------------------------------- |
-| `ADDR`                 | `0.0.0.0` | Listen address                                     |
-| `PORT`                 | `3001`    | Listen port                                        |
-| `DATA_DIR`             | `./data`  | Data directory (SQLite DB and media)               |
-| `JWT_SECRET`           | —         | JWT signing secret (**required in production**)    |
-| `LOG_LEVEL`            | `info`    | `debug`, `info`, `warn`, `error`, `fatal`, `panic` |
-| `BEHIND_REVERSE_PROXY` | `false`   | Honor `X-Forwarded-*` headers when `true`          |
-| `TRUSTED_PROXIES`      | —         | Comma-separated trusted proxy IPs/CIDRs            |
+| Variable               | Default   | Description                                     |
+| ---------------------- | --------- | ----------------------------------------------- |
+| `ADDR`                 | `0.0.0.0` | Listen address                                  |
+| `PORT`                 | `3001`    | Listen port                                     |
+| `DATA_DIR`             | `./data`  | Data directory (SQLite DB and media)            |
+| `JWT_SECRET`           | —         | JWT signing secret (**required in production**) |
+| `LOG_LEVEL`            | `info`    | `debug`, `info`, `warn`, `error`                |
+| `BEHIND_REVERSE_PROXY` | `false`   | Honor `X-Forwarded-*` headers when `true`       |
+| `TRUSTED_PROXIES`      | —         | Comma-separated trusted proxy IPs/CIDRs         |
 
 ### Database
 

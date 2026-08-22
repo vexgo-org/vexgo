@@ -36,7 +36,7 @@
 | `PORT`                 | `3001`    | 服务器监听端口                                                                             |
 | `DATA_DIR`             | `./data`  | 数据目录路径                                                                               |
 | `JWT_SECRET`           | —         | JWT 签名密钥（**生产环境必填**）                                                           |
-| `LOG_LEVEL`            | `info`    | 日志级别：`debug`、`info`、`warn`、`error`、`fatal`、`panic`                               |
+| `LOG_LEVEL`            | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                 |
 | `BEHIND_REVERSE_PROXY` | `false`   | 位于反向代理之后时设为 `true`，以解析 `X-Forwarded-*` 请求头                               |
 | `TRUSTED_PROXIES`      | —         | 逗号分隔的可信代理 IP/CIDR。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。留空 = 默认私有网段。 |
 
@@ -114,15 +114,15 @@
 
 ### 服务器
 
-| YAML 键                | 默认值    | 说明                                               |
-| ---------------------- | --------- | -------------------------------------------------- |
-| `addr`                 | `0.0.0.0` | 监听地址                                           |
-| `port`                 | `3001`    | 监听端口                                           |
-| `data`                 | `./data`  | 数据目录路径                                       |
-| `jwt_secret`           | —         | JWT 签名密钥（**生产环境必填**）                   |
-| `log_level`            | `info`    | `debug`、`info`、`warn`、`error`、`fatal`、`panic` |
-| `behind_reverse_proxy` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头            |
-| `trusted_proxies`      | `[]`      | 可信代理 IP/CIDR 列表                              |
+| YAML 键                | 默认值    | 说明                                    |
+| ---------------------- | --------- | --------------------------------------- |
+| `addr`                 | `0.0.0.0` | 监听地址                                |
+| `port`                 | `3001`    | 监听端口                                |
+| `data`                 | `./data`  | 数据目录路径                            |
+| `jwt_secret`           | —         | JWT 签名密钥（**生产环境必填**）        |
+| `log_level`            | `info`    | `debug`、`info`、`warn`、`error`        |
+| `behind_reverse_proxy` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头 |
+| `trusted_proxies`      | `[]`      | 可信代理 IP/CIDR 列表                   |
 
 ### 数据库
 

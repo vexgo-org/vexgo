@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sort"
 	"strconv"
@@ -10,8 +11,6 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/sirupsen/logrus"
 )
 
 // ListQuery carries the acting user, pagination and filters for List.
@@ -70,7 +69,7 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 
 	// Increment view count (best-effort)
 	if err := s.repo.IncrementViewCount(ctx, post.ID); err != nil {
-		logrus.WithError(err).Warn("failed to increment view count")
+		slog.Warn("failed to increment view count", "err", err)
 	}
 
 	// Fill likes count and current logged-in user's like status
@@ -265,7 +264,10 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	}
 	for url := range uniqueImages {
 		if err := s.files.Delete(url); err != nil {
-			logrus.WithError(err).WithField("url", url).Warn("Failed to delete image")
+			slog.Warn("failed to delete image",
+				"url", url,
+				"err", err,
+			)
 		}
 	}
 

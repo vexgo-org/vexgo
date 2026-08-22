@@ -2,12 +2,12 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // Handler exposes the auth domain over HTTP.
@@ -33,7 +33,7 @@ func requestProtocolAndHost(c *gin.Context) (protocol, host string) {
 
 // Login logs a user in and returns a signed JWT
 func (h *Handler) Login(c *gin.Context) {
-	logrus.Info("User login attempt started")
+	slog.Debug("user login attempt started")
 
 	var req struct {
 		Email        string `json:"email" binding:"required"`
@@ -44,12 +44,12 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logrus.WithError(err).Warn("Failed to bind login request JSON")
+		slog.Warn("failed to bind login request JSON", "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	logrus.WithField("email", req.Email).Debug("Login request parsed successfully")
+	slog.Debug("login request parsed successfully", "email", req.Email)
 
 	token, user, err := h.svc.Login(c.Request.Context(), LoginRequest{
 		Email:        req.Email,
@@ -101,7 +101,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 // Register creates a new user account
 func (h *Handler) Register(c *gin.Context) {
-	logrus.Info("User registration attempt started")
+	slog.Debug("user registration attempt started")
 
 	var req struct {
 		Email        string `json:"email" binding:"required,email"`
@@ -113,15 +113,15 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logrus.WithError(err).Warn("Failed to bind registration request JSON")
+		slog.Error("failed to bind registration request JSON", "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"email":    req.Email,
-		"username": req.Username,
-	}).Debug("Registration request parsed successfully")
+	slog.Debug("registration request parsed successfully",
+		"email", req.Email,
+		"username", req.Username,
+	)
 
 	protocol, host := requestProtocolAndHost(c)
 	result, err := h.svc.Register(c.Request.Context(), RegisterRequest{
