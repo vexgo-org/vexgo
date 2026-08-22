@@ -19,7 +19,7 @@ type Config struct {
 	Addr     string // Address to listen on (e.g., "0.0.0.0" or "127.0.0.1")
 	Port     int    // Port to listen on
 	DataDir  string // Data directory for storing sqlite database and media files
-	LogLevel string `yaml:"log_level"` // Logging level: "debug", "info", "warn", "error", "fatal", "panic"
+	LogLevel string `yaml:"log_level"` // Logging level: "debug", "info", "warn", "error"
 
 	// Database configuration
 	DBType     string `yaml:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"

@@ -36,7 +36,7 @@ Run `./vexgo --help` for the authoritative list.
 | `PORT`                 | `3001`    | Server listen port                                                                                                     |
 | `DATA_DIR`             | `./data`  | Data directory path                                                                                                    |
 | `JWT_SECRET`           | —         | JWT secret key (**required in production**)                                                                            |
-| `LOG_LEVEL`            | `info`    | Logging level: `debug`, `info`, `warn`, `error`, `fatal`, `panic`                                                      |
+| `LOG_LEVEL`            | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                        |
 | `BEHIND_REVERSE_PROXY` | `false`   | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                       |
 | `TRUSTED_PROXIES`      | —         | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks. |
 
@@ -114,15 +114,15 @@ The config file uses the same settings with lowercase YAML keys. The default YAM
 
 ### Server
 
-| YAML key               | Default   | Description                                        |
-| ---------------------- | --------- | -------------------------------------------------- |
-| `addr`                 | `0.0.0.0` | Listen address                                     |
-| `port`                 | `3001`    | Listen port                                        |
-| `data`                 | `./data`  | Data directory path                                |
-| `jwt_secret`           | —         | JWT secret key (**required in production**)        |
-| `log_level`            | `info`    | `debug`, `info`, `warn`, `error`, `fatal`, `panic` |
-| `behind_reverse_proxy` | `false`   | Honor `X-Forwarded-*` headers when `true`          |
-| `trusted_proxies`      | `[]`      | List of trusted proxy IPs/CIDRs                    |
+| YAML key               | Default   | Description                                 |
+| ---------------------- | --------- | ------------------------------------------- |
+| `addr`                 | `0.0.0.0` | Listen address                              |
+| `port`                 | `3001`    | Listen port                                 |
+| `data`                 | `./data`  | Data directory path                         |
+| `jwt_secret`           | —         | JWT secret key (**required in production**) |
+| `log_level`            | `info`    | `debug`, `info`, `warn`, `error`            |
+| `behind_reverse_proxy` | `false`   | Honor `X-Forwarded-*` headers when `true`   |
+| `trusted_proxies`      | `[]`      | List of trusted proxy IPs/CIDRs             |
 
 ### Database
 

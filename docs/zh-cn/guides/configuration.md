@@ -71,15 +71,15 @@ s3_bucket: "my-bucket"
 
 每个设置都可以通过环境变量提供，这在 Docker 和 systemd 部署中很自然。
 
-| 变量                   | 默认值    | 说明                                               |
-| ---------------------- | --------- | -------------------------------------------------- |
-| `ADDR`                 | `0.0.0.0` | 监听地址                                           |
-| `PORT`                 | `3001`    | 监听端口                                           |
-| `DATA_DIR`             | `./data`  | 数据目录（SQLite 数据库和媒体文件）                |
-| `JWT_SECRET`           | —         | JWT 签名密钥（**生产环境必填**）                   |
-| `LOG_LEVEL`            | `info`    | `debug`、`info`、`warn`、`error`、`fatal`、`panic` |
-| `BEHIND_REVERSE_PROXY` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头            |
-| `TRUSTED_PROXIES`      | —         | 逗号分隔的可信代理 IP/CIDR                         |
+| 变量                   | 默认值    | 说明                                    |
+| ---------------------- | --------- | --------------------------------------- |
+| `ADDR`                 | `0.0.0.0` | 监听地址                                |
+| `PORT`                 | `3001`    | 监听端口                                |
+| `DATA_DIR`             | `./data`  | 数据目录（SQLite 数据库和媒体文件）     |
+| `JWT_SECRET`           | —         | JWT 签名密钥（**生产环境必填**）        |
+| `LOG_LEVEL`            | `info`    | `debug`、`info`、`warn`、`error`        |
+| `BEHIND_REVERSE_PROXY` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头 |
+| `TRUSTED_PROXIES`      | —         | 逗号分隔的可信代理 IP/CIDR              |
 
 ### 数据库
 
