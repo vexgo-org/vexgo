@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"math"
 	"net/url"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -114,7 +114,7 @@ type LoginRequest struct {
 // Login authenticates a user by email and password and returns a signed JWT
 // together with the user record. Captcha is enforced when enabled.
 func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.User, error) {
-	logrus.Debug("User login attempt started")
+	slog.Debug("user login attempt started")
 
 	if err := s.verifyCaptcha(ctx, &verifyCaptchaArgs{
 		Token:     req.CaptchaToken,
@@ -145,7 +145,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 	// Update last login time to invalidate old tokens
 	user.LastLoginAt = time.Now()
 	if err := s.repo.SaveUser(ctx, user); err != nil {
-		logrus.WithError(err).Warn("Failed to update last login time")
+		slog.Warn("failed to update last login time", "err", err)
 		// Don't fail the login, just log
 	}
 
@@ -179,7 +179,7 @@ type RegisterRequest struct {
 // captcha when enabled. When SMTP is enabled a verification email is sent and
 // RequiresVerification is set.
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterResult, error) {
-	logrus.Debug("User registration attempt started")
+	slog.Debug("user registration attempt started")
 
 	// Check if registration is allowed
 	settings, err := s.repo.GetGeneralSettings(ctx)
@@ -208,20 +208,21 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 
 	// Check if user already exists
 	if _, err := s.repo.FindUserByEmail(ctx, req.Email); err == nil {
-		logrus.WithField("email", req.Email).Warn("Registration failed: user already exists")
+		slog.Warn("registration failed: user already exists", "email", req.Email)
 		return nil, ErrUserExists
 	}
 
 	// Encrypt password
-	logrus.WithField("email", req.Email).Debug("Starting password hashing")
+	slog.Debug("starting password hashing", "email", req.Email)
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"email": req.Email,
-		}).WithError(err).Error("Failed to hash password")
+		slog.Error("failed to hash password",
+			"email", req.Email,
+			"err", err,
+		)
 		return nil, ErrHashPassword
 	}
-	logrus.WithField("email", req.Email).Debug("Password hashed successfully")
+	slog.Debug("password hashed successfully", "email", req.Email)
 
 	// Create new user
 	newUser := model.User{
@@ -232,23 +233,24 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		EmailVerified: false,
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"username": req.Username,
-		"email":    req.Email,
-		"role":     model.RoleGuest,
-	}).Debug("Creating new user")
+	slog.Debug("creating new user",
+		"username", req.Username,
+		"email", req.Email,
+		"role", model.RoleGuest,
+	)
 	if err := s.repo.CreateUser(ctx, &newUser); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"username": req.Username,
-			"email":    req.Email,
-		}).WithError(err).Error("Failed to create user in database")
+		slog.Error("failed to create user in database",
+			"username", req.Username,
+			"email", req.Email,
+			"err", err,
+		)
 		return nil, ErrCreateUser
 	}
-	logrus.WithFields(logrus.Fields{
-		"userID":   newUser.ID,
-		"username": req.Username,
-		"email":    req.Email,
-	}).Info("User created successfully")
+	slog.Info("user created successfully",
+		"userID", newUser.ID,
+		"username", req.Username,
+		"email", req.Email,
+	)
 
 	// Send a verification email when SMTP is enabled; otherwise the account
 	// is immediately usable.
@@ -265,28 +267,29 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 // transient SMTP error does not block registration.
 func (s *Service) sendVerificationEmail(user *model.User, protocol, host string) bool {
 	enabled, err := s.mailer.IsEmailEnabled()
+	logger := slog.With("email", user.Email)
 	if err != nil {
-		logrus.WithField("email", user.Email).WithError(err).Warn("Failed to check if SMTP is enabled")
+		logger.Warn("failed to check if SMTP is enabled", "err", err)
 		return false
 	}
 	if !enabled {
-		logrus.WithField("email", user.Email).Info("SMTP not enabled, skipping email verification")
+		logger.Info("SMTP not enabled, skipping email verification")
 		return false
 	}
 
 	token, err := s.mailer.GenerateVerificationToken(user.ID)
 	if err != nil {
-		logrus.WithField("email", user.Email).WithError(err).Error("Failed to generate verification token")
+		logger.Error("failed to generate verification token", "err", err)
 		return false
 	}
 
 	verificationLink := buildLinkWithToken(protocol, host, verificationLinkPath, token)
 	if err := s.mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
-		logrus.WithField("email", user.Email).WithError(err).Error("Failed to send verification email")
+		logger.Error("failed to send verification email", "err", err)
 		return false
 	}
 
-	logrus.WithField("email", user.Email).Info("Verification email sent successfully")
+	logger.Info("verification email sent successfully")
 	return true
 }
 
@@ -326,7 +329,10 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		// Delete old avatar file
 		if err := s.files.Delete(user.Avatar); err != nil {
 			// Log error but continue execution to avoid avatar update failure
-			logrus.WithError(err).WithField("url", user.Avatar).Warn("Failed to delete old avatar")
+			slog.Warn("failed to delete old avatar",
+				"url", user.Avatar,
+				"err", err,
+			)
 		}
 		user.Avatar = *req.Avatar
 	} else if req.Avatar != nil {
@@ -569,63 +575,64 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	}
 
 	// Verify captcha
-	logrus.Debug("Captcha verification enabled, validating user captcha")
+	slog.Debug("captcha verification enabled, validating user captcha")
 	if arg.ID == "" || arg.Token == "" || arg.X == 0 {
-		logrus.WithFields(logrus.Fields{
-			"email":     arg.Email,
-			"captchaID": arg.ID,
-			"captchaX":  arg.X,
-		}).Warn("Captcha verification failed: missing required fields")
+		slog.Warn("captcha verification failed: missing required fields",
+			"email", arg.Email,
+			"captchaID", arg.ID,
+			"captchaX", arg.X,
+		)
 		return ErrCaptchaRequired
 	}
 	// Query captcha
 	captcha, err := s.repo.FindCaptcha(ctx, arg.ID, arg.Token)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"captchaID": arg.ID,
-			"email":     arg.Email,
-		}).Warn("Captcha verification failed: captcha not found or invalid token")
+		slog.Warn("captcha verification failed: captcha not found or invalid token",
+			"captchaID", arg.ID,
+			"email", arg.Email,
+		)
 		return ErrCaptchaNotFound
 	}
 
 	// Check if expired
 	if time.Now().After(captcha.ExpiresAt) {
-		logrus.WithFields(logrus.Fields{
-			"captchaID": arg.ID,
-			"expiresAt": captcha.ExpiresAt,
-			"email":     arg.Email,
-		}).Warn("Captcha verification failed: captcha expired")
+		slog.Warn("captcha verification failed: captcha expired",
+			"captchaID", arg.ID,
+			"expiresAt", captcha.ExpiresAt,
+			"email", arg.Email,
+		)
 		return ErrCaptchaExpired
 	}
 
 	// Verify position (allow certain tolerance)
 	if math.Abs(float64(arg.X-captcha.X)) > float64(arg.Tolerance) {
-		logrus.WithFields(logrus.Fields{
-			"captchaID": arg.ID,
-			"userX":     arg.X,
-			"correctX":  captcha.X,
-			"tolerance": arg.Tolerance,
-			"email":     arg.Email,
-		}).Warn("Captcha verification failed: incorrect position")
+		slog.Warn("captcha verification failed: incorrect position",
+			"captchaID", arg.ID,
+			"userX", arg.X,
+			"correctX", captcha.X,
+			"tolerance", arg.Tolerance,
+			"email", arg.Email,
+		)
 		return ErrCaptchaMismatch
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"captchaID": arg.ID,
-		"email":     arg.Email,
-	}).Debug("Captcha verification passed")
+	slog.Debug("captcha verification passed",
+		"captchaID", arg.ID,
+		"email", arg.Email,
+	)
 
 	// If captcha has not been used yet, mark it as used
 	if !captcha.Used {
 		captcha.Used = true
 		if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"captchaID": arg.ID,
-				"email":     arg.Email,
-			}).WithError(err).Error("Failed to mark captcha as used")
+			slog.Error("failed to mark captcha as used",
+				"captchaID", arg.ID,
+				"email", arg.Email,
+				"err", err,
+			)
 			return ErrCaptchaFailed
 		}
-		logrus.WithField("captchaID", arg.ID).Debug("Captcha marked as used")
+		slog.Debug("Captcha marked as used", "captchaID", arg.ID)
 	}
 	// If captcha already used, pre-verification successful, pass directly
 

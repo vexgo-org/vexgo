@@ -3,10 +3,11 @@
 package main
 
 import (
+	"log/slog"
+	"os"
+
 	"github.com/vexgo-org/vexgo/backend/internal/app"
 	"github.com/vexgo-org/vexgo/backend/internal/config"
-
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -14,10 +15,12 @@ func main() {
 
 	application, err := app.New(cfg)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to initialize application")
+		slog.Error("failed to initialize application", "err", err)
+		os.Exit(1)
 	}
 
 	if err := application.Run(); err != nil {
-		logrus.WithError(err).Fatal("Failed to start server")
+		slog.Error("failed to start server", "err", err)
+		os.Exit(1)
 	}
 }

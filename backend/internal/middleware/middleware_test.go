@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -510,26 +510,41 @@ func TestPermission_SuperAdminAlwaysAllowed(t *testing.T) {
 
 func TestRequestLogger_LogsRequest(t *testing.T) {
 	var buf bytes.Buffer
-	oldOut := logrus.StandardLogger().Out
-	logrus.SetOutput(&buf)
-	logrus.SetFormatter(&logrus.TextFormatter{DisableColors: true})
-	defer logrus.SetOutput(oldOut)
+
+	oldLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		&buf,
+		&slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	)))
+	t.Cleanup(func() {
+		slog.SetDefault(oldLogger)
+	})
 
 	gin.SetMode(gin.TestMode)
+
 	r := gin.New()
 	r.Use(RequestLogger())
-	r.GET("/ok", func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.GET("/ok", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ok", nil))
+	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
+	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
-	if !strings.Contains(buf.String(), "Request completed successfully") {
-		t.Errorf("expected success log line, got: %s", buf.String())
+
+	output := buf.String()
+
+	if !strings.Contains(output, "request completed successfully") {
+		t.Errorf("expected success log line, got: %s", output)
 	}
-	if !strings.Contains(buf.String(), "method=GET") {
-		t.Errorf("expected method field in log, got: %s", buf.String())
+
+	if !strings.Contains(output, "method=GET") {
+		t.Errorf("expected method field in log, got: %s", output)
 	}
 }

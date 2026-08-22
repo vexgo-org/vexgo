@@ -2,12 +2,12 @@ package verification
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // Handler exposes the verification domain over HTTP.
@@ -24,7 +24,7 @@ func NewHandler(deps Deps) *Handler {
 // VerifyEmail verifies email (supports initial verification and email change)
 func (h *Handler) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
-	logrus.WithField("hasToken", token != "").Debug("Email verification request received")
+	slog.Debug("email verification request received", "hasToken", token != "")
 
 	if token == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token cannot be empty"})

@@ -5,13 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -150,7 +150,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment
 		approved, _, err := moderateCommentAI(req.Content, config)
 		if err != nil {
 			// If AI moderation fails, log error but don't affect comment creation
-			logrus.WithError(err).Warn("AI moderation failed, defaulting to published")
+			slog.Warn("AI moderation failed, defaulting to published", "err", err)
 			comment.Status = model.CommentStatusPublished
 		} else if approved {
 			comment.Status = model.CommentStatusPublished
@@ -203,7 +203,7 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 		RelatedID:   strconv.FormatUint(uint64(postID), 10),
 		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to create comment notification")
+		slog.Warn("failed to create comment notification", "err", err)
 	}
 }
 
@@ -234,7 +234,7 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 		RelatedID:   strconv.FormatUint(uint64(parentID), 10),
 		RelatedType: model.NotificationRelatedTypeComment,
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to create reply notification")
+		slog.Warn("failed to create reply notification", "err", err)
 	}
 }
 

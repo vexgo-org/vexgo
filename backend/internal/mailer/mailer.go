@@ -6,13 +6,13 @@ package mailer
 
 import (
 	"fmt"
+	"log/slog"
 	"net/smtp"
 	"strings"
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -131,13 +131,13 @@ If you did not register for this account, please ignore this email.
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
-	logrus.WithField("addr", addr).Info("Connecting to SMTP server")
+	slog.Info("connecting to SMTP server", "addr", addr)
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{toEmail}, []byte(message)); err != nil {
-		logrus.WithError(err).Error("Failed to send verification email")
+		slog.Error("failed to send verification email", "err", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	logrus.WithField("to", toEmail).Info("Verification email sent successfully")
+	slog.Info("verification email sent successfully", "to", toEmail)
 	return nil
 }
 
@@ -282,13 +282,13 @@ If you did not request a password reset, please ignore this email.
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
-	logrus.WithField("to", toEmail).Info("Sending password reset email")
+	slog.Info("sending password reset email", "to", toEmail)
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{toEmail}, []byte(message)); err != nil {
-		logrus.WithError(err).Error("Failed to send password reset email")
+		slog.Error("failed to send password reset email", "err", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	logrus.WithField("to", toEmail).Info("Password reset email sent successfully")
+	slog.Info("password reset email sent successfully", "to", toEmail)
 	return nil
 }
 
@@ -414,53 +414,57 @@ If you did not request an email change, please ignore this email.
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 
-	logrus.WithField("to", toEmail).Info("Sending email change confirmation")
+	slog.Info("sending email change confirmation", "to", toEmail)
 	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{toEmail}, []byte(message)); err != nil {
-		logrus.WithError(err).Error("Failed to send email change confirmation")
+		slog.Error("failed to send email change confirmation", "err", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	logrus.WithField("to", toEmail).Info("Email change confirmation sent successfully")
+	slog.Info("email change confirmation sent successfully", "to", toEmail)
 	return nil
 }
 
 // ConfirmEmailChange confirms email change
 func (m *Mailer) ConfirmEmailChange(token string) error {
-	logrus.WithField("token", token).Debug("ConfirmEmailChange processing started")
+	slog.Debug("confirm email change processing started", "token", token)
 
 	// Only email-change tokens may confirm an email change.
 	if !strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		logrus.Warn("Invalid verification token")
+		slog.Warn("invalid verification token")
 		return fmt.Errorf("invalid verification token")
 	}
 
 	var user model.User
 	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			logrus.Warn("Invalid verification token")
+			slog.Warn("invalid verification token")
 			return fmt.Errorf("invalid verification token")
 		}
-		logrus.WithError(err).Error("Failed to query user for email change")
+		slog.Error("failed to query user for email change", "err", err)
 		return fmt.Errorf("failed to find user: %w", err)
 	}
-	logrus.WithFields(logrus.Fields{"userID": user.ID, "username": user.Username, "pendingEmail": user.PendingEmail}).Debug("Found user for email change")
+	slog.Debug("found user for email change",
+		"userID", user.ID,
+		"username", user.Username,
+		"pendingEmail", user.PendingEmail,
+	)
 
 	// Check if token is expired
 	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
-		logrus.WithField("expiresAt", user.TokenExpiresAt).Warn("Email change token expired")
+		slog.Warn("email change token expired", "expiresAt", user.TokenExpiresAt)
 		return fmt.Errorf("verification token has expired")
 	}
 
 	// Check if there is a pending email
 	if user.PendingEmail == "" {
-		logrus.Warn("No pending email in email change request")
+		slog.Warn("no pending email in email change request")
 		return fmt.Errorf("no pending email change")
 	}
 
 	// Check if the new email is already used by another user
 	var existingUser model.User
 	if err := m.DB.Where("email = ? AND id != ?", user.PendingEmail, user.ID).First(&existingUser).Error; err == nil {
-		logrus.WithField("existingUserID", existingUser.ID).Warn("Email already in use by another user")
+		slog.Warn("email already in use by another user", "existingUserID", existingUser.ID)
 		return fmt.Errorf("email already in use by another account")
 	}
 
@@ -472,11 +476,11 @@ func (m *Mailer) ConfirmEmailChange(token string) error {
 		"verification_token": "",
 		"token_expires_at":   time.Time{},
 	}).Error; err != nil {
-		logrus.WithError(err).Error("Failed to update email")
+		slog.Error("failed to update email", "err", err)
 		return fmt.Errorf("failed to update email: %w", err)
 	}
 
-	logrus.WithField("newEmail", user.PendingEmail).Info("Email change confirmed successfully")
+	slog.Info("email change confirmed successfully", "newEmail", user.PendingEmail)
 	return nil
 }
 

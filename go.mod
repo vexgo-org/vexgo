@@ -12,7 +12,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.99
-	github.com/sirupsen/logrus v1.9.4
 	golang.org/x/crypto v0.48.0
 	golang.org/x/oauth2 v0.36.0
 	gorm.io/driver/mysql v1.5.7

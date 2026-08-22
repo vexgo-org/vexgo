@@ -4,7 +4,8 @@ package app
 
 import (
 	"fmt"
-	"strings"
+	"log/slog"
+	"os"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
@@ -24,7 +25,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -66,7 +66,7 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.RequestLogger())
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
-	logrus.WithField("baseURL", renderer.BaseURL()).Info("Base URL set for server-side rendering")
+	slog.Info("base url set for server-side rendering", "baseURL", renderer.BaseURL())
 
 	configureProxies(r, cfg)
 
@@ -140,7 +140,7 @@ func New(cfg *config.Config) (*App, error) {
 
 // Run starts the HTTP server.
 func (a *App) Run() error {
-	logrus.WithField("address", a.cfg.GetListenAddr()).Info("Starting server")
+	slog.Info("starting server", "address", a.cfg.GetListenAddr())
 	return a.engine.Run(a.cfg.GetListenAddr())
 }
 
@@ -149,7 +149,7 @@ func (a *App) Run() error {
 func initStorage(cfg *config.Config) (upload.Storage, error) {
 	var storage upload.Storage = upload.NewLocalStorage(cfg.DataDir)
 	if !cfg.S3Enabled {
-		logrus.Info("Using local file storage")
+		slog.Info("using local file storage")
 		return storage, nil
 	}
 
@@ -164,12 +164,12 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 		CustomDomain:             cfg.S3CustomDomain,
 		DisableBucketInCustomURL: cfg.S3DisableBucketInCustomURL,
 	}
-	logrus.WithFields(logrus.Fields{
-		"enabled":  s3Cfg.Enabled,
-		"endpoint": s3Cfg.Endpoint,
-		"region":   s3Cfg.Region,
-		"bucket":   s3Cfg.Bucket,
-	}).Info("S3 Config Loaded")
+	slog.Info("s3 config loaded",
+		"enabled", s3Cfg.Enabled,
+		"endpoint", s3Cfg.Endpoint,
+		"region", s3Cfg.Region,
+		"bucket", s3Cfg.Bucket,
+	)
 
 	s3Storage, err := upload.NewS3Storage(s3Cfg)
 	if err != nil {
@@ -178,7 +178,7 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 	if s3Storage != nil {
 		storage = s3Storage
 	}
-	logrus.Info("S3 storage initialized")
+	slog.Info("s3 storage initialized")
 	return storage, nil
 }
 
@@ -188,33 +188,40 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 func configureProxies(r *gin.Engine, cfg *config.Config) {
 	if !cfg.BehindReverseProxy {
 		if err := r.SetTrustedProxies(nil); err != nil {
-			logrus.WithError(err).Fatal("Failed to disable trusted proxies")
+			slog.Error("failed to disable trusted proxies", "err", err)
+			os.Exit(1)
 		}
 		return
 	}
 
 	if len(cfg.TrustedProxies) > 0 {
 		if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
-			logrus.WithError(err).Fatal("Invalid trusted proxies configuration")
+			slog.Error("invalid trusted proxies configuration", "err", err)
+			os.Exit(1)
 		}
-		logrus.WithField("proxies", cfg.TrustedProxies).Info("Trusted proxies configured")
+		slog.Info("trusted proxies configured", "proxies", cfg.TrustedProxies)
 	} else {
 		defaultProxies := []string{"127.0.0.1", "::1", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"}
 		if err := r.SetTrustedProxies(defaultProxies); err != nil {
-			logrus.WithError(err).Fatal("Invalid default trusted proxies configuration")
+			slog.Error("invalid default trusted proxies configuration", "err", err)
+			os.Exit(1)
 		}
-		logrus.Info("Trusted proxies set to common private networks")
+		slog.Info("trusted proxies set to common private networks")
 	}
 }
 
-// setupLogging sets the global logrus level and formatter from the config,
+// setupLogging sets the global slog level and formatter from the config,
 // falling back to info when the level string is invalid.
 func setupLogging(levelStr string) {
-	level, err := logrus.ParseLevel(strings.ToLower(levelStr))
-	if err != nil {
-		logrus.Warnf("Invalid log level '%s', defaulting to 'info'", levelStr)
-		level = logrus.InfoLevel
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(levelStr)); err != nil {
+		slog.Warn("invalid log level, fallback to info level", "level", level, "err", err)
+		level = slog.LevelInfo
 	}
-	logrus.SetLevel(level)
-	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
+
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	})
+
+	slog.SetDefault(slog.New(handler))
 }

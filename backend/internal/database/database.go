@@ -5,13 +5,12 @@ package database
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/vexgo-org/vexgo/backend/internal/config"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/glebarez/sqlite"
 	dmsql "github.com/go-sql-driver/mysql"
@@ -63,7 +62,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 		// If port not set in config, get from env
 		if portStr := os.Getenv("DB_PORT"); portStr != "" {
 			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
-				logrus.Warnf("invalid DB_PORT %q, using default MySQL port", portStr)
+				slog.Warn("invalid DB_PORT using default MySQL port", "port", portStr, "fallback", 3306)
 				port = 3306
 			}
 		}
@@ -80,7 +79,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		// Check if the error is "Unknown database" (error code 1049)
 		if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
-			logrus.Infof("Database '%s' not found, attempting to create it", dbname)
+			slog.Info("database not found, attempting to create it", "dbname", dbname)
 			// DSN without database name to connect to the server
 			serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
 			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{})
@@ -92,7 +91,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 			if execErr := serverDb.Exec(createDbSQL).Error; execErr != nil {
 				return nil, fmt.Errorf("create database '%s': %w", dbname, execErr)
 			}
-			logrus.Infof("Database '%s' created successfully", dbname)
+			slog.Info("database created successfully", "dbname", dbname)
 			// Re-attempt connection to the newly created database
 			db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 			if err != nil {
@@ -102,7 +101,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 			return nil, fmt.Errorf("connect to MySQL database: %w", err)
 		}
 	}
-	logrus.Info("Successfully connected to MySQL database")
+	slog.Info("successfully connected to MySQL database")
 	return db, nil
 }
 
@@ -125,7 +124,7 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 		port = 5432
 		if portStr := os.Getenv("DB_PORT"); portStr != "" {
 			if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
-				logrus.Warnf("invalid DB_PORT %q, using default PostgreSQL port", portStr)
+				slog.Warn("invalid DB_PORT, using default PostgreSQL port", "port", portStr, "fallback", 5432)
 				port = 5432
 			}
 		}
@@ -149,7 +148,7 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect to PostgreSQL database: %w", err)
 	}
-	logrus.Info("Successfully connected to PostgreSQL database")
+	slog.Info("successfully connected to PostgreSQL database")
 	return db, nil
 }
 
@@ -163,7 +162,7 @@ func openSQLite(dataDir string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect to SQLite database: %w", err)
 	}
-	logrus.Info("Successfully connected to SQLite database")
+	slog.Info("successfully connected to SQLite database")
 	return db, nil
 }
 
@@ -228,7 +227,7 @@ func Seed(db *gorm.DB) error {
 			if err := db.Create(&u).Error; err != nil {
 				return fmt.Errorf("create default admin: %w", err)
 			}
-			logrus.Info("Default admin user created")
+			slog.Info("default admin user created")
 
 			// Create default SMTP configuration (if not exists)
 			if err := seedSMTP(db); err != nil {
@@ -265,7 +264,7 @@ func seedSMTP(db *gorm.DB) error {
 		if err := db.Create(&config).Error; err != nil {
 			return fmt.Errorf("create default SMTP config: %w", err)
 		}
-		logrus.Info("Default SMTP config created")
+		slog.Info("default SMTP config created")
 	}
 	return nil
 }
@@ -284,7 +283,7 @@ func seedGeneralSettings(db *gorm.DB) error {
 		if err := db.Create(&config).Error; err != nil {
 			return fmt.Errorf("create default general settings: %w", err)
 		}
-		logrus.Info("Default general settings created")
+		slog.Info("default general settings created")
 	}
 	return nil
 }
@@ -301,7 +300,7 @@ func seedAIConfig(db *gorm.DB) error {
 		if err := db.Create(&config).Error; err != nil {
 			return fmt.Errorf("create default AI config: %w", err)
 		}
-		logrus.Info("Default AI config created")
+		slog.Info("default AI config created")
 	}
 	return nil
 }
@@ -314,7 +313,7 @@ func seedThemeConfig(db *gorm.DB) error {
 		if err := db.Create(&config).Error; err != nil {
 			return fmt.Errorf("create default theme config: %w", err)
 		}
-		logrus.Info("Default theme config created")
+		slog.Info("default theme config created")
 	}
 	return nil
 }
@@ -330,7 +329,7 @@ func seedCategory(db *gorm.DB) error {
 		if err := db.Create(&category).Error; err != nil {
 			return fmt.Errorf("create default category: %w", err)
 		}
-		logrus.Info("Default category created")
+		slog.Info("default category created")
 	}
 	return nil
 }

@@ -2,11 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 // S3Config holds S3-compatible storage configuration
@@ -29,25 +28,25 @@ func (s *S3Config) IsEnabled() bool {
 
 // GetURL returns the public URL for an object in S3
 func (s *S3Config) GetURL(key string) string {
-	logrus.WithFields(logrus.Fields{
-		"customDomain":             s.CustomDomain,
-		"disableBucketInCustomURL": s.DisableBucketInCustomURL,
-		"bucket":                   s.Bucket,
-		"key":                      key,
-	}).Debug("Generating S3 object URL")
+	slog.Debug("generating S3 object URL",
+		"customDomain", s.CustomDomain,
+		"disableBucketInCustomURL", s.DisableBucketInCustomURL,
+		"bucket", s.Bucket,
+		"key", key,
+	)
 	if s.CustomDomain != "" {
 		domain := s.CustomDomain
 		if !strings.HasPrefix(domain, "http://") && !strings.HasPrefix(domain, "https://") {
 			domain = "https://" + domain
 		}
-		logrus.WithField("domain", domain).Debug("S3 GetURL")
+		slog.Debug("S3 GetURL", "domain", domain)
 		if !s.DisableBucketInCustomURL {
 			url := fmt.Sprintf("%s/%s/%s", domain, s.Bucket, key)
-			logrus.WithField("url", url).Debug("S3 GetURL: including bucket")
+			slog.Debug("S3 GetURL: including bucket", "url", url)
 			return url
 		}
 		url := fmt.Sprintf("%s/%s", domain, key)
-		logrus.WithField("url", url).Debug("S3 GetURL: not including bucket")
+		slog.Debug("S3 GetURL: not including bucket", "url", url)
 		return url
 	}
 	// Default S3 URL format

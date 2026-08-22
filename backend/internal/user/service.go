@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -129,7 +129,7 @@ func (s *Service) UpdateRole(ctx context.Context, actor model.User, targetID uin
 		Title:   "Role Changed",
 		Content: fmt.Sprintf("Your role has been changed from \"%s\" to \"%s\"", oldRole, newRole),
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to create role change notification")
+		slog.Warn("failed to create role change notification", "err", err)
 	}
 
 	return user, nil
@@ -171,7 +171,10 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 
 	for _, url := range fileURLs {
 		if err := s.files.Delete(url); err != nil {
-			logrus.WithError(err).WithField("url", url).Warn("Failed to delete media file")
+			slog.Warn("failed to delete media file",
+				"url", url,
+				"err", err,
+			)
 		}
 	}
 	return nil
@@ -216,7 +219,7 @@ func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason s
 				RelatedID:   fmt.Sprintf("%d", application.ID),
 				RelatedType: model.NotificationRelatedTypeCreatorApplication,
 			}); err != nil {
-				logrus.WithError(err).Warn("failed to create role application notification")
+				slog.Warn("failed to create role application notification", "err", err)
 			}
 		}
 	}
@@ -318,7 +321,7 @@ func (s *Service) ReviewCreatorApplication(ctx context.Context, req ReviewCreato
 		Title:   notificationTitle,
 		Content: notificationContent,
 	}); err != nil {
-		logrus.WithError(err).Warn("failed to create creator application notification")
+		slog.Warn("failed to create creator application notification", "err", err)
 	}
 
 	return nil

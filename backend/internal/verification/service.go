@@ -13,6 +13,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -20,7 +21,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -74,31 +74,31 @@ func NewService(deps Deps) *Service {
 // (only meaningful for email changes).
 func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bool, newEmail string, err error) {
 	if strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		logrus.Debug("[VerifyEmail] Detected email change token, calling ConfirmEmailChange")
+		slog.Debug("detected email change token, calling ConfirmEmailChange")
 		// The pending email must be read before the token is consumed:
 		// ConfirmEmailChange clears verification_token together with
 		// pending_email, so a lookup afterwards can never find the user.
 		user, err := s.repo.FindUserByToken(ctx, token)
 		if err != nil {
-			logrus.WithError(err).Debug("[VerifyEmail] FindUserByToken failed")
+			slog.Debug("FindUserByToken failed", "err", err)
 			return false, "", err
 		}
 		pendingEmail := user.PendingEmail
 
 		if err := s.mailer.ConfirmEmailChange(token); err != nil {
-			logrus.WithError(err).Debug("[VerifyEmail] ConfirmEmailChange failed")
+			slog.Debug("ConfirmEmailChange failed", "err", err)
 			return false, "", err
 		}
-		logrus.Debug("[VerifyEmail] ConfirmEmailChange succeeded")
+		slog.Debug("ConfirmEmailChange succeeded")
 		return true, pendingEmail, nil
 	}
 
-	logrus.Debug("[VerifyEmail] Normal email verification token, calling VerifyEmail")
+	slog.Debug("normal email verification token, calling VerifyEmail")
 	if err := s.mailer.VerifyEmail(token); err != nil {
-		logrus.WithError(err).Debug("[VerifyEmail] VerifyEmail failed")
+		slog.Debug("VerifyEmail failed", "err", err)
 		return false, "", err
 	}
-	logrus.Debug("[VerifyEmail] VerifyEmail succeeded")
+	slog.Debug("VerifyEmail succeeded")
 	return false, "", nil
 }
 
