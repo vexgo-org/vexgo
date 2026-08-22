@@ -20,7 +20,7 @@ VexGo is a lightweight, self-hosted blog content management system designed for 
 - **🛡️ AI-Powered Moderation**: Automatic comment moderation with configurable prompts, keyword blocking, and score thresholds
 - **🖼️ Media Management**: Built-in file storage with S3-compatible support
 - **🎨 Theme System**: Server-side-rendered themes, switchable and uploadable from the admin panel
-- **🔔 Notifications**: In-app message inbox for likes, comments, and other events
+- **🔔 Notifications**: In-app notification inbox for likes, comments, and other events
 - **🔑 SSO**: Login with GitHub, Google, or any OpenID Connect provider
 - **🌐 Self-Hosted**: Complete control over your data and deployment
 
@@ -534,7 +534,7 @@ backend/
     database/        # connection, auto-migration, seeding
     home/            # site statistics
     mailer/          # SMTP mail building and sending
-    message/         # in-app notifications
+    notification/    # in-app notifications
     middleware/      # JWT auth, role-based permissions, request logging
     model/           # GORM data models + shared seams (Notifier, FileRemover, Mailer)
     post/            # post CRUD, categories, tags, likes
@@ -571,7 +571,7 @@ import (
 
 - **Leaf packages** — `config/` and `model/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`, `Mailer`); `config` is imported by `app`, `auth`, `database`, `middleware`, `sso`, and `upload`.
 - **Shared layer** — `middleware/` (JWT auth, role permissions, request logging) depends only on `config` and `model`.
-- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` itself depends on `verification`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `message` implements `Notifier`, `upload` implements `FileRemover`, `mailer` implements `Mailer`. The dependency graph is acyclic.
+- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` itself depends on `verification`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, `mailer` implements `Mailer`. The dependency graph is acyclic.
 - **Wiring** — `backend/cmd/vexgo/main.go` is the thin entry point: it parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root — it opens the database, creates storage and the `public.Renderer`, and wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
 ### Contributing

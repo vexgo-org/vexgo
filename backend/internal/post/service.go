@@ -31,7 +31,7 @@ type Deps struct {
 	Files     FileRemover
 }
 
-// Notifier is the seam for creating notifications; implemented by the message domain.
+// Notifier is the seam for creating notifications; implemented by the notification domain.
 // FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
 type (
 	Notifier    = model.Notifier

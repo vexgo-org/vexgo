@@ -5,8 +5,8 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/home"
-	"github.com/vexgo-org/vexgo/backend/internal/message"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/notification"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
@@ -22,7 +22,7 @@ import (
 type Deps struct {
 	DB           *gorm.DB
 	JWTSecret    []byte
-	Message      message.Deps
+	Notification notification.Deps
 	Comment      comment.Deps
 	Post         post.Deps
 	Upload       upload.Deps
@@ -39,7 +39,7 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	api := r.Group("/api")
 	api.Use(middleware.NewAuth(deps.DB, deps.JWTSecret).OptionalJWTAuth())
 
-	message.NewHandler(deps.Message).RegisterRoutes(api)
+	notification.NewHandler(deps.Notification).RegisterRoutes(api)
 	comment.NewHandler(deps.Comment).RegisterRoutes(api)
 	post.NewHandler(deps.Post).RegisterRoutes(api)
 	upload.NewHandler(deps.Upload).RegisterRoutes(api)

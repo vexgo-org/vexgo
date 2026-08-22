@@ -14,7 +14,7 @@ type NotificationInput struct {
 }
 
 // Notifier is the seam for creating notifications; implemented by the
-// message domain and injected so it can be faked in tests.
+// notification domain and injected so it can be faked in tests.
 type Notifier interface {
 	CreateNotification(ctx context.Context, input NotificationInput) error
 }

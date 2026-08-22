@@ -12,8 +12,8 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/database"
 	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
-	"github.com/vexgo-org/vexgo/backend/internal/message"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/notification"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 	"github.com/vexgo-org/vexgo/backend/internal/router"
@@ -72,26 +72,26 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Shared service instances: construct each once and reuse it across the
 	// domains that depend on it.
-	messageSvc := message.NewService(message.Deps{DB: db, JWTSecret: cfg.JWTSecret})
+	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 	mailerSvc := mailer.NewMailer(db)
 	verificationSvc := verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret, Mailer: mailerSvc})
 
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
 		JWTSecret: cfg.JWTSecret,
-		Message: message.Deps{
+		Notification: notification.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 		},
 		Comment: comment.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Notifier:  messageSvc,
+			Notifier:  notificationSvc,
 		},
 		Post: post.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Notifier:  messageSvc,
+			Notifier:  notificationSvc,
 			Files:     storage,
 		},
 		Upload: upload.Deps{
@@ -102,7 +102,7 @@ func New(cfg *config.Config) (*App, error) {
 		User: user.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Notifier:  messageSvc,
+			Notifier:  notificationSvc,
 			Files:     storage,
 		},
 		Verification: verification.Deps{

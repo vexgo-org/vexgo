@@ -26,7 +26,7 @@ backend/
     database/                # 连接、自动迁移、种子数据
     home/                    # 站点统计
     mailer/                  # SMTP 邮件构建与发送
-    message/                 # 站内通知
+    notification/            # 站内通知
     middleware/              # JWT 认证、角色权限、请求日志
     model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover、Mailer）
     post/                    # 文章 CRUD、分类、标签、点赞
@@ -60,7 +60,7 @@ repository.go → 持久化接口 + GORM 实现（调用数据库）
 跨领域的接缝定义在 `model` 包中，作为小型接口：
 
 ```go
-// Notifier 是创建通知的接缝；由 message 领域实现。
+// Notifier 是创建通知的接缝；由 notification 领域实现。
 type Notifier interface {
     CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
 }
@@ -120,7 +120,7 @@ cmd/vexgo/main.go
 跨领域边：
     auth/          ← 被 comment、post、sso 使用（隐私过滤）
     mailer/        ← 实现 model.Mailer，被 auth 和 verification 用于发送邮件
-    message/       ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
+    notification/  ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
     upload/        ← 实现 model.FileRemover，被 user、auth、post 用于文件清理
     verification/  ← 被 auth 用作验证码检查接缝
     public/        ← 被 settings 用作主题渲染器接缝
@@ -230,9 +230,9 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ## 通知
 
-站内通知按用户存储。评论、点赞、回复、文章审核和角色变更等事件都会在接收者的收件箱中创建消息，通过 `/messages` API 暴露。
+站内通知按用户存储。评论、点赞、回复、文章审核和角色变更等事件都会在接收者的收件箱中创建通知，通过 `/notifications` API 暴露。
 
-通知系统使用**接缝接口**（`model.Notifier`）——各领域调用 `notifier.CreateNotification()` 而不导入 message 包。具体实现在启动时由组合根注入。
+通知系统使用**接缝接口**（`model.Notifier`）——各领域调用 `notifier.CreateNotification()` 而不导入 notification 包。具体实现在启动时由组合根注入。
 
 ## 数据库
 
@@ -317,7 +317,7 @@ cd backend && go test ./...
 查看覆盖率：
 
 ```bash
-cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/message/...
+cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/notification/...
 ```
 
 ## 相关阅读

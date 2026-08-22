@@ -1,4 +1,4 @@
-package message
+package notification
 
 import (
 	"context"
@@ -99,7 +99,7 @@ func TestList_PaginationAndFilters(t *testing.T) {
 		t.Errorf("expected 5 unread items, got %d", len(list))
 	}
 
-	_, total, err = svc.List(ctx, ListQuery{UserID: 1, Page: 1, Limit: 10, MessageType: "comment"})
+	_, total, err = svc.List(ctx, ListQuery{UserID: 1, Page: 1, Limit: 10, NotificationType: "comment"})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}

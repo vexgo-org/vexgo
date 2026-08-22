@@ -14,13 +14,13 @@ import (
 
 // fakeNotifier records notification calls instead of touching the DB.
 type fakeNotifier struct {
-	calls    []model.NotificationType
-	messages []string
+	calls         []model.NotificationType
+	notifications []string
 }
 
 func (f *fakeNotifier) CreateNotification(_ context.Context, input model.NotificationInput) error {
 	f.calls = append(f.calls, input.Type)
-	f.messages = append(f.messages, input.Content)
+	f.notifications = append(f.notifications, input.Content)
 	return nil
 }
 
@@ -78,22 +78,22 @@ func TestUpdateRole_NotificationReportsOldRole(t *testing.T) {
 	if _, err := svc.UpdateRole(ctx, admin, target.ID, model.RoleAuthor); err != nil {
 		t.Fatalf("UpdateRole error: %v", err)
 	}
-	if len(notifier.messages) != 1 {
-		t.Fatalf("expected one notification, got %d", len(notifier.messages))
+	if len(notifier.notifications) != 1 {
+		t.Fatalf("expected one notification, got %d", len(notifier.notifications))
 	}
-	if !strings.Contains(notifier.messages[0], `from "guest" to "author"`) {
-		t.Errorf("expected old role in notification message, got %q", notifier.messages[0])
+	if !strings.Contains(notifier.notifications[0], `from "guest" to "author"`) {
+		t.Errorf("expected old role in the notification content, got %q", notifier.notifications[0])
 	}
 
 	// Role upgrade path: contributor -> author must report both roles too.
 	super := seedUser(t, db, "super", model.RoleSuperAdmin)
 	target2 := seedUser(t, db, "target2", model.RoleContributor)
-	notifier.messages = nil
+	notifier.notifications = nil
 	if _, err := svc.UpdateRole(ctx, super, target2.ID, model.RoleAuthor); err != nil {
 		t.Fatalf("UpdateRole error: %v", err)
 	}
-	if len(notifier.messages) != 1 || !strings.Contains(notifier.messages[0], `from "contributor" to "author"`) {
-		t.Errorf("expected contributor->author message, got %q", notifier.messages)
+	if len(notifier.notifications) != 1 || !strings.Contains(notifier.notifications[0], `from "contributor" to "author"`) {
+		t.Errorf("expected contributor->author notification, got %q", notifier.notifications)
 	}
 }
 

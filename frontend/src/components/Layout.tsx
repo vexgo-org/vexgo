@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { configApi, messagesApi } from "@/lib/api";
+import { configApi, notificationsApi } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,16 +99,16 @@ export function Layout({ children }: LayoutProps) {
     navigate("/");
   };
 
-  // Unread message count
+  // Unread notification count
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Fetch the unread message count
+  // Fetch the unread notification count
   const fetchUnreadCount = async () => {
     try {
-      const response = await messagesApi.getUnreadCount();
+      const response = await notificationsApi.getUnreadCount();
       setUnreadCount(response.data.unreadCount);
     } catch (error) {
-      console.error("Failed to fetch the unread message count:", error);
+      console.error("Failed to fetch the unread notification count:", error);
     }
   };
 
@@ -134,7 +134,7 @@ export function Layout({ children }: LayoutProps) {
     };
   }, [isAuthenticated]);
 
-  // Refresh the unread count on route changes, e.g. when entering or leaving the messages page
+  // Refresh the unread count on route changes, e.g. when entering or leaving the notifications page
   useEffect(() => {
     if (isAuthenticated) {
       // Check the unread count whenever the route changes
@@ -151,7 +151,13 @@ export function Layout({ children }: LayoutProps) {
       ? [{ path: "/my-posts", label: t("layout.myPosts"), icon: FileText }]
       : []),
     ...(isAuthenticated
-      ? [{ path: "/messages", label: t("layout.messages"), icon: Bell }]
+      ? [
+          {
+            path: "/notifications",
+            label: t("layout.notifications"),
+            icon: Bell,
+          },
+        ]
       : []),
     ...(user?.role === "admin" || user?.role === "super_admin"
       ? [{ path: "/admin", label: t("layout.adminPanel"), icon: BarChart3 }]
@@ -227,12 +233,12 @@ export function Layout({ children }: LayoutProps) {
                   variant={isActive(item.path) ? "default" : "ghost"}
                   size="sm"
                   asChild
-                  className={item.path === "/messages" ? "relative" : ""}
+                  className={item.path === "/notifications" ? "relative" : ""}
                 >
                   <Link to={item.path} className="flex items-center gap-2">
                     <item.icon className="w-4 h-4" />
                     {item.label}
-                    {item.path === "/messages" && unreadCount > 0 && (
+                    {item.path === "/notifications" && unreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
                         {unreadCount}
                       </span>

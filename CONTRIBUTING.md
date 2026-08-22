@@ -109,7 +109,7 @@ backend/
     database/              # DB connection, migrations, seeding
     home/                  # homepage data endpoints
     mailer/                # email sending (SMTP)
-    message/               # notifications
+    notification/          # notifications
     middleware/            # JWT auth and permission middleware
     model/                 # GORM data models + shared seams (Notifier, FileRemover, Mailer)
     post/                  # blog post CRUD
@@ -290,7 +290,7 @@ The `scope` should refer to a stable functional area, such as:
 - `middleware`
 - `database`
 - `mailer`
-- `message`
+- `notification`
 - `router`
 - `config`
 - `frontend`

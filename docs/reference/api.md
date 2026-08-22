@@ -18,7 +18,7 @@ Roles: `super_admin`, `admin`, `author`, `contributor`, `guest`. Endpoints marke
 - [Comments](#comments)
 - [Likes](#likes)
 - [File Upload](#file-upload)
-- [Messages (Notifications)](#messages-notifications)
+- [Notifications](#notifications)
 - [Moderation](#moderation)
 - [User Management](#user-management)
 - [Creator Applications](#creator-applications)
@@ -976,9 +976,9 @@ Delete an uploaded file (requires authentication; uploader or admin only).
 
 ---
 
-## Messages (Notifications)
+## Notifications
 
-### GET /messages
+### GET /notifications
 
 Get the current user's notifications (requires authentication).
 
@@ -986,7 +986,7 @@ Get the current user's notifications (requires authentication).
 
 - `page` (int, default: 1)
 - `limit` (int, default: 10)
-- `type` (string, optional): Filter by message type (`comment`, `like`, `reply`, `review`, `role`)
+- `type` (string, optional): Filter by notification type (`comment`, `like`, `reply`, `review`, `role`)
 - `is_read` (string, optional): Filter by read status (`true` or `false`)
 
 **Response:**
@@ -1013,7 +1013,7 @@ Get the current user's notifications (requires authentication).
 
 ---
 
-### GET /messages/unread-count
+### GET /notifications/unread-count
 
 Get the current user's unread notification count (requires authentication).
 
@@ -1025,38 +1025,38 @@ Get the current user's unread notification count (requires authentication).
 
 ---
 
-### PUT /messages/:id/read
+### PUT /notifications/:id/read
 
-Mark a message as read (requires authentication).
+Mark a notification as read (requires authentication).
 
 **Response:**
 
 ```json
-{ "message": "Message marked as read" }
+{ "message": "Notification marked as read" }
 ```
 
 ---
 
-### PUT /messages/read-all
+### PUT /notifications/read-all
 
-Mark all messages as read (requires authentication).
+Mark all notifications as read (requires authentication).
 
 **Response:**
 
 ```json
-{ "message": "All messages marked as read" }
+{ "message": "All notifications marked as read" }
 ```
 
 ---
 
-### DELETE /messages/:id
+### DELETE /notifications/:id
 
-Delete a message (requires authentication; message owner only).
+Delete a notification (requires authentication; notification owner only).
 
 **Response:**
 
 ```json
-{ "message": "Message deleted" }
+{ "message": "Notification deleted" }
 ```
 
 ---

@@ -1,5 +1,5 @@
-// Package message implements the notification/message domain.
-package message
+// Package notification implements the notification domain.
+package notification
 
 import (
 	"context"
@@ -9,41 +9,41 @@ import (
 	"gorm.io/gorm"
 )
 
-// Deps holds the dependencies required by the message domain.
+// Deps holds the dependencies required by the notification domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 }
 
-// Service contains the business logic of the message domain.
+// Service contains the business logic of the notification domain.
 type Service struct {
 	repo Repository
 }
 
-// NewService creates a message service with the given dependencies.
+// NewService creates a notification service with the given dependencies.
 func NewService(deps Deps) *Service {
 	return &Service{repo: NewRepository(deps.DB)}
 }
 
-// newServiceWithRepo creates a message service with an explicit repository.
+// newServiceWithRepo creates a notification service with an explicit repository.
 func newServiceWithRepo(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
 // ListQuery carries the pagination and filter parameters for List.
 type ListQuery struct {
-	UserID      uint
-	Page        int
-	Limit       int
-	MessageType string
-	IsRead      string
+	UserID           uint
+	Page             int
+	Limit            int
+	NotificationType string
+	IsRead           string
 }
 
 // List returns the paginated notifications of a user, optionally filtered by
 // type and read status.
 func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Notification, int64, error) {
 	offset := (q.Page - 1) * q.Limit
-	return s.repo.List(ctx, q.UserID, offset, q.Limit, q.MessageType, q.IsRead)
+	return s.repo.List(ctx, q.UserID, offset, q.Limit, q.NotificationType, q.IsRead)
 }
 
 // MarkAsRead marks a single notification as read. It returns the number of

@@ -573,7 +573,7 @@ export const zhCN = {
     home: "首页",
     writePost: "写文章",
     myPosts: "我的文章",
-    messages: "消息",
+    notifications: "通知",
     adminPanel: "管理后台",
     searchPlaceholder: "搜索文章...",
     login: "登录",
@@ -839,9 +839,9 @@ export const zhCN = {
     permissionDenied: "权限不足，无法访问写文章页面",
   },
 
-  // 消息中心页面
-  messageCenter: {
-    title: "消息中心",
+  // 通知中心页面
+  notificationCenter: {
+    title: "通知中心",
     markAllAsRead: "全部标记为已读",
     tabs: {
       all: "全部",
@@ -852,18 +852,18 @@ export const zhCN = {
       role: "权限",
     },
     empty: {
-      noMessages: "暂无消息",
-      noMessagesDesc: "您还没有收到任何消息",
-      noUnreadMessages: "暂无未读消息",
-      allRead: "您的所有消息都已读",
-      noCommentMessages: "暂无评论消息",
-      noCommentMessagesDesc: "您还没有收到任何评论相关的消息",
-      noLikeMessages: "暂无点赞消息",
-      noLikeMessagesDesc: "您还没有收到任何点赞相关的消息",
-      noReviewMessages: "暂无审核消息",
-      noReviewMessagesDesc: "您还没有收到任何审核相关的消息",
-      noRoleMessages: "暂无权限消息",
-      noRoleMessagesDesc: "您还没有收到任何权限相关的消息",
+      noNotifications: "暂无通知",
+      noNotificationsDesc: "您还没有收到任何通知",
+      noUnreadNotifications: "暂无未读通知",
+      allRead: "您的所有通知都已读",
+      noCommentNotifications: "暂无评论通知",
+      noCommentNotificationsDesc: "您还没有收到任何评论相关的通知",
+      noLikeNotifications: "暂无点赞通知",
+      noLikeNotificationsDesc: "您还没有收到任何点赞相关的通知",
+      noReviewNotifications: "暂无审核通知",
+      noReviewNotificationsDesc: "您还没有收到任何审核相关的通知",
+      noRoleNotifications: "暂无权限通知",
+      noRoleNotificationsDesc: "您还没有收到任何权限相关的通知",
     },
     unreadBadge: "未读",
     view: "查看",

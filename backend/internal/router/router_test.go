@@ -8,7 +8,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/home"
-	"github.com/vexgo-org/vexgo/backend/internal/message"
+	"github.com/vexgo-org/vexgo/backend/internal/notification"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
@@ -45,13 +45,13 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 
 	r := gin.New()
 	RegisterAPIRoutes(r, Deps{
-		DB:        db,
-		JWTSecret: secret,
-		Message:   message.Deps{DB: db, JWTSecret: secret},
-		Comment:   comment.Deps{DB: db, JWTSecret: secret},
-		Post:      post.Deps{DB: db, JWTSecret: secret},
-		Upload:    upload.Deps{DB: db, JWTSecret: secret},
-		User:      user.Deps{DB: db, JWTSecret: secret},
+		DB:           db,
+		JWTSecret:    secret,
+		Notification: notification.Deps{DB: db, JWTSecret: secret},
+		Comment:      comment.Deps{DB: db, JWTSecret: secret},
+		Post:         post.Deps{DB: db, JWTSecret: secret},
+		Upload:       upload.Deps{DB: db, JWTSecret: secret},
+		User:         user.Deps{DB: db, JWTSecret: secret},
 		Verification: verification.Deps{
 			DB:        db,
 			JWTSecret: secret,
@@ -93,12 +93,12 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"PUT /api/moderation/comments/config",
 		// home
 		"GET /api/stats",
-		// message
-		"GET /api/messages",
-		"GET /api/messages/unread-count",
-		"PUT /api/messages/:id/read",
-		"PUT /api/messages/read-all",
-		"DELETE /api/messages/:id",
+		// notification
+		"GET /api/notifications",
+		"GET /api/notifications/unread-count",
+		"PUT /api/notifications/:id/read",
+		"PUT /api/notifications/read-all",
+		"DELETE /api/notifications/:id",
 		// post
 		"GET /api/posts",
 		"GET /api/posts/:id",

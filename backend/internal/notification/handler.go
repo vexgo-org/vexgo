@@ -1,4 +1,4 @@
-package message
+package notification
 
 import (
 	"net/http"
@@ -9,30 +9,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler exposes the message domain over HTTP.
+// Handler exposes the notification domain over HTTP.
 type Handler struct {
 	svc *Service
 	mw  *middleware.Auth
 }
 
-// NewHandler creates a message HTTP handler with the given dependencies.
+// NewHandler creates a notification HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
-// GetMessages retrieves the message list
-func (h *Handler) GetMessages(c *gin.Context) {
+// GetNotifications retrieves the notification list
+func (h *Handler) GetNotifications(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	notifications, total, err := h.svc.List(c.Request.Context(), ListQuery{
-		UserID:      uid,
-		Page:        page,
-		Limit:       limit,
-		MessageType: c.Query("type"),
-		IsRead:      c.Query("is_read"),
+		UserID:           uid,
+		Page:             page,
+		Limit:            limit,
+		NotificationType: c.Query("type"),
+		IsRead:           c.Query("is_read"),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
@@ -50,67 +50,67 @@ func (h *Handler) GetMessages(c *gin.Context) {
 	})
 }
 
-// MarkAsRead marks a message as read
+// MarkAsRead marks a notification as read
 func (h *Handler) MarkAsRead(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification ID"})
 		return
 	}
 
 	rowsAffected, err := h.svc.MarkAsRead(c.Request.Context(), uid, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark message as read"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark notification as read"})
 		return
 	}
 	if rowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found or not updated"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found or not updated"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Message marked as read"})
+	c.JSON(http.StatusOK, gin.H{"message": "Notification marked as read"})
 }
 
-// MarkAllAsRead marks all messages as read
+// MarkAllAsRead marks all notifications as read
 func (h *Handler) MarkAllAsRead(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
 	if err := h.svc.MarkAllAsRead(c.Request.Context(), uid); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark all messages as read"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark all notifications as read"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "All messages marked as read"})
+	c.JSON(http.StatusOK, gin.H{"message": "All notifications marked as read"})
 }
 
-// DeleteMessage deletes a message
-func (h *Handler) DeleteMessage(c *gin.Context) {
+// DeleteNotification deletes a notification
+func (h *Handler) DeleteNotification(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification ID"})
 		return
 	}
 
 	rowsAffected, err := h.svc.Delete(c.Request.Context(), uid, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete notification"})
 		return
 	}
 	if rowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found or not deleted"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Notification not found or not deleted"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Message deleted"})
+	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted"})
 }
 
-// GetUnreadCount retrieves the number of unread messages
+// GetUnreadCount retrieves the number of unread notifications
 func (h *Handler) GetUnreadCount(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 

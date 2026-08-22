@@ -20,7 +20,7 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 - **🛡️ AI 内容审核**：可配置提示词、关键词拦截和评分阈值的自动评论审核
 - **🖼️ 媒体管理**：内置文件存储，支持 S3 兼容服务
 - **🎨 主题系统**：服务端渲染主题，可在管理面板切换和上传
-- **🔔 通知**：点赞、评论等事件的站内消息收件箱
+- **🔔 通知**：点赞、评论等事件的站内通知收件箱
 - **🔑 SSO**：支持 GitHub、Google 及任意 OpenID Connect 提供商登录
 - **🌐 自托管**：完全控制您的数据和部署
 
@@ -534,7 +534,7 @@ backend/
     database/        # 数据库连接、自动迁移、种子数据
     home/            # 站点统计
     mailer/          # SMTP 邮件构建与发送
-    message/         # 站内通知
+    notification/    # 站内通知
     middleware/      # JWT 认证、角色权限、请求日志
     model/           # GORM 数据模型 + 共享接口（Notifier、FileRemover、Mailer）
     post/            # 文章 CRUD、分类、标签、点赞
@@ -571,7 +571,7 @@ import (
 
 - **叶子包** — `config/` 和 `model/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`、`Mailer`）；`config` 被 `app`、`auth`、`database`、`middleware`、`sso`、`upload` 引用。
 - **共享层** — `middleware/`（JWT 认证、角色权限、请求日志）只依赖 `config` 和 `model`。
-- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`auth` 自身依赖 `verification`；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`message` 实现 `Notifier`、`upload` 实现 `FileRemover`、`mailer` 实现 `Mailer`。依赖图无环。
+- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`auth` 自身依赖 `verification`；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`、`mailer` 实现 `Mailer`。依赖图无环。
 - **接线** — `backend/cmd/vexgo/main.go` 是极简入口：解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根——打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
 
 ### 贡献指南

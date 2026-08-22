@@ -26,7 +26,7 @@ backend/
     database/                # connection, auto-migration, seeding
     home/                    # site statistics
     mailer/                  # SMTP mail building and sending
-    message/                 # in-app notifications
+    notification/            # in-app notifications
     middleware/              # JWT auth, role-based permissions, request logging
     model/                   # GORM data models + shared interfaces (Notifier, FileRemover, Mailer)
     post/                    # post CRUD, categories, tags, likes
@@ -60,7 +60,7 @@ This separation ensures that:
 Cross-domain seams are defined in the `model` package as small interfaces:
 
 ```go
-// Notifier is the seam for creating notifications; implemented by the message domain.
+// Notifier is the seam for creating notifications; implemented by the notification domain.
 type Notifier interface {
     CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
 }
@@ -121,7 +121,7 @@ Shared layer:
 Cross-domain edges:
     auth/          ← used by comment, post, sso (for privacy filtering)
     mailer/        ← implements model.Mailer, used by auth and verification for email
-    message/       ← implements model.Notifier, used by comment, post, user as notification seam
+    notification/  ← implements model.Notifier, used by comment, post, user as notification seam
     upload/        ← implements model.FileRemover, used by user, auth, post for file cleanup
     verification/  ← used by auth as the captcha-check seam
     public/        ← used by settings as the theme-renderer seam
@@ -231,9 +231,9 @@ The callback URLs are:
 
 ## Notifications
 
-In-app notifications are stored per user. Events such as comments, likes, replies, post reviews, and role changes create messages in the recipient's inbox, exposed through the `/messages` API.
+In-app notifications are stored per user. Events such as comments, likes, replies, post reviews, and role changes create notifications in the recipient's inbox, exposed through the `/notifications` API.
 
-The notification system uses a **seam interface** (`model.Notifier`) — domain packages call `notifier.CreateNotification()` without importing the message package. The concrete implementation is injected at startup by the composition root.
+The notification system uses a **seam interface** (`model.Notifier`) — domain packages call `notifier.CreateNotification()` without importing the notification package. The concrete implementation is injected at startup by the composition root.
 
 ## Database
 
@@ -318,7 +318,7 @@ cd backend && go test ./...
 To check coverage:
 
 ```bash
-cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/message/...
+cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/notification/...
 ```
 
 ## Related Reading
