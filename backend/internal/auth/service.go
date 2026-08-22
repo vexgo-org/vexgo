@@ -632,7 +632,7 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 			)
 			return ErrCaptchaFailed
 		}
-		slog.Debug("Captcha marked as used", "captchaID", arg.ID)
+		slog.Debug("captcha marked as used", "captchaID", arg.ID)
 	}
 	// If captcha already used, pre-verification successful, pass directly
 

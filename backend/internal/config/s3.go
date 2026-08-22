@@ -39,14 +39,14 @@ func (s *S3Config) GetURL(key string) string {
 		if !strings.HasPrefix(domain, "http://") && !strings.HasPrefix(domain, "https://") {
 			domain = "https://" + domain
 		}
-		slog.Debug("S3 GetURL", "domain", domain)
+		slog.Debug("s3 geturl", "domain", domain)
 		if !s.DisableBucketInCustomURL {
 			url := fmt.Sprintf("%s/%s/%s", domain, s.Bucket, key)
-			slog.Debug("S3 GetURL: including bucket", "url", url)
+			slog.Debug("s3 geturl: including bucket", "url", url)
 			return url
 		}
 		url := fmt.Sprintf("%s/%s", domain, key)
-		slog.Debug("S3 GetURL: not including bucket", "url", url)
+		slog.Debug("s3 geturl: not including bucket", "url", url)
 		return url
 	}
 	// Default S3 URL format

@@ -80,25 +80,25 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bo
 		// pending_email, so a lookup afterwards can never find the user.
 		user, err := s.repo.FindUserByToken(ctx, token)
 		if err != nil {
-			slog.Debug("FindUserByToken failed", "err", err)
+			slog.Debug("find user by token failed", "err", err)
 			return false, "", err
 		}
 		pendingEmail := user.PendingEmail
 
 		if err := s.mailer.ConfirmEmailChange(token); err != nil {
-			slog.Debug("ConfirmEmailChange failed", "err", err)
+			slog.Debug("confirm email change failed", "err", err)
 			return false, "", err
 		}
-		slog.Debug("ConfirmEmailChange succeeded")
+		slog.Debug("confirm email change succeeded")
 		return true, pendingEmail, nil
 	}
 
 	slog.Debug("normal email verification token, calling VerifyEmail")
 	if err := s.mailer.VerifyEmail(token); err != nil {
-		slog.Debug("VerifyEmail failed", "err", err)
+		slog.Debug("verify email failed", "err", err)
 		return false, "", err
 	}
-	slog.Debug("VerifyEmail succeeded")
+	slog.Debug("verify email succeeded")
 	return false, "", nil
 }
 

@@ -74,7 +74,7 @@ func NewS3Storage(cfg *config.S3Config) (*S3Storage, error) {
 		return nil, fmt.Errorf("bucket %s does not exist", cfg.Bucket)
 	}
 
-	slog.Info("S3 storage initialized successfully")
+	slog.Info("s3 storage initialized successfully")
 	return &S3Storage{client: client, cfg: cfg}, nil
 }
 
