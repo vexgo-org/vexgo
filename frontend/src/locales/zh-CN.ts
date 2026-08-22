@@ -528,6 +528,7 @@ export const zhCN = {
     modelName: "模型名称",
     modelNamePlaceholder: "如: gpt-3.5-turbo",
     available: "可用模型",
+    availableModelCount: "共 {count} 个可用模型",
     fetchModels: "获取可用模型",
     fetchModelsTooltip: "从服务商获取可用的模型列表",
     fetchingModels: "获取中...",
@@ -540,6 +541,28 @@ export const zhCN = {
     loadFailed: "加载失败",
     configRequired: "API 密钥和端点不能为空",
     selectModel: "请选择模型",
+    selectedModel: "已选择: {model}",
+    helpInfo: {
+      title: "配置说明",
+      openai: {
+        title: "OpenAI 官方 API",
+        baseUrl: "Base URL: https://api.openai.com/v1",
+        apiKey: "需要有效的 API 密钥，可从 OpenAI 平台获取",
+        supportedModels:
+          "支持的模型: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview 等",
+      },
+      custom: {
+        title: "自定义兼容接口",
+        compatible: "支持任何兼容 OpenAI 格式的 API 接口",
+        examples: "例如：本地部署的 Ollama、vLLM 或其他中转服务",
+        endpoint: "确保端点 URL 指向 chat/completions 接口",
+      },
+      test: {
+        title: "测试功能",
+        description:
+          "点击“测试连接”按钮，系统会向 AI API 发送一个简单的测试请求，以验证配置是否正确。",
+      },
+    },
   },
 
   // 管理员数据相关
@@ -904,5 +927,16 @@ export const zhCN = {
       approved: "已通过",
       rejected: "已拒绝",
     },
+  },
+
+  // Image Cropper
+  imageCropper: {
+    cropMode: {
+      cropProfilePictureCircle: "裁剪头像（圆形）",
+      cropCoverImage: "裁剪封面（保持比例）",
+    },
+    confirm: "确定",
+    zoom: "缩放：",
+    help: "拖动图片以移动，滚轮缩放",
   },
 };

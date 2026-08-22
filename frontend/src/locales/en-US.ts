@@ -552,6 +552,7 @@ export const enUS = {
     modelName: "Model Name",
     modelNamePlaceholder: "e.g. gpt-3.5-turbo",
     available: "Available Models",
+    availableModelCount: "Found {count} Available Model(s)",
     fetchModels: "Fetch Available Models",
     fetchModelsTooltip: "Get the list of available models from the provider",
     fetchingModels: "Fetching...",
@@ -564,6 +565,30 @@ export const enUS = {
     loadFailed: "Failed to load",
     configRequired: "API key and endpoint cannot be empty",
     selectModel: "Please select a model",
+    selectedModel: "Selected Model: {model}",
+    helpInfo: {
+      title: "Configuration Guide",
+      openai: {
+        title: "Official OpenAI API",
+        baseUrl: "Base URL: https://api.openai.com/v1",
+        apiKey: "A valid API key from the OpenAI platform is required.",
+        supportedModels:
+          "Supported models: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview, etc.",
+      },
+      custom: {
+        title: "Custom Compatible API",
+        compatible: "Supports any API compatible with the OpenAI API format.",
+        examples:
+          "Examples include locally deployed Ollama, vLLM, and other proxy services.",
+        endpoint:
+          "Make sure the endpoint URL points to the chat/completions endpoint.",
+      },
+      test: {
+        title: "Connection Test",
+        description:
+          'Click "Test Connection" to send a simple request to the AI API and verify the configuration.',
+      },
+    },
   },
 
   // Admin Data Related
@@ -949,5 +974,16 @@ export const enUS = {
       approved: "Approved",
       rejected: "Rejected",
     },
+  },
+
+  // Image Cropper
+  imageCropper: {
+    cropMode: {
+      cropProfilePictureCircle: "Crop Profile Picture (Circle)",
+      cropCoverImage: "Crop Cover Image (Fixed Aspect Ratio)",
+    },
+    confirm: "Confirm",
+    zoom: "Zoom: ",
+    help: "Drag to move. Scroll to zoom",
   },
 };
