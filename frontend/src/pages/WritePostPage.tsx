@@ -264,16 +264,15 @@ export function WritePostPage() {
   // Generate a URL-safe slug from the title
   const generateSlug = () => {
     let s = title
-      .toLowerCase()
-      .replace(/[^a-z0-9\u4e00-\u9fff\s-]/g, "")
-      .replace(/[\s_]+/g, "-")
+      .normalize("NFKC")
+      .toLocaleLowerCase()
+      // Convert spaces, underscores, and Unicode dashes to hyphens
+      .replace(/[\s_\p{Pd}]+/gu, "-")
+      // Keep letters and numbers from all languages
+      .replace(/[^\p{L}\p{N}-]/gu, "")
+      // Collapse consecutive hyphens and trim leading/trailing hyphens
       .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
-
-    // Remove Chinese characters and other non-ASCII
-    s = s.replace(/[^a-z0-9-]/g, "");
-    // Remove consecutive hyphens again after removing chars
-    s = s.replace(/-+/g, "-").replace(/^-|-$/g, "");
+      .replace(/^-+|-+$/g, "");
 
     if (!s) {
       s = `post-${Date.now().toString(36)}`;

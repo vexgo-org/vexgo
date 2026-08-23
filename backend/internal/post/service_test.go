@@ -520,20 +520,81 @@ func TestSlugValidation(t *testing.T) {
 	}
 }
 
-func TestSlugFromTitle_EmptyForNonLatin(t *testing.T) {
-	result := model.SlugFromTitle("纯中文标题")
-	if result != "" {
-		t.Errorf("expected empty slug for pure Chinese title, got %q", result)
+func TestSlugFromTitle_I18n(t *testing.T) {
+	tests := []struct {
+		name  string
+		title string
+		want  string
+	}{
+		{
+			name:  "Chinese",
+			title: "中文 标题 测试",
+			want:  "中文-标题-测试",
+		},
+		{
+			name:  "English",
+			title: "Hello World Test",
+			want:  "hello-world-test",
+		},
+		{
+			name:  "French",
+			title: "Bonjour le Monde",
+			want:  "bonjour-le-monde",
+		},
+		{
+			name:  "German",
+			title: "Hallo schöne Welt",
+			want:  "hallo-schöne-welt",
+		},
+		{
+			name:  "Japanese",
+			title: "こんにちは 世界 入門",
+			want:  "こんにちは-世界-入門",
+		},
+		{
+			name:  "Russian",
+			title: "Привет прекрасный мир",
+			want:  "привет-прекрасный-мир",
+		},
+		{
+			name:  "Korean",
+			title: "안녕하세요 아름다운 세계",
+			want:  "안녕하세요-아름다운-세계",
+		},
+		{
+			name:  "Arabic",
+			title: "مرحبا بالعالم الجميل",
+			want:  "مرحبا-بالعالم-الجميل",
+		},
+		{
+			name:  "Multiple spaces",
+			title: "Hello   世界   테스트",
+			want:  "hello-世界-테스트",
+		},
+		{
+			name:  "Mixed languages",
+			title: "Hello 中文 Français Deutsch 日本語 Русский 한국어 العربية",
+			want:  "hello-中文-français-deutsch-日本語-русский-한국어-العربية",
+		},
+		{
+			name:  "Punctuation and numbers",
+			title: "What's Up? 中文 测试 123!",
+			want:  "whats-up-中文-测试-123",
+		},
 	}
 
-	result = model.SlugFromTitle("Hello World")
-	if result != "hello-world" {
-		t.Errorf("expected hello-world, got %q", result)
-	}
-
-	result = model.SlugFromTitle("What's Up? 123!")
-	if result != "whats-up-123" {
-		t.Errorf("expected whats-up-123, got %q", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := model.SlugFromTitle(tt.title)
+			if got != tt.want {
+				t.Errorf(
+					"SlugFromTitle(%q) = %q, want %q",
+					tt.title,
+					got,
+					tt.want,
+				)
+			}
+		})
 	}
 }
 
