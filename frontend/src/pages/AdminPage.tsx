@@ -387,6 +387,22 @@ export function AdminPage() {
             </Card>
             <Card
               className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate("/admin/comment-config")}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  {t("commentConfig.title")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  {t("commentConfig.description")}
+                </p>
+              </CardContent>
+            </Card>
+            <Card
+              className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => navigate("/admin/theme")}
             >
               <CardHeader>
