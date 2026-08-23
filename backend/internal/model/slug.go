@@ -28,6 +28,8 @@ const MaxSlugLength = 200
 // ValidateSlug checks whether a slug conforms to the Unicode-safe pattern and
 // length limit. The slug must contain at least one Unicode letter so that
 // pure-numeric values, which may collide with old numeric URLs, are rejected.
+// Slugs containing uppercase ASCII letters are rejected; callers should
+// normalize the slug to lowercase before calling this function.
 func ValidateSlug(slug string) error {
 	if slug == "" {
 		return ErrEmptySlug
@@ -35,6 +37,13 @@ func ValidateSlug(slug string) error {
 
 	if utf8.RuneCountInString(slug) > MaxSlugLength {
 		return ErrSlugTooLong
+	}
+
+	// Reject uppercase ASCII letters — slugs must be normalized to lowercase.
+	if strings.ContainsFunc(slug, func(r rune) bool {
+		return r >= 'A' && r <= 'Z'
+	}) {
+		return ErrInvalidSlug
 	}
 
 	if !SlugPattern.MatchString(slug) {

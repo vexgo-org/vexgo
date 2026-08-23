@@ -126,6 +126,9 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		return nil, ErrForbidden
 	}
 
+	// Normalize slug to lowercase before validation and storage.
+	req.Slug = strings.ToLower(req.Slug)
+
 	// Validate slug
 	if err := model.ValidateSlug(req.Slug); err != nil {
 		return nil, fmt.Errorf("slug: %w", err)
@@ -218,15 +221,23 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 		return nil, ErrForbidden
 	}
 
-	if req.Slug != "" && req.Slug != post.Slug {
-		if err := model.ValidateSlug(req.Slug); err != nil {
-			return nil, fmt.Errorf("slug: %w", err)
+	if req.Slug != "" {
+		// Normalize slug to lowercase before validation and storage.
+		req.Slug = strings.ToLower(req.Slug)
+
+		if req.Slug == post.Slug {
+			// After normalization the slug matches the current one — no change.
+			// Skip validation and duplicate check below.
+		} else {
+			if err := model.ValidateSlug(req.Slug); err != nil {
+				return nil, fmt.Errorf("slug: %w", err)
+			}
+			// Allow the post to keep its own slug, reject duplicates with others.
+			if _, err := s.repo.FindBySlugExcludeID(ctx, req.Slug, post.ID); err == nil {
+				return nil, fmt.Errorf("slug: %w", model.ErrSlugTaken)
+			}
+			post.Slug = req.Slug
 		}
-		// Allow the post to keep its own slug, reject duplicates with others.
-		if _, err := s.repo.FindBySlugExcludeID(ctx, req.Slug, post.ID); err == nil {
-			return nil, fmt.Errorf("slug: %w", model.ErrSlugTaken)
-		}
-		post.Slug = req.Slug
 	}
 
 	if req.Title != "" {

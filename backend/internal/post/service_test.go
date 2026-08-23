@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -387,6 +388,10 @@ func TestList_GuestViewDenied(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Slug validation and generation tests
+// ---------------------------------------------------------------------------
+
 func TestCreate_RejectsEmptySlug(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
@@ -404,7 +409,6 @@ func TestCreate_RejectsInvalidSlug(t *testing.T) {
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 
 	invalid := []string{
-		"INVALID",                 // uppercase
 		"with space",              // spaces
 		"-leading",                // leading hyphen
 		"trailing-",               // trailing hyphen
@@ -504,97 +508,220 @@ func TestFindBySlug_UnknownSlug(t *testing.T) {
 	}
 }
 
+// TestSlugValidation exercises model.ValidateSlug directly for both valid and
+// invalid inputs: empty, long, uppercase, various syntax violations, and
+// numeric-only slugs.  The service layer normalizes before calling
+// ValidateSlug, so these tests ensure the model function itself is correct.
 func TestSlugValidation(t *testing.T) {
-	valid := []string{"hello", "hello-world", "my-post-123", "a1-b2-c3"}
+	// Valid slugs — must all pass.
+	valid := []string{
+		"hello", "hello-world", "my-post-123", "a1-b2-c3",
+		"a", "a1",
+		"中文-标题", "こんにちは-世界", "안녕하세요-세계",
+		"привет-мир", "مرحبا-بالعالم",
+		"hello-中文-привет",
+		"café",
+		strings.Repeat("a", model.MaxSlugLength),
+	}
 	for _, s := range valid {
-		if err := model.ValidateSlug(s); err != nil {
-			t.Errorf("expected valid slug %q, got error: %v", s, err)
-		}
+		t.Run("valid/"+s, func(t *testing.T) {
+			if len([]rune(s)) > 20 {
+				t.Skip("long value")
+			}
+			if err := model.ValidateSlug(s); err != nil {
+				t.Errorf("expected valid slug %q, got error: %v", s, err)
+			}
+		})
 	}
 
-	invalid := []string{"", "INVALID", "-bad", "bad-", "bad--bad", "123"}
-	for _, s := range invalid {
-		if err := model.ValidateSlug(s); err == nil {
-			t.Errorf("expected error for slug %q, got nil", s)
-		}
+	// Invalid slugs — each must return an error.
+	invalid := []struct {
+		slug   string
+		reason string
+	}{
+		{"", "empty"},
+		{"INVALID", "uppercase"},
+		{"Hello", "mixed case"},
+		{"hello-WORLD", "partial uppercase"},
+		{"-bad", "leading hyphen"},
+		{"bad-", "trailing hyphen"},
+		{"bad--bad", "consecutive hyphens"},
+		{"with space", "space"},
+		{"has@at", "at sign"},
+		{"has/slash", "slash"},
+		{"has.dot", "dot"},
+		{"123", "numeric only"},
+		{"-", "hyphen only"},
+		{strings.Repeat("a", model.MaxSlugLength+1), "too long"},
+	}
+	for _, tc := range invalid {
+		t.Run("invalid/"+tc.reason, func(t *testing.T) {
+			if len(tc.slug) > 20 {
+				t.Skip("long value")
+			}
+			if err := model.ValidateSlug(tc.slug); err == nil {
+				t.Errorf("expected error for slug %q (%s), got nil", tc.slug, tc.reason)
+			}
+		})
 	}
 }
 
-func TestSlugFromTitle_I18n(t *testing.T) {
-	tests := []struct {
+// TestSlugFromTitle exercises model.SlugFromTitle across languages,
+// punctuation, edge cases (empty, non-Latin), combining marks, truncation,
+// and multiple consecutive separators.
+func TestSlugFromTitle(t *testing.T) {
+	type slugCase struct {
 		name  string
 		title string
 		want  string
-	}{
-		{
-			name:  "Chinese",
-			title: "中文 标题 测试",
-			want:  "中文-标题-测试",
-		},
-		{
-			name:  "English",
-			title: "Hello World Test",
-			want:  "hello-world-test",
-		},
-		{
-			name:  "French",
-			title: "Bonjour le Monde",
-			want:  "bonjour-le-monde",
-		},
-		{
-			name:  "German",
-			title: "Hallo schöne Welt",
-			want:  "hallo-schöne-welt",
-		},
-		{
-			name:  "Japanese",
-			title: "こんにちは 世界 入門",
-			want:  "こんにちは-世界-入門",
-		},
-		{
-			name:  "Russian",
-			title: "Привет прекрасный мир",
-			want:  "привет-прекрасный-мир",
-		},
-		{
-			name:  "Korean",
-			title: "안녕하세요 아름다운 세계",
-			want:  "안녕하세요-아름다운-세계",
-		},
-		{
-			name:  "Arabic",
-			title: "مرحبا بالعالم الجميل",
-			want:  "مرحبا-بالعالم-الجميل",
-		},
-		{
-			name:  "Multiple spaces",
-			title: "Hello   世界   테스트",
-			want:  "hello-世界-테스트",
-		},
-		{
-			name:  "Mixed languages",
-			title: "Hello 中文 Français Deutsch 日本語 Русский 한국어 العربية",
-			want:  "hello-中文-français-deutsch-日本語-русский-한국어-العربية",
-		},
-		{
-			name:  "Punctuation and numbers",
-			title: "What's Up? 中文 测试 123!",
-			want:  "whats-up-中文-测试-123",
-		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := model.SlugFromTitle(tt.title)
-			if got != tt.want {
-				t.Errorf(
-					"SlugFromTitle(%q) = %q, want %q",
-					tt.title,
-					got,
-					tt.want,
-				)
+	tests := []slugCase{
+		// ── Basic English ──
+		{name: "English", title: "Hello World Test", want: "hello-world-test"},
+		{name: "all uppercase", title: "HELLO WORLD", want: "hello-world"},
+		{name: "extra spaces", title: "  hello   world  ", want: "hello-world"},
+		{name: "numbers", title: "Post 123 Title", want: "post-123-title"},
+		{name: "underscores", title: "hello_world_test", want: "hello-world-test"},
+		{name: "em dash", title: "hello\u2014world\u2014test", want: "hello-world-test"},
+		{name: "en dash", title: "hello\u2013world\u2013test", want: "hello-world-test"},
+
+		// ── Non-Latin languages ──
+		{name: "Chinese", title: "中文 标题 测试", want: "中文-标题-测试"},
+		{name: "Japanese", title: "こんにちは 世界 入門", want: "こんにちは-世界-入門"},
+		{name: "Korean", title: "안녕하세요 아름다운 세계", want: "안녕하세요-아름다운-세계"},
+		{name: "Russian", title: "Привет прекрасный мир", want: "привет-прекрасный-мир"},
+		{name: "Arabic", title: "مرحبا بالعالم الجميل", want: "مرحبا-بالعالم-الجميل"},
+		{name: "French", title: "Bonjour le Monde", want: "bonjour-le-monde"},
+		{name: "German umlauts", title: "Hallo schöne Welt", want: "hallo-schöne-welt"},
+
+		// ── Mixed scripts ──
+		{name: "Mixed languages", title: "Hello 中文 Français Deutsch 日本語 Русский 한국어 العربية", want: "hello-中文-français-deutsch-日本語-русский-한국어-العربية"},
+		{name: "Multiple spaces", title: "Hello   世界   테스트", want: "hello-世界-테스트"},
+
+		// ── Punctuation stripping ──
+		{name: "apostrophe", title: "What's Up", want: "whats-up"},
+		{name: "question and exclaim", title: "Hello! How are you?", want: "hello-how-are-you"},
+		{name: "periods", title: "Hello. World.", want: "hello-world"},
+		{name: "commas", title: "Hello, World", want: "hello-world"},
+		{name: "quotes", title: `"Hello" World`, want: "hello-world"},
+		{name: "parentheses", title: "Hello (World) Test", want: "hello-world-test"},
+		{name: "brackets", title: "Hello [World] Test", want: "hello-world-test"},
+		{name: "at and hash", title: "Hello @ World #1", want: "hello-world-1"},
+		{name: "Chinese with numbers", title: "What's Up? 中文 测试 123!", want: "whats-up-中文-测试-123"},
+
+		// ── Empty / all-punctuation fallback ──
+		{name: "empty title", title: "", want: ""},
+		{name: "only punctuation", title: "!@#$%", want: ""},
+		{name: "only hyphens", title: "---", want: ""},
+		{name: "only spaces", title: "   ", want: ""},
+		{name: "only underscores", title: "_ _ _", want: ""},
+
+		// ── Combining marks ──
+		{name: "combining acute", title: "cafe\u0301 resume\u0301 test", want: "cafe\u0301-resume\u0301-test"},
+		{name: "isolated combining mark", title: "\u0301hello", want: "hello"},
+
+		// ── Multiple consecutive separators collapse ──
+		{name: "consecutive separators", title: "hello__world  --test_\t\tfoo", want: "hello-world-test-foo"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := model.SlugFromTitle(tc.title)
+			if got != tc.want {
+				t.Errorf("SlugFromTitle(%q) = %q, want %q", tc.title, got, tc.want)
 			}
 		})
+	}
+
+	// ── Truncation ──
+	t.Run("truncation", func(t *testing.T) {
+		longWord := strings.Repeat("a", model.MaxSlugLength+10)
+		got := model.SlugFromTitle(longWord)
+		if len([]rune(got)) != model.MaxSlugLength {
+			t.Errorf("expected slug length %d, got %d (%q)", model.MaxSlugLength, len([]rune(got)), got)
+		}
+
+		// Truncation that ends on a trailing hyphen must strip it.
+		hyphenSegment := strings.Repeat("a", model.MaxSlugLength-1) + " b"
+		got2 := model.SlugFromTitle(hyphenSegment)
+		if len([]rune(got2)) != model.MaxSlugLength-1 {
+			t.Errorf("expected truncated slug without trailing hyphen, got %q", got2)
+		}
+		if strings.HasSuffix(got2, "-") {
+			t.Errorf("slug should not end with hyphen after truncation, got %q", got2)
+		}
+	})
+}
+
+// TestCreate_NormalizesUppercaseSlug verifies the service layer normalizes
+// uppercase input to lowercase before persisting.
+func TestCreate_NormalizesUppercaseSlug(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "tester", model.RoleAuthor)
+
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "HELLO-WORLD", Title: "t", Content: "c", Category: 1})
+	if err != nil {
+		t.Fatalf("expected uppercase slug to be normalized, got error: %v", err)
+	}
+	if post.Slug != "hello-world" {
+		t.Errorf("expected slug to be normalized to lowercase, got %q", post.Slug)
+	}
+}
+
+// TestUpdate_NormalizesUppercaseSlug verifies the service layer normalizes
+// uppercase slug input in Update, and a duplicate that only differs in case
+// is treated as a no-op (keeping the same slug).
+func TestUpdate_NormalizesUppercaseSlug(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "tester", model.RoleAuthor)
+
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-slug", Title: "t", Content: "c", Category: 1})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	// Case-only change should be a no-op.
+	updated, err := svc.Update(ctx, idString(post.ID), user.ID, UpdateRequest{Slug: "MY-SLUG"})
+	if err != nil {
+		t.Fatalf("Update with case-only change should succeed, got: %v", err)
+	}
+	if updated.Slug != "my-slug" {
+		t.Errorf("expected slug to stay my-slug, got %s", updated.Slug)
+	}
+}
+
+// TestCreate_SupportsInternationalSlugs verifies the full Create → GetBySlug
+// lifecycle works with non-ASCII slug content.
+func TestCreate_SupportsInternationalSlugs(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "tester", model.RoleAuthor)
+	db.Create(&model.GeneralSettings{AllowGuestViewPosts: true})
+
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
+		Slug:     "中文-标题-测试",
+		Title:    "中文标题",
+		Content:  "内容",
+		Category: 1,
+		Status:   model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create with Chinese slug should succeed, got: %v", err)
+	}
+	if post.Slug != "中文-标题-测试" {
+		t.Errorf("expected slug 中文-标题-测试, got %s", post.Slug)
+	}
+
+	// Lookup by slug works.
+	found, err := svc.GetBySlug(ctx, "中文-标题-测试", "", 0)
+	if err != nil {
+		t.Fatalf("GetBySlug with Chinese slug should succeed, got: %v", err)
+	}
+	if found.Title != "中文标题" {
+		t.Errorf("expected title 中文标题, got %s", found.Title)
 	}
 }
 
