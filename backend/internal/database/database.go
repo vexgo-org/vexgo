@@ -214,7 +214,7 @@ func backfillSlugs(db *gorm.DB) error {
 
 	var posts []model.Post
 	if err := db.Where("slug = '' OR slug IS NULL").Find(&posts).Error; err != nil {
-		return fmt.Errorf("backfill slugs: find empty: %w", err)
+		return fmt.Errorf("backfill slugs failed: %w", err)
 	}
 	if len(posts) == 0 {
 		return nil
