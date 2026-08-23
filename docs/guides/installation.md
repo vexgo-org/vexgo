@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- **Operating system**: Linux, macOS, Window, FreeBSD or any system with Docker
+- **Operating system**: Linux, macOS, Windows, FreeBSD or any system with Docker
 - **Memory**: 512 MB minimum, 1 GB recommended
 - **Disk**: at least 100 MB for the application, plus space for your data
 

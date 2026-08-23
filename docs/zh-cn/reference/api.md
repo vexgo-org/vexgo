@@ -41,7 +41,6 @@
 - `page`（int，默认：1）：页码
 - `limit`（int，默认：10，最大：100）：每页条数
 - `category`（string）：按分类名称筛选
-- `status`（string）：按状态筛选（`published`、`pending`、`rejected`、`draft`）
 - `search`（string）：在标题和内容中搜索
 
 **响应：**
@@ -77,7 +76,7 @@
 
 - 游客只能看到已发布的帖子（当 `allowGuestViewPosts` 启用时）
 - 非管理员用户只能看到其他用户已发布的帖子
-- 管理员可以查看所有状态的帖子
+- 管理员可以查看除已拒绝外的所有帖子
 
 ---
 
@@ -109,7 +108,7 @@
 **错误响应：**
 
 - `403`：`{"error": "You must be logged in to view this post"}`（游客浏览被禁用）
-- `404`：`{"error": "Post does not exist", "postId": "<id>", "details": "..."}`
+- `404`：`{"error": "Post does not exist", "postId": "<id>"}`
 
 ---
 

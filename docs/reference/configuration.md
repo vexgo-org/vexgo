@@ -30,15 +30,16 @@ Run `./vexgo --help` for the authoritative list.
 
 ### Server
 
-| Variable               | Default   | Description                                                                                                            |
-| ---------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `ADDR`                 | `0.0.0.0` | Server listen address                                                                                                  |
-| `PORT`                 | `3001`    | Server listen port                                                                                                     |
-| `DATA_DIR`             | `./data`  | Data directory path                                                                                                    |
-| `JWT_SECRET`           | —         | JWT secret key (**required in production**)                                                                            |
-| `LOG_LEVEL`            | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                        |
-| `BEHIND_REVERSE_PROXY` | `false`   | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                       |
-| `TRUSTED_PROXIES`      | —         | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks. |
+| Variable               | Default                 | Description                                                                                                            |
+| ---------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ADDR`                 | `0.0.0.0`               | Server listen address                                                                                                  |
+| `PORT`                 | `3001`                  | Server listen port                                                                                                     |
+| `DATA_DIR`             | `./data`                | Data directory path                                                                                                    |
+| `JWT_SECRET`           | —                       | JWT secret key (**required in production**)                                                                            |
+| `FRONTEND_URL`         | `http://localhost:5173` | Frontend application URL                                                                                               |
+| `LOG_LEVEL`            | `info`                  | Logging level: `debug`, `info`, `warn`, `error`                                                                        |
+| `BEHIND_REVERSE_PROXY` | `false`                 | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                       |
+| `TRUSTED_PROXIES`      | —                       | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks. |
 
 ### Database
 
@@ -110,7 +111,7 @@ Run `./vexgo --help` for the authoritative list.
 
 ## Config File Keys
 
-The config file uses the same settings with lowercase YAML keys. The default YAML config file is loaded from `examples/config.yml` in the repository.
+The config file uses the same settings with lowercase YAML keys. The canonical example lives at `examples/config.yml` in the repository and is loaded with `-c examples/config.yml`.
 
 ### Server
 
@@ -207,4 +208,4 @@ The config file uses the same settings with lowercase YAML keys. The default YAM
 | S3 access key    | `S3_ACCESS_KEY`        | `s3_access_key`        | —        |
 | S3 secret key    | `S3_SECRET_KEY`        | `s3_secret_key`        | —        |
 
-> **Note:** `base_url` (or `BASE_URL`) is read directly from the environment by the SSO package rather than the main config struct — set it via `BASE_URL` in production.
+> **Note:** `BASE_URL` and `FRONTEND_URL` are read directly from the environment rather than from a config-file key or CLI flag — set them as environment variables in production.

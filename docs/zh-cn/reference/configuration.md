@@ -30,15 +30,16 @@
 
 ### 服务器
 
-| 变量                   | 默认值    | 说明                                                                                       |
-| ---------------------- | --------- | ------------------------------------------------------------------------------------------ |
-| `ADDR`                 | `0.0.0.0` | 服务器监听地址                                                                             |
-| `PORT`                 | `3001`    | 服务器监听端口                                                                             |
-| `DATA_DIR`             | `./data`  | 数据目录路径                                                                               |
-| `JWT_SECRET`           | —         | JWT 签名密钥（**生产环境必填**）                                                           |
-| `LOG_LEVEL`            | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                 |
-| `BEHIND_REVERSE_PROXY` | `false`   | 位于反向代理之后时设为 `true`，以解析 `X-Forwarded-*` 请求头                               |
-| `TRUSTED_PROXIES`      | —         | 逗号分隔的可信代理 IP/CIDR。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。留空 = 默认私有网段。 |
+| 变量                   | 默认值                  | 说明                                                                                       |
+| ---------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `ADDR`                 | `0.0.0.0`               | 服务器监听地址                                                                             |
+| `PORT`                 | `3001`                  | 服务器监听端口                                                                             |
+| `DATA_DIR`             | `./data`                | 数据目录路径                                                                               |
+| `JWT_SECRET`           | —                       | JWT 签名密钥（**生产环境必填**）                                                           |
+| `FRONTEND_URL`         | `http://localhost:5173` | 前端应用地址                                                                               |
+| `LOG_LEVEL`            | `info`                  | 日志级别：`debug`、`info`、`warn`、`error`                                                 |
+| `BEHIND_REVERSE_PROXY` | `false`                 | 位于反向代理之后时设为 `true`，以解析 `X-Forwarded-*` 请求头                               |
+| `TRUSTED_PROXIES`      | —                       | 逗号分隔的可信代理 IP/CIDR。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。留空 = 默认私有网段。 |
 
 ### 数据库
 
@@ -110,7 +111,7 @@
 
 ## 配置文件键
 
-配置文件使用相同设置的小写 YAML 键。默认 YAML 配置文件为仓库中的 `examples/config.yml`。
+配置文件使用相同设置的小写 YAML 键。仓库中的示例配置文件为 `examples/config.yml`，通过 `-c examples/config.yml` 加载。
 
 ### 服务器
 
@@ -207,4 +208,4 @@
 | S3 Access Key    | `S3_ACCESS_KEY`        | `s3_access_key`        | —        |
 | S3 Secret Key    | `S3_SECRET_KEY`        | `s3_secret_key`        | —        |
 
-> **注意：** `BASE_URL` 由 SSO 包直接从环境变量读取，而非主配置结构——生产环境请通过 `BASE_URL` 设置。
+> **注意：** `BASE_URL` 和 `FRONTEND_URL` 直接由环境变量读取，没有对应的配置文件键或 CLI 参数——生产环境请以环境变量方式设置。

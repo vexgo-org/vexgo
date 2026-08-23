@@ -42,7 +42,7 @@ This site is the official documentation for VexGo. It is organized into four sec
 
 - **🖥️ Modern Web Interface** — React-based admin panel for content management
 - **🚀 High Performance** — built with Go and Gin
-- **🔐 Secure Authentication** — JWT-based user system with role-based permissions (`user` / `admin` / `super_admin`)
+- **🔐 Secure Authentication** — JWT-based user system with role-based permissions (`guest` / `contributor` / `author` / `admin` / `super_admin`)
 - **📝 Rich Content** — Markdown editor, categories, tags, drafts, likes, and comments
 - **🛡️ AI-Powered Moderation** — automatic comment moderation with configurable prompts, keyword blocking, and score thresholds
 - **🖼️ Media Management** — built-in file storage with S3-compatible support

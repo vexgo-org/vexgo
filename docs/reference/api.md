@@ -41,7 +41,6 @@ Get a paginated list of posts with filtering support.
 - `page` (int, default: 1): Page number
 - `limit` (int, default: 10, max: 100): Items per page
 - `category` (string): Filter by category name
-- `status` (string): Filter by status (`published`, `pending`, `rejected`, `draft`)
 - `search` (string): Search in title and content
 
 **Response:**
@@ -77,7 +76,7 @@ Get a paginated list of posts with filtering support.
 
 - Guests can only see published posts (when `allowGuestViewPosts` is enabled)
 - Non-admin users can only see published posts from other users
-- Admins can see all posts regardless of status
+- Admins can see all posts except rejected ones
 
 ---
 
@@ -109,7 +108,7 @@ Get a single post by ID.
 **Error Responses:**
 
 - `403`: `{"error": "You must be logged in to view this post"}` (guest viewing disabled)
-- `404`: `{"error": "Post does not exist", "postId": "<id>", "details": "..."}`
+- `404`: `{"error": "Post does not exist", "postId": "<id>"}`
 
 ---
 

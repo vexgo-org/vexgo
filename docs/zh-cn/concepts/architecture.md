@@ -60,9 +60,19 @@ repository.go → 持久化接口 + GORM 实现（调用数据库）
 跨领域的接缝定义在 `model` 包中，作为小型接口：
 
 ```go
+// NotificationInput 是 CreateNotification 接收的通知字段（userID、type、title、content、relatedID、relatedType）。
+type NotificationInput struct {
+    UserID      uint
+    Type        NotificationType
+    Title       string
+    Content     string
+    RelatedID   string
+    RelatedType NotificationRelatedType
+}
+
 // Notifier 是创建通知的接缝；由 notification 领域实现。
 type Notifier interface {
-    CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
+    CreateNotification(ctx context.Context, input NotificationInput) error
 }
 
 // FileRemover 删除已存储的文件（通过公开 URL）；由 upload.Storage 实现。

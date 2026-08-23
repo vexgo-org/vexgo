@@ -60,9 +60,19 @@ This separation ensures that:
 Cross-domain seams are defined in the `model` package as small interfaces:
 
 ```go
+// NotificationInput groups the notification fields passed to CreateNotification.
+type NotificationInput struct {
+    UserID      uint
+    Type        NotificationType
+    Title       string
+    Content     string
+    RelatedID   string
+    RelatedType NotificationRelatedType
+}
+
 // Notifier is the seam for creating notifications; implemented by the notification domain.
 type Notifier interface {
-    CreateNotification(ctx context.Context, userID uint, notificationType, title, content, relatedID, relatedType string) error
+    CreateNotification(ctx context.Context, input NotificationInput) error
 }
 
 // FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
