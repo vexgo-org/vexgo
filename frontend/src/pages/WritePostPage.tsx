@@ -131,7 +131,7 @@ export function WritePostPage() {
 
   const loadPost = async () => {
     try {
-      const response = await postsApi.getPost(id!);
+      const response = await postsApi.getPostById(id!);
       const post: LoadedPost = response.data.post;
       console.debug("WritePostPage loaded post:", post);
       console.log("Post content:", post.content);
