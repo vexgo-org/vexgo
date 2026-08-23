@@ -64,7 +64,7 @@ function App() {
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<HomePage />} />
-              <Route path="/post/:id" element={<PostDetailPage />} />
+              <Route path="/post/:slug" element={<PostDetailPage />} />
               <Route path="/user/:id" element={<UserPostsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

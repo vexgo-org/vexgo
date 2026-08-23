@@ -19,6 +19,7 @@ const (
 // Post is a blog article with its author, category, tags and moderation state.
 type Post struct {
 	ID              uint       `json:"id" gorm:"primaryKey"`
+	Slug            string     `json:"slug" gorm:"size:255;uniqueIndex"`
 	Title           string     `json:"title" binding:"required" gorm:"size:255"`
 	Content         string     `json:"content" binding:"required" gorm:"type:text"`
 	Excerpt         string     `json:"excerpt" gorm:"type:text"`

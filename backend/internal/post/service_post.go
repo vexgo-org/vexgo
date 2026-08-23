@@ -50,14 +50,32 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, e
 	return posts, total, nil
 }
 
-// Get returns a single post with privacy filtering, view-count increment and
-// like/comment counts.
+// Get returns a single post by numeric ID with privacy filtering, view-count
+// increment and like/comment counts. Used by internal operations (edit,
+// delete, likes, moderation).
 func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("post load: %w", err)
 	}
 
+	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
+}
+
+// GetBySlug returns a single post by slug with privacy filtering, view-count
+// increment and like/comment counts. Used by the public read route.
+func (s *Service) GetBySlug(ctx context.Context, slug, currentUserRole string, currentUserID uint) (*model.Post, error) {
+	post, err := s.repo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, ErrPostNotFound
+	}
+
+	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
+}
+
+// enrichPost fills like/comment counts, view count and privacy filtering on a
+// post that was just loaded from the database.
+func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	// If not logged in and guest viewing is not allowed, return 403
 	if currentUserRole == "" && !s.allowGuestView(ctx) {
 		return nil, ErrGuestViewDenied
@@ -91,6 +109,7 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 
 // CreateRequest carries the fields accepted when creating a post.
 type CreateRequest struct {
+	Slug       string
 	Title      string
 	Content    string
 	Category   any
@@ -105,6 +124,16 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	// Check if user has permission to create posts
 	if userRole == "" || userRole == model.RoleGuest {
 		return nil, ErrForbidden
+	}
+
+	// Validate slug
+	if err := model.ValidateSlug(req.Slug); err != nil {
+		return nil, fmt.Errorf("slug: %w", err)
+	}
+
+	// Check for duplicate slug
+	if _, err := s.repo.FindBySlug(ctx, req.Slug); err == nil {
+		return nil, fmt.Errorf("slug: %w", model.ErrSlugTaken)
 	}
 
 	// Convert category to string regardless of number or string type
@@ -136,6 +165,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 
 	post := model.Post{
+		Slug:       req.Slug,
 		Title:      req.Title,
 		Content:    req.Content,
 		Category:   catStr,
@@ -162,6 +192,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 
 // UpdateRequest carries the fields accepted when updating a post.
 type UpdateRequest struct {
+	Slug       string
 	Title      string
 	Content    string
 	Category   any
@@ -185,6 +216,17 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 	}
 	if !model.IsAdmin(user.Role) && post.AuthorID != userID {
 		return nil, ErrForbidden
+	}
+
+	if req.Slug != "" && req.Slug != post.Slug {
+		if err := model.ValidateSlug(req.Slug); err != nil {
+			return nil, fmt.Errorf("slug: %w", err)
+		}
+		// Allow the post to keep its own slug, reject duplicates with others.
+		if _, err := s.repo.FindBySlugExcludeID(ctx, req.Slug, post.ID); err == nil {
+			return nil, fmt.Errorf("slug: %w", model.ErrSlugTaken)
+		}
+		post.Slug = req.Slug
 	}
 
 	if req.Title != "" {

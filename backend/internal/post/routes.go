@@ -11,7 +11,8 @@ import (
 // in the legacy handler package.
 func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.GET("/posts", h.GetPosts)
-	api.GET("/posts/:id", h.GetPost)
+	api.GET("/posts/:slug", h.GetPost)
+	api.GET("/posts/by-id/:id", h.GetPostByID)
 
 	api.GET("/categories", h.GetCategories)
 	api.GET("/tags", h.GetTags)

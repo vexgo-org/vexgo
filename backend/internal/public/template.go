@@ -73,8 +73,11 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 		}
 	}
 
-	// Generate canonical URL
+	// Generate canonical URL (use slug when available, fall back to ID)
 	canonical := fmt.Sprintf("%s/posts/%d", baseURL, post.ID)
+	if post.Slug != "" {
+		canonical = fmt.Sprintf("%s/posts/%s", baseURL, post.Slug)
+	}
 
 	// Generate JSON data
 	postJSON, err := model.ToJSON(post)

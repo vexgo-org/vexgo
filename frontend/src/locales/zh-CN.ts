@@ -860,6 +860,11 @@ export const zhCN = {
     imageTooLarge: "图片大小不能超过10MB",
     uploadFailed: "上传失败，请重试",
     permissionDenied: "权限不足，无法访问写文章页面",
+    slugLabel: "URL 别名",
+    slugPlaceholder: "输入 URL 友好的别名（如 my-first-post）",
+    slugRequired: "请输入 URL 别名",
+    slugTaken: "该别名已被其他文章使用，请选择其他别名。",
+    generateSlug: "从标题生成",
   },
 
   // 通知中心页面

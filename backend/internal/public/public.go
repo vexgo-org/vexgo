@@ -289,8 +289,8 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	})
 
 	// Post detail page - server-side rendering (plural form)
-	e.GET("/posts/:id", func(c *gin.Context) {
-		id := c.Param("id")
+	e.GET("/posts/:slug", func(c *gin.Context) {
+		slug := c.Param("slug")
 
 		// Check if it's an API request
 		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
@@ -299,9 +299,9 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 			return
 		}
 
-		// Server-side rendering
+		// Server-side rendering: lookup by slug
 		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
+		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
 			// Post not found, fall back to SPA for frontend 404 handling
 			c.Next()
 			return
@@ -319,8 +319,8 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	})
 
 	// Post detail page - server-side rendering (singular form)
-	e.GET("/post/:id", func(c *gin.Context) {
-		id := c.Param("id")
+	e.GET("/post/:slug", func(c *gin.Context) {
+		slug := c.Param("slug")
 
 		// Check if it's an API request
 		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
@@ -329,9 +329,9 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 			return
 		}
 
-		// Server-side rendering
+		// Server-side rendering: lookup by slug
 		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
+		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
 			c.Next()
 			return
 		}

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { notificationsApi } from "@/lib/api";
+import { notificationsApi, postsApi } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { CreatorApplicationButton } from "@/components/CreatorApplicationButton";
 
@@ -158,15 +158,26 @@ export function NotificationCenterPage() {
   };
 
   // Navigate to the related content
-  const navigateToRelated = (
+  const navigateToRelated = async (
     relatedId: string,
     relatedType: "post" | "comment",
   ) => {
     if (relatedType === "post") {
-      navigate(`/post/${relatedId}`);
+      try {
+        const response = await postsApi.getPostById(relatedId);
+        navigate(`/post/${response.data.post.slug}`);
+      } catch {
+        // Fallback: navigate with the ID (will be handled by the post page)
+        navigate(`/post/by-id/${relatedId}`);
+      }
     } else if (relatedType === "comment") {
       // Navigate to the post page and scroll to the comment
-      navigate(`/post/123#comment-${relatedId}`);
+      try {
+        const response = await postsApi.getPostById(relatedId);
+        navigate(`/post/${response.data.post.slug}#comment-${relatedId}`);
+      } catch {
+        navigate(`/post/by-id/${relatedId}#comment-${relatedId}`);
+      }
     }
   };
 

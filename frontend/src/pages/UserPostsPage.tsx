@@ -205,7 +205,7 @@ export function UserPostsPage() {
                   className="hover:shadow-md transition-shadow"
                 >
                   <CardContent className="p-6">
-                    <Link to={`/post/${post.id}`} className="block group">
+                    <Link to={`/post/${post.slug}`} className="block group">
                       <h2 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">
                         {post.title}
                       </h2>

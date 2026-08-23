@@ -896,6 +896,12 @@ export const enUS = {
     imageTooLarge: "Image size cannot exceed 10MB",
     uploadFailed: "Upload failed, please try again",
     permissionDenied: "Permission denied, cannot access write post page",
+    slugLabel: "URL Slug",
+    slugPlaceholder: "Enter a URL-friendly slug (e.g. my-first-post)",
+    slugRequired: "Please enter a URL slug",
+    slugTaken:
+      "This slug is already taken by another post. Please choose a different one.",
+    generateSlug: "Generate from title",
   },
 
   // Notification Center Page

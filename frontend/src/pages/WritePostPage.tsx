@@ -75,6 +75,7 @@ export function WritePostPage() {
     }
   }, [isAuthenticated, user, navigate, t]);
 
+  const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
@@ -136,6 +137,7 @@ export function WritePostPage() {
       console.log("Post content:", post.content);
       console.log("Post content type:", typeof post.content);
       console.log("Post content length:", post.content?.length);
+      setSlug((post as { slug?: string }).slug || "");
       setTitle(post.title);
       setContent(post.content || "");
       setOriginalContent(post.content || "");
@@ -259,6 +261,26 @@ export function WritePostPage() {
     }
   };
 
+  // Generate a URL-safe slug from the title
+  const generateSlug = () => {
+    let s = title
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff\s-]/g, "")
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    // Remove Chinese characters and other non-ASCII
+    s = s.replace(/[^a-z0-9-]/g, "");
+    // Remove consecutive hyphens again after removing chars
+    s = s.replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+    if (!s) {
+      s = `post-${Date.now().toString(36)}`;
+    }
+    setSlug(s.slice(0, 200));
+  };
+
   const handleSubmit = async (status: "published" | "draft" | "pending") => {
     if (!title.trim()) {
       alert(t("writePostPage.titleRequired"));
@@ -272,10 +294,15 @@ export function WritePostPage() {
       alert(t("writePostPage.categoryRequired"));
       return;
     }
+    if (!slug.trim()) {
+      alert(t("writePostPage.slugRequired"));
+      return;
+    }
 
     setSaving(true);
     try {
       const postData = {
+        slug: slug.trim(),
         title: title.trim(),
         content,
         category,
@@ -287,14 +314,22 @@ export function WritePostPage() {
 
       if (isEditMode) {
         await postsApi.updatePost(id!, postData);
-        navigate(`/post/${id}`);
+        const updatedPost = await postsApi.getPostById(id!);
+        navigate(`/post/${updatedPost.data.post.slug}`);
       } else {
         const response = await postsApi.createPost(postData);
-        navigate(`/post/${response.data.post.id}`);
+        navigate(`/post/${response.data.post.slug}`);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to save post:", error);
-      alert(t("writePostPage.writePostFailed"));
+      const axiosErr = error as {
+        response?: { status?: number; data?: { error?: string } };
+      };
+      if (axiosErr.response?.status === 409) {
+        alert(t("writePostPage.slugTaken"));
+      } else {
+        alert(t("writePostPage.writePostFailed"));
+      }
     } finally {
       setSaving(false);
     }
@@ -312,6 +347,24 @@ export function WritePostPage() {
             onChange={(e) => setTitle(e.target.value)}
             className="text-2xl font-bold border-0 border-b rounded-none px-0 focus-visible:ring-0"
           />
+        </div>
+
+        {/* Slug */}
+        <div>
+          <Label htmlFor="slug" className="block mb-2">
+            {t("writePostPage.slugLabel")} *
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="slug"
+              placeholder={t("writePostPage.slugPlaceholder")}
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+            />
+            <Button type="button" variant="outline" onClick={generateSlug}>
+              {t("writePostPage.generateSlug")}
+            </Button>
+          </div>
         </div>
 
         {/* Cover image */}

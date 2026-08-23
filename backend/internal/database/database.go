@@ -180,7 +180,7 @@ func AutoMigrate(db *gorm.DB) error {
 		}
 	}
 
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.Post{},
 		&model.User{},
 		&model.Tag{},
@@ -197,7 +197,52 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.ThemeConfig{},
 		&model.Notification{},
 		&model.CreatorApplication{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// Backfill slugs for existing posts that don't have one yet.
+	return backfillSlugs(db)
+}
+
+// backfillSlugs generates unique slugs for existing posts that have an empty
+// slug column, deriving them from each post's title.
+func backfillSlugs(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&model.Post{}) {
+		return nil
+	}
+
+	var posts []model.Post
+	if err := db.Where("slug = '' OR slug IS NULL").Find(&posts).Error; err != nil {
+		return fmt.Errorf("backfill slugs: find empty: %w", err)
+	}
+	if len(posts) == 0 {
+		return nil
+	}
+
+	for _, post := range posts {
+		base := model.SlugFromTitle(post.Title)
+		if base == "" {
+			base = "post"
+		}
+		slug := base
+		counter := 1
+		for {
+			// Check for collision with an existing slug in the database.
+			var existing model.Post
+			err := db.Where("slug = ? AND id != ?", slug, post.ID).First(&existing).Error
+			if err != nil {
+				break // no collision
+			}
+			counter++
+			slug = fmt.Sprintf("%s-%d", base, counter)
+		}
+		if err := db.Model(&post).Update("slug", slug).Error; err != nil {
+			return fmt.Errorf("backfill slugs: update post %d: %w", post.ID, err)
+		}
+	}
+
+	return nil
 }
 
 // defaultAdminUsername is the login name of the seeded super admin account.
