@@ -238,7 +238,7 @@ func backfillSlugs(db *gorm.DB) error {
 			slug = fmt.Sprintf("%s-%d", base, counter)
 		}
 		if err := db.Model(&post).Update("slug", slug).Error; err != nil {
-			return fmt.Errorf("backfill slugs: update post %d: %w", post.ID, err)
+			return fmt.Errorf("backfill slugs failed (post_id=%d): %w", post.ID, err)
 		}
 	}
 
