@@ -131,7 +131,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 
 	// Validate slug
 	if err := model.ValidateSlug(req.Slug); err != nil {
-		return nil, fmt.Errorf("slug: %w", err)
+		return nil, fmt.Errorf("failed to validate slug: %w", err)
 	}
 
 	// Check for duplicate slug
