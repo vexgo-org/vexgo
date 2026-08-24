@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"golang.org/x/crypto/bcrypt"
@@ -62,7 +63,7 @@ type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Files     FileRemover
-	Mailer    model.Mailer
+	Mailer    mailer.MailSender
 	Captcha   CaptchaChecker
 }
 
@@ -81,7 +82,7 @@ type Service struct {
 	repo      Repository
 	jwtSecret []byte
 	files     FileRemover
-	mailer    model.Mailer
+	mailer    mailer.MailSender
 	captcha   CaptchaChecker
 }
 

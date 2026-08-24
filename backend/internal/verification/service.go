@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/google/uuid"
@@ -54,13 +55,13 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Mailer    model.Mailer
+	Mailer    mailer.MailSender
 }
 
 // Service contains the business logic of the verification domain.
 type Service struct {
 	repo   Repository
-	mailer model.Mailer
+	mailer mailer.MailSender
 }
 
 // NewService creates a verification service with the given dependencies.
