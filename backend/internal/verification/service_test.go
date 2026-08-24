@@ -3,6 +3,8 @@ package verification
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +36,50 @@ func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
 	db := newTestDB(t)
 	return NewService(Deps{DB: db, Mailer: mailer.NewMailer(db)}), db
+}
+
+func enableSMTP(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	cfg := model.SMTPConfig{Enabled: true, Host: "localhost", Port: 25, FromEmail: "a@b.c", FromName: "Test"}
+	if err := db.Create(&cfg).Error; err != nil {
+		t.Fatalf("failed to seed smtp config: %v", err)
+	}
+}
+
+// capturedEmail holds the rendered parts of an outgoing email captured by the
+// mailer test seam.
+type capturedEmail struct {
+	To       string
+	Subject  string
+	TextBody string
+	HTMLBody string
+}
+
+// capturedEmails records emails captured by the mailer test seam.
+var capturedEmails []capturedEmail
+
+// captureEmails installs the mailer capture hook and resets it after the test.
+func captureEmails(t *testing.T) {
+	t.Helper()
+	capturedEmails = nil
+	mailer.SetMailCaptureHook(func(to, subject, textBody, htmlBody string) {
+		capturedEmails = append(capturedEmails, capturedEmail{to, subject, textBody, htmlBody})
+	})
+	t.Cleanup(func() { mailer.SetMailCaptureHook(nil) })
+}
+
+// extractToken pulls the token query parameter out of an emailed link.
+func extractToken(t *testing.T, link string) string {
+	t.Helper()
+	u, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("failed to parse link %q: %v", link, err)
+	}
+	tok := u.Query().Get("token")
+	if tok == "" {
+		t.Fatalf("no token in link %q", link)
+	}
+	return tok
 }
 
 func TestIsCaptchaEnabled_DefaultDisabled(t *testing.T) {
@@ -282,5 +328,72 @@ func TestResendVerificationEmail_MissingUser(t *testing.T) {
 	svc, _ := newTestService(t)
 	if err := svc.ResendVerificationEmail(context.Background(), 99999, "localhost:8080"); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("expected ErrUserNotFound, got %v", err)
+	}
+}
+
+func TestResendVerificationEmail_SendsContentfulEmail(t *testing.T) {
+	svc, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: false}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	if err := svc.ResendVerificationEmail(context.Background(), u.ID, "localhost:8080"); err != nil {
+		t.Fatalf("ResendVerificationEmail error: %v", err)
+	}
+
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
+	}
+	email := capturedEmails[0]
+	if email.To != "alice@example.com" {
+		t.Errorf("expected To alice@example.com, got %q", email.To)
+	}
+	if email.Subject != "Please Verify Your Email Address" {
+		t.Errorf("unexpected subject %q", email.Subject)
+	}
+	if !strings.Contains(email.TextBody, "alice") || !strings.Contains(email.HTMLBody, "alice") {
+		t.Errorf("expected username in email body")
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixVerify) {
+		t.Fatalf("expected verify token, got %q", stored.VerificationToken)
+	}
+	wantLink := "localhost:8080/verify-email?token=" + stored.VerificationToken
+	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
+		t.Errorf("expected verification link %q in email body", wantLink)
+	}
+
+	// The emailed link actually verifies the address.
+	tok := extractToken(t, wantLink)
+	emailChange, _, err := svc.VerifyEmail(context.Background(), tok)
+	if err != nil {
+		t.Fatalf("VerifyEmail via link error: %v", err)
+	}
+	if emailChange {
+		t.Errorf("expected normal verification, got email change")
+	}
+}
+
+func TestResendVerificationEmail_NoEmailWhenSMTPDisabled(t *testing.T) {
+	svc, db := newTestService(t)
+	captureEmails(t)
+	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: false}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	if err := svc.ResendVerificationEmail(context.Background(), u.ID, "localhost:8080"); !errors.Is(err, ErrEmailServiceDisabled) {
+		t.Errorf("expected ErrEmailServiceDisabled, got %v", err)
+	}
+	if len(capturedEmails) != 0 {
+		t.Errorf("expected no email when SMTP disabled, got %d", len(capturedEmails))
 	}
 }

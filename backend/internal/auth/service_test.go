@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +19,9 @@ import (
 )
 
 var testJWTSecret = []byte("test-secret-for-auth-tests")
+
+// capturedEmails records emails captured by the mailer test seam.
+var capturedEmails []capturedEmail
 
 // fakeFiles records deleted URLs.
 type fakeFiles struct {
@@ -415,5 +420,221 @@ func TestIssueJWT(t *testing.T) {
 	}
 	if uint(claims["password_version"].(float64)) != 2 {
 		t.Errorf("expected password version 2 in claims")
+	}
+}
+
+// capturedEmail holds the rendered parts of an outgoing email captured by the
+// mailer test seam.
+type capturedEmail struct {
+	To       string
+	Subject  string
+	TextBody string
+	HTMLBody string
+}
+
+// captureEmails installs the mailer capture hook and resets it after the test.
+func captureEmails(t *testing.T) {
+	t.Helper()
+	capturedEmails = nil
+	mailer.SetMailCaptureHook(func(to, subject, textBody, htmlBody string) {
+		capturedEmails = append(capturedEmails, capturedEmail{to, subject, textBody, htmlBody})
+	})
+	t.Cleanup(func() { mailer.SetMailCaptureHook(nil) })
+}
+
+// extractToken pulls the token query parameter out of an emailed link.
+func extractToken(t *testing.T, link string) string {
+	t.Helper()
+	u, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("failed to parse link %q: %v", link, err)
+	}
+	tok := u.Query().Get("token")
+	if tok == "" {
+		t.Fatalf("no token in link %q", link)
+	}
+	return tok
+}
+
+func TestRegister_SendsVerificationEmail(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	result, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "new@example.com", Password: "password123", Username: "newbie",
+		Protocol: "https", Host: "example.com",
+	})
+	if err != nil {
+		t.Fatalf("Register error: %v", err)
+	}
+	if !result.RequiresVerification {
+		t.Errorf("expected verification required")
+	}
+
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
+	}
+	email := capturedEmails[0]
+	if email.To != "new@example.com" {
+		t.Errorf("expected To new@example.com, got %q", email.To)
+	}
+	if email.Subject != "Please Verify Your Email Address" {
+		t.Errorf("unexpected subject %q", email.Subject)
+	}
+	if !strings.Contains(email.TextBody, "newbie") || !strings.Contains(email.HTMLBody, "newbie") {
+		t.Errorf("expected recipient username in email body")
+	}
+
+	var stored model.User
+	if err := db.First(&stored, result.User.ID).Error; err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	wantLink := "https://example.com/verify-email?token=" + stored.VerificationToken
+	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
+		t.Errorf("expected verification link %q in email body", wantLink)
+	}
+
+	// The emailed link actually verifies the address.
+	tok := extractToken(t, wantLink)
+	vc := verification.NewService(verification.Deps{DB: db, Mailer: mailer.NewMailer(db)})
+	emailChange, _, err := vc.VerifyEmail(context.Background(), tok)
+	if err != nil {
+		t.Fatalf("VerifyEmail via link error: %v", err)
+	}
+	if emailChange {
+		t.Errorf("expected normal verification, got email change")
+	}
+}
+
+func TestRegister_NoEmailWhenSMTPDisabled(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	captureEmails(t)
+
+	result, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "x@example.com", Password: "password123", Username: "x",
+		Protocol: "https", Host: "example.com",
+	})
+	if err != nil {
+		t.Fatalf("Register error: %v", err)
+	}
+	if result.RequiresVerification {
+		t.Errorf("expected no verification requirement when SMTP disabled")
+	}
+	if len(capturedEmails) != 0 {
+		t.Errorf("expected no email sent, got %d", len(capturedEmails))
+	}
+}
+
+func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+	captureEmails(t)
+
+	pending, err := svc.UpdateEmail(context.Background(), UpdateEmailRequest{
+		UserID: u.ID, NewEmail: "fresh@example.com", Protocol: "https", Host: "example.com",
+	})
+	if err != nil {
+		t.Fatalf("UpdateEmail error: %v", err)
+	}
+	if !pending {
+		t.Errorf("expected pending confirmation")
+	}
+
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
+	}
+	email := capturedEmails[0]
+	if email.To != "alice@example.com" {
+		t.Errorf("expected To alice@example.com, got %q", email.To)
+	}
+	if email.Subject != "Confirm Email Change" {
+		t.Errorf("unexpected subject %q", email.Subject)
+	}
+	if !strings.Contains(email.TextBody, "fresh@example.com") || !strings.Contains(email.HTMLBody, "fresh@example.com") {
+		t.Errorf("expected new email in email body")
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixEmailChange) {
+		t.Fatalf("expected email-change token, got %q", stored.VerificationToken)
+	}
+	wantLink := "https://example.com/verify-email?token=" + stored.VerificationToken
+	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
+		t.Errorf("expected change link %q in email body", wantLink)
+	}
+
+	// The emailed link actually confirms the email change.
+	tok := extractToken(t, wantLink)
+	vc := verification.NewService(verification.Deps{DB: db, Mailer: mailer.NewMailer(db)})
+	emailChange, newEmail, err := vc.VerifyEmail(context.Background(), tok)
+	if err != nil {
+		t.Fatalf("VerifyEmail via link error: %v", err)
+	}
+	if !emailChange {
+		t.Errorf("expected email change")
+	}
+	if newEmail != "fresh@example.com" {
+		t.Errorf("expected new email fresh@example.com, got %q", newEmail)
+	}
+}
+
+func TestRequestPasswordReset_SendsResetEmail(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+	captureEmails(t)
+
+	if err := svc.RequestPasswordReset(context.Background(), "alice@example.com", "https", "example.com"); err != nil {
+		t.Fatalf("RequestPasswordReset error: %v", err)
+	}
+
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
+	}
+	email := capturedEmails[0]
+	if email.To != "alice@example.com" {
+		t.Errorf("expected To alice@example.com, got %q", email.To)
+	}
+	if email.Subject != "Password Reset Request" {
+		t.Errorf("unexpected subject %q", email.Subject)
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixReset) {
+		t.Fatalf("expected reset token, got %q", stored.VerificationToken)
+	}
+	wantLink := "https://example.com/reset-password?token=" + stored.VerificationToken
+	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
+		t.Errorf("expected reset link %q in email body", wantLink)
+	}
+
+	// The emailed link actually resets the password.
+	tok := extractToken(t, wantLink)
+	if err := svc.ResetPassword(context.Background(), tok, "brandnew123"); err != nil {
+		t.Fatalf("ResetPassword error: %v", err)
+	}
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Errorf("expected old password invalid after reset")
+	}
+}
+
+func TestRequestPasswordReset_NoEmailForUnknownUser(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	if err := svc.RequestPasswordReset(context.Background(), "ghost@example.com", "https", "example.com"); err != nil {
+		t.Fatalf("RequestPasswordReset error: %v", err)
+	}
+	if len(capturedEmails) != 0 {
+		t.Errorf("expected no email for unknown user, got %d", len(capturedEmails))
 	}
 }

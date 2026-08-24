@@ -49,6 +49,17 @@ type MailMessageArgs struct {
 // compile-time check that Mailer satisfies MailSender
 var _ MailSender = (*Mailer)(nil)
 
+// mailCaptureHook, when non-nil, receives the rendered parts of outgoing
+// emails instead of sending them over SMTP. It exists solely as a test seam so
+// callers can assert on email content without a real SMTP server.
+var mailCaptureHook func(to, subject, textBody, htmlBody string)
+
+// SetMailCaptureHook installs a hook that captures outgoing emails. Passing nil
+// restores real SMTP sending. Intended for tests.
+func SetMailCaptureHook(hook func(to, subject, textBody, htmlBody string)) {
+	mailCaptureHook = hook
+}
+
 // NewMailer creates a new Mailer instance
 func NewMailer(db *gorm.DB) *Mailer {
 	return &Mailer{DB: db}
@@ -127,6 +138,11 @@ If you did not register for this account, please ignore this email.
 		TextBody: textBody,
 		HTMLBody: htmlBody,
 	}, config)
+
+	if mailCaptureHook != nil {
+		mailCaptureHook(toEmail, "Please Verify Your Email Address", textBody, htmlBody)
+		return nil
+	}
 
 	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
@@ -279,6 +295,11 @@ If you did not request a password reset, please ignore this email.
 		HTMLBody: htmlBody,
 	}, config)
 
+	if mailCaptureHook != nil {
+		mailCaptureHook(toEmail, "Password Reset Request", textBody, htmlBody)
+		return nil
+	}
+
 	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
@@ -410,6 +431,11 @@ If you did not request an email change, please ignore this email.
 		TextBody: textBody,
 		HTMLBody: htmlBody,
 	}, config)
+
+	if mailCaptureHook != nil {
+		mailCaptureHook(toEmail, "Confirm Email Change", textBody, htmlBody)
+		return nil
+	}
 
 	// Connect to SMTP server
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
