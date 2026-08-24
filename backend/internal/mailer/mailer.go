@@ -5,6 +5,7 @@
 package mailer
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/smtp"
@@ -20,15 +21,15 @@ import (
 // management. It exists so domain packages can be tested without a real SMTP
 // server.
 type MailSender interface {
-	SendVerificationEmail(toEmail, toName, verificationLink string) error
-	GenerateVerificationToken(userID uint) (string, error)
-	VerifyEmail(token string) error
+	SendVerificationEmail(ctx context.Context, toEmail, toName, verificationLink string) error
+	GenerateVerificationToken(ctx context.Context, userID uint) (string, error)
+	VerifyEmail(ctx context.Context, token string) error
 	IsEmailEnabled() (bool, error)
-	SendPasswordResetEmail(toEmail, toName, resetLink string) error
-	GeneratePasswordResetToken(userID uint) (string, error)
-	GenerateEmailChangeToken(userID uint, newEmail string) (string, error)
-	SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error
-	ConfirmEmailChange(token string) error
+	SendPasswordResetEmail(ctx context.Context, toEmail, toName, resetLink string) error
+	GeneratePasswordResetToken(ctx context.Context, userID uint) (string, error)
+	GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error)
+	SendEmailChangeEmail(ctx context.Context, toEmail, toName, newEmail, verificationLink string) error
+	ConfirmEmailChange(ctx context.Context, token string) error
 }
 
 // Mailer sends transactional emails via SMTP and manages the associated
@@ -54,7 +55,7 @@ func NewMailer(db *gorm.DB) *Mailer {
 }
 
 // SendVerificationEmail sends email verification email
-func (m *Mailer) SendVerificationEmail(toEmail, toName, verificationLink string) error {
+func (m *Mailer) SendVerificationEmail(ctx context.Context, toEmail, toName, verificationLink string) error {
 	config, err := m.getConfig()
 	if err != nil {
 		return err
@@ -142,7 +143,7 @@ If you did not register for this account, please ignore this email.
 }
 
 // GenerateVerificationToken generates verification token
-func (m *Mailer) GenerateVerificationToken(userID uint) (string, error) {
+func (m *Mailer) GenerateVerificationToken(ctx context.Context, userID uint) (string, error) {
 	// Generate random token (should use more secure method in production)
 	token := model.TokenPrefixVerify + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
 
@@ -164,7 +165,7 @@ func (m *Mailer) GenerateVerificationToken(userID uint) (string, error) {
 // VerifyEmail verifies email address. Only email-verification tokens are
 // accepted: password-reset and email-change tokens are rejected so they
 // cannot be cross-used to verify an email.
-func (m *Mailer) VerifyEmail(token string) error {
+func (m *Mailer) VerifyEmail(ctx context.Context, token string) error {
 	if strings.HasPrefix(token, model.TokenPrefixReset) || strings.HasPrefix(token, model.TokenPrefixEmailChange) {
 		return fmt.Errorf("invalid verification token")
 	}
@@ -204,7 +205,7 @@ func (m *Mailer) IsEmailEnabled() (bool, error) {
 }
 
 // SendPasswordResetEmail sends password reset email
-func (m *Mailer) SendPasswordResetEmail(toEmail, toName, resetLink string) error {
+func (m *Mailer) SendPasswordResetEmail(ctx context.Context, toEmail, toName, resetLink string) error {
 	// Get SMTP configuration
 	config, err := m.getConfig()
 	if err != nil {
@@ -293,7 +294,7 @@ If you did not request a password reset, please ignore this email.
 }
 
 // GeneratePasswordResetToken generates password reset token
-func (m *Mailer) GeneratePasswordResetToken(userID uint) (string, error) {
+func (m *Mailer) GeneratePasswordResetToken(ctx context.Context, userID uint) (string, error) {
 	// Generate random token
 	token := model.TokenPrefixReset + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
 
@@ -313,7 +314,7 @@ func (m *Mailer) GeneratePasswordResetToken(userID uint) (string, error) {
 }
 
 // GenerateEmailChangeToken generates email change verification token
-func (m *Mailer) GenerateEmailChangeToken(userID uint, newEmail string) (string, error) {
+func (m *Mailer) GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error) {
 	// Generate random token
 	token := model.TokenPrefixEmailChange + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
 
@@ -334,7 +335,7 @@ func (m *Mailer) GenerateEmailChangeToken(userID uint, newEmail string) (string,
 }
 
 // SendEmailChangeEmail sends email change confirmation email
-func (m *Mailer) SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error {
+func (m *Mailer) SendEmailChangeEmail(ctx context.Context, toEmail, toName, newEmail, verificationLink string) error {
 	// Get SMTP configuration
 	config, err := m.getConfig()
 	if err != nil {
@@ -425,7 +426,7 @@ If you did not request an email change, please ignore this email.
 }
 
 // ConfirmEmailChange confirms email change
-func (m *Mailer) ConfirmEmailChange(token string) error {
+func (m *Mailer) ConfirmEmailChange(ctx context.Context, token string) error {
 	slog.Debug("confirm email change processing started", "token", token)
 
 	// Only email-change tokens may confirm an email change.

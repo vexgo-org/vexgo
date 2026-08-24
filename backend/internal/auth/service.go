@@ -255,7 +255,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 
 	// Send a verification email when SMTP is enabled; otherwise the account
 	// is immediately usable.
-	if s.sendVerificationEmail(&newUser, req.Protocol, req.Host) {
+	if s.sendVerificationEmail(ctx, &newUser, req.Protocol, req.Host) {
 		return &RegisterResult{User: &newUser, RequiresVerification: true}, nil
 	}
 
@@ -266,7 +266,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 // created user. It returns true when the message was sent (so registration
 // requires verification); failures are logged and reported as false so a
 // transient SMTP error does not block registration.
-func (s *Service) sendVerificationEmail(user *model.User, protocol, host string) bool {
+func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) bool {
 	enabled, err := s.mailer.IsEmailEnabled()
 	logger := slog.With("email", user.Email)
 	if err != nil {
@@ -278,14 +278,14 @@ func (s *Service) sendVerificationEmail(user *model.User, protocol, host string)
 		return false
 	}
 
-	token, err := s.mailer.GenerateVerificationToken(user.ID)
+	token, err := s.mailer.GenerateVerificationToken(ctx, user.ID)
 	if err != nil {
 		logger.Error("failed to generate verification token", "err", err)
 		return false
 	}
 
 	verificationLink := buildLinkWithToken(protocol, host, verificationLinkPath, token)
-	if err := s.mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
+	if err := s.mailer.SendVerificationEmail(ctx, user.Email, user.Username, verificationLink); err != nil {
 		logger.Error("failed to send verification email", "err", err)
 		return false
 	}
@@ -458,7 +458,7 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 
 	if enabled {
 		// If SMTP enabled, generate email change verification token and send confirmation email
-		token, err := s.mailer.GenerateEmailChangeToken(req.UserID, req.NewEmail)
+		token, err := s.mailer.GenerateEmailChangeToken(ctx, req.UserID, req.NewEmail)
 		if err != nil {
 			return false, ErrGenerateToken
 		}
@@ -467,7 +467,7 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 		verificationLink := buildLinkWithToken(req.Protocol, req.Host, verificationLinkPath, token)
 
 		// Send confirmation email
-		if err := s.mailer.SendEmailChangeEmail(user.Email, user.Username, req.NewEmail, verificationLink); err != nil {
+		if err := s.mailer.SendEmailChangeEmail(ctx, user.Email, user.Username, req.NewEmail, verificationLink); err != nil {
 			return false, ErrSendEmail
 		}
 
@@ -499,7 +499,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, protocol, hos
 	}
 
 	// Generate password reset token
-	token, err := s.mailer.GeneratePasswordResetToken(user.ID)
+	token, err := s.mailer.GeneratePasswordResetToken(ctx, user.ID)
 	if err != nil {
 		return ErrGenerateResetToken
 	}
@@ -508,7 +508,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, protocol, hos
 	resetLink := buildLinkWithToken(protocol, host, resetLinkPath, token)
 
 	// Send email
-	if err := s.mailer.SendPasswordResetEmail(user.Email, user.Username, resetLink); err != nil {
+	if err := s.mailer.SendPasswordResetEmail(ctx, user.Email, user.Username, resetLink); err != nil {
 		return ErrSendResetEmail
 	}
 

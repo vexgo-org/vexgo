@@ -86,7 +86,7 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bo
 		}
 		pendingEmail := user.PendingEmail
 
-		if err := s.mailer.ConfirmEmailChange(token); err != nil {
+		if err := s.mailer.ConfirmEmailChange(ctx, token); err != nil {
 			slog.Debug("confirm email change failed", "err", err)
 			return false, "", err
 		}
@@ -95,7 +95,7 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bo
 	}
 
 	slog.Debug("normal email verification token, calling VerifyEmail")
-	if err := s.mailer.VerifyEmail(token); err != nil {
+	if err := s.mailer.VerifyEmail(ctx, token); err != nil {
 		slog.Debug("verify email failed", "err", err)
 		return false, "", err
 	}
@@ -136,14 +136,14 @@ func (s *Service) ResendVerificationEmail(ctx context.Context, userID uint, host
 	}
 
 	// Generate new verification token
-	token, err := s.mailer.GenerateVerificationToken(user.ID)
+	token, err := s.mailer.GenerateVerificationToken(ctx, user.ID)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrGenerateToken, err)
 	}
 
 	// Build verification link
 	verificationLink := host + "/verify-email?token=" + token
-	if err := s.mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
+	if err := s.mailer.SendVerificationEmail(ctx, user.Email, user.Username, verificationLink); err != nil {
 		return fmt.Errorf("%w: %v", ErrSendVerificationEmail, err)
 	}
 
