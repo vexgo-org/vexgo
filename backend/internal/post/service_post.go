@@ -136,7 +136,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 
 	// Check for duplicate slug
 	if _, err := s.repo.FindBySlug(ctx, req.Slug); err == nil {
-		return nil, fmt.Errorf("slug: %w", model.ErrSlugTaken)
+		return nil, fmt.Errorf("failed to find post by slug: %w", model.ErrSlugTaken)
 	}
 
 	// Convert category to string regardless of number or string type
