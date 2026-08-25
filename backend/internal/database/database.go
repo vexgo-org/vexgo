@@ -75,14 +75,16 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		user, password, host, port, dbname)
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{TranslateError: true})
+	gormCfg := &gorm.Config{TranslateError: true}
+
+	db, err := gorm.Open(mysql.Open(dsn), gormCfg)
 	if err != nil {
 		// Check if the error is "Unknown database" (error code 1049)
 		if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
 			slog.Info("database not found, attempting to create it", "dbname", dbname)
 			// DSN without database name to connect to the server
 			serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
-			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{TranslateError: true})
+			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), gormCfg)
 			if serverErr != nil {
 				return nil, fmt.Errorf("connect to MySQL server to create database: %w", serverErr)
 			}
@@ -93,7 +95,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 			}
 			slog.Info("database created successfully", "dbname", dbname)
 			// Re-attempt connection to the newly created database
-			db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{TranslateError: true})
+			db, err = gorm.Open(mysql.Open(dsn), gormCfg)
 			if err != nil {
 				return nil, fmt.Errorf("connect to newly created MySQL database: %w", err)
 			}
