@@ -70,6 +70,51 @@ func (s *Service) SendVerificationEmail(ctx context.Context, toEmail, toName, ve
 	return nil
 }
 
+// SendPasswordResetEmail sends password reset email
+func (s *Service) SendPasswordResetEmail(ctx context.Context, toEmail, toName, resetLink string) error {
+	if err := s.readConfig(ctx); err != nil {
+		return err
+	}
+
+	data := passwordResetEmailTemplateData{
+		Name: toName,
+		Link: resetLink,
+	}
+
+	textBody, err := RenderTextTemplate(
+		resetPasswordEmailTemplateText,
+		data,
+	)
+	if err != nil {
+		return fmt.Errorf("render text password reset email failed: %w", err)
+	}
+
+	htmlBody, err := RenderHTMLTemplate(
+		resetPasswordEmailTemplateHTML,
+		data,
+	)
+	if err != nil {
+		return fmt.Errorf("render html password reset email failed: %w", err)
+	}
+
+	const SUBJECT = "Password Reset Request"
+	if mailCaptureHook != nil {
+		mailCaptureHook(toEmail, SUBJECT, textBody, htmlBody)
+		return nil
+	}
+
+	if err := s.client.Send(Message{
+		To:       []string{toEmail},
+		Subject:  SUBJECT,
+		TextBody: textBody,
+		HTMLBody: htmlBody,
+	}); err != nil {
+		return fmt.Errorf("send password reset email failed: %w", err)
+	}
+
+	return nil
+}
+
 // readConfig reads SMTP configuration from database, and
 // updates the configuraiton of SMTP client.
 func (s *Service) readConfig(ctx context.Context) error {

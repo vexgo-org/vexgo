@@ -12,8 +12,10 @@ import (
 var templateFS embed.FS
 
 const (
-	verificationEmailTemplateText = "templates/verification.txt"
-	verificationEmailTemplateHTML = "templates/verification.html"
+	verificationEmailTemplateText  = "templates/verification.txt"
+	verificationEmailTemplateHTML  = "templates/verification.html"
+	resetPasswordEmailTemplateText = "templates/password-reset.txt"
+	resetPasswordEmailTemplateHTML = "templates/password-reset.html"
 )
 
 // RenderHTMLTemplate renders HTML templates.
