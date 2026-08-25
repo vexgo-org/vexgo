@@ -325,6 +325,11 @@ export function WritePostPage() {
       };
       if (axiosErr.response?.status === 409) {
         alert(t("writePostPage.slugTaken"));
+      } else if (
+        axiosErr.response?.status === 400 &&
+        axiosErr.response?.data?.error
+      ) {
+        alert(axiosErr.response.data.error);
       } else {
         alert(t("writePostPage.writePostFailed"));
       }
