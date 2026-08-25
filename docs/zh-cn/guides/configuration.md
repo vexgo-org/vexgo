@@ -17,7 +17,7 @@ VexGo 从四个来源读取配置。当同一设置出现在多个来源时，�
 | 环境变量         | `PORT=8080 ./vexgo`      | 容器（Docker、systemd） |
 | 默认值           | `3001`、`./data`、`info` | 未设置任何值时的兜底    |
 
-**CLI 参数：** `-c <file>`（配置文件）、`--addr`、`--port`、`--data`。运行 `./vexgo --help` 查看全部参数。
+**CLI 参数：** `--config, -c <file>`、`--addr, -a`、`--port, -p`、`--data, -d`、`--version, -V`、`--help, -h`。运行 `./vexgo --help` 查看完整列表。
 
 > **提示：** 密钥（如 `JWT_SECRET` 或数据库密码）既可在配置文件中，也可用环境变量提供——选择符合你部署方式的方案。切勿把真实密钥提交到仓库。
 

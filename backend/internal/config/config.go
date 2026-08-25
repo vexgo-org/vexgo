@@ -4,6 +4,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,22 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+)
+
+// Action describes what the program should do after parsing flags.
+type Action int
+
+const (
+	ActionRun     Action = iota // Start the server normally.
+	ActionHelp                  // Print usage and exit 0.
+	ActionVersion               // Print version and exit 0.
+)
+
+// Default values used in PrintUsage and as fallback in newConfigFromEnv.
+const (
+	defaultAddr    = "0.0.0.0"
+	defaultPort    = 3001
+	defaultDataDir = "./data"
 )
 
 // Config holds the server configuration from command line arguments and/or config file
@@ -137,20 +154,62 @@ type fileConfig struct {
 	S3DisableBucketInCustomURL *bool  `yaml:"s3_disable_bucket_in_custom_url"`
 }
 
-// ParseFlags parses command line flags and returns the server configuration.
-// Priority: command line flags > config file > environment variables > defaults.
-func ParseFlags() *Config {
+// ParseFlags parses command-line arguments and returns the action to take
+// and the server configuration. version is the build version string, injected
+// via ldflags.
+//
+// When args are invalid it prints an error and usage to stderr and returns
+// ActionRun with a nil *Config — the caller should exit with code 2.
+func ParseFlags(version string, args []string) (Action, *Config) {
 	loadDotEnv()
 
-	configFile := flag.String("c", "", "Path to configuration file (YAML format)")
-	addr := flag.String("addr", "", "Address to listen on")
-	port := flag.Int("port", 0, "Port to listen on")
-	dataDir := flag.String("data", "", "Data directory for storing sqlite database and media files")
+	fs := flag.NewFlagSet("vexgo", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
 
-	// Parse command line flags
-	flag.Parse()
+	var (
+		configFile  string
+		addr        string
+		port        int
+		dataDir     string
+		showVersion bool
+	)
 
-	return buildConfig(*addr, *port, *dataDir, *configFile)
+	// Register both long and short forms for every option, bound to the
+	// same variable so either spelling writes the same value.
+	fs.StringVar(&configFile, "config", "", "Path to configuration file (YAML format)")
+	fs.StringVar(&configFile, "c", "", "Alias for -config")
+
+	fs.StringVar(&addr, "addr", "", "Address to listen on")
+	fs.StringVar(&addr, "a", "", "Alias for -addr")
+
+	fs.IntVar(&port, "port", 0, "Port to listen on")
+	fs.IntVar(&port, "p", 0, "Alias for -port")
+
+	fs.StringVar(&dataDir, "data", "", "Data directory for storing SQLite database and media files")
+	fs.StringVar(&dataDir, "d", "", "Alias for -data")
+
+	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
+	fs.BoolVar(&showVersion, "V", false, "Alias for -version")
+
+	// Suppress the automatic usage callback — we handle display ourselves
+	// so the help message is printed exactly once.
+	fs.Usage = func() {}
+
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ActionHelp, nil
+		}
+		fmt.Fprintf(os.Stderr, "vexgo: %v\n", err)
+		PrintUsage()
+		return ActionRun, nil
+	}
+
+	if showVersion {
+		fmt.Printf("vexgo %s\n", version)
+		return ActionVersion, nil
+	}
+
+	return ActionRun, buildConfig(addr, port, dataDir, configFile)
 }
 
 // buildConfig merges the three configuration sources with explicit priority:
@@ -188,9 +247,9 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 // falling back to defaults when a variable is unset or invalid.
 func newConfigFromEnv() *Config {
 	return &Config{
-		Addr:     envString("ADDR", "0.0.0.0"),
-		Port:     envInt("PORT", 3001),
-		DataDir:  envString("DATA_DIR", "./data"),
+		Addr:     envString("ADDR", defaultAddr),
+		Port:     envInt("PORT", defaultPort),
+		DataDir:  envString("DATA_DIR", defaultDataDir),
 		LogLevel: envString("LOG_LEVEL", "info"),
 
 		DBType:     envString("DB_TYPE", ""),
@@ -440,11 +499,16 @@ func (c *Config) GetListenAddr() string {
 	return fmt.Sprintf("%s:%d", c.Addr, c.Port)
 }
 
-// PrintUsage prints usage information for the server command
+// PrintUsage prints the command-line usage to stdout, showing both long
+// and short spellings with their default values.
 func PrintUsage() {
-	fmt.Printf("Usage: %s [options]\n", os.Args[0])
-	fmt.Println("\nOptions:")
-	flag.PrintDefaults()
+	fmt.Printf("Usage: vexgo [options]\n\nOptions:\n")
+	fmt.Printf("  --config, -c <file>    Path to configuration file (YAML format)\n")
+	fmt.Printf("  --addr, -a <addr>      Address to listen on (default: %s)\n", defaultAddr)
+	fmt.Printf("  --port, -p <port>      Port to listen on (default: %d)\n", defaultPort)
+	fmt.Printf("  --data, -d <dir>       Data directory (default: %s)\n", defaultDataDir)
+	fmt.Printf("  --version, -V          Print version and exit\n")
+	fmt.Printf("  --help, -h             Print this help and exit\n")
 }
 
 // parseTrustedProxies parses a comma-separated list of trusted proxies

@@ -19,12 +19,14 @@ An explicit value in a higher-priority source overrides lower sources. Note that
 
 Run `./vexgo --help` for the authoritative list.
 
-| Flag        | Default   | Description                                   |
-| ----------- | --------- | --------------------------------------------- |
-| `-c <file>` | —         | Path to a YAML configuration file             |
-| `--addr`    | `0.0.0.0` | Listen address                                |
-| `--port`    | `3001`    | Listen port                                   |
-| `--data`    | `./data`  | Data directory (SQLite DB and uploaded media) |
+| Flag                  | Default   | Description                                   |
+| --------------------- | --------- | --------------------------------------------- |
+| `--config, -c <file>` | —         | Path to a YAML configuration file             |
+| `--addr, -a <addr>`   | `0.0.0.0` | Listen address                                |
+| `--port, -p <port>`   | `3001`    | Listen port                                   |
+| `--data, -d <dir>`    | `./data`  | Data directory (SQLite DB and uploaded media) |
+| `--version, -V`       | —         | Print version and exit                        |
+| `--help, -h`          | —         | Print help and exit                           |
 
 ## Environment Variables
 
@@ -177,35 +179,35 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 
 ## Environment ↔ Config File ↔ Flag Cross-Reference
 
-| Setting          | Environment variable   | Config file key        | CLI flag |
-| ---------------- | ---------------------- | ---------------------- | -------- |
-| Listen address   | `ADDR`                 | `addr`                 | `--addr` |
-| Listen port      | `PORT`                 | `port`                 | `--port` |
-| Data directory   | `DATA_DIR`             | `data`                 | `--data` |
-| JWT secret       | `JWT_SECRET`           | `jwt_secret`           | —        |
-| Log level        | `LOG_LEVEL`            | `log_level`            | —        |
-| Reverse proxy    | `BEHIND_REVERSE_PROXY` | `behind_reverse_proxy` | —        |
-| Trusted proxies  | `TRUSTED_PROXIES`      | `trusted_proxies`      | —        |
-| DB type          | `DB_TYPE`              | `db_type`              | —        |
-| DB host          | `DB_HOST`              | `db_host`              | —        |
-| DB port          | `DB_PORT`              | `db_port`              | —        |
-| DB user          | `DB_USER`              | `db_user`              | —        |
-| DB password      | `DB_PASSWORD`          | `db_password`          | —        |
-| DB name          | `DB_NAME`              | `db_name`              | —        |
-| DB SSL mode      | `DB_SSL_MODE`          | `db_ssl_mode`          | —        |
-| GitHub client ID | `GITHUB_CLIENT_ID`     | `github_client_id`     | —        |
-| GitHub secret    | `GITHUB_CLIENT_SECRET` | `github_client_secret` | —        |
-| Google client ID | `GOOGLE_CLIENT_ID`     | `google_client_id`     | —        |
-| Google secret    | `GOOGLE_CLIENT_SECRET` | `google_client_secret` | —        |
-| OIDC enabled     | `OIDC_ENABLED`         | `oidc_enabled`         | —        |
-| OIDC issuer      | `OIDC_ISSUER_URL`      | `oidc_issuer_url`      | —        |
-| OIDC client ID   | `OIDC_CLIENT_ID`       | `oidc_client_id`       | —        |
-| OIDC secret      | `OIDC_CLIENT_SECRET`   | `oidc_client_secret`   | —        |
-| S3 enabled       | `S3_ENABLED`           | `s3_enabled`           | —        |
-| S3 endpoint      | `S3_ENDPOINT`          | `s3_endpoint`          | —        |
-| S3 region        | `S3_REGION`            | `s3_region`            | —        |
-| S3 bucket        | `S3_BUCKET`            | `s3_bucket`            | —        |
-| S3 access key    | `S3_ACCESS_KEY`        | `s3_access_key`        | —        |
-| S3 secret key    | `S3_SECRET_KEY`        | `s3_secret_key`        | —        |
+| Setting          | Environment variable   | Config file key        | CLI flag     |
+| ---------------- | ---------------------- | ---------------------- | ------------ |
+| Listen address   | `ADDR`                 | `addr`                 | `--addr, -a` |
+| Listen port      | `PORT`                 | `port`                 | `--port, -p` |
+| Data directory   | `DATA_DIR`             | `data`                 | `--data, -d` |
+| JWT secret       | `JWT_SECRET`           | `jwt_secret`           | —            |
+| Log level        | `LOG_LEVEL`            | `log_level`            | —            |
+| Reverse proxy    | `BEHIND_REVERSE_PROXY` | `behind_reverse_proxy` | —            |
+| Trusted proxies  | `TRUSTED_PROXIES`      | `trusted_proxies`      | —            |
+| DB type          | `DB_TYPE`              | `db_type`              | —            |
+| DB host          | `DB_HOST`              | `db_host`              | —            |
+| DB port          | `DB_PORT`              | `db_port`              | —            |
+| DB user          | `DB_USER`              | `db_user`              | —            |
+| DB password      | `DB_PASSWORD`          | `db_password`          | —            |
+| DB name          | `DB_NAME`              | `db_name`              | —            |
+| DB SSL mode      | `DB_SSL_MODE`          | `db_ssl_mode`          | —            |
+| GitHub client ID | `GITHUB_CLIENT_ID`     | `github_client_id`     | —            |
+| GitHub secret    | `GITHUB_CLIENT_SECRET` | `github_client_secret` | —            |
+| Google client ID | `GOOGLE_CLIENT_ID`     | `google_client_id`     | —            |
+| Google secret    | `GOOGLE_CLIENT_SECRET` | `google_client_secret` | —            |
+| OIDC enabled     | `OIDC_ENABLED`         | `oidc_enabled`         | —            |
+| OIDC issuer      | `OIDC_ISSUER_URL`      | `oidc_issuer_url`      | —            |
+| OIDC client ID   | `OIDC_CLIENT_ID`       | `oidc_client_id`       | —            |
+| OIDC secret      | `OIDC_CLIENT_SECRET`   | `oidc_client_secret`   | —            |
+| S3 enabled       | `S3_ENABLED`           | `s3_enabled`           | —            |
+| S3 endpoint      | `S3_ENDPOINT`          | `s3_endpoint`          | —            |
+| S3 region        | `S3_REGION`            | `s3_region`            | —            |
+| S3 bucket        | `S3_BUCKET`            | `s3_bucket`            | —            |
+| S3 access key    | `S3_ACCESS_KEY`        | `s3_access_key`        | —            |
+| S3 secret key    | `S3_SECRET_KEY`        | `s3_secret_key`        | —            |
 
 > **Note:** `BASE_URL` and `FRONTEND_URL` are read directly from the environment rather than from a config-file key or CLI flag — set them as environment variables in production.

@@ -155,3 +155,149 @@ func TestEnvWithoutConfigFileStillPopulatesSSO(t *testing.T) {
 		t.Fatalf("env-only config should populate SSO, got %s", cfg.SSO.GitHub.ClientID)
 	}
 }
+
+// =============================================================================
+// ParseFlags tests — cover alias pairs, version, help, unknown flags, defaults.
+// =============================================================================
+
+func TestParseFlagsLongSpellings(t *testing.T) {
+	_, cfg := ParseFlags("dev", []string{
+		"--config", "/tmp/cfg.yaml",
+		"--addr", "10.0.0.1",
+		"--port", "8080",
+		"--data", "/tmp/data",
+	})
+
+	if cfg.Addr != "10.0.0.1" {
+		t.Fatalf("--addr: expected 10.0.0.1, got %s", cfg.Addr)
+	}
+	if cfg.Port != 8080 {
+		t.Fatalf("--port: expected 8080, got %d", cfg.Port)
+	}
+	if cfg.DataDir != "/tmp/data" {
+		t.Fatalf("--data: expected /tmp/data, got %s", cfg.DataDir)
+	}
+}
+
+func TestParseFlagsShortSpellings(t *testing.T) {
+	_, cfg := ParseFlags("dev", []string{
+		"-c", "/tmp/cfg.yaml",
+		"-a", "10.0.0.1",
+		"-p", "9090",
+		"-d", "/custom/data",
+	})
+
+	if cfg.Addr != "10.0.0.1" {
+		t.Fatalf("-a: expected 10.0.0.1, got %s", cfg.Addr)
+	}
+	if cfg.Port != 9090 {
+		t.Fatalf("-p: expected 9090, got %d", cfg.Port)
+	}
+	if cfg.DataDir != "/custom/data" {
+		t.Fatalf("-d: expected /custom/data, got %s", cfg.DataDir)
+	}
+}
+
+func TestParseFlagsAliasPairsWriteSameConfig(t *testing.T) {
+	// Long spelling followed by short spelling: the last one wins.
+	_, cfg := ParseFlags("dev", []string{
+		"--addr", "ignored",
+		"-a", "10.1.1.1",
+		"--port", "1111",
+		"-p", "2222",
+	})
+
+	if cfg.Addr != "10.1.1.1" {
+		t.Fatalf("addr should be 10.1.1.1 (last wins), got %s", cfg.Addr)
+	}
+	if cfg.Port != 2222 {
+		t.Fatalf("port should be 2222 (last wins), got %d", cfg.Port)
+	}
+}
+
+func TestParseFlagsNoArgsDefaults(t *testing.T) {
+	_, cfg := ParseFlags("dev", nil)
+
+	if cfg.Addr != defaultAddr {
+		t.Fatalf("default addr, got %s", cfg.Addr)
+	}
+	if cfg.Port != defaultPort {
+		t.Fatalf("default port, got %d", cfg.Port)
+	}
+	if cfg.DataDir != defaultDataDir {
+		t.Fatalf("default data dir, got %s", cfg.DataDir)
+	}
+}
+
+func TestParseFlagsVersion(t *testing.T) {
+	action, _ := ParseFlags("1.2.3", []string{"--version"})
+	if action != ActionVersion {
+		t.Fatalf("--version should return ActionVersion, got %v", action)
+	}
+}
+
+func TestParseFlagsVersionShort(t *testing.T) {
+	action, _ := ParseFlags("1.2.3", []string{"-V"})
+	if action != ActionVersion {
+		t.Fatalf("-V should return ActionVersion, got %v", action)
+	}
+}
+
+func TestParseFlagsVersionDefaultIsDev(t *testing.T) {
+	// The default version injected by main.go is "dev".
+	// Verify that passing "dev" as the version argument works with both
+	// --version and -V.
+	t.Run("long", func(t *testing.T) {
+		action, _ := ParseFlags("dev", []string{"--version"})
+		if action != ActionVersion {
+			t.Errorf("expected ActionVersion, got %v", action)
+		}
+	})
+	t.Run("short", func(t *testing.T) {
+		action, _ := ParseFlags("dev", []string{"-V"})
+		if action != ActionVersion {
+			t.Errorf("expected ActionVersion, got %v", action)
+		}
+	})
+}
+
+func TestParseFlagsHelp(t *testing.T) {
+	action, _ := ParseFlags("dev", []string{"--help"})
+	if action != ActionHelp {
+		t.Fatalf("--help should return ActionHelp, got %v", action)
+	}
+}
+
+func TestParseFlagsHelpShort(t *testing.T) {
+	action, _ := ParseFlags("dev", []string{"-h"})
+	if action != ActionHelp {
+		t.Fatalf("-h should return ActionHelp, got %v", action)
+	}
+}
+
+func TestParseFlagsUnknownFlag(t *testing.T) {
+	action, cfg := ParseFlags("dev", []string{"--nope"})
+	if action != ActionRun {
+		t.Fatalf("unknown flag should return ActionRun, got %v", action)
+	}
+	if cfg != nil {
+		t.Fatal("unknown flag should return nil config to signal error")
+	}
+}
+
+func TestParseFlagsFlagOverConfigFile(t *testing.T) {
+	t.Setenv("ADDR", "env-addr")
+	path := writeConfig(t, "addr: file-addr\nport: 5000\n")
+
+	_, cfg := ParseFlags("dev", []string{
+		"-c", path,
+		"-a", "flag-addr",
+	})
+
+	if cfg.Addr != "flag-addr" {
+		t.Fatalf("flag should override config file and env, got %s", cfg.Addr)
+	}
+	if cfg.Port != 5000 {
+		t.Fatalf("config file port should be applied, got %d", cfg.Port)
+	}
+}
