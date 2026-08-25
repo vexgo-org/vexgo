@@ -79,41 +79,6 @@ func (s *Service) VerificationStatus(ctx context.Context, userID uint) (emailVer
 	return user.EmailVerified, user.Email, nil
 }
 
-// ResendVerificationEmail generates a new verification token for the user and
-// sends it to their email address.
-func (s *Service) ResendVerificationEmail(ctx context.Context, userID uint, host string) error {
-	user, err := s.repo.FindUserByID(ctx, userID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return ErrUserNotFound
-		}
-		return err
-	}
-
-	if user.EmailVerified {
-		return ErrEmailAlreadyVerified
-	}
-
-	enabled, err := s.mailer.IsEmailEnabled()
-	if err != nil || !enabled {
-		return ErrEmailServiceDisabled
-	}
-
-	// Generate new verification token
-	token, err := s.mailer.GenerateVerificationToken(ctx, user.ID)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrGenerateToken, err)
-	}
-
-	// Build verification link
-	verificationLink := host + "/verify-email?token=" + token
-	if err := s.mailer.SendVerificationEmail(ctx, user.Email, user.Username, verificationLink); err != nil {
-		return fmt.Errorf("%w: %v", ErrSendVerificationEmail, err)
-	}
-
-	return nil
-}
-
 // IsCaptchaEnabled reports whether captcha verification is enabled in the
 // general settings (disabled by default when no settings row exists).
 func (s *Service) IsCaptchaEnabled(ctx context.Context) (bool, error) {

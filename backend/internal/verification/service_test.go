@@ -36,28 +36,6 @@ func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	return NewService(Deps{DB: db, Mailer: mailer.NewMailer(db)}), db
 }
 
-// capturedEmail holds the rendered parts of an outgoing email captured by the
-// mailer test seam.
-type capturedEmail struct {
-	To       string
-	Subject  string
-	TextBody string
-	HTMLBody string
-}
-
-// capturedEmails records emails captured by the mailer test seam.
-var capturedEmails []capturedEmail
-
-// captureEmails installs the mailer capture hook and resets it after the test.
-func captureEmails(t *testing.T) {
-	t.Helper()
-	capturedEmails = nil
-	mailer.SetMailCaptureHook(func(to, subject, textBody, htmlBody string) {
-		capturedEmails = append(capturedEmails, capturedEmail{to, subject, textBody, htmlBody})
-	})
-	t.Cleanup(func() { mailer.SetMailCaptureHook(nil) })
-}
-
 func TestIsCaptchaEnabled_DefaultDisabled(t *testing.T) {
 	svc, _ := newTestService(t)
 	enabled, err := svc.IsCaptchaEnabled(context.Background())
@@ -176,40 +154,5 @@ func TestVerifyCaptcha(t *testing.T) {
 	}
 	if err := svc.VerifyCaptcha(context.Background(), "expired-id", "expired-token", 50); !errors.Is(err, ErrCaptchaExpired) {
 		t.Errorf("expected ErrCaptchaExpired, got %v", err)
-	}
-}
-
-func TestResendVerificationEmail_AlreadyVerified(t *testing.T) {
-	svc, db := newTestService(t)
-	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: true}
-	if err := db.Create(&u).Error; err != nil {
-		t.Fatalf("failed to seed user: %v", err)
-	}
-
-	if err := svc.ResendVerificationEmail(context.Background(), u.ID, "localhost:8080"); !errors.Is(err, ErrEmailAlreadyVerified) {
-		t.Errorf("expected ErrEmailAlreadyVerified, got %v", err)
-	}
-}
-
-func TestResendVerificationEmail_MissingUser(t *testing.T) {
-	svc, _ := newTestService(t)
-	if err := svc.ResendVerificationEmail(context.Background(), 99999, "localhost:8080"); !errors.Is(err, ErrUserNotFound) {
-		t.Errorf("expected ErrUserNotFound, got %v", err)
-	}
-}
-
-func TestResendVerificationEmail_NoEmailWhenSMTPDisabled(t *testing.T) {
-	svc, db := newTestService(t)
-	captureEmails(t)
-	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: false}
-	if err := db.Create(&u).Error; err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
-
-	if err := svc.ResendVerificationEmail(context.Background(), u.ID, "localhost:8080"); !errors.Is(err, ErrEmailServiceDisabled) {
-		t.Errorf("expected ErrEmailServiceDisabled, got %v", err)
-	}
-	if len(capturedEmails) != 0 {
-		t.Errorf("expected no email when SMTP disabled, got %d", len(capturedEmails))
 	}
 }

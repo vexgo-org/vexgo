@@ -103,35 +103,3 @@ func (h *Handler) VerifyCaptcha(c *gin.Context) {
 	// Return verification success
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Verification successful"})
 }
-
-// ResendVerificationEmail resends verification email
-func (h *Handler) ResendVerificationEmail(c *gin.Context) {
-	u, ok := middleware.CurrentUser(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	err := h.svc.ResendVerificationEmail(c.Request.Context(), u.ID, c.Request.Host)
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
-		case errors.Is(err, ErrEmailAlreadyVerified):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
-		case errors.Is(err, ErrEmailServiceDisabled):
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Email service not enabled"})
-		case errors.Is(err, ErrGenerateToken):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification token"})
-		case errors.Is(err, ErrSendVerificationEmail):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user information"})
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Verification email has been resent, please check your inbox",
-	})
-}
