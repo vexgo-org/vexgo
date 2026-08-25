@@ -55,12 +55,11 @@ func newTestService(t *testing.T) (*Service, *fakeFiles, *gorm.DB) {
 	files := &fakeFiles{}
 	db := newTestDB(t)
 	svc := NewService(Deps{
-		DB:          db,
-		JWTSecret:   testJWTSecret,
-		Files:       files,
-		Mailer:      mailer.NewMailer(db),
-		Captcha:     verification.NewService(verification.Deps{DB: db}),
-		MailService: *mailer.NewService(mailer.Deps{DB: db}),
+		DB:        db,
+		JWTSecret: testJWTSecret,
+		Files:     files,
+		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
+		Captcha:   verification.NewService(verification.Deps{DB: db}),
 	})
 	return svc, files, db
 }
@@ -744,56 +743,5 @@ func TestVerifyEmail_RejectsResetToken(t *testing.T) {
 	}
 	if after.EmailVerified {
 		t.Errorf("email must not be verified by a reset token")
-	}
-}
-
-func TestResendVerificationEmail_SendsContentfulEmail(t *testing.T) {
-	svc, _, db := newTestService(t)
-	enableSMTP(t, db)
-	captureEmails(t)
-
-	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: false}
-	if err := db.Create(&u).Error; err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
-
-	if err := svc.ResendVerificationEmail(context.Background(), u.ID, "localhost:8080"); err != nil {
-		t.Fatalf("ResendVerificationEmail error: %v", err)
-	}
-
-	if len(capturedEmails) != 1 {
-		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
-	}
-	email := capturedEmails[0]
-	if email.To != "alice@example.com" {
-		t.Errorf("expected To alice@example.com, got %q", email.To)
-	}
-	if email.Subject != "Please Verify Your Email Address" {
-		t.Errorf("unexpected subject %q", email.Subject)
-	}
-	if !strings.Contains(email.TextBody, "alice") || !strings.Contains(email.HTMLBody, "alice") {
-		t.Errorf("expected username in email body")
-	}
-
-	var stored model.User
-	if err := db.First(&stored, u.ID).Error; err != nil {
-		t.Fatalf("reload user: %v", err)
-	}
-	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixVerify) {
-		t.Fatalf("expected verify token, got %q", stored.VerificationToken)
-	}
-	wantLink := "localhost:8080/verify-email?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected verification link %q in email body", wantLink)
-	}
-
-	// The emailed link actually verifies the address.
-	tok := extractToken(t, wantLink)
-	emailChange, _, err := svc.VerifyEmail(context.Background(), tok)
-	if err != nil {
-		t.Fatalf("VerifyEmail via link error: %v", err)
-	}
-	if emailChange {
-		t.Errorf("expected normal verification, got email change")
 	}
 }

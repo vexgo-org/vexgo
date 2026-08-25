@@ -64,7 +64,7 @@ type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Files     FileRemover
-	Mailer    mailer.MailSender
+	Mailer    *mailer.Service
 	Captcha   CaptchaChecker
 }
 
@@ -83,7 +83,7 @@ type Service struct {
 	repo      Repository
 	jwtSecret []byte
 	files     FileRemover
-	mailer    mailer.MailSender
+	mailer    *mailer.Service
 	captcha   CaptchaChecker
 }
 
@@ -130,7 +130,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 	}
 
 	// Check if SMTP is enabled, if so verify email status
-	enabled, err := s.mailer.IsEmailEnabled()
+	enabled, err := s.mailer.Enabled(ctx)
 	if err == nil && enabled && !user.EmailVerified {
 		return "", nil, ErrEmailUnverified
 	}
@@ -247,7 +247,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 // requires verification); failures are logged and reported as false so a
 // transient SMTP error does not block registration.
 func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) bool {
-	enabled, err := s.mailer.IsEmailEnabled()
+	enabled, err := s.mailer.Enabled(ctx)
 	logger := slog.With("email", user.Email)
 	if err != nil {
 		logger.Warn("failed to check if SMTP is enabled", "err", err)
@@ -407,7 +407,7 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 	}
 
 	// Check if SMTP is enabled
-	enabled, err := s.mailer.IsEmailEnabled()
+	enabled, err := s.mailer.Enabled(ctx)
 	if err != nil {
 		return false, ErrMailConfigCheck
 	}
@@ -449,7 +449,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, protocol, hos
 	}
 
 	// Check if SMTP is enabled
-	enabled, err := s.mailer.IsEmailEnabled()
+	enabled, err := s.mailer.Enabled(ctx)
 	if err != nil || !enabled {
 		return nil
 	}
