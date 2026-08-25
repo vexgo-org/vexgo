@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
@@ -33,7 +32,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
 	db := newTestDB(t)
-	return NewService(Deps{DB: db, Mailer: mailer.NewMailer(db)}), db
+	return NewService(Deps{DB: db}), db
 }
 
 func TestIsCaptchaEnabled_DefaultDisabled(t *testing.T) {

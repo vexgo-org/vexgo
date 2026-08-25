@@ -16,7 +16,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/google/uuid"
@@ -53,18 +52,16 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Mailer    mailer.MailSender
 }
 
 // Service contains the business logic of the verification domain.
 type Service struct {
-	repo   Repository
-	mailer mailer.MailSender
+	repo Repository
 }
 
 // NewService creates a verification service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), mailer: deps.Mailer}
+	return &Service{repo: NewRepository(deps.DB)}
 }
 
 // VerificationStatus returns the email verification status of a user.
