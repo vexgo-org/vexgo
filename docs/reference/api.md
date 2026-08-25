@@ -80,9 +80,9 @@ Get a paginated list of posts with filtering support.
 
 ---
 
-### GET /posts/:id
+### GET /posts/:slug
 
-Get a single post by ID.
+Get a single post by URL slug.
 
 **Response:**
 
@@ -104,6 +104,21 @@ Get a single post by ID.
   }
 }
 ```
+
+**Error Responses:**
+
+- `403`: `{"error": "You must be logged in to view this post"}` (guest viewing disabled)
+- `404`: `{"error": "Post does not exist", "postId": "<id>"}`
+
+---
+
+---
+
+### GET /posts/by-id/:id
+
+Get a single post by numeric ID. Useful when the caller has an ID but not the slug (e.g., from notification data).
+
+**Response:** Same format as `GET /posts/:slug`.
 
 **Error Responses:**
 
@@ -722,6 +737,7 @@ Create a new post (requires authentication).
 
 ```json
 {
+  "slug": "my-post",
   "title": "My Post",
   "content": "Post content in markdown...",
   "category": "tech",
@@ -732,14 +748,19 @@ Create a new post (requires authentication).
 }
 ```
 
-`title`, `content` and `category` are required. `category` accepts a category name or ID; `status` is one of `draft` / `pending` / `published`.
+`slug`, `title`, `content` and `category` are required. `slug` must be a URL-safe string (lowercase letters/digits, hyphen-separated, no leading/trailing/consecutive hyphens). `category` accepts a category name or ID; `status` is one of `draft` / `pending` / `published`.
+
+**Error Responses:**
+
+- `400`: Invalid or empty slug
+- `409`: `{"error": "Slug is already taken by another post", "code": "slug_taken"}` (duplicate slug)
 
 **Response (201):**
 
 ```json
 {
   "message": "Post created successfully",
-  "post": { "id": 1, "title": "My Post", "status": "draft" }
+  "post": { "id": 1, "slug": "my-post", "title": "My Post", "status": "draft" }
 }
 ```
 
@@ -791,14 +812,21 @@ Update a post (requires authentication; author or admin only).
 ```json
 {
   "message": "Post updated successfully",
-  "post": { "id": 1, "title": "Updated Title", "status": "published" }
+  "post": {
+    "id": 1,
+    "slug": "my-post",
+    "title": "Updated Title",
+    "status": "published"
+  }
 }
 ```
 
 **Error Responses:**
 
-- `404`: `{"error": "Post does not exist"}`
+- `400`: Invalid slug format
 - `403`: `{"error": "Not authorized to modify this post"}`
+- `404`: `{"error": "Post does not exist"}`
+- `409`: `{"error": "Slug is already taken by another post", "code": "slug_taken"}`
 
 ---
 

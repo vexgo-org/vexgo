@@ -62,12 +62,13 @@ repository.go → 持久化接口 + GORM 实现（调用数据库）
 ```go
 // NotificationInput 是 CreateNotification 接收的通知字段（userID、type、title、content、relatedID、relatedType）。
 type NotificationInput struct {
-    UserID      uint
-    Type        NotificationType
-    Title       string
-    Content     string
-    RelatedID   string
-    RelatedType NotificationRelatedType
+    UserID        uint
+    Type          NotificationType
+    Title         string
+    Content       string
+    RelatedID     string
+    RelatedType   NotificationRelatedType
+    RelatedPostID *uint
 }
 
 // Notifier 是创建通知的接缝；由 notification 领域实现。

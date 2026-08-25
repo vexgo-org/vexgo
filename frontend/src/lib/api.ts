@@ -125,7 +125,9 @@ export const postsApi = {
     status?: string;
   }) => api.get<PostsResponse>("/posts", { params }),
 
-  getPost: (id: string) => api.get<{ post: Post }>(`/posts/${id}`),
+  getPost: (slug: string) => api.get<{ post: Post }>(`/posts/${slug}`),
+
+  getPostById: (id: string) => api.get<{ post: Post }>(`/posts/by-id/${id}`),
 
   createPost: (data: {
     title: string;

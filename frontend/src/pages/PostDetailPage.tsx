@@ -40,7 +40,7 @@ import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { getLocale } from "@/lib/i18n";
 
 export function PostDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { t } = useTranslation();
@@ -69,11 +69,12 @@ export function PostDetailPage() {
   );
   const [submittingComment, setSubmittingComment] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const loadPost = useCallback(async () => {
     try {
-      console.log("Loading post, ID:", id);
-      const response = await postsApi.getPost(id!);
+      console.log("Loading post by slug:", slug);
+      const response = await postsApi.getPost(slug!);
       console.log("Post loaded successfully:", response.data);
       const p = response.data.post;
       p.tags = normalizeTagsArray(p.tags);
@@ -91,45 +92,42 @@ export function PostDetailPage() {
         status: axiosError.response?.status,
         data: axiosError.response?.data,
       });
-      // Only redirect back to the homepage if you truly cannot find the article.
       if (axiosError.response?.status === 404) {
-        navigate("/");
+        setNotFound(true);
       }
       // For other errors, still set loading to false so that users can see the error message.
     } finally {
       setLoading(false);
     }
-  }, [id, navigate]);
+  }, [slug, navigate]);
 
   const loadComments = useCallback(async () => {
+    if (!post?.id) return [] as Comment[];
     try {
-      const response = await commentsApi.getComments(id!);
+      const response = await commentsApi.getComments(post.id);
       setComments(response.data.comments);
       return response.data.comments;
     } catch (error) {
       console.error("Failed to load comments:", error);
       return [] as Comment[];
     }
-  }, [id]);
+  }, [post?.id]);
 
   const loadLikeStatus = useCallback(async () => {
+    if (!post?.id) return;
     try {
-      const response = await likesApi.getLikeStatus(id!);
+      const response = await likesApi.getLikeStatus(post.id);
       setIsLiked(response.data.isLiked);
       setLikesCount(response.data.likesCount);
     } catch (error) {
       console.error("Failed to load like status:", error);
     }
-  }, [id]);
+  }, [post?.id]);
 
   useEffect(() => {
     const loadData = async () => {
-      if (id) {
+      if (slug) {
         try {
-          // Load comments and like status
-          await loadComments();
-          await loadLikeStatus();
-
           // Load from the API when there is no initial data
           if (!initialData?.post) {
             setLoading(true);
@@ -146,16 +144,25 @@ export function PostDetailPage() {
     };
 
     loadData();
-  }, [id, loadComments, loadLikeStatus, loadPost, initialData?.post]);
+  }, [slug, loadPost, initialData?.post]);
+
+  // Load comments and likes when post is loaded
+  useEffect(() => {
+    if (post?.id) {
+      loadComments();
+      loadLikeStatus();
+    }
+  }, [post?.id, loadComments, loadLikeStatus]);
 
   const handleLike = async () => {
     if (!isAuthenticated) {
       navigate("/login");
       return;
     }
+    if (!post?.id) return;
 
     try {
-      const response = await likesApi.toggleLike(id!);
+      const response = await likesApi.toggleLike(post.id);
       setIsLiked(response.data.isLiked);
       setLikesCount(response.data.likesCount);
       // Notify other pages (e.g. the home page) to update the post's like status
@@ -163,7 +170,7 @@ export function PostDetailPage() {
         window.dispatchEvent(
           new CustomEvent("like-changed", {
             detail: {
-              postId: id,
+              postId: post.id,
               isLiked: response.data.isLiked,
               likesCount: response.data.likesCount,
             },
@@ -182,13 +189,14 @@ export function PostDetailPage() {
       navigate("/login");
       return;
     }
+    if (!post?.id) return;
 
     if (!commentContent.trim()) return;
 
     setSubmittingComment(true);
     try {
       const response = await commentsApi.createComment({
-        postId: id!,
+        postId: post.id,
         content: commentContent.trim(),
       });
       setCommentContent("");
@@ -198,7 +206,7 @@ export function PostDetailPage() {
       try {
         window.dispatchEvent(
           new CustomEvent("comment-changed", {
-            detail: { postId: id, commentsCount: newCount },
+            detail: { postId: post.id, commentsCount: newCount },
           }),
         );
       } catch {
@@ -212,8 +220,9 @@ export function PostDetailPage() {
   };
 
   const handleDeletePost = async () => {
+    if (!post?.id) return;
     try {
-      await postsApi.deletePost(id!);
+      await postsApi.deletePost(post.id);
       navigate("/");
     } catch (error) {
       console.error("Failed to delete post:", error);
@@ -221,6 +230,7 @@ export function PostDetailPage() {
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    if (!post?.id) return;
     try {
       const response = await commentsApi.deleteComment(commentId);
       await loadComments();
@@ -230,7 +240,7 @@ export function PostDetailPage() {
       try {
         window.dispatchEvent(
           new CustomEvent("comment-changed", {
-            detail: { postId: id, commentsCount: newCount },
+            detail: { postId: post.id, commentsCount: newCount },
           }),
         );
       } catch {
@@ -243,7 +253,7 @@ export function PostDetailPage() {
 
   const handleShare = async () => {
     try {
-      const postUrl = `${window.location.origin}/post/${id}`;
+      const postUrl = `${window.location.origin}/post/${post?.slug || slug}`;
       await navigator.clipboard.writeText(postUrl);
       setShareSuccess(true);
       // Hide the success hint after 3 seconds
@@ -278,6 +288,22 @@ export function PostDetailPage() {
     (user.id === post.authorId ||
       user.role === "admin" ||
       user.role === "super_admin");
+
+  if (notFound) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-4xl text-center">
+        <h1 className="text-6xl font-bold text-muted-foreground/30 mb-4">
+          404
+        </h1>
+        <p className="text-muted-foreground mb-8">
+          {t("postDetailPage.articleNotExist")}
+        </p>
+        <Button asChild>
+          <Link to="/">{t("postDetailPage.backToHome")}</Link>
+        </Button>
+      </div>
+    );
+  }
 
   if (loading || !post) {
     return (

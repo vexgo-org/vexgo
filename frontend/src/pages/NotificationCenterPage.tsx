@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { notificationsApi } from "@/lib/api";
+import { notificationsApi, postsApi } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { CreatorApplicationButton } from "@/components/CreatorApplicationButton";
 
@@ -34,6 +34,7 @@ type Notification = {
   content: string;
   relatedId: string;
   relatedType: "post" | "comment";
+  relatedPostId: number | null;
   createdAt: string;
   isRead: boolean;
   sender?: {
@@ -73,6 +74,7 @@ export function NotificationCenterPage() {
           content: string;
           related_id: string;
           related_type: "post" | "comment";
+          related_post_id: number | null;
           created_at: string;
           is_read: boolean;
         }
@@ -86,6 +88,7 @@ export function NotificationCenterPage() {
           content: notification.content,
           relatedId: notification.related_id,
           relatedType: notification.related_type,
+          relatedPostId: notification.related_post_id,
           createdAt: notification.created_at,
           isRead: notification.is_read,
           // The backend may not include sender info, so leave it empty for now
@@ -158,15 +161,35 @@ export function NotificationCenterPage() {
   };
 
   // Navigate to the related content
-  const navigateToRelated = (
+  const navigateToRelated = async (
     relatedId: string,
     relatedType: "post" | "comment",
+    relatedPostId: number | null,
   ) => {
+    // Resolve the post ID: for comment-related notifications use the
+    // explicit post ID field; for post notifications relatedId is already
+    // the post ID.
+    const postId =
+      relatedType === "comment" && relatedPostId != null
+        ? String(relatedPostId)
+        : relatedId;
+
     if (relatedType === "post") {
-      navigate(`/post/${relatedId}`);
+      try {
+        const response = await postsApi.getPostById(postId);
+        navigate(`/post/${response.data.post.slug}`);
+      } catch {
+        // Fallback: navigate with the ID (will be handled by the post page)
+        navigate(`/post/by-id/${postId}`);
+      }
     } else if (relatedType === "comment") {
       // Navigate to the post page and scroll to the comment
-      navigate(`/post/123#comment-${relatedId}`);
+      try {
+        const response = await postsApi.getPostById(postId);
+        navigate(`/post/${response.data.post.slug}#comment-${relatedId}`);
+      } catch {
+        navigate(`/post/by-id/${postId}#comment-${relatedId}`);
+      }
     }
   };
 
@@ -254,6 +277,7 @@ export function NotificationCenterPage() {
                     navigateToRelated(
                       notification.relatedId,
                       notification.relatedType,
+                      notification.relatedPostId,
                     );
                   }
                 }}
@@ -312,6 +336,7 @@ export function NotificationCenterPage() {
                                   navigateToRelated(
                                     notification.relatedId,
                                     notification.relatedType,
+                                    notification.relatedPostId,
                                   );
                                 }
                               }}
@@ -370,6 +395,7 @@ export function NotificationCenterPage() {
                     navigateToRelated(
                       notification.relatedId,
                       notification.relatedType,
+                      notification.relatedPostId,
                     );
                   }
                 }}
@@ -423,6 +449,7 @@ export function NotificationCenterPage() {
                                   navigateToRelated(
                                     notification.relatedId,
                                     notification.relatedType,
+                                    notification.relatedPostId,
                                   );
                                 }
                               }}
@@ -480,6 +507,7 @@ export function NotificationCenterPage() {
                     navigateToRelated(
                       notification.relatedId,
                       notification.relatedType,
+                      notification.relatedPostId,
                     );
                   }
                 }}
@@ -534,6 +562,7 @@ export function NotificationCenterPage() {
                                 navigateToRelated(
                                   notification.relatedId,
                                   notification.relatedType,
+                                  notification.relatedPostId,
                                 );
                               }
                             }}
@@ -590,6 +619,7 @@ export function NotificationCenterPage() {
                     navigateToRelated(
                       notification.relatedId,
                       notification.relatedType,
+                      notification.relatedPostId,
                     );
                   }
                 }}
@@ -644,6 +674,7 @@ export function NotificationCenterPage() {
                                 navigateToRelated(
                                   notification.relatedId,
                                   notification.relatedType,
+                                  notification.relatedPostId,
                                 );
                               }
                             }}
@@ -700,6 +731,7 @@ export function NotificationCenterPage() {
                     navigateToRelated(
                       notification.relatedId,
                       notification.relatedType,
+                      notification.relatedPostId,
                     );
                   }
                 }}
@@ -740,6 +772,7 @@ export function NotificationCenterPage() {
                                 navigateToRelated(
                                   notification.relatedId,
                                   notification.relatedType,
+                                  notification.relatedPostId,
                                 );
                               }
                             }}

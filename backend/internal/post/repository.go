@@ -2,6 +2,7 @@ package post
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -24,6 +25,10 @@ type Repository interface {
 	// Posts
 	FindByID(ctx context.Context, id string) (*model.Post, error)
 	FindByIDPreloadTags(ctx context.Context, id string) (*model.Post, error)
+	FindBySlug(ctx context.Context, slug string) (*model.Post, error)
+	FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error)
+	SlugExists(ctx context.Context, slug string) (bool, error)
+	SlugExistsExcludeID(ctx context.Context, slug string, excludeID uint) (bool, error)
 	Create(ctx context.Context, post *model.Post) error
 	Save(ctx context.Context, post *model.Post) error
 	Delete(ctx context.Context, post *model.Post) error
@@ -100,6 +105,58 @@ func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id string) (*m
 		return nil, err
 	}
 	return &post, nil
+}
+
+func (r *gormRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
+	var post model.Post
+	if err := r.db.WithContext(ctx).
+		Preload("Author").
+		Preload("Tags").
+		Where("slug = ?", slug).
+		First(&post).Error; err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+func (r *gormRepository) FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error) {
+	var post model.Post
+	if err := r.db.WithContext(ctx).
+		Where("slug = ? AND id != ?", slug, excludeID).
+		First(&post).Error; err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+func (r *gormRepository) SlugExists(ctx context.Context, slug string) (bool, error) {
+	err := r.db.WithContext(ctx).
+		Model(&model.Post{}).
+		Select("id").
+		Where("slug = ?", slug).
+		First(&model.Post{}).Error
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (r *gormRepository) SlugExistsExcludeID(ctx context.Context, slug string, excludeID uint) (bool, error) {
+	err := r.db.WithContext(ctx).
+		Model(&model.Post{}).
+		Select("id").
+		Where("slug = ? AND id != ?", slug, excludeID).
+		First(&model.Post{}).Error
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (r *gormRepository) Create(ctx context.Context, post *model.Post) error {

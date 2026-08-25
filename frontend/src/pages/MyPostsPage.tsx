@@ -241,7 +241,7 @@ export function MyPostsPage() {
                       </div>
 
                       {/* Title */}
-                      <Link to={`/post/${post.id}`}>
+                      <Link to={`/post/${post.slug}`}>
                         <h2 className="text-lg font-semibold mb-2 hover:text-primary transition-colors">
                           {post.title}
                         </h2>
@@ -271,7 +271,7 @@ export function MyPostsPage() {
                     {/* Action buttons */}
                     <div className="flex flex-col gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <Link to={`/post/${post.id}`}>
+                        <Link to={`/post/${post.slug}`}>
                           <Eye className="w-4 h-4" />
                         </Link>
                       </Button>

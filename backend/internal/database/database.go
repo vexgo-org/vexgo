@@ -75,14 +75,16 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		user, password, host, port, dbname)
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	gormCfg := &gorm.Config{TranslateError: true}
+
+	db, err := gorm.Open(mysql.Open(dsn), gormCfg)
 	if err != nil {
 		// Check if the error is "Unknown database" (error code 1049)
 		if mysqlErr, ok := err.(*dmsql.MySQLError); ok && mysqlErr.Number == 1049 {
 			slog.Info("database not found, attempting to create it", "dbname", dbname)
 			// DSN without database name to connect to the server
 			serverDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=Local", user, password, host, port)
-			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), &gorm.Config{})
+			serverDb, serverErr := gorm.Open(mysql.Open(serverDsn), gormCfg)
 			if serverErr != nil {
 				return nil, fmt.Errorf("connect to MySQL server to create database: %w", serverErr)
 			}
@@ -93,7 +95,7 @@ func openMySQL(cfg *config.Config) (*gorm.DB, error) {
 			}
 			slog.Info("database created successfully", "dbname", dbname)
 			// Re-attempt connection to the newly created database
-			db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+			db, err = gorm.Open(mysql.Open(dsn), gormCfg)
 			if err != nil {
 				return nil, fmt.Errorf("connect to newly created MySQL database: %w", err)
 			}
@@ -144,7 +146,7 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslMode)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		return nil, fmt.Errorf("connect to PostgreSQL database: %w", err)
 	}
@@ -158,7 +160,7 @@ func openSQLite(dataDir string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("create data directory: %w", err)
 	}
 	dbPath := filepath.Join(dataDir, "blog.db")
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{TranslateError: true})
 	if err != nil {
 		return nil, fmt.Errorf("connect to SQLite database: %w", err)
 	}
@@ -180,7 +182,7 @@ func AutoMigrate(db *gorm.DB) error {
 		}
 	}
 
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.Post{},
 		&model.User{},
 		&model.Tag{},
@@ -197,7 +199,57 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.ThemeConfig{},
 		&model.Notification{},
 		&model.CreatorApplication{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// Backfill slugs for existing posts that don't have one yet.
+	return backfillSlugs(db)
+}
+
+// backfillSlugs generates unique slugs for existing posts that have an empty
+// slug column, deriving them from each post's title.
+func backfillSlugs(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&model.Post{}) {
+		return nil
+	}
+
+	var posts []model.Post
+	if err := db.Select("id", "title").Where("slug = '' OR slug IS NULL").Find(&posts).Error; err != nil {
+		return fmt.Errorf("backfill slugs failed: %w", err)
+	}
+	if len(posts) == 0 {
+		return nil
+	}
+
+	for _, post := range posts {
+		base := model.SlugFromTitle(post.Title)
+		if base == "" {
+			base = "post"
+		}
+		// Fall back to a stable post-id-based slug when the generated slug
+		// fails validation (e.g. pure-numeric slugs like "2023").
+		if err := model.ValidateSlug(base); err != nil {
+			base = fmt.Sprintf("post-%d", post.ID)
+		}
+		slug := base
+		counter := 1
+		for {
+			// Check for collision with an existing slug in the database.
+			var existing model.Post
+			err := db.Where("slug = ? AND id != ?", slug, post.ID).First(&existing).Error
+			if err != nil {
+				break // no collision
+			}
+			counter++
+			slug = fmt.Sprintf("%s-%d", base, counter)
+		}
+		if err := db.Model(&post).UpdateColumn("slug", slug).Error; err != nil {
+			return fmt.Errorf("backfill slugs failed (post_id=%d): %w", post.ID, err)
+		}
+	}
+
+	return nil
 }
 
 // defaultAdminUsername is the login name of the seeded super admin account.

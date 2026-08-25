@@ -80,9 +80,9 @@
 
 ---
 
-### GET /posts/:id
+### GET /posts/:slug
 
-按 ID 获取单个帖子。
+按 URL 别名获取单个帖子。
 
 **响应：**
 
@@ -109,6 +109,21 @@
 
 - `403`：`{"error": "You must be logged in to view this post"}`（游客浏览被禁用）
 - `404`：`{"error": "Post does not exist", "postId": "<id>"}`
+
+---
+
+---
+
+### GET /posts/by-id/:id
+
+按数字 ID 获取单个帖子。适用于调用方持有 ID 但没有别名的场景（例如通知数据）。
+
+**响应：** 与 `GET /posts/:slug` 格式相同。
+
+**错误响应：**
+
+- `403`：`{"error": "You must be logged in to view this post"}`（游客浏览被禁用）
+- `404`：`{"error": "Post does not exist", "slug": "<slug>"}`
 
 ---
 
@@ -722,6 +737,7 @@ SSO 回调端点；提供商重定向到这里。
 
 ```json
 {
+  "slug": "my-post",
   "title": "My Post",
   "content": "Post content in markdown...",
   "category": "tech",
@@ -732,14 +748,19 @@ SSO 回调端点；提供商重定向到这里。
 }
 ```
 
-`title`、`content` 和 `category` 为必填。`category` 接受分类名称或 ID；`status` 是 `draft` / `pending` / `published` 之一。
+`slug`、`title`、`content` 和 `category` 为必填。`slug` 必须是 URL 安全的字符串（小写字母/数字，连字符分隔，不能以连字符开头或结尾，不能有连续连字符）。`category` 接受分类名称或 ID；`status` 是 `draft` / `pending` / `published` 之一。
+
+**错误响应：**
+
+- `400`：别名格式无效或为空
+- `409`：`{"error": "Slug is already taken by another post", "code": "slug_taken"}`（别名已被占用）
 
 **响应（201）：**
 
 ```json
 {
   "message": "Post created successfully",
-  "post": { "id": 1, "title": "My Post", "status": "draft" }
+  "post": { "id": 1, "slug": "my-post", "title": "My Post", "status": "draft" }
 }
 ```
 
@@ -791,14 +812,21 @@ SSO 回调端点；提供商重定向到这里。
 ```json
 {
   "message": "Post updated successfully",
-  "post": { "id": 1, "title": "Updated Title", "status": "published" }
+  "post": {
+    "id": 1,
+    "slug": "my-post",
+    "title": "Updated Title",
+    "status": "published"
+  }
 }
 ```
 
 **错误响应：**
 
-- `404`：`{"error": "Post does not exist"}`
+- `400`：别名格式无效
 - `403`：`{"error": "Not authorized to modify this post"}`
+- `404`：`{"error": "Post does not exist"}`
+- `409`：`{"error": "Slug is already taken by another post", "code": "slug_taken"}`
 
 ---
 

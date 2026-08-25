@@ -162,8 +162,8 @@ export function ModerationPage() {
     }
   };
 
-  const handleViewPost = (postId: string) => {
-    navigate(`/post/${postId}`);
+  const handleViewPost = (postSlug: string) => {
+    navigate(`/post/${postSlug}`);
   };
 
   const handleEditPost = (postId: string) => {
@@ -306,7 +306,7 @@ export function ModerationPage() {
                       <div className="flex flex-col gap-2 ml-4">
                         <Button
                           size="sm"
-                          onClick={() => handleViewPost(post.id)}
+                          onClick={() => handleViewPost(post.slug)}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}
@@ -394,7 +394,7 @@ export function ModerationPage() {
                       <div className="flex flex-col gap-2 ml-4">
                         <Button
                           size="sm"
-                          onClick={() => handleViewPost(post.id)}
+                          onClick={() => handleViewPost(post.slug)}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}
@@ -463,7 +463,7 @@ export function ModerationPage() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleViewPost(post.id)}
+                          onClick={() => handleViewPost(post.slug)}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}

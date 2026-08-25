@@ -362,7 +362,7 @@ export function HomePage() {
                   >
                     {/* Cover image (placed at the top of the Card so it sits flush with the card edge) */}
                     {post.coverImage && (
-                      <Link to={`/post/${post.id}`} className="block">
+                      <Link to={`/post/${post.slug}`} className="block">
                         <div className="w-full overflow-hidden rounded-t-xl">
                           <img
                             src={post.coverImage}
@@ -393,7 +393,7 @@ export function HomePage() {
                       </div>
 
                       {/* Title */}
-                      <Link to={`/post/${post.id}`}>
+                      <Link to={`/post/${post.slug}`}>
                         <h2 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2">
                           {post.title}
                         </h2>
@@ -610,7 +610,7 @@ export function HomePage() {
                 {popularPosts.map((post, index) => (
                   <Link
                     key={post.id}
-                    to={`/post/${post.id}`}
+                    to={`/post/${post.slug}`}
                     className="flex items-start gap-3 group"
                   >
                     <span className="text-lg font-bold text-muted-foreground w-6">

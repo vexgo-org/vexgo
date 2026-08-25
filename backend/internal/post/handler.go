@@ -69,8 +69,9 @@ func (h *Handler) GetPosts(c *gin.Context) {
 	})
 }
 
-// GetPost returns a single post.
-func (h *Handler) GetPost(c *gin.Context) {
+// GetPostByID returns a single post by numeric ID. Used by internal callers
+// (notifications, moderation) that need to resolve a post ID to its slug.
+func (h *Handler) GetPostByID(c *gin.Context) {
 	id := c.Param("id")
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
@@ -82,6 +83,29 @@ func (h *Handler) GetPost(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "postId": id})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"post": post})
+}
+
+// GetPost returns a single post by slug.
+func (h *Handler) GetPost(c *gin.Context) {
+	slug := c.Param("slug")
+	u, _ := middleware.CurrentUser(c)
+	userRole, userID := u.Role, u.ID
+
+	post, err := h.svc.GetBySlug(c.Request.Context(), slug, userRole, userID)
+	if err != nil {
+		if errors.Is(err, ErrGuestViewDenied) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view this post"})
+			return
+		}
+		if errors.Is(err, ErrPostNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "slug": slug})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load post"})
 		return
 	}
 
@@ -102,6 +126,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	userRole := u.Role
 
 	var req struct {
+		Slug       string   `json:"slug" binding:"required"`
 		Title      string   `json:"title" binding:"required"`
 		Content    string   `json:"content" binding:"required"`
 		Category   any      `json:"category" binding:"required"`
@@ -116,6 +141,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Create(c.Request.Context(), userRole, userID, CreateRequest{
+		Slug:       req.Slug,
 		Title:      req.Title,
 		Content:    req.Content,
 		Category:   req.Category,
@@ -127,6 +153,14 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a post"})
+			return
+		}
+		if errors.Is(err, model.ErrSlugTaken) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Slug is already taken by another post", "code": "slug_taken"})
+			return
+		}
+		if errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post"})
@@ -142,6 +176,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
 	var req struct {
+		Slug       string   `json:"slug"`
 		Title      string   `json:"title"`
 		Content    string   `json:"content"`
 		Category   any      `json:"category"`
@@ -156,6 +191,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Update(c.Request.Context(), id, userID, UpdateRequest{
+		Slug:       req.Slug,
 		Title:      req.Title,
 		Content:    req.Content,
 		Category:   req.Category,
@@ -170,6 +206,10 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
 		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this post"})
+		case errors.Is(err, model.ErrSlugTaken):
+			c.JSON(http.StatusConflict, gin.H{"error": "Slug is already taken by another post", "code": "slug_taken"})
+		case errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update post"})
 		}
