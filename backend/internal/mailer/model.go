@@ -1,16 +1,16 @@
 package mailer
 
-type verificationEamilTemplateData struct {
+type VerificationEamilTemplateData struct {
 	Name string
 	Link string
 }
 
-type passwordResetEmailTemplateData struct {
+type PasswordResetEmailTemplateData struct {
 	Name string
 	Link string
 }
 
-type emailChangeEmailTemplateData struct {
+type EmailChangeEmailTemplateData struct {
 	Name     string
 	Link     string
 	NewEmail string

@@ -265,7 +265,14 @@ func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, p
 	}
 
 	verificationLink := buildLinkWithToken(protocol, host, verificationLinkPath, token)
-	if err := s.mailer.SendVerificationEmail(ctx, user.Email, user.Username, verificationLink); err != nil {
+	if err := s.mailer.SendVerificationEmail(
+		ctx,
+		user.Email,
+		&mailer.VerificationEamilTemplateData{
+			Name: user.Username,
+			Link: verificationLink,
+		},
+	); err != nil {
 		logger.Error("failed to send verification email", "err", err)
 		return false
 	}
@@ -423,7 +430,15 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 		verificationLink := buildLinkWithToken(req.Protocol, req.Host, verificationLinkPath, token)
 
 		// Send confirmation email
-		if err := s.mailer.SendEmailChangeEmail(ctx, user.Email, user.Username, req.NewEmail, verificationLink); err != nil {
+		if err := s.mailer.SendEmailChangeEmail(
+			ctx,
+			user.Email,
+			&mailer.EmailChangeEmailTemplateData{
+				Name:     user.Username,
+				NewEmail: req.NewEmail,
+				Link:     verificationLink,
+			},
+		); err != nil {
 			return false, ErrSendEmail
 		}
 
@@ -464,7 +479,14 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, protocol, hos
 	resetLink := buildLinkWithToken(protocol, host, resetLinkPath, token)
 
 	// Send email
-	if err := s.mailer.SendPasswordResetEmail(ctx, user.Email, user.Username, resetLink); err != nil {
+	if err := s.mailer.SendPasswordResetEmail(
+		ctx,
+		user.Email,
+		&mailer.PasswordResetEmailTemplateData{
+			Name: user.Username,
+			Link: resetLink,
+		},
+	); err != nil {
 		return ErrSendResetEmail
 	}
 

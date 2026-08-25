@@ -36,14 +36,13 @@ func NewService(deps Deps) *Service {
 }
 
 // SendVerificationEmail sends email verification email
-func (s *Service) SendVerificationEmail(ctx context.Context, toEmail, toName, verificationLink string) error {
+func (s *Service) SendVerificationEmail(
+	ctx context.Context,
+	toEmail string,
+	data *VerificationEamilTemplateData,
+) error {
 	if err := s.readConfig(ctx); err != nil {
 		return err
-	}
-
-	data := verificationEamilTemplateData{
-		Name: toName,
-		Link: verificationLink,
 	}
 
 	htmlBody, err := RenderHTMLTemplate(
@@ -82,14 +81,12 @@ func (s *Service) SendVerificationEmail(ctx context.Context, toEmail, toName, ve
 }
 
 // SendPasswordResetEmail sends password reset email
-func (s *Service) SendPasswordResetEmail(ctx context.Context, toEmail, toName, resetLink string) error {
+func (s *Service) SendPasswordResetEmail(
+	ctx context.Context, toEmail string,
+	data *PasswordResetEmailTemplateData,
+) error {
 	if err := s.readConfig(ctx); err != nil {
 		return err
-	}
-
-	data := passwordResetEmailTemplateData{
-		Name: toName,
-		Link: resetLink,
 	}
 
 	textBody, err := RenderTextTemplate(
@@ -127,15 +124,13 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, toEmail, toName, r
 }
 
 // SendEmailChangeEmail sends email change confirmation email
-func (s *Service) SendEmailChangeEmail(ctx context.Context, toEmail, toName, newEmail, verificationLink string) error {
+func (s *Service) SendEmailChangeEmail(
+	ctx context.Context,
+	toEmail string,
+	data *EmailChangeEmailTemplateData,
+) error {
 	if err := s.readConfig(ctx); err != nil {
 		return err
-	}
-
-	data := emailChangeEmailTemplateData{
-		Name:     toName,
-		Link:     verificationLink,
-		NewEmail: newEmail,
 	}
 
 	textBody, err := RenderTextTemplate(emailChangeEmailTemplateText, data)
