@@ -78,7 +78,7 @@ export function SMTPSettingsPage() {
     setSaving(true);
     try {
       await configApi.updateSMTPConfig(config);
-      toast.success(t("smtpSettings.saveSuccess"));
+      toast.success(t("generalSettings.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save SMTP config:", error);
       const apiError = error as { response?: { data?: { error?: string } } };
@@ -292,7 +292,7 @@ export function SMTPSettingsPage() {
               onChange={(e) =>
                 setConfig({ ...config, testEmail: e.target.value })
               }
-              placeholder={t("smtpSettings.testEmailPlaceholder")}
+              placeholder="his/her-email@example.com"
               disabled={saving}
             />
             <p className="text-xs text-muted-foreground">
