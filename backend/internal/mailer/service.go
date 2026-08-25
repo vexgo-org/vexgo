@@ -17,6 +17,17 @@ type Service struct {
 	client SMTPMailer
 }
 
+// mailCaptureHook, when non-nil, receives the rendered parts of outgoing
+// emails instead of sending them over SMTP. It exists solely as a test seam so
+// callers can assert on email content without a real SMTP server.
+var mailCaptureHook func(to, subject, textBody, htmlBody string)
+
+// SetMailCaptureHook installs a hook that captures outgoing emails. Passing nil
+// restores real SMTP sending. Intended for tests.
+func SetMailCaptureHook(hook func(to, subject, textBody, htmlBody string)) {
+	mailCaptureHook = hook
+}
+
 func NewService(deps Deps) *Service {
 	return &Service{
 		client: NewClient(),
