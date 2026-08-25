@@ -9,3 +9,9 @@ type passwordResetEmailTemplateData struct {
 	Name string
 	Link string
 }
+
+type emailChangeEmailTemplateData struct {
+	Name     string
+	Link     string
+	NewEmail string
+}

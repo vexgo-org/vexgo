@@ -1,0 +1,9 @@
+Dear {{ .Name }},
+
+We received an email change request. Please click the following link to confirm changing your email to {{ .NewEmail }}:
+
+{{ .Link }}
+
+This link will expire in 5 minutes.
+
+If you did not request an email change, please ignore this email.

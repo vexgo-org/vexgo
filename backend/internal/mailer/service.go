@@ -115,6 +115,47 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, toEmail, toName, r
 	return nil
 }
 
+// SendEmailChangeEmail sends email change confirmation email
+func (s *Service) SendEmailChangeEmail(ctx context.Context, toEmail, toName, newEmail, verificationLink string) error {
+	if err := s.readConfig(ctx); err != nil {
+		return err
+	}
+
+	data := emailChangeEmailTemplateData{
+		Name:     toName,
+		Link:     verificationLink,
+		NewEmail: newEmail,
+	}
+
+	textBody, err := RenderTextTemplate(emailChangeEmailTemplateText, data)
+	if err != nil {
+		return fmt.Errorf("render text email change email failed: %w", err)
+	}
+
+	htmlBody, err := RenderHTMLTemplate(emailChangeEmailTemplateHTML, data)
+	if err != nil {
+		return fmt.Errorf("render html email change email failed: %w", err)
+	}
+
+	const SUBJECT = "Confirm Email Change"
+
+	if mailCaptureHook != nil {
+		mailCaptureHook(toEmail, SUBJECT, textBody, htmlBody)
+		return nil
+	}
+
+	if err := s.client.Send(Message{
+		To:       []string{toEmail},
+		Subject:  SUBJECT,
+		TextBody: textBody,
+		HTMLBody: htmlBody,
+	}); err != nil {
+		return fmt.Errorf("send email change email failed: %w", err)
+	}
+
+	return nil
+}
+
 // readConfig reads SMTP configuration from database, and
 // updates the configuraiton of SMTP client.
 func (s *Service) readConfig(ctx context.Context) error {

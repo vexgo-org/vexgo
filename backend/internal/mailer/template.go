@@ -16,6 +16,8 @@ const (
 	verificationEmailTemplateHTML  = "templates/verification.html"
 	resetPasswordEmailTemplateText = "templates/password-reset.txt"
 	resetPasswordEmailTemplateHTML = "templates/password-reset.html"
+	emailChangeEmailTemplateText   = "templates/email-change.txt"
+	emailChangeEmailTemplateHTML   = "templates/email-change.html"
 )
 
 // RenderHTMLTemplate renders HTML templates.
