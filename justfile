@@ -8,6 +8,7 @@ format:
 lint:
     # Run linter.
     golangci-lint run
+    output=$(deadcode -test ./...); test -z "$output" || { echo "$output"; exit 1;}
     prettier --check "**/*.{js,jsx,ts,tsx,html,md}"
     diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
     oxlint --deny-warnings -c frontend/.oxlintrc.json frontend/
