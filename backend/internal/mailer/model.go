@@ -15,3 +15,11 @@ type emailChangeEmailTemplateData struct {
 	Link     string
 	NewEmail string
 }
+
+type TestSMTPEmailTemplateData struct {
+	Name  string
+	Host  string
+	Port  int
+	Email string
+	Time  string
+}

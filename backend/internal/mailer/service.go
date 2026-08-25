@@ -167,6 +167,39 @@ func (s *Service) SendEmailChangeEmail(ctx context.Context, toEmail, toName, new
 	return nil
 }
 
+func (s *Service) SendTestSMTPEmail(
+	ctx context.Context,
+	toEmail string,
+	data *TestSMTPEmailTemplateData,
+) error {
+	if err := s.readConfig(ctx); err != nil {
+		return err
+	}
+
+	const SUBJECT = "SMTP Configuration Test Email"
+
+	textBody, err := RenderTextTemplate(testSMTPEmailTemplateText, data)
+	if err != nil {
+		return fmt.Errorf("render text test SMTP email failed: %w", err)
+	}
+
+	htmlBody, err := RenderHTMLTemplate(testSMTPEmailTemplateHTML, data)
+	if err != nil {
+		return fmt.Errorf("render html test SMTP email failed: %w", err)
+	}
+
+	if err := s.client.Send(Message{
+		To:       []string{toEmail},
+		Subject:  SUBJECT,
+		TextBody: textBody,
+		HTMLBody: htmlBody,
+	}); err != nil {
+		return fmt.Errorf("send test SMTP email failed: %w", err)
+	}
+
+	return nil
+}
+
 // Enabled indicates whether SMTP is enabled.
 func (s *Service) Enabled(ctx context.Context) (bool, error) {
 	cfg, err := s.repo.GetSMTPSetting(ctx)

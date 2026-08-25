@@ -18,6 +18,8 @@ const (
 	resetPasswordEmailTemplateHTML = "templates/password-reset.html"
 	emailChangeEmailTemplateText   = "templates/email-change.txt"
 	emailChangeEmailTemplateHTML   = "templates/email-change.html"
+	testSMTPEmailTemplateText      = "templates/test-smtp.txt"
+	testSMTPEmailTemplateHTML      = "templates/test-smtp.html"
 )
 
 // RenderHTMLTemplate renders HTML templates.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 
@@ -33,7 +34,7 @@ func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
 	db := newTestDB(t)
 	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
-	return NewService(Deps{DB: db, Themes: renderer}), db
+	return NewService(Deps{DB: db, Themes: renderer, Mailer: mailer.NewService(mailer.Deps{DB: db})}), db
 }
 
 func TestGetSMTPConfig_Default(t *testing.T) {

@@ -73,8 +73,8 @@ func New(cfg *config.Config) (*App, error) {
 	// Shared service instances: construct each once and reuse it across the
 	// domains that depend on it.
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
-	mailerSvc := mailer.NewMailer(db)
 	verificationSvc := verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret, Mailer: mailerSvc})
+	mailerSvc := mailer.NewService(mailer.Deps{DB: db})
 
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
@@ -130,6 +130,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Themes:    renderer,
+			Mailer:    mailerSvc,
 		},
 	})
 
