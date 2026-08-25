@@ -230,6 +230,7 @@ export function PostDetailPage() {
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    if (!post?.id) return;
     try {
       const response = await commentsApi.deleteComment(commentId);
       await loadComments();
@@ -239,7 +240,7 @@ export function PostDetailPage() {
       try {
         window.dispatchEvent(
           new CustomEvent("comment-changed", {
-            detail: { postId: post?.id, commentsCount: newCount },
+            detail: { postId: post.id, commentsCount: newCount },
           }),
         );
       } catch {
