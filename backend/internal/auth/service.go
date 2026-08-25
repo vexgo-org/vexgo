@@ -258,7 +258,7 @@ func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, p
 		return false
 	}
 
-	token, err := s.mailer.GenerateVerificationToken(ctx, user.ID)
+	token, err := s.GenerateVerificationToken(ctx, user.ID)
 	if err != nil {
 		logger.Error("failed to generate verification token", "err", err)
 		return false
@@ -623,6 +623,21 @@ func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, new
 	// Save to database, also store pending new email
 	if err := s.repo.UpdateEmailChangeToken(ctx, userID, newEmail, token, expiresAt); err != nil {
 		return "", fmt.Errorf("failed to update email change token: %w", err)
+	}
+
+	return token, nil
+}
+
+func (s *Service) GenerateVerificationToken(ctx context.Context, userID uint) (string, error) {
+	// Generate random token (should use more secure method in production)
+	token := model.TokenPrefixVerify + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+
+	// Calculate expiration time (5 minutes from now)
+	expiresAt := time.Now().Add(5 * time.Minute)
+
+	// Save to database
+	if err := s.repo.UpdateUserToken(ctx, userID, token, expiresAt); err != nil {
+		return "", fmt.Errorf("failed to save verification token: %w", err)
 	}
 
 	return token, nil
