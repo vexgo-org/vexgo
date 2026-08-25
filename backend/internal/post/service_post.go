@@ -2,6 +2,7 @@ package post
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+
+	"gorm.io/gorm"
 )
 
 // ListQuery carries the acting user, pagination and filters for List.
@@ -187,6 +190,9 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 
 	if err := s.repo.Create(ctx, &post); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, model.ErrSlugTaken
+		}
 		return nil, err
 	}
 
@@ -282,6 +288,9 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 	}
 
 	if err := s.repo.Save(ctx, post); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, model.ErrSlugTaken
+		}
 		return nil, fmt.Errorf("save post: %w", err)
 	}
 	return post, nil
