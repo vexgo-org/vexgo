@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/url"
@@ -499,7 +500,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, protocol, hos
 	}
 
 	// Generate password reset token
-	token, err := s.mailer.GeneratePasswordResetToken(ctx, user.ID)
+	token, err := s.GeneratePasswordResetToken(ctx, user.ID)
 	if err != nil {
 		return ErrGenerateResetToken
 	}
@@ -638,6 +639,22 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// If captcha already used, pre-verification successful, pass directly
 
 	return nil
+}
+
+// GeneratePasswordResetToken generates password reset token
+func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (string, error) {
+	// Generate random token
+	token := model.TokenPrefixReset + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+
+	// Calculate expiration time (5 minutes from now)
+	expiresAt := time.Now().Add(5 * time.Minute)
+
+	// Save to database
+	if err := s.repo.UpdateUserPasswordResetToken(ctx, userID, token, expiresAt); err != nil {
+		return "", fmt.Errorf("failed to save password reset token: %w", err)
+	}
+
+	return token, nil
 }
 
 func buildLinkWithToken(protocol, host, path, token string) string {
