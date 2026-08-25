@@ -141,8 +141,12 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 
 	// Check for duplicate slug
-	if _, err := s.repo.FindBySlug(ctx, req.Slug); err == nil {
-		return nil, fmt.Errorf("failed to find post by slug: %w", model.ErrSlugTaken)
+	_, err := s.repo.FindBySlug(ctx, req.Slug)
+	if err == nil {
+		return nil, fmt.Errorf("%w", model.ErrSlugTaken)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("slug availability: %w", err)
 	}
 
 	// Convert category to string regardless of number or string type
@@ -245,8 +249,12 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 				return nil, fmt.Errorf("slug: %w", err)
 			}
 			// Allow the post to keep its own slug, reject duplicates with others.
-			if _, err := s.repo.FindBySlugExcludeID(ctx, req.Slug, post.ID); err == nil {
-				return nil, fmt.Errorf("slug: %w", model.ErrSlugTaken)
+			_, err := s.repo.FindBySlugExcludeID(ctx, req.Slug, post.ID)
+			if err == nil {
+				return nil, fmt.Errorf("%w", model.ErrSlugTaken)
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, fmt.Errorf("slug availability: %w", err)
 			}
 			post.Slug = req.Slug
 		}
