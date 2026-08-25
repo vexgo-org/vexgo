@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { isAxiosError } from "axios";
 import { postsApi, categoriesApi, uploadApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
@@ -32,6 +33,7 @@ import {
 
 // Post fields from the backend may be looser than the frontend Post type (category may be numeric, tags may be an object array)
 interface LoadedPost {
+  slug?: string;
   title: string;
   content: string;
   excerpt: string;
@@ -137,7 +139,7 @@ export function WritePostPage() {
       console.log("Post content:", post.content);
       console.log("Post content type:", typeof post.content);
       console.log("Post content length:", post.content?.length);
-      setSlug((post as { slug?: string }).slug || "");
+      setSlug(post.slug || "");
       setTitle(post.title);
       setContent(post.content || "");
       setOriginalContent(post.content || "");
@@ -320,19 +322,18 @@ export function WritePostPage() {
       }
     } catch (error: unknown) {
       console.error("Failed to save post:", error);
-      const axiosErr = error as {
-        response?: { status?: number; data?: { error?: string } };
-      };
-      if (axiosErr.response?.status === 409) {
-        alert(t("writePostPage.slugTaken"));
-      } else if (
-        axiosErr.response?.status === 400 &&
-        axiosErr.response?.data?.error
-      ) {
-        alert(axiosErr.response.data.error);
-      } else {
-        alert(t("writePostPage.writePostFailed"));
+      // The backend error body is {"error": string} (409 also carries code: "slug_taken")
+      let alertMessage = t("writePostPage.writePostFailed");
+      if (isAxiosError<{ error?: string }>(error)) {
+        const status = error.response?.status;
+        const serverError = error.response?.data?.error;
+        if (status === 409) {
+          alertMessage = t("writePostPage.slugTaken");
+        } else if (status === 400 && serverError) {
+          alertMessage = serverError;
+        }
       }
+      alert(alertMessage);
     } finally {
       setSaving(false);
     }
