@@ -25,6 +25,7 @@ import { CommentConfigPage } from "@/pages/CommentConfigPage";
 import { AISettingsPage } from "@/pages/AISettingsPage";
 import { NotificationCenterPage } from "@/pages/NotificationCenterPage";
 import { CreatorApplicationReviewPage } from "@/pages/CreatorApplicationReviewPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 
@@ -203,6 +204,8 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* Catch-all 404 */}
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Layout>
         </Router>
