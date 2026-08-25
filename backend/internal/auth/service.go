@@ -459,7 +459,7 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 
 	if enabled {
 		// If SMTP enabled, generate email change verification token and send confirmation email
-		token, err := s.mailer.GenerateEmailChangeToken(ctx, req.UserID, req.NewEmail)
+		token, err := s.GenerateEmailChangeToken(ctx, req.UserID, req.NewEmail)
 		if err != nil {
 			return false, ErrGenerateToken
 		}
@@ -652,6 +652,22 @@ func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (
 	// Save to database
 	if err := s.repo.UpdateUserPasswordResetToken(ctx, userID, token, expiresAt); err != nil {
 		return "", fmt.Errorf("failed to save password reset token: %w", err)
+	}
+
+	return token, nil
+}
+
+// GenerateEmailChangeToken generates email change verification token
+func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error) {
+	// Generate random token
+	token := model.TokenPrefixEmailChange + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+
+	// Calculate expiration time (5 minutes from now)
+	expiresAt := time.Now().Add(5 * time.Minute)
+
+	// Save to database, also store pending new email
+	if err := s.repo.UpdateEmailChangeToken(ctx, userID, newEmail, token, expiresAt); err != nil {
+		return "", fmt.Errorf("failed to update email change token: %w", err)
 	}
 
 	return token, nil

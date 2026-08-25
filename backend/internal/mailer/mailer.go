@@ -26,7 +26,6 @@ type MailSender interface {
 	VerifyEmail(ctx context.Context, token string) error
 	IsEmailEnabled() (bool, error)
 	SendPasswordResetEmail(ctx context.Context, toEmail, toName, resetLink string) error
-	GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error)
 	SendEmailChangeEmail(ctx context.Context, toEmail, toName, newEmail, verificationLink string) error
 	ConfirmEmailChange(ctx context.Context, token string) error
 }
@@ -311,27 +310,6 @@ If you did not request a password reset, please ignore this email.
 
 	slog.Info("password reset email sent successfully", "to", toEmail)
 	return nil
-}
-
-// GenerateEmailChangeToken generates email change verification token
-func (m *Mailer) GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error) {
-	// Generate random token
-	token := model.TokenPrefixEmailChange + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
-
-	// Calculate expiration time (5 minutes from now)
-	expiresAt := time.Now().Add(5 * time.Minute)
-
-	// Save to database, also store pending new email
-	updates := map[string]any{
-		"verification_token": token,
-		"token_expires_at":   expiresAt,
-		"pending_email":      newEmail,
-	}
-	if err := m.DB.Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
-		return "", fmt.Errorf("failed to save email change token: %w", err)
-	}
-
-	return token, nil
 }
 
 // SendEmailChangeEmail sends email change confirmation email
