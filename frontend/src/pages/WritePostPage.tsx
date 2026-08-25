@@ -312,9 +312,8 @@ export function WritePostPage() {
       };
 
       if (isEditMode) {
-        await postsApi.updatePost(id!, postData);
-        const updatedPost = await postsApi.getPostById(id!);
-        navigate(`/post/${updatedPost.data.post.slug}`);
+        const response = await postsApi.updatePost(id!, postData);
+        navigate(`/post/${response.data.post.slug}`);
       } else {
         const response = await postsApi.createPost(postData);
         navigate(`/post/${response.data.post.slug}`);
