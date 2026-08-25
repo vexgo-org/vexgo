@@ -5,12 +5,13 @@ import "context"
 // NotificationInput is the content of a notification to create. It groups
 // the values that were previously passed as positional arguments.
 type NotificationInput struct {
-	UserID      uint
-	Type        NotificationType
-	Title       string
-	Content     string
-	RelatedID   string
-	RelatedType NotificationRelatedType
+	UserID        uint
+	Type          NotificationType
+	Title         string
+	Content       string
+	RelatedID     string
+	RelatedType   NotificationRelatedType
+	RelatedPostID *uint // Owning post ID for reply/comment notifications
 }
 
 // Notifier is the seam for creating notifications; implemented by the

@@ -72,13 +72,14 @@ func (s *Service) UnreadCount(ctx context.Context, userID uint) (int64, error) {
 // domains (post, comment, user) when an event of interest occurs.
 func (s *Service) CreateNotification(ctx context.Context, input model.NotificationInput) error {
 	n := &model.Notification{
-		UserID:      input.UserID,
-		Type:        input.Type,
-		Title:       input.Title,
-		Content:     input.Content,
-		RelatedID:   input.RelatedID,
-		RelatedType: input.RelatedType,
-		IsRead:      false,
+		UserID:        input.UserID,
+		Type:          input.Type,
+		Title:         input.Title,
+		Content:       input.Content,
+		RelatedID:     input.RelatedID,
+		RelatedType:   input.RelatedType,
+		RelatedPostID: input.RelatedPostID,
+		IsRead:        false,
 	}
 	return s.repo.Create(ctx, n)
 }

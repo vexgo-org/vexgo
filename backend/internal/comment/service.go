@@ -196,12 +196,13 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 		commentContent = commentContent[:50] + "..."
 	}
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
-		UserID:      post.AuthorID,
-		Type:        model.NotificationTypeComment,
-		Title:       "Post Commented",
-		Content:     fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
-		RelatedID:   strconv.FormatUint(uint64(postID), 10),
-		RelatedType: model.NotificationRelatedTypePost,
+		UserID:        post.AuthorID,
+		Type:          model.NotificationTypeComment,
+		Title:         "Post Commented",
+		Content:       fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
+		RelatedID:     strconv.FormatUint(uint64(postID), 10),
+		RelatedType:   model.NotificationRelatedTypePost,
+		RelatedPostID: &postID,
 	}); err != nil {
 		slog.Warn("failed to create comment notification", "err", err)
 	}
@@ -227,12 +228,13 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 		replyContent = replyContent[:50] + "..."
 	}
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
-		UserID:      parentComment.UserID,
-		Type:        model.NotificationTypeReply,
-		Title:       "Comment Replied",
-		Content:     fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
-		RelatedID:   strconv.FormatUint(uint64(parentID), 10),
-		RelatedType: model.NotificationRelatedTypeComment,
+		UserID:        parentComment.UserID,
+		Type:          model.NotificationTypeReply,
+		Title:         "Comment Replied",
+		Content:       fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
+		RelatedID:     strconv.FormatUint(uint64(parentID), 10),
+		RelatedType:   model.NotificationRelatedTypeComment,
+		RelatedPostID: &parentComment.PostID,
 	}); err != nil {
 		slog.Warn("failed to create reply notification", "err", err)
 	}
