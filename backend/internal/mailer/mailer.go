@@ -23,11 +23,9 @@ import (
 type MailSender interface {
 	SendVerificationEmail(ctx context.Context, toEmail, toName, verificationLink string) error
 	GenerateVerificationToken(ctx context.Context, userID uint) (string, error)
-	VerifyEmail(ctx context.Context, token string) error
 	IsEmailEnabled() (bool, error)
 	SendPasswordResetEmail(ctx context.Context, toEmail, toName, resetLink string) error
 	SendEmailChangeEmail(ctx context.Context, toEmail, toName, newEmail, verificationLink string) error
-	ConfirmEmailChange(ctx context.Context, token string) error
 }
 
 // Mailer sends transactional emails via SMTP and manages the associated
@@ -174,39 +172,6 @@ func (m *Mailer) GenerateVerificationToken(ctx context.Context, userID uint) (st
 	}
 
 	return token, nil
-}
-
-// VerifyEmail verifies email address. Only email-verification tokens are
-// accepted: password-reset and email-change tokens are rejected so they
-// cannot be cross-used to verify an email.
-func (m *Mailer) VerifyEmail(ctx context.Context, token string) error {
-	if strings.HasPrefix(token, model.TokenPrefixReset) || strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		return fmt.Errorf("invalid verification token")
-	}
-
-	var user model.User
-	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return fmt.Errorf("invalid verification token")
-		}
-		return fmt.Errorf("failed to find user: %w", err)
-	}
-
-	// Check if token is expired
-	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
-		return fmt.Errorf("verification token has expired")
-	}
-
-	// Update user verification status
-	if err := m.DB.Model(&user).Updates(map[string]any{
-		"email_verified":     true,
-		"verification_token": "",
-		"token_expires_at":   time.Time{},
-	}).Error; err != nil {
-		return fmt.Errorf("failed to update user verification status: %w", err)
-	}
-
-	return nil
 }
 
 // IsEmailEnabled checks if SMTP is enabled
@@ -405,66 +370,6 @@ If you did not request an email change, please ignore this email.
 	}
 
 	slog.Info("email change confirmation sent successfully", "to", toEmail)
-	return nil
-}
-
-// ConfirmEmailChange confirms email change
-func (m *Mailer) ConfirmEmailChange(ctx context.Context, token string) error {
-	slog.Debug("confirm email change processing started", "token", token)
-
-	// Only email-change tokens may confirm an email change.
-	if !strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		slog.Warn("invalid verification token")
-		return fmt.Errorf("invalid verification token")
-	}
-
-	var user model.User
-	if err := m.DB.Where("verification_token = ?", token).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			slog.Warn("invalid verification token")
-			return fmt.Errorf("invalid verification token")
-		}
-		slog.Error("failed to query user for email change", "err", err)
-		return fmt.Errorf("failed to find user: %w", err)
-	}
-	slog.Debug("found user for email change",
-		"userID", user.ID,
-		"username", user.Username,
-		"pendingEmail", user.PendingEmail,
-	)
-
-	// Check if token is expired
-	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
-		slog.Warn("email change token expired", "expiresAt", user.TokenExpiresAt)
-		return fmt.Errorf("verification token has expired")
-	}
-
-	// Check if there is a pending email
-	if user.PendingEmail == "" {
-		slog.Warn("no pending email in email change request")
-		return fmt.Errorf("no pending email change")
-	}
-
-	// Check if the new email is already used by another user
-	var existingUser model.User
-	if err := m.DB.Where("email = ? AND id != ?", user.PendingEmail, user.ID).First(&existingUser).Error; err == nil {
-		slog.Warn("email already in use by another user", "existingUserID", existingUser.ID)
-		return fmt.Errorf("email already in use by another account")
-	}
-
-	// Update email address
-	if err := m.DB.Model(&user).Updates(map[string]any{
-		"email":              user.PendingEmail,
-		"email_verified":     true, // automatically verify the changed email
-		"pending_email":      "",
-		"verification_token": "",
-		"token_expires_at":   time.Time{},
-	}).Error; err != nil {
-		slog.Error("failed to update email", "err", err)
-		return fmt.Errorf("failed to update email: %w", err)
-	}
-
-	slog.Info("email change confirmed successfully", "newEmail", user.PendingEmail)
 	return nil
 }
 
