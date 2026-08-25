@@ -302,8 +302,8 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 		// Server-side rendering: lookup by slug
 		var post model.Post
 		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
-			// Post not found, fall back to SPA for frontend 404 handling
-			c.Next()
+			// Post not found, serve SPA so the frontend can render a 404 page.
+			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
 			return
 		}
 
@@ -332,7 +332,7 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 		// Server-side rendering: lookup by slug
 		var post model.Post
 		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
-			c.Next()
+			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
 			return
 		}
 

@@ -69,6 +69,7 @@ export function PostDetailPage() {
   );
   const [submittingComment, setSubmittingComment] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const loadPost = useCallback(async () => {
     try {
@@ -91,9 +92,8 @@ export function PostDetailPage() {
         status: axiosError.response?.status,
         data: axiosError.response?.data,
       });
-      // Only redirect back to the homepage if you truly cannot find the article.
       if (axiosError.response?.status === 404) {
-        navigate("/");
+        setNotFound(true);
       }
       // For other errors, still set loading to false so that users can see the error message.
     } finally {
@@ -288,6 +288,22 @@ export function PostDetailPage() {
     (user.id === post.authorId ||
       user.role === "admin" ||
       user.role === "super_admin");
+
+  if (notFound) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-4xl text-center">
+        <h1 className="text-6xl font-bold text-muted-foreground/30 mb-4">
+          404
+        </h1>
+        <p className="text-muted-foreground mb-8">
+          {t("postDetailPage.articleNotExist")}
+        </p>
+        <Button asChild>
+          <Link to="/">{t("postDetailPage.backToHome")}</Link>
+        </Button>
+      </div>
+    );
+  }
 
   if (loading || !post) {
     return (
