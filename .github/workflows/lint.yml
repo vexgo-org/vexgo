@@ -63,7 +63,7 @@ jobs:
       - name: Run oxlint
         run: |
           cd frontend/
-          pnpm exec oxlint .
+          pnpm run lint
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9

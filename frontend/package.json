@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/copy-manifest.mjs",
-    "lint": "oxlint .",
+    "lint": "oxlint --deny-warnings .",
     "preview": "vite preview"
   },
   "dependencies": {
