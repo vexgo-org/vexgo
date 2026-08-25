@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/config"
 	"github.com/vexgo-org/vexgo/backend/internal/database"
@@ -22,7 +23,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
 	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
-	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -74,7 +74,7 @@ func New(cfg *config.Config) (*App, error) {
 	// domains that depend on it.
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 	mailerSvc := mailer.NewService(mailer.Deps{DB: db})
-	verificationSvc := verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
+	captchaSvc := captcha.NewService(captcha.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
@@ -105,7 +105,7 @@ func New(cfg *config.Config) (*App, error) {
 			Notifier:  notificationSvc,
 			Files:     storage,
 		},
-		Verification: verification.Deps{
+		Captcha: captcha.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 		},
@@ -114,7 +114,7 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 			Files:     storage,
 			Mailer:    mailerSvc,
-			Captcha:   verificationSvc,
+			Captcha:   captchaSvc,
 		},
 		SSO: sso.Deps{
 			DB:        db,

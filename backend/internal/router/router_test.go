@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
@@ -14,7 +15,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
 	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
-	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -52,7 +52,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		Post:         post.Deps{DB: db, JWTSecret: secret},
 		Upload:       upload.Deps{DB: db, JWTSecret: secret},
 		User:         user.Deps{DB: db, JWTSecret: secret},
-		Verification: verification.Deps{
+		Captcha: captcha.Deps{
 			DB:        db,
 			JWTSecret: secret,
 		},

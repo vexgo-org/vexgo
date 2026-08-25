@@ -1,6 +1,6 @@
 // Package verification implements email verification and sliding-puzzle
 // captcha generation/verification.
-package verification
+package captcha
 
 import (
 	"context"

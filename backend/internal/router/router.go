@@ -3,6 +3,7 @@ package router
 
 import (
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
@@ -12,7 +13,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
 	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
-	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -27,7 +27,7 @@ type Deps struct {
 	Post         post.Deps
 	Upload       upload.Deps
 	User         user.Deps
-	Verification verification.Deps
+	Captcha      captcha.Deps
 	Auth         auth.Deps
 	SSO          sso.Deps
 	Home         home.Deps
@@ -44,7 +44,7 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	post.NewHandler(deps.Post).RegisterRoutes(api)
 	upload.NewHandler(deps.Upload).RegisterRoutes(api)
 	user.NewHandler(deps.User).RegisterRoutes(api)
-	verification.NewHandler(deps.Verification).RegisterRoutes(api)
+	captcha.NewHandler(deps.Captcha).RegisterRoutes(api)
 	auth.NewHandler(deps.Auth).RegisterRoutes(api)
 	sso.NewHandler(deps.SSO).RegisterRoutes(api)
 	home.NewHandler(deps.Home).RegisterRoutes(api)

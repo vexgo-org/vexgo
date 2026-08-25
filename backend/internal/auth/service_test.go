@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/glebarez/sqlite"
 	"github.com/golang-jwt/jwt/v5"
@@ -59,7 +59,7 @@ func newTestService(t *testing.T) (*Service, *fakeFiles, *gorm.DB) {
 		JWTSecret: testJWTSecret,
 		Files:     files,
 		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-		Captcha:   verification.NewService(verification.Deps{DB: db}),
+		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
 	})
 	return svc, files, db
 }
