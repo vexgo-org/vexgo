@@ -650,7 +650,7 @@ func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database
-	if err := s.repo.UpdateUserPasswordResetToken(ctx, userID, token, expiresAt); err != nil {
+	if err := s.repo.UpdateUserToken(ctx, userID, token, expiresAt); err != nil {
 		return "", fmt.Errorf("failed to save password reset token: %w", err)
 	}
 

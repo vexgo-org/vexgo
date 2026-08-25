@@ -24,7 +24,7 @@ type Repository interface {
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
 	SaveCaptcha(ctx context.Context, captcha *model.Captcha) error
-	UpdateUserPasswordResetToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error
+	UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
 }
 
@@ -116,7 +116,7 @@ func (r *gormRepository) SaveCaptcha(ctx context.Context, captcha *model.Captcha
 	return r.db.WithContext(ctx).Save(captcha).Error
 }
 
-func (r *gormRepository) UpdateUserPasswordResetToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error {
+func (r *gormRepository) UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error {
 	return r.db.Model(&model.User{}).
 		Where("id = ?", userID).
 		Updates(
