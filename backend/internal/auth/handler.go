@@ -415,3 +415,39 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
 }
+
+func (h *Handler) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	slog.Debug("email verification request received", "hasToken", token != "")
+
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token cannot be empty"})
+		return
+	}
+
+	emailChange, newEmail, err := h.svc.VerifyEmail(c.Request.Context(), token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if emailChange {
+		if newEmail != "" {
+			c.JSON(http.StatusOK, gin.H{
+				"message":         "Email change successful! Your new email is now active.",
+				"require_relogin": true,
+				"new_email":       newEmail,
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"message":         "Email change successful! Your new email is now active.",
+				"require_relogin": true,
+			})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Email verification successful! You can now log in.",
+	})
+}

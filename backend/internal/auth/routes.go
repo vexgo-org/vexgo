@@ -21,4 +21,6 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 		auth.POST("/request-password-reset", h.RequestPasswordReset)
 		auth.POST("/reset-password", h.ResetPassword)
 	}
+
+	api.GET("/verify-email", h.VerifyEmail)
 }

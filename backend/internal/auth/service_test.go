@@ -55,11 +55,12 @@ func newTestService(t *testing.T) (*Service, *fakeFiles, *gorm.DB) {
 	files := &fakeFiles{}
 	db := newTestDB(t)
 	svc := NewService(Deps{
-		DB:        db,
-		JWTSecret: testJWTSecret,
-		Files:     files,
-		Mailer:    mailer.NewMailer(db),
-		Captcha:   verification.NewService(verification.Deps{DB: db}),
+		DB:          db,
+		JWTSecret:   testJWTSecret,
+		Files:       files,
+		Mailer:      mailer.NewMailer(db),
+		Captcha:     verification.NewService(verification.Deps{DB: db}),
+		MailService: *mailer.NewService(mailer.Deps{DB: db}),
 	})
 	return svc, files, db
 }
@@ -497,8 +498,7 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 
 	// The emailed link actually verifies the address.
 	tok := extractToken(t, wantLink)
-	vc := verification.NewService(verification.Deps{DB: db, Mailer: mailer.NewMailer(db)})
-	emailChange, _, err := vc.VerifyEmail(context.Background(), tok)
+	emailChange, _, err := svc.VerifyEmail(context.Background(), tok)
 	if err != nil {
 		t.Fatalf("VerifyEmail via link error: %v", err)
 	}
@@ -570,8 +570,7 @@ func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
 
 	// The emailed link actually confirms the email change.
 	tok := extractToken(t, wantLink)
-	vc := verification.NewService(verification.Deps{DB: db, Mailer: mailer.NewMailer(db)})
-	emailChange, newEmail, err := vc.VerifyEmail(context.Background(), tok)
+	emailChange, newEmail, err := svc.VerifyEmail(context.Background(), tok)
 	if err != nil {
 		t.Fatalf("VerifyEmail via link error: %v", err)
 	}
@@ -636,5 +635,165 @@ func TestRequestPasswordReset_NoEmailForUnknownUser(t *testing.T) {
 	}
 	if len(capturedEmails) != 0 {
 		t.Errorf("expected no email for unknown user, got %d", len(capturedEmails))
+	}
+}
+
+func TestVerifyEmail_InvalidToken(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	if _, _, err := svc.VerifyEmail(context.Background(), "no-such-token"); err == nil {
+		t.Errorf("expected error for unknown token")
+	}
+}
+
+func TestVerifyEmail_Success(t *testing.T) {
+	svc, _, db := newTestService(t)
+	expiresAt := time.Now().Add(5 * time.Minute)
+	u := model.User{
+		Username:          "alice",
+		Email:             "alice@example.com",
+		VerificationToken: "verify-abc",
+		TokenExpiresAt:    &expiresAt,
+		EmailVerified:     false,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+
+	emailChange, _, err := svc.VerifyEmail(context.Background(), "verify-abc")
+	if err != nil {
+		t.Fatalf("VerifyEmail error: %v", err)
+	}
+	if emailChange {
+		t.Errorf("expected non-email-change verification")
+	}
+	var after model.User
+	if err := db.First(&after, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if !after.EmailVerified {
+		t.Errorf("expected email verified after VerifyEmail")
+	}
+}
+
+func TestVerifyEmail_EmailChangeUnknownToken(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	if _, _, err := svc.VerifyEmail(context.Background(), "email-change-nope"); err == nil {
+		t.Errorf("expected error for unknown email-change token")
+	}
+}
+
+func TestVerifyEmail_EmailChangeReturnsNewEmail(t *testing.T) {
+	svc, _, db := newTestService(t)
+	expiresAt := time.Now().Add(5 * time.Minute)
+	u := model.User{
+		Username:          "alice",
+		Email:             "old@example.com",
+		VerificationToken: "email-change-abc",
+		TokenExpiresAt:    &expiresAt,
+		PendingEmail:      "new@example.com",
+		EmailVerified:     true,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+
+	emailChange, newEmail, err := svc.VerifyEmail(context.Background(), "email-change-abc")
+	if err != nil {
+		t.Fatalf("VerifyEmail error: %v", err)
+	}
+	if !emailChange {
+		t.Errorf("expected email-change verification")
+	}
+	if newEmail != "new@example.com" {
+		t.Errorf("expected pending email returned, got %q", newEmail)
+	}
+
+	var after model.User
+	if err := db.First(&after, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if after.Email != "new@example.com" {
+		t.Errorf("expected email updated, got %q", after.Email)
+	}
+	if after.VerificationToken != "" || after.PendingEmail != "" {
+		t.Errorf("expected token and pending email cleared")
+	}
+}
+
+func TestVerifyEmail_RejectsResetToken(t *testing.T) {
+	svc, _, db := newTestService(t)
+	expiresAt := time.Now().Add(5 * time.Minute)
+	u := model.User{
+		Username:          "alice",
+		Email:             "alice@example.com",
+		VerificationToken: "reset-abc",
+		TokenExpiresAt:    &expiresAt,
+		EmailVerified:     false,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+
+	// A password-reset token must not be usable to verify an email.
+	if _, _, err := svc.VerifyEmail(context.Background(), "reset-abc"); err == nil {
+		t.Errorf("expected error for password-reset token")
+	}
+	var after model.User
+	if err := db.First(&after, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if after.EmailVerified {
+		t.Errorf("email must not be verified by a reset token")
+	}
+}
+
+func TestResendVerificationEmail_SendsContentfulEmail(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: false}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	if err := svc.ResendVerificationEmail(context.Background(), u.ID, "localhost:8080"); err != nil {
+		t.Fatalf("ResendVerificationEmail error: %v", err)
+	}
+
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
+	}
+	email := capturedEmails[0]
+	if email.To != "alice@example.com" {
+		t.Errorf("expected To alice@example.com, got %q", email.To)
+	}
+	if email.Subject != "Please Verify Your Email Address" {
+		t.Errorf("unexpected subject %q", email.Subject)
+	}
+	if !strings.Contains(email.TextBody, "alice") || !strings.Contains(email.HTMLBody, "alice") {
+		t.Errorf("expected username in email body")
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixVerify) {
+		t.Fatalf("expected verify token, got %q", stored.VerificationToken)
+	}
+	wantLink := "localhost:8080/verify-email?token=" + stored.VerificationToken
+	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
+		t.Errorf("expected verification link %q in email body", wantLink)
+	}
+
+	// The emailed link actually verifies the address.
+	tok := extractToken(t, wantLink)
+	emailChange, _, err := svc.VerifyEmail(context.Background(), tok)
+	if err != nil {
+		t.Fatalf("VerifyEmail via link error: %v", err)
+	}
+	if emailChange {
+		t.Errorf("expected normal verification, got email change")
 	}
 }

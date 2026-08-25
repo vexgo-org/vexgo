@@ -20,6 +20,8 @@ type Repository interface {
 	CreateUser(ctx context.Context, user *model.User) error
 	SaveUser(ctx context.Context, user *model.User) error
 	UpdateEmail(ctx context.Context, userID uint, email string) error
+	UpdateVerifiedEmail(ctx context.Context, userID uint, email string) error
+	UpdateUserEmailVerified(ctx context.Context, userID uint) error
 	ResetPassword(ctx context.Context, userID uint, hashedPassword string) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
@@ -85,6 +87,34 @@ func (r *gormRepository) SaveUser(ctx context.Context, user *model.User) error {
 func (r *gormRepository) UpdateEmail(ctx context.Context, userID uint, email string) error {
 	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
 		Update("email", email).Error
+}
+
+func (r *gormRepository) UpdateVerifiedEmail(ctx context.Context, userID uint, email string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Where("id = ?", userID).
+		Updates(
+			map[string]any{
+				"email":              email,
+				"email_verified":     true, // automatically verify the changed email
+				"pending_email":      "",
+				"verification_token": "",
+				"token_expires_at":   time.Time{},
+			},
+		).Error
+}
+
+func (r *gormRepository) UpdateUserEmailVerified(ctx context.Context, userID uint) error {
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Where("id = ?", userID).
+		Updates(
+			map[string]any{
+				"email_verified":     true,
+				"verification_token": "",
+				"token_expires_at":   time.Time{},
+			},
+		).Error
 }
 
 func (r *gormRepository) ResetPassword(ctx context.Context, userID uint, hashedPassword string) error {

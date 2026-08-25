@@ -98,3 +98,32 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
 	slog.Info("email change confirmed successfully", "newEmail", user.PendingEmail)
 	return nil
 }
+
+// verifyEmailToken verifies email address. Only email-verification tokens are
+// accepted: password-reset and email-change tokens are rejected so they
+// cannot be cross-used to verify an email.
+func (s *Service) verifyEmailToken(ctx context.Context, token string) error {
+	if strings.HasPrefix(token, model.TokenPrefixReset) || strings.HasPrefix(token, model.TokenPrefixEmailChange) {
+		return fmt.Errorf("invalid verification token")
+	}
+
+	user, err := s.repo.FindUserByToken(ctx, token)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("invalid verification token")
+		}
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+
+	// Check if token is expired
+	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
+		return fmt.Errorf("verification token has expired")
+	}
+
+	// Update user verification status
+	if err := s.repo.UpdateUserEmailVerified(ctx, user.ID); err != nil {
+		return fmt.Errorf("failed to update user verification status: %w", err)
+	}
+
+	return nil
+}

@@ -13,9 +13,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"log/slog"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
@@ -67,40 +65,6 @@ type Service struct {
 // NewService creates a verification service with the given dependencies.
 func NewService(deps Deps) *Service {
 	return &Service{repo: NewRepository(deps.DB), mailer: deps.Mailer}
-}
-
-// VerifyEmail verifies an email address. Tokens prefixed with "email-change-"
-// confirm a pending email change; all other tokens verify the initial email.
-// It returns whether the token was an email change and the user's new email
-// (only meaningful for email changes).
-func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bool, newEmail string, err error) {
-	if strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		slog.Debug("detected email change token, calling ConfirmEmailChange")
-		// The pending email must be read before the token is consumed:
-		// ConfirmEmailChange clears verification_token together with
-		// pending_email, so a lookup afterwards can never find the user.
-		user, err := s.repo.FindUserByToken(ctx, token)
-		if err != nil {
-			slog.Debug("find user by token failed", "err", err)
-			return false, "", err
-		}
-		pendingEmail := user.PendingEmail
-
-		if err := s.mailer.ConfirmEmailChange(ctx, token); err != nil {
-			slog.Debug("confirm email change failed", "err", err)
-			return false, "", err
-		}
-		slog.Debug("confirm email change succeeded")
-		return true, pendingEmail, nil
-	}
-
-	slog.Debug("normal email verification token, calling VerifyEmail")
-	if err := s.mailer.VerifyEmail(ctx, token); err != nil {
-		slog.Debug("verify email failed", "err", err)
-		return false, "", err
-	}
-	slog.Debug("verify email succeeded")
-	return false, "", nil
 }
 
 // VerificationStatus returns the email verification status of a user.
