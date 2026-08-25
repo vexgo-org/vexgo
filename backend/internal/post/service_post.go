@@ -70,7 +70,10 @@ func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUs
 func (s *Service) GetBySlug(ctx context.Context, slug, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	post, err := s.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return nil, ErrPostNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		return nil, fmt.Errorf("find post by slug: %w", err)
 	}
 
 	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
@@ -215,7 +218,10 @@ type UpdateRequest struct {
 func (s *Service) Update(ctx context.Context, id string, userID uint, req UpdateRequest) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
-		return nil, ErrPostNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		return nil, fmt.Errorf("find post for update: %w", err)
 	}
 
 	// Permission check
@@ -301,7 +307,10 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		return ErrPostNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrPostNotFound
+		}
+		return fmt.Errorf("find post for delete: %w", err)
 	}
 
 	// Permission check

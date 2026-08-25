@@ -101,7 +101,11 @@ func (h *Handler) GetPost(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view this post"})
 			return
 		}
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "slug": slug})
+		if errors.Is(err, ErrPostNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "slug": slug})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load post"})
 		return
 	}
 
