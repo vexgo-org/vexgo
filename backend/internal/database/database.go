@@ -225,6 +225,11 @@ func backfillSlugs(db *gorm.DB) error {
 		if base == "" {
 			base = "post"
 		}
+		// Fall back to a stable post-id-based slug when the generated slug
+		// fails validation (e.g. pure-numeric slugs like "2023").
+		if err := model.ValidateSlug(base); err != nil {
+			base = fmt.Sprintf("post-%d", post.ID)
+		}
 		slug := base
 		counter := 1
 		for {
