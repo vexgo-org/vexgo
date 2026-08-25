@@ -62,12 +62,13 @@ Cross-domain seams are defined in the `model` package as small interfaces:
 ```go
 // NotificationInput groups the notification fields passed to CreateNotification.
 type NotificationInput struct {
-    UserID      uint
-    Type        NotificationType
-    Title       string
-    Content     string
-    RelatedID   string
-    RelatedType NotificationRelatedType
+    UserID        uint
+    Type          NotificationType
+    Title         string
+    Content       string
+    RelatedID     string
+    RelatedType   NotificationRelatedType
+    RelatedPostID *uint
 }
 
 // Notifier is the seam for creating notifications; implemented by the notification domain.
