@@ -167,6 +167,15 @@ func (s *Service) SendEmailChangeEmail(ctx context.Context, toEmail, toName, new
 	return nil
 }
 
+// Enabled indicates whether SMTP is enabled.
+func (s *Service) Enabled(ctx context.Context) (bool, error) {
+	cfg, err := s.repo.GetSMTPSetting(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read SMTP configuration failed: %w", err)
+	}
+	return cfg.Enabled, nil
+}
+
 // readConfig reads SMTP configuration from database, and
 // updates the configuraiton of SMTP client.
 func (s *Service) readConfig(ctx context.Context) error {
