@@ -31,6 +31,8 @@ const MaxSlugLength = 200
 // Slugs containing uppercase ASCII letters are rejected; callers should
 // normalize the slug to lowercase before calling this function.
 func ValidateSlug(slug string) error {
+	slug = strings.TrimSpace(slug)
+
 	if slug == "" {
 		return ErrEmptySlug
 	}

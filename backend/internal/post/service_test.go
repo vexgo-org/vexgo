@@ -522,6 +522,8 @@ func TestSlugValidation(t *testing.T) {
 		"hello-中文-привет",
 		"café",
 		strings.Repeat("a", model.MaxSlugLength),
+		"  hello  ",           // trimmed before validation
+		"\t\thello-world\t\t", // trimmed before validation
 	}
 	for _, s := range valid {
 		t.Run("valid/"+s, func(t *testing.T) {
@@ -540,6 +542,8 @@ func TestSlugValidation(t *testing.T) {
 		reason string
 	}{
 		{"", "empty"},
+		{"   ", "whitespace only"},
+		{"\t\n", "whitespace only tab+newline"},
 		{"INVALID", "uppercase"},
 		{"Hello", "mixed case"},
 		{"hello-WORLD", "partial uppercase"},
