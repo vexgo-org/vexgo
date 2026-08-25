@@ -183,6 +183,11 @@ func (s *Service) SendTestSMTPEmail(
 		return fmt.Errorf("render html test SMTP email failed: %w", err)
 	}
 
+	if mailCaptureHook != nil {
+		mailCaptureHook(toEmail, SUBJECT, textBody, htmlBody)
+		return nil
+	}
+
 	if err := s.client.Send(Message{
 		To:       []string{toEmail},
 		Subject:  SUBJECT,
