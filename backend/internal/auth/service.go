@@ -104,15 +104,6 @@ func (s *Service) captchaEnabled(ctx context.Context) (bool, error) {
 	return s.captcha.IsCaptchaEnabled(ctx)
 }
 
-// LoginRequest carries the credentials and captcha inputs for Login.
-type LoginRequest struct {
-	Email        string
-	Password     string
-	CaptchaID    string
-	CaptchaToken string
-	CaptchaX     int
-}
-
 // Login authenticates a user by email and password and returns a signed JWT
 // together with the user record. Captcha is enforced when enabled.
 func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.User, error) {
@@ -163,18 +154,6 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 type RegisterResult struct {
 	User                 *model.User
 	RequiresVerification bool
-}
-
-// RegisterRequest carries the registration inputs.
-type RegisterRequest struct {
-	Email        string
-	Password     string
-	Username     string
-	CaptchaID    string
-	CaptchaToken string
-	CaptchaX     int
-	Protocol     string
-	Host         string
 }
 
 // Register creates a new guest user, enforcing registration settings and
@@ -307,14 +286,6 @@ func (s *Service) GetCurrentUser(ctx context.Context, userID uint) (*model.User,
 	return user, nil
 }
 
-// UpdateProfileRequest carries the optional profile fields.
-type UpdateProfileRequest struct {
-	Username *string
-	Avatar   *string
-	Birthday *string
-	Bio      *string
-}
-
 // UpdateProfile updates the optional profile fields, deleting the old avatar
 // file when the avatar changes.
 func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProfileRequest) (*model.User, error) {
@@ -383,14 +354,6 @@ func (s *Service) ChangePassword(ctx context.Context, userID uint, oldPassword, 
 	return s.repo.SaveUser(ctx, user)
 }
 
-// UpdateSettingsRequest carries the optional privacy settings.
-type UpdateSettingsRequest struct {
-	ProfileVisibility *string
-	HideEmail         *bool
-	HideBirthday      *bool
-	HideBio           *bool
-}
-
 // UpdateSettings updates the user's privacy settings.
 func (s *Service) UpdateSettings(ctx context.Context, userID uint, req UpdateSettingsRequest) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
@@ -419,14 +382,6 @@ func (s *Service) UpdateSettings(ctx context.Context, userID uint, req UpdateSet
 	}
 
 	return user, nil
-}
-
-// UpdateEmailRequest carries the email change inputs.
-type UpdateEmailRequest struct {
-	UserID   uint
-	NewEmail string
-	Protocol string
-	Host     string
 }
 
 // UpdateEmail changes the user's email. When SMTP is enabled it requires
