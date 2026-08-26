@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/joho/godotenv"
 )
 
 // Action describes what the program should do after parsing flags.
@@ -243,6 +244,15 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 	}
 
 	return cfg
+}
+
+// loadDotEnv loads environment variables from a .env file (best-effort).
+// It is called by ParseFlags only on the run path, just before config
+// construction, so help and version exit without reading the file.
+func loadDotEnv() {
+	if err := godotenv.Load("../.env"); err != nil {
+		slog.Info("no .env file found, will use environment variables from the system")
+	}
 }
 
 // newConfigFromEnv returns a Config populated from environment variables,

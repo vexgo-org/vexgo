@@ -5,18 +5,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"os"
-
-	"github.com/joho/godotenv"
 )
-
-// loadDotEnv loads environment variables from a .env file (best-effort).
-// It is called by ParseFlags only on the run path, just before config
-// construction, so help and version exit without reading the file.
-func loadDotEnv() {
-	if err := godotenv.Load("../.env"); err != nil {
-		slog.Info("no .env file found, will use environment variables from the system")
-	}
-}
 
 // ComputeJWTSecret ensures cfg.JWTSecret is populated. It checks, in order:
 //   - cfg.JWTSecret already set (from config file or flag)
