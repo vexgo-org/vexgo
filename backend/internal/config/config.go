@@ -161,8 +161,6 @@ type fileConfig struct {
 // When args are invalid it prints an error and usage to stderr and returns
 // ActionRun with a nil *Config — the caller should exit with code 2.
 func ParseFlags(version string, args []string) (Action, *Config) {
-	loadDotEnv()
-
 	fs := flag.NewFlagSet("vexgo", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 
@@ -208,6 +206,10 @@ func ParseFlags(version string, args []string) (Action, *Config) {
 		fmt.Printf("vexgo %s\n", version)
 		return ActionVersion, nil
 	}
+
+	// .env is only needed when actually building the server configuration;
+	// help and version should not read it.
+	loadDotEnv()
 
 	return ActionRun, buildConfig(addr, port, dataDir, configFile)
 }

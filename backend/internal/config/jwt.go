@@ -10,8 +10,8 @@ import (
 )
 
 // loadDotEnv loads environment variables from a .env file (best-effort).
-// It is called at the start of ParseFlags so that env vars are available
-// before config construction.
+// It is called by ParseFlags only on the run path, just before config
+// construction, so help and version exit without reading the file.
 func loadDotEnv() {
 	if err := godotenv.Load("../.env"); err != nil {
 		slog.Info("no .env file found, will use environment variables from the system")
