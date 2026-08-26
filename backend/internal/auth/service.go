@@ -268,7 +268,7 @@ func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, p
 	if err := s.mailer.SendVerificationEmail(
 		ctx,
 		user.Email,
-		&mailer.VerificationEamilTemplateData{
+		&mailer.VerificationEmailTemplateData{
 			Name: user.Username,
 			Link: verificationLink,
 		},

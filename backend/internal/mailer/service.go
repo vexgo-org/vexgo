@@ -39,7 +39,7 @@ func NewService(deps Deps) *Service {
 func (s *Service) SendVerificationEmail(
 	ctx context.Context,
 	toEmail string,
-	data *VerificationEamilTemplateData,
+	data *VerificationEmailTemplateData,
 ) error {
 	if err := s.readConfig(ctx); err != nil {
 		return err

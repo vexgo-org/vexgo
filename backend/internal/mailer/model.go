@@ -1,6 +1,6 @@
 package mailer
 
-type VerificationEamilTemplateData struct {
+type VerificationEmailTemplateData struct {
 	Name string
 	Link string
 }

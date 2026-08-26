@@ -57,7 +57,7 @@ func (c *SMTPClient) Send(ctx context.Context, msg Message) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if err := validateMessge(msg); err != nil {
+	if err := validateMessage(msg); err != nil {
 		return err
 	}
 
@@ -151,8 +151,8 @@ func validateConfig(cfg *model.SMTPConfig) error {
 	return nil
 }
 
-// validateMessge validates the message to be sent.
-func validateMessge(msg Message) error {
+// validateMessage validates the message to be sent.
+func validateMessage(msg Message) error {
 	if len(msg.To) == 0 {
 		return errors.New("at least one recipient is required")
 	}
