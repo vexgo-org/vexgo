@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/wneessen/go-mail"
@@ -17,6 +18,7 @@ type SMTPMailer interface {
 
 // SMTPClient encapsulate `mail.Client` and store SMTP configuration.
 type SMTPClient struct {
+	mu     sync.Mutex
 	c      *mail.Client
 	config *model.SMTPConfig
 }
@@ -36,6 +38,9 @@ func NewClient() SMTPMailer {
 
 // LoadConfig updates the configuration of SMTP client.
 func (c *SMTPClient) LoadConfig(cfg *model.SMTPConfig) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	client, err := createClientFromConfig(cfg)
 	if err != nil {
 		return err
@@ -48,6 +53,9 @@ func (c *SMTPClient) LoadConfig(cfg *model.SMTPConfig) error {
 
 // Send sends a message to recipient(s).
 func (c *SMTPClient) Send(msg Message) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if err := validateMessge(msg); err != nil {
 		return err
 	}
@@ -98,6 +106,9 @@ func (c *SMTPClient) Send(msg Message) error {
 }
 
 func (c *SMTPClient) Enabled() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	return c.config != nil && c.config.Enabled
 }
 
