@@ -126,6 +126,7 @@ func createClientFromConfig(cfg *model.SMTPConfig) (*mail.Client, error) {
 		mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover),
 		mail.WithUsername(cfg.Username),
 		mail.WithPassword(cfg.Password),
+		mail.WithTLSPolicy(mail.TLSOpportunistic),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create SMTP client failed: %w", err)
