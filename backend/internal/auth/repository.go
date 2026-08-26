@@ -147,7 +147,8 @@ func (r *gormRepository) SaveCaptcha(ctx context.Context, captcha *model.Captcha
 }
 
 func (r *gormRepository) UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error {
-	return r.db.Model(&model.User{}).
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
 		Where("id = ?", userID).
 		Updates(
 			map[string]any{
