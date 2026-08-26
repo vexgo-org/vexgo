@@ -159,7 +159,8 @@ func (r *gormRepository) UpdateUserToken(ctx context.Context, userID uint, token
 }
 
 func (r *gormRepository) UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error {
-	return r.db.Model(&model.User{}).
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
 		Where("id = ?", userID).
 		Updates(
 			map[string]any{
