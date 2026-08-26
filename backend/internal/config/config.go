@@ -4,14 +4,33 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/joho/godotenv"
+)
+
+// Action describes what the program should do after parsing flags.
+type Action int
+
+const (
+	ActionRun     Action = iota // Start the server normally.
+	ActionHelp                  // Print usage and exit 0.
+	ActionVersion               // Print version and exit 0.
+)
+
+// Default values used in PrintUsage and as fallback in newConfigFromEnv.
+const (
+	defaultAddr    = "0.0.0.0"
+	defaultPort    = 3001
+	defaultDataDir = "./data"
 )
 
 // Config holds the server configuration from command line arguments and/or config file
@@ -137,25 +156,74 @@ type fileConfig struct {
 	S3DisableBucketInCustomURL *bool  `yaml:"s3_disable_bucket_in_custom_url"`
 }
 
-// ParseFlags parses command line flags and returns the server configuration.
-// Priority: command line flags > config file > environment variables > defaults.
-func ParseFlags() *Config {
+// ParseFlags parses command-line arguments and returns the action to take
+// and the server configuration. version is the build version string, injected
+// via ldflags.
+//
+// When args are invalid it prints an error and usage to stderr and returns
+// ActionRun with a nil *Config — the caller should exit with code 2.
+func ParseFlags(version string, args []string) (Action, *Config) {
+	fs := flag.NewFlagSet("vexgo", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+
+	var (
+		configFile  string
+		addr        string
+		port        int
+		dataDir     string
+		showVersion bool
+	)
+
+	// Register both long and short forms for every option, bound to the
+	// same variable so either spelling writes the same value.
+	fs.StringVar(&configFile, "config", "", "Path to configuration file (YAML format)")
+	fs.StringVar(&configFile, "c", "", "Alias for -config")
+
+	fs.StringVar(&addr, "addr", "", "Address to listen on")
+	fs.StringVar(&addr, "a", "", "Alias for -addr")
+
+	fs.IntVar(&port, "port", 0, "Port to listen on")
+	fs.IntVar(&port, "p", 0, "Alias for -port")
+
+	fs.StringVar(&dataDir, "data", "", "Data directory for storing SQLite database and media files")
+	fs.StringVar(&dataDir, "d", "", "Alias for -data")
+
+	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
+	fs.BoolVar(&showVersion, "V", false, "Alias for -version")
+
+	// Suppress the automatic usage callback — we handle display ourselves
+	// so the help message is printed exactly once.
+	fs.Usage = func() {}
+
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ActionHelp, nil
+		}
+		fmt.Fprintf(os.Stderr, "vexgo: error: %v\n", err)
+		PrintUsage()
+		return ActionRun, nil
+	}
+
+	if showVersion {
+		fmt.Printf("vexgo %s\n", version)
+		return ActionVersion, nil
+	}
+
+	// .env is only needed when actually building the server configuration;
+	// help and version should not read it.
 	loadDotEnv()
 
-	configFile := flag.String("c", "", "Path to configuration file (YAML format)")
-	addr := flag.String("addr", "", "Address to listen on")
-	port := flag.Int("port", 0, "Port to listen on")
-	dataDir := flag.String("data", "", "Data directory for storing sqlite database and media files")
-
-	// Parse command line flags
-	flag.Parse()
-
-	return buildConfig(*addr, *port, *dataDir, *configFile)
+	cfg, err := buildConfig(addr, port, dataDir, configFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vexgo: error: %v\n", err)
+		return ActionRun, nil
+	}
+	return ActionRun, cfg
 }
 
 // buildConfig merges the three configuration sources with explicit priority:
 // command line flags > config file > environment variables > defaults.
-func buildConfig(addr string, port int, dataDir, configFile string) *Config {
+func buildConfig(addr string, port int, dataDir, configFile string) (*Config, error) {
 	// 1. Lowest priority: defaults, then environment variables
 	cfg := newConfigFromEnv()
 
@@ -163,11 +231,10 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 	if configFile != "" {
 		file := &fileConfig{}
 		if err := loadConfigFile(configFile, file); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to load config file %s: %v\n", configFile, err)
-		} else {
-			slog.Info("loaded configuration", "configFile", configFile)
-			applyFileConfig(cfg, file)
+			return nil, fmt.Errorf("failed to load config file %q: %w", configFile, err)
 		}
+		slog.Info("loaded configuration", "configFile", configFile)
+		applyFileConfig(cfg, file)
 	}
 
 	// 3. Highest priority: command line flags
@@ -181,16 +248,25 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 		cfg.DataDir = dataDir
 	}
 
-	return cfg
+	return cfg, nil
+}
+
+// loadDotEnv loads environment variables from a .env file (best-effort).
+// It is called by ParseFlags only on the run path, just before config
+// construction, so help and version exit without reading the file.
+func loadDotEnv() {
+	if err := godotenv.Load(".env"); err != nil {
+		slog.Info("no .env file found, will use environment variables from the system")
+	}
 }
 
 // newConfigFromEnv returns a Config populated from environment variables,
 // falling back to defaults when a variable is unset or invalid.
 func newConfigFromEnv() *Config {
 	return &Config{
-		Addr:     envString("ADDR", "0.0.0.0"),
-		Port:     envInt("PORT", 3001),
-		DataDir:  envString("DATA_DIR", "./data"),
+		Addr:     envString("ADDR", defaultAddr),
+		Port:     envInt("PORT", defaultPort),
+		DataDir:  envString("DATA_DIR", defaultDataDir),
 		LogLevel: envString("LOG_LEVEL", "info"),
 
 		DBType:     envString("DB_TYPE", ""),
@@ -273,7 +349,14 @@ func envBool(key string, defaultValue bool) bool {
 func loadConfigFile(filename string, file *fileConfig) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		// Strip the *fs.PathError wrapper so buildConfig can render a clean
+		// message ("no such file or directory", "permission denied", ...)
+		// without duplicating the filename.
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) {
+			return pathErr.Err
+		}
+		return err
 	}
 	if err := yaml.Unmarshal(data, file); err != nil {
 		return fmt.Errorf("failed to parse YAML: %w", err)
@@ -440,11 +523,16 @@ func (c *Config) GetListenAddr() string {
 	return fmt.Sprintf("%s:%d", c.Addr, c.Port)
 }
 
-// PrintUsage prints usage information for the server command
+// PrintUsage prints the command-line usage to stdout, showing both long
+// and short spellings with their default values.
 func PrintUsage() {
-	fmt.Printf("Usage: %s [options]\n", os.Args[0])
-	fmt.Println("\nOptions:")
-	flag.PrintDefaults()
+	fmt.Printf("Usage: vexgo [options]\n\nOptions:\n")
+	fmt.Printf("  --config, -c <file>    Path to configuration file (YAML format)\n")
+	fmt.Printf("  --addr, -a <addr>      Address to listen on (default: %s)\n", defaultAddr)
+	fmt.Printf("  --port, -p <port>      Port to listen on (default: %d)\n", defaultPort)
+	fmt.Printf("  --data, -d <dir>       Data directory (default: %s)\n", defaultDataDir)
+	fmt.Printf("  --version, -V          Print version and exit\n")
+	fmt.Printf("  --help, -h             Print this help and exit\n")
 }
 
 // parseTrustedProxies parses a comma-separated list of trusted proxies

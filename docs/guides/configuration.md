@@ -17,7 +17,7 @@ command-line arguments  >  config file  >  environment variables  >  defaults
 | Environment variables  | `PORT=8080 ./vexgo`      | Containers (Docker, systemd)      |
 | Defaults               | `3001`, `./data`, `info` | Fallback when nothing else is set |
 
-**CLI flags:** `-c <file>` (config file), `--addr`, `--port`, `--data`. Run `./vexgo --help` to see them all.
+**CLI flags:** `--config, -c <file>`, `--addr, -a`, `--port, -p`, `--data, -d`, `--version, -V`, `--help, -h`. Run `./vexgo --help` to see the full list.
 
 > **Tip:** secrets (like `JWT_SECRET` or database passwords) can go in either the config file or environment variables — pick what fits your deployment. Never commit real secrets to a repository.
 
