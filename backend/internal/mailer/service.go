@@ -68,7 +68,7 @@ func (s *Service) SendVerificationEmail(
 		return nil
 	}
 
-	if err := s.client.Send(Message{
+	if err := s.client.Send(ctx, Message{
 		To:       []string{toEmail},
 		Subject:  SUBJECT,
 		TextBody: textBody,
@@ -111,7 +111,7 @@ func (s *Service) SendPasswordResetEmail(
 		return nil
 	}
 
-	if err := s.client.Send(Message{
+	if err := s.client.Send(ctx, Message{
 		To:       []string{toEmail},
 		Subject:  SUBJECT,
 		TextBody: textBody,
@@ -150,7 +150,7 @@ func (s *Service) SendEmailChangeEmail(
 		return nil
 	}
 
-	if err := s.client.Send(Message{
+	if err := s.client.Send(ctx, Message{
 		To:       []string{toEmail},
 		Subject:  SUBJECT,
 		TextBody: textBody,
@@ -188,7 +188,7 @@ func (s *Service) SendTestSMTPEmail(
 		return nil
 	}
 
-	if err := s.client.Send(Message{
+	if err := s.client.Send(ctx, Message{
 		To:       []string{toEmail},
 		Subject:  SUBJECT,
 		TextBody: textBody,

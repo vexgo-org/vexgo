@@ -1,6 +1,7 @@
 package mailer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 type SMTPMailer interface {
 	LoadConfig(cfg *model.SMTPConfig) error
-	Send(msg Message) error
+	Send(ctx context.Context, msg Message) error
 	Enabled() bool
 }
 
@@ -52,7 +53,7 @@ func (c *SMTPClient) LoadConfig(cfg *model.SMTPConfig) error {
 }
 
 // Send sends a message to recipient(s).
-func (c *SMTPClient) Send(msg Message) error {
+func (c *SMTPClient) Send(ctx context.Context, msg Message) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -98,7 +99,7 @@ func (c *SMTPClient) Send(msg Message) error {
 	}
 
 	// Send the message.
-	if err := c.c.DialAndSend(message); err != nil {
+	if err := c.c.DialAndSendWithContext(ctx, message); err != nil {
 		return fmt.Errorf("send mail failed: %w", err)
 	}
 
