@@ -20,6 +20,7 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 		auth.PUT("/settings", h.mw.JWTAuth(), h.UpdateSettings)
 		auth.POST("/request-password-reset", h.RequestPasswordReset)
 		auth.POST("/reset-password", h.ResetPassword)
+		auth.GET("/verification-status", h.mw.JWTAuth(), h.GetVerificationStatus)
 	}
 
 	api.GET("/verify-email", h.VerifyEmail)

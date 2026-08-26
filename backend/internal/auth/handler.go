@@ -451,3 +451,27 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 		"message": "Email verification successful! You can now log in.",
 	})
 }
+
+// GetVerificationStatus gets current user's email verification status
+func (h *Handler) GetVerificationStatus(c *gin.Context) {
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+		return
+	}
+
+	emailVerified, email, err := h.svc.VerificationStatus(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user information"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"email_verified": emailVerified,
+		"email":          email,
+	})
+}

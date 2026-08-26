@@ -1,5 +1,5 @@
-// Package verification implements email verification and sliding-puzzle
-// captcha generation/verification.
+// Package captcha implements sliding-puzzle captcha generation and
+// verification.
 package captcha
 
 import (
@@ -24,12 +24,6 @@ import (
 
 // Sentinel errors mapped to HTTP responses by the handler.
 var (
-	// ErrUserNotFound means the user does not exist.
-	ErrUserNotFound = errors.New("user not found")
-	// ErrEmailAlreadyVerified means the email is already verified.
-	ErrEmailAlreadyVerified = errors.New("email already verified")
-	// ErrEmailServiceDisabled means SMTP is not enabled.
-	ErrEmailServiceDisabled = errors.New("email service not enabled")
 	// ErrCaptchaNotFound means the captcha does not exist or has expired.
 	ErrCaptchaNotFound = errors.New("captcha not found")
 	// ErrCaptchaUsed means the captcha was already used.
@@ -42,38 +36,22 @@ var (
 	ErrEncodeBgImage = errors.New("encode background image")
 	// ErrEncodePuzzleImage means the puzzle image could not be encoded.
 	ErrEncodePuzzleImage = errors.New("encode puzzle image")
-	// ErrGenerateToken means the verification token could not be generated.
-	ErrGenerateToken = errors.New("generate verification token")
-	// ErrSendVerificationEmail means the verification email could not be sent.
-	ErrSendVerificationEmail = errors.New("send verification email")
 )
 
-// Deps holds the dependencies required by the verification domain.
+// Deps holds the dependencies required by the captcha domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 }
 
-// Service contains the business logic of the verification domain.
+// Service contains the business logic of the captcha domain.
 type Service struct {
 	repo Repository
 }
 
-// NewService creates a verification service with the given dependencies.
+// NewService creates a captcha service with the given dependencies.
 func NewService(deps Deps) *Service {
 	return &Service{repo: NewRepository(deps.DB)}
-}
-
-// VerificationStatus returns the email verification status of a user.
-func (s *Service) VerificationStatus(ctx context.Context, userID uint) (emailVerified bool, email string, err error) {
-	user, err := s.repo.FindUserByID(ctx, userID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return false, "", ErrUserNotFound
-		}
-		return false, "", err
-	}
-	return user.EmailVerified, user.Email, nil
 }
 
 // IsCaptchaEnabled reports whether captcha verification is enabled in the

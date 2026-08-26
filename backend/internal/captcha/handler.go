@@ -4,44 +4,17 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
-
 	"github.com/gin-gonic/gin"
 )
 
-// Handler exposes the verification domain over HTTP.
+// Handler exposes the captcha domain over HTTP.
 type Handler struct {
 	svc *Service
-	mw  *middleware.Auth
 }
 
-// NewHandler creates a verification HTTP handler with the given dependencies.
+// NewHandler creates a captcha HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
-}
-
-// GetVerificationStatus gets current user's email verification status
-func (h *Handler) GetVerificationStatus(c *gin.Context) {
-	u, ok := middleware.CurrentUser(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	emailVerified, email, err := h.svc.VerificationStatus(c.Request.Context(), u.ID)
-	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user information"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"email_verified": emailVerified,
-		"email":          email,
-	})
+	return &Handler{svc: NewService(deps)}
 }
 
 // GenerateCaptcha generates sliding puzzle captcha

@@ -745,3 +745,23 @@ func TestVerifyEmail_RejectsResetToken(t *testing.T) {
 		t.Errorf("email must not be verified by a reset token")
 	}
 }
+
+func TestVerificationStatus(t *testing.T) {
+	svc, _, db := newTestService(t)
+	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: true}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("failed to seed user: %v", err)
+	}
+
+	verified, email, err := svc.VerificationStatus(context.Background(), u.ID)
+	if err != nil {
+		t.Fatalf("VerificationStatus error: %v", err)
+	}
+	if !verified || email != "alice@example.com" {
+		t.Errorf("expected verified true + email, got verified=%v email=%q", verified, email)
+	}
+
+	if _, _, err := svc.VerificationStatus(context.Background(), 99999); !errors.Is(err, ErrUserNotFound) {
+		t.Errorf("expected ErrUserNotFound, got %v", err)
+	}
+}

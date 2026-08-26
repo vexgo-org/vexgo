@@ -127,3 +127,15 @@ func (s *Service) verifyEmailToken(ctx context.Context, token string) error {
 
 	return nil
 }
+
+// VerificationStatus returns the email verification status of a user.
+func (s *Service) VerificationStatus(ctx context.Context, userID uint) (emailVerified bool, email string, err error) {
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return false, "", ErrUserNotFound
+		}
+		return false, "", err
+	}
+	return user.EmailVerified, user.Email, nil
+}

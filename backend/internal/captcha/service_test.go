@@ -23,7 +23,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}); err != nil {
+	if err := db.AutoMigrate(&model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -59,26 +59,6 @@ func TestIsCaptchaEnabled_WhenEnabled(t *testing.T) {
 	}
 	if !enabled {
 		t.Errorf("expected captcha enabled")
-	}
-}
-
-func TestVerificationStatus(t *testing.T) {
-	svc, db := newTestService(t)
-	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: true}
-	if err := db.Create(&u).Error; err != nil {
-		t.Fatalf("failed to seed user: %v", err)
-	}
-
-	verified, email, err := svc.VerificationStatus(context.Background(), u.ID)
-	if err != nil {
-		t.Fatalf("VerificationStatus error: %v", err)
-	}
-	if !verified || email != "alice@example.com" {
-		t.Errorf("expected verified true + email, got verified=%v email=%q", verified, email)
-	}
-
-	if _, _, err := svc.VerificationStatus(context.Background(), 99999); !errors.Is(err, ErrUserNotFound) {
-		t.Errorf("expected ErrUserNotFound, got %v", err)
 	}
 }
 
