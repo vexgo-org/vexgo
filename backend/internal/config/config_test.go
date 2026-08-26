@@ -16,8 +16,18 @@ func writeConfig(t *testing.T, content string) string {
 	return path
 }
 
+// buildConfigOrFail calls buildConfig and fails the test on error.
+func buildConfigOrFail(t *testing.T, addr string, port int, dataDir, configFile string) *Config {
+	t.Helper()
+	cfg, err := buildConfig(addr, port, dataDir, configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
+}
+
 func TestPriorityDefaultWhenNothingSet(t *testing.T) {
-	cfg := buildConfig("", 0, "", "")
+	cfg := buildConfigOrFail(t, "", 0, "", "")
 	if cfg.Addr != "0.0.0.0" || cfg.Port != 3001 || cfg.DataDir != "./data" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
@@ -35,7 +45,7 @@ func TestPriorityEnvOverridesDefault(t *testing.T) {
 	t.Setenv("ALLOW_LOCAL_LOGIN", "false")
 	t.Setenv("S3_ENABLED", "true")
 
-	cfg := buildConfig("", 0, "", "")
+	cfg := buildConfigOrFail(t, "", 0, "", "")
 	if cfg.Addr != "10.0.0.1" || cfg.Port != 8080 {
 		t.Fatalf("env should override defaults: %+v", cfg)
 	}
@@ -53,7 +63,7 @@ func TestPriorityConfigFileOverridesEnv(t *testing.T) {
 	t.Setenv("S3_ENABLED", "true")
 
 	path := writeConfig(t, "addr: 192.168.1.1\ndb_host: file-host\n")
-	cfg := buildConfig("", 0, "", path)
+	cfg := buildConfigOrFail(t, "", 0, "", path)
 
 	if cfg.Addr != "192.168.1.1" {
 		t.Fatalf("config file should override env for addr, got %s", cfg.Addr)
@@ -70,7 +80,7 @@ func TestPriorityConfigFileBoolFalseOverridesEnvTrue(t *testing.T) {
 	t.Setenv("ALLOW_LOCAL_LOGIN", "true")
 
 	path := writeConfig(t, "s3_enabled: false\nallow_local_login: false\n")
-	cfg := buildConfig("", 0, "", path)
+	cfg := buildConfigOrFail(t, "", 0, "", path)
 
 	if cfg.S3Enabled {
 		t.Fatal("config file s3_enabled: false should override env S3_ENABLED=true")
@@ -87,7 +97,7 @@ func TestPriorityConfigFileBoolTrueOverridesEnvFalse(t *testing.T) {
 	t.Setenv("S3_ENABLED", "false")
 
 	path := writeConfig(t, "s3_enabled: true\n")
-	cfg := buildConfig("", 0, "", path)
+	cfg := buildConfigOrFail(t, "", 0, "", path)
 
 	if !cfg.S3Enabled {
 		t.Fatal("config file s3_enabled: true should override env S3_ENABLED=false")
@@ -98,7 +108,7 @@ func TestPriorityFlagsOverrideConfigFileAndEnv(t *testing.T) {
 	t.Setenv("ADDR", "10.0.0.1")
 	path := writeConfig(t, "addr: 192.168.1.1\n")
 
-	cfg := buildConfig("172.16.0.1", 9090, "/custom/data", path)
+	cfg := buildConfigOrFail(t, "172.16.0.1", 9090, "/custom/data", path)
 	if cfg.Addr != "172.16.0.1" {
 		t.Fatalf("flag should override config file for addr, got %s", cfg.Addr)
 	}
@@ -115,7 +125,7 @@ func TestLoadFromConfigBoolFalse(t *testing.T) {
 	t.Setenv("OIDC_AUTO_REDIRECT", "true")
 
 	path := writeConfig(t, "oidc_enabled: false\noidc_auto_redirect: false\n")
-	cfg := buildConfig("", 0, "", path)
+	cfg := buildConfigOrFail(t, "", 0, "", path)
 	cfg.LoadSSOFromEnv()
 	cfg.LoadSSOFromConfig()
 
@@ -132,7 +142,7 @@ func TestLoadFromConfigStringOverrides(t *testing.T) {
 	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
 
 	path := writeConfig(t, "github_client_id: file-id\n")
-	cfg := buildConfig("", 0, "", path)
+	cfg := buildConfigOrFail(t, "", 0, "", path)
 	cfg.LoadSSOFromEnv()
 	cfg.LoadSSOFromConfig()
 
@@ -147,7 +157,7 @@ func TestLoadFromConfigStringOverrides(t *testing.T) {
 
 func TestEnvWithoutConfigFileStillPopulatesSSO(t *testing.T) {
 	t.Setenv("GITHUB_CLIENT_ID", "env-id")
-	cfg := buildConfig("", 0, "", "")
+	cfg := buildConfigOrFail(t, "", 0, "", "")
 	cfg.LoadSSOFromEnv()
 	cfg.LoadSSOFromConfig()
 
@@ -161,8 +171,9 @@ func TestEnvWithoutConfigFileStillPopulatesSSO(t *testing.T) {
 // =============================================================================
 
 func TestParseFlagsLongSpellings(t *testing.T) {
+	path := writeConfig(t, "")
 	_, cfg := ParseFlags("dev", []string{
-		"--config", "/tmp/cfg.yaml",
+		"--config", path,
 		"--addr", "10.0.0.1",
 		"--port", "8080",
 		"--data", "/tmp/data",
@@ -180,8 +191,9 @@ func TestParseFlagsLongSpellings(t *testing.T) {
 }
 
 func TestParseFlagsShortSpellings(t *testing.T) {
+	path := writeConfig(t, "")
 	_, cfg := ParseFlags("dev", []string{
-		"-c", "/tmp/cfg.yaml",
+		"-c", path,
 		"-a", "10.0.0.1",
 		"-p", "9090",
 		"-d", "/custom/data",
@@ -282,6 +294,29 @@ func TestParseFlagsUnknownFlag(t *testing.T) {
 	}
 	if cfg != nil {
 		t.Fatal("unknown flag should return nil config to signal error")
+	}
+}
+
+func TestParseFlagsMissingConfigFile(t *testing.T) {
+	action, cfg := ParseFlags("dev", []string{
+		"-c", filepath.Join(t.TempDir(), "nonexistent.yaml"),
+	})
+	if action != ActionRun {
+		t.Fatalf("missing config file should return ActionRun, got %v", action)
+	}
+	if cfg != nil {
+		t.Fatal("missing config file should return nil config to signal error")
+	}
+}
+
+func TestParseFlagsInvalidConfigFile(t *testing.T) {
+	path := writeConfig(t, "addr: [unclosed\n")
+	action, cfg := ParseFlags("dev", []string{"-c", path})
+	if action != ActionRun {
+		t.Fatalf("invalid config file should return ActionRun, got %v", action)
+	}
+	if cfg != nil {
+		t.Fatal("invalid config file should return nil config to signal error")
 	}
 }
 

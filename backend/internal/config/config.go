@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"strconv"
@@ -198,7 +199,7 @@ func ParseFlags(version string, args []string) (Action, *Config) {
 		if errors.Is(err, flag.ErrHelp) {
 			return ActionHelp, nil
 		}
-		fmt.Fprintf(os.Stderr, "vexgo: %v\n", err)
+		fmt.Fprintf(os.Stderr, "vexgo: error: %v\n", err)
 		PrintUsage()
 		return ActionRun, nil
 	}
@@ -212,12 +213,17 @@ func ParseFlags(version string, args []string) (Action, *Config) {
 	// help and version should not read it.
 	loadDotEnv()
 
-	return ActionRun, buildConfig(addr, port, dataDir, configFile)
+	cfg, err := buildConfig(addr, port, dataDir, configFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vexgo: error: %v\n", err)
+		return ActionRun, nil
+	}
+	return ActionRun, cfg
 }
 
 // buildConfig merges the three configuration sources with explicit priority:
 // command line flags > config file > environment variables > defaults.
-func buildConfig(addr string, port int, dataDir, configFile string) *Config {
+func buildConfig(addr string, port int, dataDir, configFile string) (*Config, error) {
 	// 1. Lowest priority: defaults, then environment variables
 	cfg := newConfigFromEnv()
 
@@ -225,11 +231,10 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 	if configFile != "" {
 		file := &fileConfig{}
 		if err := loadConfigFile(configFile, file); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to load config file %s: %v\n", configFile, err)
-		} else {
-			slog.Info("loaded configuration", "configFile", configFile)
-			applyFileConfig(cfg, file)
+			return nil, fmt.Errorf("failed to load config file %q: %w", configFile, err)
 		}
+		slog.Info("loaded configuration", "configFile", configFile)
+		applyFileConfig(cfg, file)
 	}
 
 	// 3. Highest priority: command line flags
@@ -243,7 +248,7 @@ func buildConfig(addr string, port int, dataDir, configFile string) *Config {
 		cfg.DataDir = dataDir
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 // loadDotEnv loads environment variables from a .env file (best-effort).
@@ -344,7 +349,14 @@ func envBool(key string, defaultValue bool) bool {
 func loadConfigFile(filename string, file *fileConfig) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		// Strip the *fs.PathError wrapper so buildConfig can render a clean
+		// message ("no such file or directory", "permission denied", ...)
+		// without duplicating the filename.
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) {
+			return pathErr.Err
+		}
+		return err
 	}
 	if err := yaml.Unmarshal(data, file); err != nil {
 		return fmt.Errorf("failed to parse YAML: %w", err)
