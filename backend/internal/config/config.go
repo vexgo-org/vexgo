@@ -255,7 +255,7 @@ func buildConfig(addr string, port int, dataDir, configFile string) (*Config, er
 // It is called by ParseFlags only on the run path, just before config
 // construction, so help and version exit without reading the file.
 func loadDotEnv() {
-	if err := godotenv.Load("../.env"); err != nil {
+	if err := godotenv.Load(".env"); err != nil {
 		slog.Info("no .env file found, will use environment variables from the system")
 	}
 }
