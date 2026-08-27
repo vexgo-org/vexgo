@@ -2,9 +2,11 @@ package mailer
 
 import (
 	"context"
+	"net"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -286,6 +288,70 @@ func TestSMTPClient_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// TestSMTPClient_SendDoesNotHoldLockDuringDial proves Send releases the client
+// mutex before touching the network. A stalling loopback listener accepts the
+// connection but never answers with an SMTP greeting, parking Send mid-dial;
+// Accept is the rendezvous point proving the sender is inside its network
+// wait, so at that moment the mutex must already be free for other callers
+// (auth flows contend on it via LoadConfig/Enabled). On the previous locking
+// scheme the mutex was held for the whole SMTP round-trip and this fails.
+func TestSMTPClient_SendDoesNotHoldLockDuringDial(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	tcp := ln.(*net.TCPListener)
+	if err := tcp.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("set accept deadline: %v", err)
+	}
+
+	cfg := &model.SMTPConfig{
+		Enabled:   true,
+		Host:      "127.0.0.1",
+		Port:      tcp.Addr().(*net.TCPAddr).Port,
+		FromEmail: "a@b.c",
+	}
+	c := &SMTPClient{}
+	if err := c.LoadConfig(cfg); err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+
+	sendDone := make(chan error, 1)
+	go func() {
+		sendDone <- c.Send(context.Background(), Message{
+			To: []string{"x@example.com"}, Subject: "s", TextBody: "b",
+		})
+	}()
+
+	// The sender has now parked on the silent server.
+	if _, err := tcp.Accept(); err != nil {
+		t.Fatalf("sender never dialed the stalling server: %v", err)
+	}
+
+	const budget = 500 * time.Millisecond
+	deadline := time.Now().Add(budget)
+	for {
+		if c.mu.TryLock() {
+			c.mu.Unlock()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("client mutex held during SMTP dial: a slow server serializes unrelated requests")
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+
+	enabledDone := make(chan bool, 1)
+	go func() { enabledDone <- c.Enabled() }()
+	select {
+	case <-enabledDone:
+	case <-time.After(budget):
+		t.Error("Enabled() starved while Send was dialing")
+	}
+
+	ln.Close()
 }
 
 // TestService_ConcurrentSends_CapturedExactlyOnce fires concurrent sends

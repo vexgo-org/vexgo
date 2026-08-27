@@ -54,33 +54,57 @@ func (c *SMTPClient) LoadConfig(cfg *model.SMTPConfig) error {
 
 // Send sends a message to recipient(s).
 func (c *SMTPClient) Send(ctx context.Context, msg Message) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if err := validateMessage(msg); err != nil {
 		return err
 	}
 
+	// Snapshot the configured client and config under the lock, then release
+	// it before any network I/O: LoadConfig/Enabled contend on this mutex,
+	// and holding it through the SMTP round-trip would serialize all emails
+	// behind a single slow server. Each DialAndSendWithContext call dials its
+	// own connection, so using the shared snapshot concurrently is safe.
+	c.mu.Lock()
+	client, cfg := c.c, c.config
+	c.mu.Unlock()
+
+	if client == nil || cfg == nil {
+		return errors.New("SMTP client is not configured")
+	}
+
+	message, err := newMessageFromConfig(cfg, msg)
+	if err != nil {
+		return err
+	}
+
+	// Send the message.
+	if err := client.DialAndSendWithContext(ctx, message); err != nil {
+		return fmt.Errorf("send mail failed: %w", err)
+	}
+
+	return nil
+}
+
+// newMessageFromConfig builds the go-mail message for a send, resolving the
+// sender from the given configuration snapshot so no shared state is read
+// after Send has released the lock.
+func newMessageFromConfig(cfg *model.SMTPConfig, msg Message) (*mail.Msg, error) {
 	message := mail.NewMsg()
 
 	// Construct `from` field of a mail.
 	// If `FromName` is configured, the format will be
 	// FromName <FromEmail>
-	if c.config.FromName != "" {
-		if err := message.FromFormat(
-			c.config.FromName,
-			c.config.FromEmail,
-		); err != nil {
-			return fmt.Errorf("set sender failed: %w", err)
+	if cfg.FromName != "" {
+		if err := message.FromFormat(cfg.FromName, cfg.FromEmail); err != nil {
+			return nil, fmt.Errorf("set sender failed: %w", err)
 		}
 	} else {
-		if err := message.From(c.config.FromEmail); err != nil {
-			return fmt.Errorf("set sender failed: %w", err)
+		if err := message.From(cfg.FromEmail); err != nil {
+			return nil, fmt.Errorf("set sender failed: %w", err)
 		}
 	}
 
 	if err := message.To(msg.To...); err != nil {
-		return fmt.Errorf("set recipients failed: %w", err)
+		return nil, fmt.Errorf("set recipients failed: %w", err)
 	}
 
 	message.Subject(msg.Subject)
@@ -98,12 +122,7 @@ func (c *SMTPClient) Send(ctx context.Context, msg Message) error {
 		message.SetBodyString(mail.TypeTextPlain, msg.TextBody)
 	}
 
-	// Send the message.
-	if err := c.c.DialAndSendWithContext(ctx, message); err != nil {
-		return fmt.Errorf("send mail failed: %w", err)
-	}
-
-	return nil
+	return message, nil
 }
 
 func (c *SMTPClient) Enabled() bool {
