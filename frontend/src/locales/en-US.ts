@@ -228,6 +228,7 @@ export const enUS = {
     testing: "Testing...",
     testFirst: "Please enable SMTP first",
     savePasswordFirst: "Please save password first",
+    testSucceeded: "Test email has been sent",
     testFailed: "Test failed",
     commonExamples: "Common Email Service Configuration Examples",
     gmailExample: "Gmail: smtp.gmail.com:587 (TLS) or 465 (SSL)",
