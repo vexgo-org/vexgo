@@ -50,6 +50,8 @@ export const zhCN = {
     registerSuccess: "注册成功",
     emailVerified: "邮箱已验证",
     verifyEmail: "验证邮箱",
+    emailVerificationRequired: "请先验证您的邮箱地址",
+    registrationFailed: "注册失败",
   },
 
   // 个人信息
@@ -255,6 +257,7 @@ export const zhCN = {
     uploadSuccess: "主题上传成功",
     uploadFailed: "上传主题失败",
     uploadError: "上传错误: {message}",
+    uploadInvalidType: "请上传 zip 格式的文件",
     viewDetails: "查看详情",
     method1: {
       title: "方法一：上传主题包",
@@ -655,6 +658,8 @@ export const zhCN = {
     puzzleAlt: "拼图块",
     dragHint: "向右拖动滑块完成验证",
     refreshButton: "刷新验证码",
+    fetchFailed: "获取验证码失败",
+    retryError: "验证失败，请重试",
     refreshing: "刷新中...",
   },
 
@@ -850,6 +855,7 @@ export const zhCN = {
     titlePlaceholder: "请输入文章标题...",
     titleRequired: "请输入文章标题",
     coverImage: "封面图",
+    coverImageAlt: "文章封面图",
     uploadCover: "点击上传封面图",
     uploading: "上传中...",
     imageFormat: "支持 JPG、PNG、GIF，最大 10MB",

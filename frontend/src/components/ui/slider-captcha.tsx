@@ -53,13 +53,15 @@ export function SliderCaptcha({
 
       const response = await fetch("/api/captcha");
       if (!response.ok) {
-        throw new Error("获取验证码失败");
+        throw new Error(t("sliderCaptcha.fetchFailed"));
       }
 
       const data = await response.json();
       setCaptchaData(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "获取验证码失败");
+      setError(
+        err instanceof Error ? err.message : t("sliderCaptcha.fetchFailed"),
+      );
     } finally {
       setIsVerifying(false);
     }
@@ -103,7 +105,7 @@ export function SliderCaptcha({
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "验证失败，请重试");
+          throw new Error(errorData.error || t("sliderCaptcha.retryError"));
         }
 
         const data = await response.json();
@@ -122,10 +124,12 @@ export function SliderCaptcha({
           }, 500);
         } else {
           // Verification failed
-          throw new Error(data.message || "验证失败，请重试");
+          throw new Error(data.message || t("sliderCaptcha.retryError"));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "验证失败，请重试");
+        setError(
+          err instanceof Error ? err.message : t("sliderCaptcha.retryError"),
+        );
         // Refresh the captcha after a failed verification
         setTimeout(() => {
           generateCaptcha();

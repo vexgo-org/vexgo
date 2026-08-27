@@ -50,6 +50,8 @@ export const enUS = {
     registerSuccess: "Registration successful",
     emailVerified: "Email Verified",
     verifyEmail: "Verify Email",
+    emailVerificationRequired: "Please verify your email address first",
+    registrationFailed: "Registration failed",
   },
 
   // Profile
@@ -274,6 +276,7 @@ export const enUS = {
     uploadSuccess: "Theme uploaded successfully",
     uploadFailed: "Failed to upload theme",
     uploadError: "Upload error: {message}",
+    uploadInvalidType: "Please upload a zip file",
     viewDetails: "View Details",
     method1: {
       title: "Method 1: Upload Theme Package",
@@ -683,6 +686,8 @@ export const enUS = {
     puzzleAlt: "Puzzle piece",
     dragHint: "Drag the slider to complete verification",
     refreshButton: "Refresh captcha",
+    fetchFailed: "Failed to load captcha",
+    retryError: "Verification failed, please try again",
     refreshing: "Refreshing...",
   },
 
@@ -886,6 +891,7 @@ export const enUS = {
     titlePlaceholder: "Enter article title...",
     titleRequired: "Please enter article title",
     coverImage: "Cover Image",
+    coverImageAlt: "Post cover image",
     uploadCover: "Click to upload cover image",
     uploading: "Uploading...",
     imageFormat: "Supports JPG, PNG, GIF, max 10MB",

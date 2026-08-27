@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { User } from "@/types";
 import { authApi } from "@/lib/api";
+import { t } from "@/lib/i18n";
 
 interface AuthContextType {
   user: User | null;
@@ -120,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (requires_verification && !email_verified) {
         const error = new Error(
-          response.data.message || "请先验证您的邮箱地址",
+          response.data.message || t("auth.emailVerificationRequired"),
         ) as Error & {
           requiresVerification: boolean;
           email: string;
@@ -155,7 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         message?: string;
       };
       const errorMessage =
-        apiError.response?.data?.error || apiError.message || "注册失败";
+        apiError.response?.data?.error ||
+        apiError.message ||
+        t("auth.registrationFailed");
       throw new Error(errorMessage);
     }
   };

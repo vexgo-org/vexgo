@@ -269,7 +269,7 @@ export function LoginPage() {
       setError(
         error.response?.data?.message ||
           error.message ||
-          "登录失败，请检查邮箱和密码",
+          t("loginPage.loginFailed"),
       );
       if (error.response?.data?.email_verified === false)
         setEmailVerified(false);
