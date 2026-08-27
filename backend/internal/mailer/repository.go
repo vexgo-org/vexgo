@@ -22,7 +22,7 @@ func NewRepository(db *gorm.DB) Repository {
 
 func (r *gormRepository) GetSMTPSetting(ctx context.Context) (*model.SMTPConfig, error) {
 	var config model.SMTPConfig
-	if err := r.db.First(&config).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&config).Error; err != nil {
 		return nil, fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 	return &config, nil
