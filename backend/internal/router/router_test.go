@@ -79,6 +79,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"PUT /api/auth/email",
 		"PUT /api/auth/settings",
 		"POST /api/auth/request-password-reset",
+		"POST /api/auth/resend-verification",
 		"POST /api/auth/reset-password",
 		// comment
 		"GET /api/comments/post/:id",

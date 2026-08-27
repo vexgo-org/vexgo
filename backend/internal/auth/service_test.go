@@ -506,6 +506,38 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 	}
 }
 
+func TestRegister_UnverifiedDuplicateResendsVerificationEmail(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	first, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "repeat@example.com", Password: "password123", Username: "first",
+		Protocol: "https", Host: "example.com",
+	})
+	if err != nil || !first.RequiresVerification {
+		t.Fatalf("initial registration failed: result=%+v err=%v", first, err)
+	}
+
+	second, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "repeat@example.com", Password: "password123", Username: "second",
+		Protocol: "https", Host: "example.com",
+	})
+	if err != nil || !second.RequiresVerification {
+		t.Fatalf("duplicate registration should resend verification: result=%+v err=%v", second, err)
+	}
+	var count int64
+	if err := db.Model(&model.User{}).Where("email = ?", "repeat@example.com").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one user, got %d", count)
+	}
+	if len(capturedEmails) != 2 {
+		t.Fatalf("expected two verification emails, got %d", len(capturedEmails))
+	}
+}
+
 func TestRegister_NoEmailWhenSMTPDisabled(t *testing.T) {
 	svc, _, _ := newTestService(t)
 	captureEmails(t)

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { configApi } from "@/lib/api";
+import { authApi, configApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,6 +182,8 @@ export function LoginPage() {
   } = useSSOProviders();
   const [error, setError] = useState("");
   const [registrationMessage, setRegistrationMessage] = useState("");
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [captchaData, setCaptchaData] = useState<{
     id: string;
@@ -279,6 +281,27 @@ export function LoginPage() {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError(t("loginPage.enterEmailForVerification"));
+      return;
+    }
+    setResendLoading(true);
+    setResendMessage("");
+    setError("");
+    try {
+      const response = await authApi.resendVerification({ email });
+      setResendMessage(response.data.message);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(
+        error.response?.data?.error || t("loginPage.resendVerificationFailed"),
+      );
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -336,6 +359,13 @@ export function LoginPage() {
                 </Alert>
               )}
 
+              {resendMessage && (
+                <Alert variant="default" className="mb-4">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{resendMessage}</AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert
                   variant={emailVerified === false ? "default" : "destructive"}
@@ -343,6 +373,19 @@ export function LoginPage() {
                 >
                   <AlertDescription className="space-y-2">
                     <p className="font-medium">{error}</p>
+                    {emailVerified === false && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto p-0 font-medium"
+                        onClick={handleResendVerification}
+                        disabled={resendLoading}
+                      >
+                        {resendLoading
+                          ? t("loginPage.resendingVerification")
+                          : t("loginPage.resendVerification")}
+                      </Button>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}

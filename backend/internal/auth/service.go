@@ -187,8 +187,17 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		return nil, err
 	}
 
-	// Check if user already exists
-	if _, err := s.repo.FindUserByEmail(ctx, req.Email); err == nil {
+	// Check if user already exists. An unverified account can request a new
+	// verification email instead of being treated as a failed registration.
+	if existingUser, err := s.repo.FindUserByEmail(ctx, req.Email); err == nil {
+		if !existingUser.EmailVerified {
+			if err := s.ResendVerification(ctx, ResendVerificationRequest{
+				Email: req.Email, Protocol: req.Protocol, Host: req.Host,
+			}); err != nil {
+				return nil, err
+			}
+			return &RegisterResult{User: existingUser, RequiresVerification: true}, nil
+		}
 		slog.Warn("registration failed: user already exists", "email", req.Email)
 		return nil, ErrUserExists
 	}
@@ -235,7 +244,15 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 
 	// Send a verification email when SMTP is enabled; otherwise the account
 	// is immediately usable.
-	if s.sendVerificationEmail(ctx, &newUser, req.Protocol, req.Host) {
+	enabled, err := s.mailer.Enabled(ctx)
+	if err != nil {
+		// No SMTP configuration is equivalent to SMTP being disabled.
+		enabled = false
+	}
+	if enabled {
+		if err := s.sendVerificationEmail(ctx, &newUser, req.Protocol, req.Host); err != nil {
+			return nil, ErrSendEmail
+		}
 		return &RegisterResult{User: &newUser, RequiresVerification: true}, nil
 	}
 
@@ -246,22 +263,45 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 // created user. It returns true when the message was sent (so registration
 // requires verification); failures are logged and reported as false so a
 // transient SMTP error does not block registration.
-func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) bool {
+// ResendVerificationRequest carries the email and request origin used to build
+// a verification link.
+type ResendVerificationRequest struct {
+	Email    string
+	Protocol string
+	Host     string
+}
+
+// ResendVerification generates and sends a verification email for an
+// unverified account. Unknown or already verified accounts return a generic
+// success to avoid exposing account state.
+func (s *Service) ResendVerification(ctx context.Context, req ResendVerificationRequest) error {
+	user, err := s.repo.FindUserByEmail(ctx, req.Email)
+	if err != nil || user.EmailVerified {
+		return nil
+	}
+
+	if err := s.sendVerificationEmail(ctx, user, req.Protocol, req.Host); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) error {
 	enabled, err := s.mailer.Enabled(ctx)
 	logger := slog.With("email", user.Email)
 	if err != nil {
 		logger.Warn("failed to check if SMTP is enabled", "err", err)
-		return false
+		return err
 	}
 	if !enabled {
 		logger.Info("SMTP not enabled, skipping email verification")
-		return false
+		return nil
 	}
 
 	token, err := s.GenerateVerificationToken(ctx, user.ID)
 	if err != nil {
 		logger.Error("failed to generate verification token", "err", err)
-		return false
+		return err
 	}
 
 	verificationLink := buildLinkWithToken(protocol, host, verificationLinkPath, token)
@@ -274,11 +314,11 @@ func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, p
 		},
 	); err != nil {
 		logger.Error("failed to send verification email", "err", err)
-		return false
+		return err
 	}
 
 	logger.Info("verification email sent successfully")
-	return true
+	return nil
 }
 
 // GetCurrentUser loads a user by ID.

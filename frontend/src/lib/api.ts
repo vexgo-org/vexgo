@@ -107,6 +107,9 @@ export const authApi = {
   requestPasswordReset: (data: { email: string }) =>
     api.post<{ message: string }>("/auth/request-password-reset", data),
 
+  resendVerification: (data: { email: string }) =>
+    api.post<{ message: string }>("/auth/resend-verification", data),
+
   resetPassword: (data: { token: string; password: string }) =>
     api.post<{ message: string }>("/auth/reset-password", data),
 };

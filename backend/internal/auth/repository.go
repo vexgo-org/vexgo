@@ -18,6 +18,7 @@ type Repository interface {
 	FindUserByEmailExcluding(ctx context.Context, email string, excludeID uint) (*model.User, error)
 	FindUserByToken(ctx context.Context, token string) (*model.User, error)
 	CreateUser(ctx context.Context, user *model.User) error
+	UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error
 	SaveUser(ctx context.Context, user *model.User) error
 	UpdateEmail(ctx context.Context, userID uint, email string) error
 	UpdateVerifiedEmail(ctx context.Context, userID uint, email string) error
@@ -26,7 +27,6 @@ type Repository interface {
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
 	SaveCaptcha(ctx context.Context, captcha *model.Captcha) error
-	UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
 }
 

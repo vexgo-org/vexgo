@@ -665,6 +665,10 @@ export const enUS = {
     orContinueWith: "Or continue with",
     ssoLoginFailed: "SSO login failed",
     popupBlocked: "Popup blocked. Please allow popups for this site.",
+    resendVerification: "Resend verification email",
+    resendingVerification: "Sending verification email...",
+    resendVerificationFailed: "Failed to resend verification email",
+    enterEmailForVerification: "Enter your email address first",
   },
 
   // Slider Captcha

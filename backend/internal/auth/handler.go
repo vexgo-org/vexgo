@@ -154,6 +154,8 @@ func (h *Handler) Register(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		case errors.Is(err, ErrCreateUser):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrMailConfigCheck), errors.Is(err, ErrSendEmail):
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register"})
 		}
@@ -382,6 +384,33 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
+}
+
+// ResendVerification sends another verification email for an unverified account.
+func (h *Handler) ResendVerification(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	protocol, host := requestProtocolAndHost(c)
+	if err := h.svc.ResendVerification(c.Request.Context(), ResendVerificationRequest{
+		Email: req.Email, Protocol: protocol, Host: host,
+	}); err != nil {
+		if errors.Is(err, ErrMailConfigCheck) || errors.Is(err, ErrSendEmail) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resend verification email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "If the account exists and is not verified, a verification email has been sent.",
+	})
 }
 
 // ResetPassword resets the password with an emailed token

@@ -637,6 +637,10 @@ export const zhCN = {
     orContinueWith: "或通过以下方式继续",
     ssoLoginFailed: "SSO 登录失败",
     popupBlocked: "弹出窗口被拦截，请允许本站弹出窗口后重试",
+    resendVerification: "重新发送验证邮件",
+    resendingVerification: "验证邮件发送中...",
+    resendVerificationFailed: "重新发送验证邮件失败",
+    enterEmailForVerification: "请先输入邮箱地址",
   },
 
   // 滑块验证
