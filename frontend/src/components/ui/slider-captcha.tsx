@@ -65,7 +65,7 @@ export function SliderCaptcha({
     } finally {
       setIsVerifying(false);
     }
-  }, []);
+  }, [t]);
 
   // Generate a captcha when the dialog opens
   useEffect(() => {
@@ -138,7 +138,7 @@ export function SliderCaptcha({
         setIsVerifying(false);
       }
     },
-    [captchaData, onSuccess, onClose, generateCaptcha],
+    [captchaData, onSuccess, onClose, generateCaptcha, t],
   );
 
   // Handle slider dragging
