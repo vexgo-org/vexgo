@@ -27,6 +27,7 @@ export const enUS = {
     accessDenied: "Access Denied",
     insufficientPermissions: "Insufficient Permissions",
     processing: "Processing...",
+    saving: "Saving...",
   },
 
   // Auth
@@ -124,6 +125,7 @@ export const enUS = {
     personalInfoVisibility: "Personal Info Visibility",
     save: "Save Settings",
     saveSuccess: "Settings saved",
+    saveFailed: "Failed to save settings",
   },
 
   // User Management Page
@@ -207,14 +209,18 @@ export const enUS = {
     commonPorts: "Common ports: 587 (TLS), 465 (SSL), 25 (unencrypted)",
     emailAccount: "Email Account",
     emailPassword: "Email Password or Authorization Code",
+    emailPasswordPlaceholder: "Email password or authorization code (optional)",
     passwordRequired: "Password required when SMTP is enabled",
     passwordNote:
       "Note: Some email services require authorization code instead of login password",
     fromEmail: "From Email",
     fromName: "From Name",
     testEmail: "Test Email Recipient",
+    testEmailPlaceholder: "recipient@example.com",
     testEmailDesc: "Used to send test email and verify SMTP configuration",
     saveConfig: "Save Configuration",
+    saveSuccess: "Saved successfully",
+    saveFailed: "Failed to save configuration",
     saving: "Saving...",
     sendTestEmail: "Send Test Email",
     testing: "Testing...",
@@ -558,6 +564,7 @@ export const enUS = {
     testAI: "Test Connection",
     testing: "Testing...",
     testSuccess: "Connection successful",
+    saving: "Saving...",
     saveSuccess: "Saved successfully",
     saveFailed: "Failed to save",
     testFailed: "Test failed",

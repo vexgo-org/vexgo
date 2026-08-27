@@ -27,6 +27,7 @@ export const zhCN = {
     accessDenied: "访问被拒绝",
     insufficientPermissions: "权限不足",
     processing: "处理中...",
+    saving: "保存中...",
   },
 
   // 认证相关
@@ -119,6 +120,7 @@ export const zhCN = {
     personalInfoVisibility: "个人信息可见性",
     save: "保存设置",
     saveSuccess: "设置已保存",
+    saveFailed: "保存设置失败",
   },
 
   // 用户管理页面
@@ -195,13 +197,17 @@ export const zhCN = {
     commonPorts: "常用端口: 587 (TLS), 465 (SSL), 25 (非加密)",
     emailAccount: "邮箱账号",
     emailPassword: "邮箱密码或授权码",
+    emailPasswordPlaceholder: "邮箱密码或授权码（可选）",
     passwordRequired: "启用 SMTP 时需要填写密码",
     passwordNote: "注意: 部分邮箱服务需要使用授权码而非登录密码",
     fromEmail: "发件人邮箱",
     fromName: "发件人名称",
     testEmail: "测试邮件收件人",
+    testEmailPlaceholder: "收件人@example.com",
     testEmailDesc: "用于发送测试邮件，验证 SMTP 配置是否正确",
     saveConfig: "保存配置",
+    saveSuccess: "保存成功",
+    saveFailed: "保存配置失败",
     saving: "保存中...",
     sendTestEmail: "发送测试邮件",
     testing: "测试中...",
@@ -534,6 +540,7 @@ export const zhCN = {
     testAI: "测试连接",
     testing: "测试中...",
     testSuccess: "连接成功",
+    saving: "保存中...",
     saveSuccess: "保存成功",
     saveFailed: "保存失败",
     testFailed: "测试失败",
