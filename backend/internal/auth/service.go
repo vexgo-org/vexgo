@@ -167,9 +167,23 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 		return "", nil, ErrInvalidCredentials
 	}
 
-	// Check if SMTP is enabled, if so verify email status
+	// Check if SMTP is enabled; if so, only verified emails may log in.
+	//
+	// Deliberate fail-open: if reading the mail configuration fails
+	// (transient DB trouble) every user is allowed through instead of
+	// locking all logins behind that read. Logging in still requires the
+	// correct password (and captcha), so the extra window of exposure for
+	// one unverified account is smaller than the availability cost of
+	// failing closed. The decision is surfaced via the warning below.
 	enabled, err := s.mailer.Enabled(ctx)
-	if err == nil && enabled && !user.EmailVerified {
+	if err != nil {
+		slog.Warn(
+			"failed to check SMTP status for email verification, failing open",
+			"user_id", user.ID,
+			"email_verified", user.EmailVerified,
+			"err", err,
+		)
+	} else if enabled && !user.EmailVerified {
 		return "", nil, ErrEmailUnverified
 	}
 
