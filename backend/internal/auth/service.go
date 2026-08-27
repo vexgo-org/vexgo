@@ -65,7 +65,23 @@ var (
 const (
 	verificationLinkPath string = "/verify-email"
 	resetLinkPath        string = "/reset-password"
+
+	// dummyPasswordSource is the plaintext hashed into dummyPasswordHash. Its
+	// value is arbitrary; only its cost matters.
+	dummyPasswordSource = "timing-equalizer-not-a-real-password"
 )
+
+// dummyPasswordHash is compared against during login when the email address
+// does not exist. It costs one bcrypt evaluation at DefaultCost — the same
+// work as a real comparison — so response timing cannot reveal which
+// addresses are registered.
+var dummyPasswordHash = func() []byte {
+	hash, err := bcrypt.GenerateFromPassword([]byte(dummyPasswordSource), bcrypt.DefaultCost)
+	if err != nil {
+		panic("auth: failed to generate dummy password hash: " + err.Error())
+	}
+	return hash
+}()
 
 // Deps holds the dependencies required by the auth domain.
 type Deps struct {
@@ -137,6 +153,12 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 
 	user, err := s.repo.FindUserByEmail(ctx, req.Email)
 	if err != nil {
+		// Unknown address: burn one bcrypt comparison anyway so this branch
+		// costs about as much as the real comparison below; otherwise the
+		// timing gap would allow enumerating registered emails.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
+		}
 		return "", nil, ErrInvalidCredentials
 	}
 

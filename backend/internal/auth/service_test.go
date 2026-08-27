@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,44 @@ func TestLogin_WrongCredentials(t *testing.T) {
 	}
 	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "nobody@example.com", Password: "password123"}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("expected ErrInvalidCredentials for unknown email, got %v", err)
+	}
+}
+
+// Logging in with an unknown address must still pay for one bcrypt
+// comparison: if that branch returns after a bare DB lookup, the response-time
+// gap versus a real comparison lets attackers enumerate registered emails.
+// Compares medians of both failure paths (relative, not absolute) so the test
+// is stable across machines.
+func TestLogin_UnknownEmailRunsDummyHashComparison(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timing-sensitive")
+	}
+	svc, _, db := newTestService(t)
+	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
+
+	sample := func(email, password string) time.Duration {
+		start := time.Now()
+		if _, _, err := svc.Login(context.Background(), LoginRequest{Email: email, Password: password}); !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("expected ErrInvalidCredentials for %q, got %v", email, err)
+		}
+		return time.Since(start)
+	}
+
+	var unknown, wrongPassword []time.Duration
+	for range 9 {
+		unknown = append(unknown, sample("ghost@example.com", "password123"))
+		wrongPassword = append(wrongPassword, sample("alice@example.com", "wrong-password"))
+	}
+	slices.Sort(unknown)
+	slices.Sort(wrongPassword)
+	medianUnknown := unknown[len(unknown)/2]
+	medianWrongPassword := wrongPassword[len(wrongPassword)/2]
+
+	if medianUnknown < medianWrongPassword/4 {
+		t.Errorf(
+			"unknown-email login too fast to include a bcrypt comparison: %v vs %v",
+			medianUnknown, medianWrongPassword,
+		)
 	}
 }
 
