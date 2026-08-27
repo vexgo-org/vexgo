@@ -44,3 +44,11 @@ type UpdateEmailRequest struct {
 	Protocol string
 	Host     string
 }
+
+// ResendVerificationRequest carries the email and request origin used to build
+// a verification link.
+type ResendVerificationRequest struct {
+	Email    string
+	Protocol string
+	Host     string
+}

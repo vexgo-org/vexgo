@@ -259,18 +259,6 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	return &RegisterResult{User: &newUser, RequiresVerification: false}, nil
 }
 
-// sendVerificationEmail sends the email-verification message for a newly
-// created user. It returns true when the message was sent (so registration
-// requires verification); failures are logged and reported as false so a
-// transient SMTP error does not block registration.
-// ResendVerificationRequest carries the email and request origin used to build
-// a verification link.
-type ResendVerificationRequest struct {
-	Email    string
-	Protocol string
-	Host     string
-}
-
 // ResendVerification generates and sends a verification email for an
 // unverified account. Unknown or already verified accounts return a generic
 // success to avoid exposing account state.
@@ -286,6 +274,10 @@ func (s *Service) ResendVerification(ctx context.Context, req ResendVerification
 	return nil
 }
 
+// sendVerificationEmail sends the email-verification message for a newly
+// created user. It returns true when the message was sent (so registration
+// requires verification); failures are logged and reported as false so a
+// transient SMTP error does not block registration.
 func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) error {
 	enabled, err := s.mailer.Enabled(ctx)
 	logger := slog.With("email", user.Email)
