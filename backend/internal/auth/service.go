@@ -179,8 +179,8 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 	if err != nil {
 		slog.Warn(
 			"failed to check SMTP status for email verification, failing open",
-			"user_id", user.ID,
-			"email_verified", user.EmailVerified,
+			"userID", user.ID,
+			"emailVerified", user.EmailVerified,
 			"err", err,
 		)
 	} else if enabled && !user.EmailVerified {
