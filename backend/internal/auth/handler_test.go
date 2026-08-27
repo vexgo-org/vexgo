@@ -19,6 +19,51 @@ import (
 	"gorm.io/gorm"
 )
 
+// The endpoint must return byte-identical responses whether the address is
+// unknown or a server-side fault happens underneath: any difference lets
+// callers probe whether an address exists and is unverified.
+func TestResendVerification_UniformResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	setup := func(t *testing.T, breakLookup bool) gin.HandlerFunc {
+		t.Helper()
+		_, _, db := newTestService(t)
+		h := NewHandler(Deps{
+			DB:        db,
+			JWTSecret: testJWTSecret,
+			Files:     &fakeFiles{},
+			Mailer:    mailer.NewService(mailer.Deps{DB: db}),
+			Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+		})
+		if breakLookup {
+			h.svc.repo = &failingRepo{Repository: h.svc.repo, findUserByEmailErr: errors.New("database is unavailable")}
+		}
+		return h.ResendVerification
+	}
+
+	call := func(handler gin.HandlerFunc, email string) (int, string) {
+		r := gin.New()
+		r.POST("/resend-verification", handler)
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/resend-verification",
+			strings.NewReader(`{"email":"`+email+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+		return w.Code, w.Body.String()
+	}
+
+	codeUnknown, bodyUnknown := call(setup(t, false), "ghost@example.com")
+	codeBroken, bodyBroken := call(setup(t, true), "victim@example.com")
+
+	if codeUnknown != codeBroken || bodyUnknown != bodyBroken {
+		t.Errorf("responses must be identical regardless of lookup outcome:\nunknown=%d %q\nbroken=%d %q",
+			codeUnknown, bodyUnknown, codeBroken, bodyBroken)
+	}
+	if codeUnknown != http.StatusOK || !strings.Contains(bodyUnknown, "has been sent") {
+		t.Errorf("expected generic 200 response, got %d %q", codeUnknown, bodyUnknown)
+	}
+}
+
 func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

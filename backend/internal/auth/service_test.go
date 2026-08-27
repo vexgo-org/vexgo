@@ -587,6 +587,56 @@ func TestRegister_NoEmailWhenSMTPDisabled(t *testing.T) {
 	}
 }
 
+func TestResendVerification_SilentForUnknownAndVerified(t *testing.T) {
+	svc, _, db := newTestService(t)
+	captureEmails(t)
+
+	// Unknown address: silent success, no email sent.
+	if err := svc.ResendVerification(context.Background(), ResendVerificationRequest{
+		Email: "ghost@example.com", Protocol: "https", Host: "example.com",
+	}); err != nil {
+		t.Errorf("unknown address must be silent, got %v", err)
+	}
+
+	// Verified address: silent success, no email sent.
+	seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+	if err := svc.ResendVerification(context.Background(), ResendVerificationRequest{
+		Email: "alice@example.com", Protocol: "https", Host: "example.com",
+	}); err != nil {
+		t.Errorf("verified address must be silent, got %v", err)
+	}
+
+	if len(capturedEmails) != 0 {
+		t.Errorf("expected no emails, got %d", len(capturedEmails))
+	}
+}
+
+func TestResendVerification_DbErrorOnLookup(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	svc.repo = &failingRepo{Repository: svc.repo, findUserByEmailErr: errors.New("database is unavailable")}
+
+	if err := svc.ResendVerification(context.Background(), ResendVerificationRequest{Email: "x@example.com"}); !errors.Is(err, ErrQueryFailed) {
+		t.Errorf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+// SMTP is enabled but points at an unreachable host; delivery must surface as
+// the coarse ErrSendEmail sentinel instead of a raw transport error.
+func TestResendVerification_DeliveryFailureReturnsSentinel(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	seedUser(t, db, "bob@example.com", "password123", model.RoleGuest, false)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := svc.ResendVerification(ctx, ResendVerificationRequest{
+		Email: "bob@example.com", Protocol: "https", Host: "example.com",
+	}); !errors.Is(err, ErrSendEmail) {
+		t.Errorf("expected ErrSendEmail, got %v", err)
+	}
+}
+
 func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
 	svc, _, db := newTestService(t)
 	enableSMTP(t, db)

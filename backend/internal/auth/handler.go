@@ -386,7 +386,11 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
 }
 
-// ResendVerification sends another verification email for an unverified account.
+// ResendVerification sends another verification email for an unverified
+// account. The HTTP response is intentionally uniform for every outcome
+// (unknown email, verified account, SMTP failure, database fault): any status
+// or body difference would let callers probe whether an address exists and is
+// unverified. Failures are logged inside the service layer.
 func (h *Handler) ResendVerification(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
@@ -397,16 +401,10 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 	}
 
 	protocol, host := requestProtocolAndHost(c)
-	if err := h.svc.ResendVerification(c.Request.Context(), ResendVerificationRequest{
+	// Intentional discard (uniform anti-enumeration response above).
+	_ = h.svc.ResendVerification(c.Request.Context(), ResendVerificationRequest{
 		Email: req.Email, Protocol: protocol, Host: host,
-	}); err != nil {
-		if errors.Is(err, ErrMailConfigCheck) || errors.Is(err, ErrSendEmail) {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resend verification email"})
-		return
-	}
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "If the account exists and is not verified, a verification email has been sent.",

@@ -276,16 +276,30 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 }
 
 // ResendVerification generates and sends a verification email for an
-// unverified account. Unknown or already verified accounts return a generic
-// success to avoid exposing account state.
+// unverified account. Absent and verified accounts (and disabled SMTP) return
+// `nil` indistinguishable from success so the endpoint cannot be used to
+// enumerate account state. Real failures return sentinel errors for internal
+// callers: the HTTP handler renders the same generic response for every
+// outcome, while Register relies on these sentinels to report delivery truth.
 func (s *Service) ResendVerification(ctx context.Context, req ResendVerificationRequest) error {
 	user, err := s.repo.FindUserByEmail(ctx, req.Email)
-	if err != nil || user.EmailVerified {
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// Unknown email: identical outcome to an existing one.
+		return nil
+	case err != nil:
+		slog.Error("failed to find user for verification resend", "email", req.Email, "err", err)
+		return ErrQueryFailed
+	}
+
+	if user.EmailVerified {
 		return nil
 	}
 
 	if err := s.sendVerificationEmail(ctx, user, req.Protocol, req.Host); err != nil {
-		return err
+		// Technical details are already logged inside sendVerificationEmail;
+		// only the coarse sentinel crosses this boundary.
+		return ErrSendEmail
 	}
 	return nil
 }
