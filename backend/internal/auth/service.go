@@ -245,18 +245,15 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	// Send a verification email when SMTP is enabled; otherwise the account
 	// is immediately usable.
 	enabled, err := s.mailer.Enabled(ctx)
-	if err != nil {
+	if err != nil || !enabled {
 		// No SMTP configuration is equivalent to SMTP being disabled.
-		enabled = false
-	}
-	if enabled {
-		if err := s.sendVerificationEmail(ctx, &newUser, req.Protocol, req.Host); err != nil {
-			return nil, ErrSendEmail
-		}
-		return &RegisterResult{User: &newUser, RequiresVerification: true}, nil
+		return &RegisterResult{User: &newUser, RequiresVerification: false}, nil
 	}
 
-	return &RegisterResult{User: &newUser, RequiresVerification: false}, nil
+	if err := s.sendVerificationEmail(ctx, &newUser, req.Protocol, req.Host); err != nil {
+		return nil, ErrSendEmail
+	}
+	return &RegisterResult{User: &newUser, RequiresVerification: true}, nil
 }
 
 // ResendVerification generates and sends a verification email for an
