@@ -10,7 +10,16 @@ import (
 // FilterUserByPrivacy filters user information based on privacy settings:
 // the user themselves and administrators see everything; other viewers see
 // information according to the user's privacy settings.
+//
+// Emailed-link tokens are always scrubbed, regardless of viewer: they must
+// never reach a rendered object (account takeover via leaked links). This is
+// defense in depth on top of `json:"-"` in the model, guarding render paths
+// that bypass encoding/json.
 func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
+	user.VerificationToken = ""
+	user.TokenExpiresAt = nil
+	user.PendingEmail = ""
+
 	// Check if viewer is the user themselves or an admin
 	isSelf := viewerID == user.ID
 	isAdmin := model.IsAdmin(viewerRole)

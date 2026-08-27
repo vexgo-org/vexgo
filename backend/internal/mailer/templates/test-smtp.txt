@@ -1,0 +1,11 @@
+Dear {{ .Name }},
+
+This is a test email to verify your SMTP configuration is working correctly.
+
+If you receive this email, it means your SMTP configuration is successful!
+
+Configuration details:
+- SMTP Server: {{ .Host }}:{{ .Port }}
+- Sender: {{ .Name }} <{{ .Email }}>
+
+Time: {{ .Time }}

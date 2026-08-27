@@ -153,6 +153,13 @@ jwt_secret: "your-secret-key-change-this-in-production"
 # 日志级别："debug", "info", "warn", "error"
 log_level: "info"
 
+# 实例的公网访问地址（如 "https://vexgo.example.com"）
+# 用于生成 OAuth/SSO 回调地址和邮件中的链接
+# （邮箱验证、密码重置、换绑邮箱）。
+# 反向代理后必须设置；留空时这些链接会退回使用请求 Host 头，
+# 存在 Host 头注入风险。
+base_url: ""
+
 # 服务是否位于反向代理之后（例如 nginx、Cloudflare）
 # 如果使用了会设置 X-Forwarded-* 请求头的反向代理，请设为 true
 behind_reverse_proxy: false
@@ -294,6 +301,7 @@ s3_disable_bucket_in_custom_url: false
 | `DATA_DIR`             | `./data`  | 数据目录路径                                                                                                                                                                                                                   |
 | `JWT_SECRET`           | —         | JWT 签名密钥（生产环境必填）                                                                                                                                                                                                   |
 | `LOG_LEVEL`            | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                                                                                                                                                     |
+| `BASE_URL`             | —         | 实例的公网地址（如 `https://vexgo.example.com`）。用于生成 OAuth 回调地址和邮件中的链接（邮箱验证、密码重置、换绑邮箱）。反向代理后必须设置。                                                                                  |
 | `BEHIND_REVERSE_PROXY` | `false`   | 设置为 `true` 表示服务器位于反向代理（如 nginx、Cloudflare 等）之后。启用后才会正确处理 `X-Forwarded-*` 头部。                                                                                                                 |
 | `TRUSTED_PROXIES`      | —         | 受信任的代理 IP/CIDR 列表（逗号分隔）。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。如果留空，默认使用常见私有网络（127.0.0.1、::1、192.168.0.0/16、10.0.0.0/8、172.16.0.0/12）。示例：`TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
 
@@ -315,10 +323,11 @@ VexGo 支持 GitHub、Google 以及任何兼容 OpenID Connect (OIDC) 的提供�
 
 **通用配置**
 
-| 变量                | 默认值 | 说明                                                                                                         |
-| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
-| `BASE_URL`          | —      | 实例的公网访问地址（如 `https://vexgo.example.com`）。使用反向代理时必须填写，用于正确生成 OAuth2 回调地址。 |
-| `ALLOW_LOCAL_LOGIN` | `true` | 设置为 `false` 可禁用密码登录，强制仅使用 SSO 登录。                                                         |
+| 变量                | 默认值 | 说明                                                 |
+| ------------------- | ------ | ---------------------------------------------------- |
+| `ALLOW_LOCAL_LOGIN` | `true` | 设置为 `false` 可禁用密码登录，强制仅使用 SSO 登录。 |
+
+> **注意：** `BASE_URL` 是通用服务器配置，并非 SSO 专属，详见[服务器](#server)一节。它同时决定 OAuth 回调地址和邮件中的链接（邮箱验证、密码重置、换绑邮箱），启用邮件或 SSO 时建议务必设置。
 
 **GitHub**
 

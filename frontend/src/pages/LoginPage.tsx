@@ -15,15 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SliderCaptcha } from "@/components/ui/slider-captcha";
-import {
-  Loader2,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  CheckCircle,
-} from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { useSSOProviders, type SSOProvider } from "@/hooks/useSSOProviders";
 
 // ── SSO helpers ──────────────────────────────────────────────────────────────
@@ -189,6 +181,9 @@ export function LoginPage() {
     loading: ssoConfigLoading,
   } = useSSOProviders();
   const [error, setError] = useState("");
+  const [registrationMessage, setRegistrationMessage] = useState("");
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [captchaData, setCaptchaData] = useState<{
     id: string;
@@ -199,8 +194,20 @@ export function LoginPage() {
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
 
-  const from =
-    (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
+  const locationState = location.state as
+    | { from?: { pathname: string }; registrationMessage?: string }
+    | undefined;
+  const from = locationState?.from?.pathname || "/";
+
+  useEffect(() => {
+    if (locationState?.registrationMessage) {
+      setRegistrationMessage(locationState.registrationMessage);
+      navigate(location.pathname, {
+        replace: true,
+        state: locationState.from ? { from: locationState.from } : undefined,
+      });
+    }
+  }, [location.pathname, locationState, navigate]);
 
   useEffect(() => {
     const loadCaptchaSettings = async () => {
@@ -262,7 +269,7 @@ export function LoginPage() {
       setError(
         error.response?.data?.message ||
           error.message ||
-          "登录失败，请检查邮箱和密码",
+          t("loginPage.loginFailed"),
       );
       if (error.response?.data?.email_verified === false)
         setEmailVerified(false);
@@ -271,6 +278,27 @@ export function LoginPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError(t("loginPage.enterEmailForVerification"));
+      return;
+    }
+    setResendLoading(true);
+    setResendMessage("");
+    setError("");
+    try {
+      const response = await authApi.resendVerification({ email });
+      setResendMessage(response.data.message);
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(
+        error.response?.data?.error || t("loginPage.resendVerificationFailed"),
+      );
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -312,24 +340,6 @@ export function LoginPage() {
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!email) {
-      setError(t("auth.email") + " " + t("common.required"));
-      return;
-    }
-    setLoading(true);
-    try {
-      await authApi.resendVerificationEmail();
-      setError("");
-      alert(t("loginPage.verificationSent"));
-    } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || t("common.error"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-16 flex justify-center">
       <Card className="w-full max-w-md">
@@ -342,6 +352,20 @@ export function LoginPage() {
         <CardContent>
           {allowLocalLogin && (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {registrationMessage && (
+                <Alert variant="default" className="mb-4">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{registrationMessage}</AlertDescription>
+                </Alert>
+              )}
+
+              {resendMessage && (
+                <Alert variant="default" className="mb-4">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{resendMessage}</AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert
                   variant={emailVerified === false ? "default" : "destructive"}
@@ -352,14 +376,14 @@ export function LoginPage() {
                     {emailVerified === false && (
                       <Button
                         type="button"
-                        variant="outline"
-                        size="sm"
+                        variant="link"
+                        className="h-auto p-0 font-medium"
                         onClick={handleResendVerification}
-                        disabled={loading}
-                        className="mt-2"
+                        disabled={resendLoading}
                       >
-                        <ArrowLeft className="w-3 h-3 mr-2" />
-                        {t("loginPage.resendVerification")}
+                        {resendLoading
+                          ? t("loginPage.resendingVerification")
+                          : t("loginPage.resendVerification")}
                       </Button>
                     )}
                   </AlertDescription>

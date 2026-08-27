@@ -381,7 +381,7 @@ export function WritePostPage() {
               <div className="relative">
                 <img
                   src={coverImage}
-                  alt="封面"
+                  alt={t("writePostPage.coverImageAlt")}
                   className="w-full h-48 object-fill rounded-lg"
                 />
                 <Button

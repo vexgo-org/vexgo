@@ -32,16 +32,16 @@
 
 ### 服务器
 
-| 变量                   | 默认值                  | 说明                                                                                       |
-| ---------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
-| `ADDR`                 | `0.0.0.0`               | 服务器监听地址                                                                             |
-| `PORT`                 | `3001`                  | 服务器监听端口                                                                             |
-| `DATA_DIR`             | `./data`                | 数据目录路径                                                                               |
-| `JWT_SECRET`           | —                       | JWT 签名密钥（**生产环境必填**）                                                           |
-| `FRONTEND_URL`         | `http://localhost:5173` | 前端应用地址                                                                               |
-| `LOG_LEVEL`            | `info`                  | 日志级别：`debug`、`info`、`warn`、`error`                                                 |
-| `BEHIND_REVERSE_PROXY` | `false`                 | 位于反向代理之后时设为 `true`，以解析 `X-Forwarded-*` 请求头                               |
-| `TRUSTED_PROXIES`      | —                       | 逗号分隔的可信代理 IP/CIDR。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。留空 = 默认私有网段。 |
+| 变量                   | 默认值    | 说明                                                                                                                              |
+| ---------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `ADDR`                 | `0.0.0.0` | 服务器监听地址                                                                                                                    |
+| `PORT`                 | `3001`    | 服务器监听端口                                                                                                                    |
+| `DATA_DIR`             | `./data`  | 数据目录路径                                                                                                                      |
+| `JWT_SECRET`           | —         | JWT 签名密钥（**生产环境必填**）                                                                                                  |
+| `LOG_LEVEL`            | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                                                        |
+| `BASE_URL`             | —         | 实例公网地址，如 `https://vexgo.example.com`。用于生成 OAuth 回调与邮件链接（邮箱验证、密码重置、换绑邮箱）。反向代理后必须设置。 |
+| `BEHIND_REVERSE_PROXY` | `false`   | 位于反向代理之后时设为 `true`，以解析 `X-Forwarded-*` 请求头                                                                      |
+| `TRUSTED_PROXIES`      | —         | 逗号分隔的可信代理 IP/CIDR。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。留空 = 默认私有网段。                                        |
 
 ### 数据库
 
@@ -59,10 +59,9 @@
 
 **通用**
 
-| 变量                | 默认值 | 说明                                                                                          |
-| ------------------- | ------ | --------------------------------------------------------------------------------------------- |
-| `BASE_URL`          | —      | 实例的公网地址，如 `https://vexgo.example.com`。反向代理后必须设置，用于正确生成 OAuth 回调。 |
-| `ALLOW_LOCAL_LOGIN` | `true` | 设为 `false` 禁用密码登录，强制仅 SSO 登录。                                                  |
+| 变量                | 默认值 | 说明                                         |
+| ------------------- | ------ | -------------------------------------------- |
+| `ALLOW_LOCAL_LOGIN` | `true` | 设为 `false` 禁用密码登录，强制仅 SSO 登录。 |
 
 **GitHub**
 
@@ -117,15 +116,16 @@
 
 ### 服务器
 
-| YAML 键                | 默认值    | 说明                                    |
-| ---------------------- | --------- | --------------------------------------- |
-| `addr`                 | `0.0.0.0` | 监听地址                                |
-| `port`                 | `3001`    | 监听端口                                |
-| `data`                 | `./data`  | 数据目录路径                            |
-| `jwt_secret`           | —         | JWT 签名密钥（**生产环境必填**）        |
-| `log_level`            | `info`    | `debug`、`info`、`warn`、`error`        |
-| `behind_reverse_proxy` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头 |
-| `trusted_proxies`      | `[]`      | 可信代理 IP/CIDR 列表                   |
+| YAML 键                | 默认值    | 说明                                         |
+| ---------------------- | --------- | -------------------------------------------- |
+| `addr`                 | `0.0.0.0` | 监听地址                                     |
+| `port`                 | `3001`    | 监听端口                                     |
+| `data`                 | `./data`  | 数据目录路径                                 |
+| `jwt_secret`           | —         | JWT 签名密钥（**生产环境必填**）             |
+| `log_level`            | `info`    | `debug`、`info`、`warn`、`error`             |
+| `base_url`             | —         | 实例公网地址，如 `https://vexgo.example.com` |
+| `behind_reverse_proxy` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头      |
+| `trusted_proxies`      | `[]`      | 可信代理 IP/CIDR 列表                        |
 
 ### 数据库
 
@@ -179,35 +179,36 @@
 
 ## 环境变量 ↔ 配置文件 ↔ 命令行对照
 
-| 设置             | 环境变量               | 配置文件键             | CLI 参数     |
-| ---------------- | ---------------------- | ---------------------- | ------------ |
-| 监听地址         | `ADDR`                 | `addr`                 | `--addr, -a` |
-| 监听端口         | `PORT`                 | `port`                 | `--port, -p` |
-| 数据目录         | `DATA_DIR`             | `data`                 | `--data, -d` |
-| JWT 密钥         | `JWT_SECRET`           | `jwt_secret`           | —            |
-| 日志级别         | `LOG_LEVEL`            | `log_level`            | —            |
-| 反向代理         | `BEHIND_REVERSE_PROXY` | `behind_reverse_proxy` | —            |
-| 可信代理         | `TRUSTED_PROXIES`      | `trusted_proxies`      | —            |
-| 数据库类型       | `DB_TYPE`              | `db_type`              | —            |
-| 数据库主机       | `DB_HOST`              | `db_host`              | —            |
-| 数据库端口       | `DB_PORT`              | `db_port`              | —            |
-| 数据库用户       | `DB_USER`              | `db_user`              | —            |
-| 数据库密码       | `DB_PASSWORD`          | `db_password`          | —            |
-| 数据库名         | `DB_NAME`              | `db_name`              | —            |
-| SSL 模式         | `DB_SSL_MODE`          | `db_ssl_mode`          | —            |
-| GitHub Client ID | `GITHUB_CLIENT_ID`     | `github_client_id`     | —            |
-| GitHub Secret    | `GITHUB_CLIENT_SECRET` | `github_client_secret` | —            |
-| Google Client ID | `GOOGLE_CLIENT_ID`     | `google_client_id`     | —            |
-| Google Secret    | `GOOGLE_CLIENT_SECRET` | `google_client_secret` | —            |
-| OIDC 启用        | `OIDC_ENABLED`         | `oidc_enabled`         | —            |
-| OIDC Issuer      | `OIDC_ISSUER_URL`      | `oidc_issuer_url`      | —            |
-| OIDC Client ID   | `OIDC_CLIENT_ID`       | `oidc_client_id`       | —            |
-| OIDC Secret      | `OIDC_CLIENT_SECRET`   | `oidc_client_secret`   | —            |
-| S3 启用          | `S3_ENABLED`           | `s3_enabled`           | —            |
-| S3 端点          | `S3_ENDPOINT`          | `s3_endpoint`          | —            |
-| S3 区域          | `S3_REGION`            | `s3_region`            | —            |
-| S3 桶            | `S3_BUCKET`            | `s3_bucket`            | —            |
-| S3 Access Key    | `S3_ACCESS_KEY`        | `s3_access_key`        | —            |
-| S3 Secret Key    | `S3_SECRET_KEY`        | `s3_secret_key`        | —            |
+| 设置             | 环境变量               | 配置文件键             | CLI 参数 |
+| ---------------- | ---------------------- | ---------------------- | -------- |
+| 监听地址         | `ADDR`                 | `addr`                 | `--addr` |
+| 监听端口         | `PORT`                 | `port`                 | `--port` |
+| 数据目录         | `DATA_DIR`             | `data`                 | `--data` |
+| JWT 密钥         | `JWT_SECRET`           | `jwt_secret`           | —        |
+| 日志级别         | `LOG_LEVEL`            | `log_level`            | —        |
+| 公网地址         | `BASE_URL`             | `base_url`             | —        |
+| 反向代理         | `BEHIND_REVERSE_PROXY` | `behind_reverse_proxy` | —        |
+| 可信代理         | `TRUSTED_PROXIES`      | `trusted_proxies`      | —        |
+| 数据库类型       | `DB_TYPE`              | `db_type`              | —        |
+| 数据库主机       | `DB_HOST`              | `db_host`              | —        |
+| 数据库端口       | `DB_PORT`              | `db_port`              | —        |
+| 数据库用户       | `DB_USER`              | `db_user`              | —        |
+| 数据库密码       | `DB_PASSWORD`          | `db_password`          | —        |
+| 数据库名         | `DB_NAME`              | `db_name`              | —        |
+| SSL 模式         | `DB_SSL_MODE`          | `db_ssl_mode`          | —        |
+| GitHub Client ID | `GITHUB_CLIENT_ID`     | `github_client_id`     | —        |
+| GitHub Secret    | `GITHUB_CLIENT_SECRET` | `github_client_secret` | —        |
+| Google Client ID | `GOOGLE_CLIENT_ID`     | `google_client_id`     | —        |
+| Google Secret    | `GOOGLE_CLIENT_SECRET` | `google_client_secret` | —        |
+| OIDC 启用        | `OIDC_ENABLED`         | `oidc_enabled`         | —        |
+| OIDC Issuer      | `OIDC_ISSUER_URL`      | `oidc_issuer_url`      | —        |
+| OIDC Client ID   | `OIDC_CLIENT_ID`       | `oidc_client_id`       | —        |
+| OIDC Secret      | `OIDC_CLIENT_SECRET`   | `oidc_client_secret`   | —        |
+| S3 启用          | `S3_ENABLED`           | `s3_enabled`           | —        |
+| S3 端点          | `S3_ENDPOINT`          | `s3_endpoint`          | —        |
+| S3 区域          | `S3_REGION`            | `s3_region`            | —        |
+| S3 桶            | `S3_BUCKET`            | `s3_bucket`            | —        |
+| S3 Access Key    | `S3_ACCESS_KEY`        | `s3_access_key`        | —        |
+| S3 Secret Key    | `S3_SECRET_KEY`        | `s3_secret_key`        | —        |
 
-> **注意：** `BASE_URL` 和 `FRONTEND_URL` 直接由环境变量读取，没有对应的配置文件键或 CLI 参数——生产环境请以环境变量方式设置。
+> **注意：** `base_url`（或 `BASE_URL`）是通用服务器配置，并非 SSO 专属：它同时用于生成邮件中的链接（邮箱验证、密码重置、换绑邮箱）。未设置时这些链接会退回使用请求来源，任何能直连服务器的攻击者都可利用 Host 头注入篡改链接。

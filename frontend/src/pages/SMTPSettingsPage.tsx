@@ -244,7 +244,7 @@ export function SMTPSettingsPage() {
               placeholder={
                 config.enabled
                   ? t("smtpSettings.passwordRequired")
-                  : t("smtpSettings.apiKeyPlaceholder")
+                  : t("smtpSettings.emailPasswordPlaceholder")
               }
               disabled={saving}
             />

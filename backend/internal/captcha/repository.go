@@ -1,6 +1,6 @@
-// Package verification implements email verification and sliding-puzzle
-// captcha generation/verification.
-package verification
+// Package captcha implements sliding-puzzle captcha generation and
+// verification.
+package captcha
 
 import (
 	"context"
@@ -10,10 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Repository is the persistence interface for the verification domain.
+// Repository is the persistence interface for the captcha domain.
 type Repository interface {
-	FindUserByID(ctx context.Context, id uint) (*model.User, error)
-	FindUserByToken(ctx context.Context, token string) (*model.User, error)
 	CreateCaptcha(ctx context.Context, captcha *model.Captcha) error
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
 	SaveCaptcha(ctx context.Context, captcha *model.Captcha) error
@@ -25,25 +23,9 @@ type gormRepository struct {
 	db *gorm.DB
 }
 
-// NewRepository creates a GORM-backed verification repository.
+// NewRepository creates a GORM-backed captcha repository.
 func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
-}
-
-func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
-}
-
-func (r *gormRepository) FindUserByToken(ctx context.Context, token string) (*model.User, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).Where("verification_token = ?", token).First(&user).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
 }
 
 func (r *gormRepository) CreateCaptcha(ctx context.Context, captcha *model.Captcha) error {

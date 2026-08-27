@@ -27,6 +27,7 @@ export const zhCN = {
     accessDenied: "访问被拒绝",
     insufficientPermissions: "权限不足",
     processing: "处理中...",
+    saving: "保存中...",
   },
 
   // 认证相关
@@ -49,7 +50,8 @@ export const zhCN = {
     registerSuccess: "注册成功",
     emailVerified: "邮箱已验证",
     verifyEmail: "验证邮箱",
-    resendVerification: "重新发送验证邮件",
+    emailVerificationRequired: "请先验证您的邮箱地址",
+    registrationFailed: "注册失败",
   },
 
   // 个人信息
@@ -120,6 +122,7 @@ export const zhCN = {
     personalInfoVisibility: "个人信息可见性",
     save: "保存设置",
     saveSuccess: "设置已保存",
+    saveFailed: "保存设置失败",
   },
 
   // 用户管理页面
@@ -196,13 +199,17 @@ export const zhCN = {
     commonPorts: "常用端口: 587 (TLS), 465 (SSL), 25 (非加密)",
     emailAccount: "邮箱账号",
     emailPassword: "邮箱密码或授权码",
+    emailPasswordPlaceholder: "邮箱密码或授权码（可选）",
     passwordRequired: "启用 SMTP 时需要填写密码",
     passwordNote: "注意: 部分邮箱服务需要使用授权码而非登录密码",
     fromEmail: "发件人邮箱",
     fromName: "发件人名称",
     testEmail: "测试邮件收件人",
+    testEmailPlaceholder: "收件人@example.com",
     testEmailDesc: "用于发送测试邮件，验证 SMTP 配置是否正确",
     saveConfig: "保存配置",
+    saveSuccess: "保存成功",
+    saveFailed: "保存配置失败",
     saving: "保存中...",
     sendTestEmail: "发送测试邮件",
     testing: "测试中...",
@@ -250,6 +257,7 @@ export const zhCN = {
     uploadSuccess: "主题上传成功",
     uploadFailed: "上传主题失败",
     uploadError: "上传错误: {message}",
+    uploadInvalidType: "请上传 zip 格式的文件",
     viewDetails: "查看详情",
     method1: {
       title: "方法一：上传主题包",
@@ -409,7 +417,7 @@ export const zhCN = {
     submit: "注册",
     haveAccount: "已有账号？",
     login: "立即登录",
-    success: "注册成功，请查收验证邮件",
+    success: "注册成功，验证邮件已发送，请查收邮箱并点击链接完成验证",
     passwordMismatch: "两次输入的密码不一致",
     passwordTooShort: "密码至少需要6个字符",
   },
@@ -535,6 +543,7 @@ export const zhCN = {
     testAI: "测试连接",
     testing: "测试中...",
     testSuccess: "连接成功",
+    saving: "保存中...",
     saveSuccess: "保存成功",
     saveFailed: "保存失败",
     testFailed: "测试失败",
@@ -619,8 +628,6 @@ export const zhCN = {
     completeCaptcha: "请先完成滑块验证",
     captchaCompleted: "验证已完成",
     emailNotVerified: "邮箱未验证",
-    resendVerification: "重新发送验证邮件",
-    verificationSent: "验证邮件已重新发送，请检查您的邮箱",
     loginFailed: "登录失败，请检查邮箱和密码",
     securityVerification: "安全验证",
     completeSlider: "请完成滑块验证",
@@ -633,6 +640,10 @@ export const zhCN = {
     orContinueWith: "或通过以下方式继续",
     ssoLoginFailed: "SSO 登录失败",
     popupBlocked: "弹出窗口被拦截，请允许本站弹出窗口后重试",
+    resendVerification: "重新发送验证邮件",
+    resendingVerification: "验证邮件发送中...",
+    resendVerificationFailed: "重新发送验证邮件失败",
+    enterEmailForVerification: "请先输入邮箱地址",
   },
 
   // 滑块验证
@@ -647,6 +658,8 @@ export const zhCN = {
     puzzleAlt: "拼图块",
     dragHint: "向右拖动滑块完成验证",
     refreshButton: "刷新验证码",
+    fetchFailed: "获取验证码失败",
+    retryError: "验证失败，请重试",
     refreshing: "刷新中...",
   },
 
@@ -842,6 +855,7 @@ export const zhCN = {
     titlePlaceholder: "请输入文章标题...",
     titleRequired: "请输入文章标题",
     coverImage: "封面图",
+    coverImageAlt: "文章封面图",
     uploadCover: "点击上传封面图",
     uploading: "上传中...",
     imageFormat: "支持 JPG、PNG、GIF，最大 10MB",

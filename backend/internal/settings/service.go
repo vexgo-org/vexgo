@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,17 +49,19 @@ type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Themes    *public.Renderer
+	Mailer    *mailer.Service
 }
 
 // Service contains the business logic of the settings domain.
 type Service struct {
 	repo   Repository
 	themes *public.Renderer
+	mailer *mailer.Service
 }
 
 // NewService creates a settings service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), themes: deps.Themes}
+	return &Service{repo: NewRepository(deps.DB), themes: deps.Themes, mailer: deps.Mailer}
 }
 
 // SMTPConfigRequest carries the fields accepted when updating the SMTP config.
@@ -180,71 +181,13 @@ func (s *Service) TestSMTP(ctx context.Context, adminEmail string) (string, erro
 		return "", ErrSMTPNoRecipient
 	}
 
-	// Send test email
-	textBody := fmt.Sprintf(`
-Dear %s,
-
-This is a test email to verify your SMTP configuration is working correctly.
-
-If you receive this email, it means your SMTP configuration is successful!
-
-Configuration details:
-- SMTP Server: %s:%d
-- Sender: %s <%s>
-
-Time: %s
-	`, config.FromName, config.Host, config.Port, config.FromName, config.FromEmail, time.Now().Format("2006-01-02 15:04:05"))
-
-	htmlBody := fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background-color: #f9f9f9; }
-        .success { color: #4CAF50; font-weight: bold; }
-        .info { background-color: #e3f2fd; padding: 15px; border-radius: 4px; margin: 10px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>SMTP Configuration Test</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p class="success">✓ Test email sent successfully!</p>
-            <p>Your SMTP configuration is working correctly. You can now use email verification features.</p>
-
-            <div class="info">
-                <strong>Configuration details:</strong><br>
-                SMTP Server: %s:%d<br>
-                Sender: %s <%s>
-            </div>
-
-            <p>Time: %s</p>
-        </div>
-    </div>
-</body>
-</html>
-	`, config.FromName, config.Host, config.Port, config.FromName, config.FromEmail, time.Now().Format("2006-01-02 15:04:05"))
-
-	// Build email
-	message := mailer.BuildMailMessage(&mailer.MailMessageArgs{
-		To:       recipientEmail,
-		Subject:  "SMTP Configuration Test Email",
-		TextBody: textBody,
-		HTMLBody: htmlBody,
-	}, &config)
-
-	// Connect to SMTP server
-	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
-	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
-
-	if err := smtp.SendMail(addr, auth, config.FromEmail, []string{recipientEmail}, []byte(message)); err != nil {
+	if err := s.mailer.SendTestSMTPEmail(ctx, recipientEmail, &mailer.TestSMTPEmailTemplateData{
+		Name:  config.FromName,
+		Host:  config.Host,
+		Port:  config.Port,
+		Email: config.FromEmail,
+		Time:  time.Now().Format("2006-01-02 15:04:05"),
+	}); err != nil {
 		return "", fmt.Errorf("failed to send test email: %w", err)
 	}
 

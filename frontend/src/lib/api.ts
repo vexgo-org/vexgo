@@ -99,9 +99,6 @@ export const authApi = {
       "/auth/verification-status",
     ),
 
-  resendVerificationEmail: () =>
-    api.post<{ message: string }>("/auth/resend-verification"),
-
   verifyEmail: (token: string) =>
     api.get<{ message: string; require_relogin?: boolean; new_email?: string }>(
       `/verify-email?token=${token}`,
@@ -109,6 +106,9 @@ export const authApi = {
 
   requestPasswordReset: (data: { email: string }) =>
     api.post<{ message: string }>("/auth/request-password-reset", data),
+
+  resendVerification: (data: { email: string }) =>
+    api.post<{ message: string }>("/auth/resend-verification", data),
 
   resetPassword: (data: { token: string; password: string }) =>
     api.post<{ message: string }>("/auth/reset-password", data),

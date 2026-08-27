@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .header {
+        background-color: #2196f3;
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+      .content {
+        padding: 20px;
+        background-color: #f9f9f9;
+      }
+      .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #2196f3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        margin: 20px 0;
+      }
+      .footer {
+        margin-top: 20px;
+        font-size: 12px;
+        color: #777;
+      }
+      .new-email {
+        font-weight: bold;
+        color: #2196f3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Confirm Email Change</h1>
+      </div>
+      <div class="content">
+        <p>Dear {{ .Name }},</p>
+        <p>
+          We received an email change request. Please click the button below to
+          confirm changing your email to:
+        </p>
+        <p class="new-email">{{ .NewEmail }}</p>
+        <p>
+          <a href="{{ .Link }}" class="button">Confirm Change</a>
+        </p>
+        <p>Or copy and paste the following link into your browser:</p>
+        <p>{{ .Link }}</p>
+        <p>This link will expire in 5 minutes.</p>
+      </div>
+      <div class="footer">
+        <p>If you did not request an email change, please ignore this email.</p>
+      </div>
+    </div>
+  </body>
+</html>

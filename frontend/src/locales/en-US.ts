@@ -27,6 +27,7 @@ export const enUS = {
     accessDenied: "Access Denied",
     insufficientPermissions: "Insufficient Permissions",
     processing: "Processing...",
+    saving: "Saving...",
   },
 
   // Auth
@@ -49,7 +50,8 @@ export const enUS = {
     registerSuccess: "Registration successful",
     emailVerified: "Email Verified",
     verifyEmail: "Verify Email",
-    resendVerification: "Resend Verification Email",
+    emailVerificationRequired: "Please verify your email address first",
+    registrationFailed: "Registration failed",
   },
 
   // Profile
@@ -125,6 +127,7 @@ export const enUS = {
     personalInfoVisibility: "Personal Info Visibility",
     save: "Save Settings",
     saveSuccess: "Settings saved",
+    saveFailed: "Failed to save settings",
   },
 
   // User Management Page
@@ -208,14 +211,18 @@ export const enUS = {
     commonPorts: "Common ports: 587 (TLS), 465 (SSL), 25 (unencrypted)",
     emailAccount: "Email Account",
     emailPassword: "Email Password or Authorization Code",
+    emailPasswordPlaceholder: "Email password or authorization code (optional)",
     passwordRequired: "Password required when SMTP is enabled",
     passwordNote:
       "Note: Some email services require authorization code instead of login password",
     fromEmail: "From Email",
     fromName: "From Name",
     testEmail: "Test Email Recipient",
+    testEmailPlaceholder: "recipient@example.com",
     testEmailDesc: "Used to send test email and verify SMTP configuration",
     saveConfig: "Save Configuration",
+    saveSuccess: "Saved successfully",
+    saveFailed: "Failed to save configuration",
     saving: "Saving...",
     sendTestEmail: "Send Test Email",
     testing: "Testing...",
@@ -269,6 +276,7 @@ export const enUS = {
     uploadSuccess: "Theme uploaded successfully",
     uploadFailed: "Failed to upload theme",
     uploadError: "Upload error: {message}",
+    uploadInvalidType: "Please upload a zip file",
     viewDetails: "View Details",
     method1: {
       title: "Method 1: Upload Theme Package",
@@ -431,7 +439,8 @@ export const enUS = {
     submit: "Register",
     haveAccount: "Already have an account?",
     login: "Login now",
-    success: "Registration successful, please check verification email",
+    success:
+      "Registration successful. A verification email has been sent to your inbox. Please click the link to complete verification.",
     passwordMismatch: "Passwords do not match",
     passwordTooShort: "Password must be at least 6 characters",
   },
@@ -559,6 +568,7 @@ export const enUS = {
     testAI: "Test Connection",
     testing: "Testing...",
     testSuccess: "Connection successful",
+    saving: "Saving...",
     saveSuccess: "Saved successfully",
     saveFailed: "Failed to save",
     testFailed: "Test failed",
@@ -646,9 +656,6 @@ export const enUS = {
     completeCaptcha: "Please complete the slider verification first",
     captchaCompleted: "Verification completed",
     emailNotVerified: "Email not verified",
-    resendVerification: "Resend Verification Email",
-    verificationSent:
-      "Verification email has been resent, please check your inbox",
     loginFailed: "Login failed, please check your email and password",
     securityVerification: "Security Verification",
     completeSlider: "Please complete the slider verification",
@@ -661,6 +668,10 @@ export const enUS = {
     orContinueWith: "Or continue with",
     ssoLoginFailed: "SSO login failed",
     popupBlocked: "Popup blocked. Please allow popups for this site.",
+    resendVerification: "Resend verification email",
+    resendingVerification: "Sending verification email...",
+    resendVerificationFailed: "Failed to resend verification email",
+    enterEmailForVerification: "Enter your email address first",
   },
 
   // Slider Captcha
@@ -675,6 +686,8 @@ export const enUS = {
     puzzleAlt: "Puzzle piece",
     dragHint: "Drag the slider to complete verification",
     refreshButton: "Refresh captcha",
+    fetchFailed: "Failed to load captcha",
+    retryError: "Verification failed, please try again",
     refreshing: "Refreshing...",
   },
 
@@ -878,6 +891,7 @@ export const enUS = {
     titlePlaceholder: "Enter article title...",
     titleRequired: "Please enter article title",
     coverImage: "Cover Image",
+    coverImageAlt: "Post cover image",
     uploadCover: "Click to upload cover image",
     uploading: "Uploading...",
     imageFormat: "Supports JPG, PNG, GIF, max 10MB",

@@ -15,6 +15,13 @@ jwt_secret: "your-secret-key-change-this-in-production"
 # Logging level: "debug", "info", "warn", "error"
 log_level: "info"
 
+# Public base URL of the instance (e.g., "https://vexgo.example.com")
+# Used to build OAuth/SSO callback URLs and emailed links
+# (email verification, password reset, email change).
+# Required behind a reverse proxy; if empty these links fall back to the
+# request Host header, which is vulnerable to host-header poisoning.
+base_url: ""
+
 # Whether the server is behind a reverse proxy (e.g., nginx, Cloudflare)
 # Set to true if you're using a reverse proxy that sets X-Forwarded-* headers
 behind_reverse_proxy: false

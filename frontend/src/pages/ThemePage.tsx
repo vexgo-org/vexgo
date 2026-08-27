@@ -118,7 +118,7 @@ export function ThemePage() {
     if (!file.name.endsWith(".zip")) {
       setMessage({
         type: "error",
-        text: t("themePage.uploadError", { message: "请上传 zip 格式的文件" }),
+        text: t("themePage.uploadInvalidType"),
       });
       return;
     }

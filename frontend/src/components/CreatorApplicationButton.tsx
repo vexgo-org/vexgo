@@ -83,7 +83,10 @@ export function CreatorApplicationButton({
             <UserPlus className="w-4 h-4 mr-2" />
             {user?.role === "guest"
               ? t("creatorApplication.applyButton")
-              : "申请成为作者"}
+              : t("creatorApplication.applyButton") +
+                " (" +
+                t("roles.contributor") +
+                ")"}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">

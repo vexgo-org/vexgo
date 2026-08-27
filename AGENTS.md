@@ -57,13 +57,14 @@ just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main
   - `repository.go` — persistence interface + GORM implementation; all SQL/GORM queries live here (including batch operations to prevent N+1).
 - Thread `context.Context` through all layers; handlers pass `c.Request.Context()`.
 - Propagate errors explicitly with context; never swallow errors.
-- Pass dependencies explicitly via `Deps` structs (see `router.Deps`) — no global mutable state.
+- Pass dependencies explicitly via `Deps` structs (see `router.Deps`) — no global mutable state, except the single sanctioned test seam `mailer.SetMailCaptureHook` (see below).
 - Imports use the full module path: `github.com/vexgo-org/vexgo/backend/internal/<package>`.
 - Package dependency rules (acyclic graph):
   - `config/` and `model/` are leaf packages — import no other backend module.
-  - `model` holds GORM models plus cross-domain seams (`Notifier`, `FileRemover`, `Mailer` in `model/interfaces.go`); it must not import application logic.
+  - `model` holds GORM models plus cross-domain seams (`Notifier`, `FileRemover` in `model/interfaces.go`); it must not import application logic.
   - `config` is a pure setup module.
-  - Cross-domain calls go through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, `mailer` implements `Mailer`.
+  - Cross-domain calls go through consumer-declared interfaces where practical: `notification` implements `model.Notifier`, `upload` implements `model.FileRemover`; the consuming domain owns any interface it defines (e.g. auth's `CaptchaChecker`), with the composition root (`internal/app`) wiring concrete implementations.
+  - `mailer.Service` is the exception to interface-based injection: it is injected as the concrete type (`*mailer.Service`) into `auth` and `settings`. It is send-only (SMTP side effect plus token-free rendering); account/token persistence lives in domain repositories, not in mailer. For tests, `mailer.SetMailCaptureHook` captures rendered emails instead of dialing SMTP — this package-level hook is the one sanctioned piece of mutable global state; tests must restore it with `t.Cleanup`.
 - Entry point `backend/cmd/vexgo/main.go` is thin (parses flags, calls `app.New(cfg)`); `internal/app` is the composition root that wires everything.
 - The backend serves both the JSON API (`/api/...`) and server-side-rendered public pages (themes managed by `internal/public` and `internal/settings`).
 

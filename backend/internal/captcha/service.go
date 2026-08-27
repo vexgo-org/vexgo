@@ -1,6 +1,6 @@
-// Package verification implements email verification and sliding-puzzle
-// captcha generation/verification.
-package verification
+// Package captcha implements sliding-puzzle captcha generation and
+// verification.
+package captcha
 
 import (
 	"bytes"
@@ -13,9 +13,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"log/slog"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -26,12 +24,6 @@ import (
 
 // Sentinel errors mapped to HTTP responses by the handler.
 var (
-	// ErrUserNotFound means the user does not exist.
-	ErrUserNotFound = errors.New("user not found")
-	// ErrEmailAlreadyVerified means the email is already verified.
-	ErrEmailAlreadyVerified = errors.New("email already verified")
-	// ErrEmailServiceDisabled means SMTP is not enabled.
-	ErrEmailServiceDisabled = errors.New("email service not enabled")
 	// ErrCaptchaNotFound means the captcha does not exist or has expired.
 	ErrCaptchaNotFound = errors.New("captcha not found")
 	// ErrCaptchaUsed means the captcha was already used.
@@ -44,109 +36,22 @@ var (
 	ErrEncodeBgImage = errors.New("encode background image")
 	// ErrEncodePuzzleImage means the puzzle image could not be encoded.
 	ErrEncodePuzzleImage = errors.New("encode puzzle image")
-	// ErrGenerateToken means the verification token could not be generated.
-	ErrGenerateToken = errors.New("generate verification token")
-	// ErrSendVerificationEmail means the verification email could not be sent.
-	ErrSendVerificationEmail = errors.New("send verification email")
 )
 
-// Deps holds the dependencies required by the verification domain.
+// Deps holds the dependencies required by the captcha domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Mailer    model.Mailer
 }
 
-// Service contains the business logic of the verification domain.
+// Service contains the business logic of the captcha domain.
 type Service struct {
-	repo   Repository
-	mailer model.Mailer
+	repo Repository
 }
 
-// NewService creates a verification service with the given dependencies.
+// NewService creates a captcha service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), mailer: deps.Mailer}
-}
-
-// VerifyEmail verifies an email address. Tokens prefixed with "email-change-"
-// confirm a pending email change; all other tokens verify the initial email.
-// It returns whether the token was an email change and the user's new email
-// (only meaningful for email changes).
-func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bool, newEmail string, err error) {
-	if strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		slog.Debug("detected email change token, calling ConfirmEmailChange")
-		// The pending email must be read before the token is consumed:
-		// ConfirmEmailChange clears verification_token together with
-		// pending_email, so a lookup afterwards can never find the user.
-		user, err := s.repo.FindUserByToken(ctx, token)
-		if err != nil {
-			slog.Debug("find user by token failed", "err", err)
-			return false, "", err
-		}
-		pendingEmail := user.PendingEmail
-
-		if err := s.mailer.ConfirmEmailChange(token); err != nil {
-			slog.Debug("confirm email change failed", "err", err)
-			return false, "", err
-		}
-		slog.Debug("confirm email change succeeded")
-		return true, pendingEmail, nil
-	}
-
-	slog.Debug("normal email verification token, calling VerifyEmail")
-	if err := s.mailer.VerifyEmail(token); err != nil {
-		slog.Debug("verify email failed", "err", err)
-		return false, "", err
-	}
-	slog.Debug("verify email succeeded")
-	return false, "", nil
-}
-
-// VerificationStatus returns the email verification status of a user.
-func (s *Service) VerificationStatus(ctx context.Context, userID uint) (emailVerified bool, email string, err error) {
-	user, err := s.repo.FindUserByID(ctx, userID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return false, "", ErrUserNotFound
-		}
-		return false, "", err
-	}
-	return user.EmailVerified, user.Email, nil
-}
-
-// ResendVerificationEmail generates a new verification token for the user and
-// sends it to their email address.
-func (s *Service) ResendVerificationEmail(ctx context.Context, userID uint, host string) error {
-	user, err := s.repo.FindUserByID(ctx, userID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return ErrUserNotFound
-		}
-		return err
-	}
-
-	if user.EmailVerified {
-		return ErrEmailAlreadyVerified
-	}
-
-	enabled, err := s.mailer.IsEmailEnabled()
-	if err != nil || !enabled {
-		return ErrEmailServiceDisabled
-	}
-
-	// Generate new verification token
-	token, err := s.mailer.GenerateVerificationToken(user.ID)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrGenerateToken, err)
-	}
-
-	// Build verification link
-	verificationLink := host + "/verify-email?token=" + token
-	if err := s.mailer.SendVerificationEmail(user.Email, user.Username, verificationLink); err != nil {
-		return fmt.Errorf("%w: %v", ErrSendVerificationEmail, err)
-	}
-
-	return nil
+	return &Service{repo: NewRepository(deps.DB)}
 }
 
 // IsCaptchaEnabled reports whether captcha verification is enabled in the

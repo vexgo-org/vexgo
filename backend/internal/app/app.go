@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/config"
 	"github.com/vexgo-org/vexgo/backend/internal/database"
@@ -22,7 +23,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
 	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
-	"github.com/vexgo-org/vexgo/backend/internal/verification"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -73,8 +73,8 @@ func New(cfg *config.Config) (*App, error) {
 	// Shared service instances: construct each once and reuse it across the
 	// domains that depend on it.
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
-	mailerSvc := mailer.NewMailer(db)
-	verificationSvc := verification.NewService(verification.Deps{DB: db, JWTSecret: cfg.JWTSecret, Mailer: mailerSvc})
+	mailerSvc := mailer.NewService(mailer.Deps{DB: db})
+	captchaSvc := captcha.NewService(captcha.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
@@ -105,22 +105,24 @@ func New(cfg *config.Config) (*App, error) {
 			Notifier:  notificationSvc,
 			Files:     storage,
 		},
-		Verification: verification.Deps{
+		Captcha: captcha.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Mailer:    mailerSvc,
 		},
 		Auth: auth.Deps{
-			DB:        db,
-			JWTSecret: cfg.JWTSecret,
-			Files:     storage,
-			Mailer:    mailerSvc,
-			Captcha:   verificationSvc,
+			DB:                 db,
+			JWTSecret:          cfg.JWTSecret,
+			Files:              storage,
+			Mailer:             mailerSvc,
+			Captcha:            captchaSvc,
+			BaseURL:            cfg.BaseURL,
+			BehindReverseProxy: cfg.BehindReverseProxy,
 		},
 		SSO: sso.Deps{
 			DB:        db,
 			SSO:       &cfg.SSO,
 			JWTSecret: cfg.JWTSecret,
+			BaseURL:   cfg.BaseURL,
 		},
 		Home: home.Deps{
 			DB:        db,
@@ -130,6 +132,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Themes:    renderer,
+			Mailer:    mailerSvc,
 		},
 	})
 
@@ -164,7 +167,8 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 		CustomDomain:             cfg.S3CustomDomain,
 		DisableBucketInCustomURL: cfg.S3DisableBucketInCustomURL,
 	}
-	slog.Info("s3 config loaded",
+	slog.Info(
+		"s3 config loaded",
 		"enabled", s3Cfg.Enabled,
 		"endpoint", s3Cfg.Endpoint,
 		"region", s3Cfg.Region,

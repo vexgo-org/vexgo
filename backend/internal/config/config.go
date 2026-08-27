@@ -40,6 +40,12 @@ type Config struct {
 	DataDir  string // Data directory for storing sqlite database and media files
 	LogLevel string `yaml:"log_level"` // Logging level: "debug", "info", "warn", "error"
 
+	// BaseURL is the public origin of this instance (e.g., https://vexgo.example.com).
+	// Used to build absolute links: SSO/OAuth callbacks and emailed
+	// verification / password-reset / email-change links. Empty means the
+	// request origin is used, which is unsafe behind untrusted clients.
+	BaseURL string `yaml:"base_url"`
+
 	// Database configuration
 	DBType     string `yaml:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"
 	DBHost     string `yaml:"db_host"`     // Database host
@@ -110,6 +116,7 @@ type fileConfig struct {
 	DataDir   string `yaml:"data_dir"`
 	JWTSecret string `yaml:"jwt_secret"`
 	LogLevel  string `yaml:"log_level"`
+	BaseURL   string `yaml:"base_url"`
 
 	DBType     string `yaml:"db_type"`
 	DBHost     string `yaml:"db_host"`
@@ -268,6 +275,7 @@ func newConfigFromEnv() *Config {
 		Port:     envInt("PORT", defaultPort),
 		DataDir:  envString("DATA_DIR", defaultDataDir),
 		LogLevel: envString("LOG_LEVEL", "info"),
+		BaseURL:  envString("BASE_URL", ""),
 
 		DBType:     envString("DB_TYPE", ""),
 		DBHost:     envString("DB_HOST", ""),
@@ -382,6 +390,9 @@ func applyFileConfig(cfg *Config, f *fileConfig) {
 	}
 	if f.LogLevel != "" {
 		cfg.LogLevel = f.LogLevel
+	}
+	if f.BaseURL != "" {
+		cfg.BaseURL = f.BaseURL
 	}
 
 	// Database

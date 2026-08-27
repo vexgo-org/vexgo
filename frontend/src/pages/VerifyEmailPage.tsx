@@ -35,7 +35,9 @@ export function VerifyEmailPage() {
       try {
         const response = await authApi.verifyEmail(token);
         setStatus("success");
-        setMessage(response.data.message || "邮箱验证成功！");
+        setMessage(
+          response.data.message || t("verifyEmail.emailVerificationSuccess"),
+        );
 
         // Check whether re-login is required (email change succeeded)
         if (response.data.require_relogin) {
