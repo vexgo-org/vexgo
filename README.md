@@ -153,6 +153,13 @@ jwt_secret: "your-secret-key-change-this-in-production"
 # Logging level: "debug", "info", "warn", "error"
 log_level: "info"
 
+# Public base URL of the instance (e.g., "https://vexgo.example.com")
+# Used to build OAuth/SSO callback URLs and emailed links
+# (email verification, password reset, email change).
+# Required behind a reverse proxy; if empty these links fall back to the
+# request Host header, which is vulnerable to host-header poisoning.
+base_url: ""
+
 # Whether the server is behind a reverse proxy (e.g., nginx, Cloudflare)
 # Set to true if you're using a reverse proxy that sets X-Forwarded-* headers
 behind_reverse_proxy: false
@@ -294,6 +301,7 @@ You can also configure the application using environment variables.
 | `DATA_DIR`             | `./data`  | Data directory path                                                                                                                                                                                                                                          |
 | `JWT_SECRET`           | —         | JWT secret key (required for production)                                                                                                                                                                                                                     |
 | `LOG_LEVEL`            | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                                                                              |
+| `BASE_URL`             | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required when running behind a reverse proxy.                                           |
 | `BEHIND_REVERSE_PROXY` | `false`   | Set to `true` if the server is behind a reverse proxy (nginx, Cloudflare, etc.). This enables proper handling of `X-Forwarded-*` headers.                                                                                                                    |
 | `TRUSTED_PROXIES`      | —         | Comma-separated list of trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. If empty, defaults to common private networks (127.0.0.1, ::1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12). Example: `TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
 
@@ -315,10 +323,11 @@ VexGo supports GitHub, Google, and any OpenID Connect (OIDC) compatible provider
 
 **General**
 
-| Variable            | Default | Description                                                                                                                                                            |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BASE_URL`          | —       | Public base URL of your instance, e.g. `https://vexgo.example.com`. Required when running behind a reverse proxy so that OAuth2 redirect URIs are generated correctly. |
-| `ALLOW_LOCAL_LOGIN` | `true`  | Set to `false` to disable password login and enforce SSO-only access.                                                                                                  |
+| Variable            | Default | Description                                                           |
+| ------------------- | ------- | --------------------------------------------------------------------- |
+| `ALLOW_LOCAL_LOGIN` | `true`  | Set to `false` to disable password login and enforce SSO-only access. |
+
+> **Note:** `BASE_URL` is a general server setting rather than an SSO-specific one; see [Server](#server). It builds both OAuth callback URLs and emailed links (verification, password reset, email change), so setting it is strongly recommended whenever mail delivery or SSO is used.
 
 **GitHub**
 
