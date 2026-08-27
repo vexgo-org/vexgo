@@ -197,7 +197,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 
 	// Check if user already exists. An unverified account can request a new
 	// verification email instead of being treated as a failed registration.
-	if existingUser, err := s.repo.FindUserByEmail(ctx, req.Email); err == nil {
+	existingUser, err := s.repo.FindUserByEmail(ctx, req.Email)
+	switch {
+	case err == nil:
 		if !existingUser.EmailVerified {
 			if err := s.ResendVerification(ctx, ResendVerificationRequest{
 				Email: req.Email, Protocol: req.Protocol, Host: req.Host,
@@ -208,6 +210,15 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		}
 		slog.Warn("registration failed: user already exists", "email", req.Email)
 		return nil, ErrUserExists
+
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// No existing account; proceed with registration below.
+
+	default:
+		// A lookup failure is not evidence that the account is absent: fail
+		// closed instead of silently proceeding to create the user.
+		slog.Error("failed to look up existing user during registration", "email", req.Email, "err", err)
+		return nil, ErrQueryFailed
 	}
 
 	// Encrypt password

@@ -221,6 +221,36 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	}
 }
 
+// failingRepo decorates Repository to force a failure on FindUserByEmail,
+// simulating a transient database error that is NOT a missing record.
+type failingRepo struct {
+	Repository
+	findUserByEmailErr error
+}
+
+func (f *failingRepo) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	if f.findUserByEmailErr != nil {
+		return nil, f.findUserByEmailErr
+	}
+	return f.Repository.FindUserByEmail(ctx, email)
+}
+
+// A registration-time user lookup failure must fail closed with ErrQueryFailed
+// instead of being treated as "user does not exist" and proceeding to create
+// the account.
+func TestRegister_DbErrorOnUserLookup(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	svc.repo = &failingRepo{Repository: svc.repo, findUserByEmailErr: errors.New("database is unavailable")}
+
+	_, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "boom@example.com", Password: "password123", Username: "boom",
+		Protocol: "https", Host: "example.com",
+	})
+	if !errors.Is(err, ErrQueryFailed) {
+		t.Errorf("expected ErrQueryFailed when user lookup fails, got %v", err)
+	}
+}
+
 func TestRegister_Disabled(t *testing.T) {
 	svc, _, db := newTestService(t)
 	// Seed settings with registration disabled. The RegistrationEnabled field
