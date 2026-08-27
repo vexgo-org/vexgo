@@ -99,7 +99,7 @@ export function PostDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [slug, navigate]);
+  }, [slug]);
 
   const loadComments = useCallback(async () => {
     if (!post?.id) return [] as Comment[];

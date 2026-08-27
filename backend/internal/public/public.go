@@ -88,12 +88,6 @@ func ReadAsset(assetPath string) ([]byte, error) {
 	return staticFS.ReadFile("dist/" + assetPath)
 }
 
-// AssetExists checks if an asset exists in the embedded filesystem.
-func AssetExists(assetPath string) bool {
-	_, err := ReadAsset(assetPath)
-	return err == nil
-}
-
 // GetAvailableThemes scans the themes directory and returns a list of available themes.
 // Each theme must have a vexgo-theme.json file in its root directory.
 // The embedded default theme is always available.
