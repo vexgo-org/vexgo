@@ -83,6 +83,10 @@ type Deps struct {
 	DB        *gorm.DB
 	SSO       *config.SSOConfig
 	JWTSecret []byte
+
+	// BaseURL is the public origin of this instance (cfg.BaseURL). When set,
+	// OAuth callback URLs are built from it instead of the request host.
+	BaseURL string
 }
 
 // Service contains the business logic of the sso domain.
@@ -90,11 +94,12 @@ type Service struct {
 	repo      Repository
 	sso       *config.SSOConfig
 	jwtSecret []byte
+	baseURL   string
 }
 
 // NewService creates an sso service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret}
+	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret, baseURL: deps.BaseURL}
 }
 
 // Providers returns the list of enabled providers and whether local login is
@@ -253,7 +258,7 @@ func (s *Service) oidcOAuth2Config(ctx context.Context, redirectURI string) (*oa
 // auto-detection from the request host. This is needed when running behind a
 // reverse proxy or when the public domain differs from the listen address.
 func (s *Service) callbackURI(c *gin.Context, provider string) string {
-	if base := s.sso.BaseURL; base != "" {
+	if base := s.baseURL; base != "" {
 		return fmt.Sprintf("%s/api/sso/%s/callback", strings.TrimRight(base, "/"), provider)
 	}
 	scheme := "http"

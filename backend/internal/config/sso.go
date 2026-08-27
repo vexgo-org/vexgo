@@ -52,9 +52,6 @@ type OIDCConfig struct {
 // SSOConfig is the full SSO configuration (GitHub / Google / OIDC).
 // The zero value disables every provider.
 type SSOConfig struct {
-	// BaseURL overrides auto-detected callback host, e.g. https://vexgo.yzlab.de
-	BaseURL string
-
 	// Simple OAuth2 providers
 	GitHub SSOProviderConfig
 	Google SSOProviderConfig
@@ -70,7 +67,6 @@ type SSOConfig struct {
 // This is the baseline; config file values override via LoadFromConfig.
 func (cfg *Config) LoadSSOFromEnv() {
 	cfg.SSO = SSOConfig{
-		BaseURL: os.Getenv("BASE_URL"),
 		GitHub: SSOProviderConfig{
 			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),

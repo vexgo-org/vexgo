@@ -336,3 +336,23 @@ func TestParseFlagsFlagOverConfigFile(t *testing.T) {
 		t.Fatalf("config file port should be applied, got %d", cfg.Port)
 	}
 }
+
+func TestBaseURLTopLevelConfig(t *testing.T) {
+	t.Setenv("BASE_URL", "https://env.example.com")
+
+	cfg, err := buildConfig("", 0, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BaseURL != "https://env.example.com" {
+		t.Fatalf("BASE_URL env should populate top-level BaseURL, got %q", cfg.BaseURL)
+	}
+	path := writeConfig(t, "base_url: https://file.example.com\n")
+	cfg, err = buildConfig("", 0, "", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BaseURL != "https://file.example.com" {
+		t.Fatalf("config file base_url should override env, got %q", cfg.BaseURL)
+	}
+}

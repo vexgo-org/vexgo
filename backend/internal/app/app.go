@@ -110,16 +110,19 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 		},
 		Auth: auth.Deps{
-			DB:        db,
-			JWTSecret: cfg.JWTSecret,
-			Files:     storage,
-			Mailer:    mailerSvc,
-			Captcha:   captchaSvc,
+			DB:                 db,
+			JWTSecret:          cfg.JWTSecret,
+			Files:              storage,
+			Mailer:             mailerSvc,
+			Captcha:            captchaSvc,
+			BaseURL:            cfg.BaseURL,
+			BehindReverseProxy: cfg.BehindReverseProxy,
 		},
 		SSO: sso.Deps{
 			DB:        db,
 			SSO:       &cfg.SSO,
 			JWTSecret: cfg.JWTSecret,
+			BaseURL:   cfg.BaseURL,
 		},
 		Home: home.Deps{
 			DB:        db,
@@ -164,7 +167,8 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 		CustomDomain:             cfg.S3CustomDomain,
 		DisableBucketInCustomURL: cfg.S3DisableBucketInCustomURL,
 	}
-	slog.Info("s3 config loaded",
+	slog.Info(
+		"s3 config loaded",
 		"enabled", s3Cfg.Enabled,
 		"endpoint", s3Cfg.Endpoint,
 		"region", s3Cfg.Region,

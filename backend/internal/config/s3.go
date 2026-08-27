@@ -28,7 +28,8 @@ func (s *S3Config) IsEnabled() bool {
 
 // GetURL returns the public URL for an object in S3
 func (s *S3Config) GetURL(key string) string {
-	slog.Debug("generating S3 object URL",
+	slog.Debug(
+		"generating S3 object URL",
 		"customDomain", s.CustomDomain,
 		"disableBucketInCustomURL", s.DisableBucketInCustomURL,
 		"bucket", s.Bucket,
