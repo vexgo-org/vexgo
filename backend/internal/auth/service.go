@@ -231,6 +231,17 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	switch {
 	case err == nil:
 		if !existingUser.EmailVerified {
+			enabled, err := s.mailer.Enabled(ctx)
+			if err != nil || !enabled {
+				if err != nil {
+					slog.Warn("failed to check SMTP status during duplicate registration", "email", req.Email, "err", err)
+				}
+				// Without SMTP there is no verification flow at all — same
+				// as fresh registration, the account is usable right away.
+				// Claiming a verification email was sent would strand the
+				// user waiting for a message nobody can send.
+				return &RegisterResult{User: existingUser, RequiresVerification: false}, nil
+			}
 			if err := s.ResendVerification(ctx, ResendVerificationRequest{
 				Email: req.Email, Protocol: req.Protocol, Host: req.Host,
 			}); err != nil {
@@ -315,6 +326,11 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 // enumerate account state. Real failures return sentinel errors for internal
 // callers: the HTTP handler renders the same generic response for every
 // outcome, while Register relies on these sentinels to report delivery truth.
+//
+// While an account's previous verification token is still live, no new email
+// is generated or sent: the live token doubles as a per-account resend
+// cooldown (one email per token window), so hammering this endpoint cannot
+// flood a mailbox.
 func (s *Service) ResendVerification(ctx context.Context, req ResendVerificationRequest) error {
 	user, err := s.repo.FindUserByEmail(ctx, req.Email)
 	switch {
@@ -330,12 +346,29 @@ func (s *Service) ResendVerification(ctx context.Context, req ResendVerification
 		return nil
 	}
 
+	if hasLiveVerifyToken(user) {
+		slog.Info("verification resend skipped: previous token still valid", "userID", user.ID)
+		return nil
+	}
+
 	if err := s.sendVerificationEmail(ctx, user, req.Protocol, req.Host); err != nil {
 		// Technical details are already logged inside sendVerificationEmail;
 		// only the coarse sentinel crosses this boundary.
 		return ErrSendEmail
 	}
 	return nil
+}
+
+// hasLiveVerifyToken reports whether the user still holds an unexpired
+// email-verification token. The token column is shared with password-reset
+// and email-change tokens, so only a "verify-" prefixed one counts: a parked
+// reset or email-change token must not suppress a legitimate verification
+// resend.
+func hasLiveVerifyToken(user *model.User) bool {
+	if !strings.HasPrefix(user.VerificationToken, model.TokenPrefixVerify) {
+		return false
+	}
+	return user.TokenExpiresAt != nil && user.TokenExpiresAt.After(time.Now())
 }
 
 // sendVerificationEmail sends the email-verification message for a newly

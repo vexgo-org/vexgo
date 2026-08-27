@@ -575,7 +575,10 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 	}
 }
 
-func TestRegister_UnverifiedDuplicateResendsVerificationEmail(t *testing.T) {
+// Re-registering an unverified address while its verification token is still
+// live must not send another email: the live token is the per-account resend
+// cooldown that keeps the endpoint from being used as a mail bomb.
+func TestRegister_UnverifiedDuplicateNoSecondEmailInCooldown(t *testing.T) {
 	svc, _, db := newTestService(t)
 	enableSMTP(t, db)
 	captureEmails(t)
@@ -593,7 +596,7 @@ func TestRegister_UnverifiedDuplicateResendsVerificationEmail(t *testing.T) {
 		Protocol: "https", Host: "example.com",
 	})
 	if err != nil || !second.RequiresVerification {
-		t.Fatalf("duplicate registration should resend verification: result=%+v err=%v", second, err)
+		t.Fatalf("duplicate registration should still ask for verification: result=%+v err=%v", second, err)
 	}
 	var count int64
 	if err := db.Model(&model.User{}).Where("email = ?", "repeat@example.com").Count(&count).Error; err != nil {
@@ -602,8 +605,114 @@ func TestRegister_UnverifiedDuplicateResendsVerificationEmail(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected one user, got %d", count)
 	}
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected no second email while the first token is live, got %d emails", len(capturedEmails))
+	}
+}
+
+// Once the previous verification token has expired, a resend goes through
+// again.
+func TestResendVerification_AfterExpirySendsAgain(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	if _, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "cool@example.com", Password: "password123", Username: "cool",
+		Protocol: "https", Host: "example.com",
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected initial email, got %d", len(capturedEmails))
+	}
+
+	req := ResendVerificationRequest{Email: "cool@example.com", Protocol: "https", Host: "example.com"}
+	for range 3 {
+		if err := svc.ResendVerification(context.Background(), req); err != nil {
+			t.Fatalf("resend during cooldown: %v", err)
+		}
+	}
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected cooldown to suppress resends, got %d emails", len(capturedEmails))
+	}
+
+	// Backdate the stored token so the window lapses.
+	var u model.User
+	if err := db.Where("email = ?", "cool@example.com").First(&u).Error; err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-1 * time.Minute)
+	if err := db.Model(&u).Update("token_expires_at", past).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ResendVerification(context.Background(), req); err != nil {
+		t.Fatalf("resend after expiry: %v", err)
+	}
 	if len(capturedEmails) != 2 {
-		t.Fatalf("expected two verification emails, got %d", len(capturedEmails))
+		t.Fatalf("expected expired token to unlock one more email, got %d", len(capturedEmails))
+	}
+}
+
+// A live password-reset (or email-change) token sharing the column must not
+// block a verification resend.
+func TestResendVerification_NonVerifyTokensDoNotCoolDown(t *testing.T) {
+	svc, _, db := newTestService(t)
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	expiresAt := time.Now().Add(5 * time.Minute)
+	u := model.User{
+		Username:          "bob",
+		Email:             "bob@example.com",
+		Password:          "hash",
+		Role:              model.RoleGuest,
+		VerificationToken: model.TokenPrefixReset + "abc",
+		TokenExpiresAt:    &expiresAt,
+	}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.ResendVerification(context.Background(), ResendVerificationRequest{
+		Email: "bob@example.com", Protocol: "https", Host: "example.com",
+	}); err != nil {
+		t.Fatalf("resend with parked reset token: %v", err)
+	}
+	if len(capturedEmails) != 1 {
+		t.Fatalf("expected reset token not to cool down resend, got %d emails", len(capturedEmails))
+	}
+}
+
+// When SMTP is disabled there is no verification flow at all: a duplicate
+// registration for an unverified account must mirror fresh-registration
+// semantics (immediately usable, requires_verification=false) instead of
+// telling the user to wait for an email nobody can send.
+func TestRegister_DuplicateUnverifiedSMTPDisabled(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	captureEmails(t)
+
+	first, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "dup@example.com", Password: "password123", Username: "first",
+	})
+	if err != nil || first.RequiresVerification {
+		t.Fatalf("initial registration: result=%+v err=%v", first, err)
+	}
+
+	second, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "dup@example.com", Password: "password123", Username: "second",
+	})
+	if err != nil {
+		t.Fatalf("duplicate registration error: %v", err)
+	}
+	if second.RequiresVerification {
+		t.Error("requires_verification must be false when SMTP is disabled")
+	}
+	if second.User == nil || second.User.Email != "dup@example.com" {
+		t.Errorf("expected the existing user returned, got %+v", second.User)
+	}
+	if len(capturedEmails) != 0 {
+		t.Errorf("expected no emails without SMTP, got %d", len(capturedEmails))
 	}
 }
 
