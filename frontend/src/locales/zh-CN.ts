@@ -414,7 +414,7 @@ export const zhCN = {
     submit: "注册",
     haveAccount: "已有账号？",
     login: "立即登录",
-    success: "注册成功，请查收验证邮件",
+    success: "注册成功，验证邮件已发送，请查收邮箱并点击链接完成验证",
     passwordMismatch: "两次输入的密码不一致",
     passwordTooShort: "密码至少需要6个字符",
   },

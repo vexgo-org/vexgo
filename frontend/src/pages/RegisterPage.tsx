@@ -243,6 +243,19 @@ export function RegisterPage() {
       resetCaptcha();
       navigate("/");
     } catch (err) {
+      // Registration succeeded but the account needs email verification: tell
+      // the user to check their inbox and send them to the login page.
+      if ((err as { requiresVerification?: boolean }).requiresVerification) {
+        const registrationMessage = (err as { registrationMessage?: string })
+          .registrationMessage;
+        navigate("/login", {
+          state: {
+            registrationMessage: registrationMessage || t("register.success"),
+          },
+          replace: true,
+        });
+        return;
+      }
       // Backend errors such as email verification can still be shown in a dialog
       const error = err as {
         response?: { data?: { message?: string } };

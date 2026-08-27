@@ -119,12 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         response.data;
 
       if (requires_verification && !email_verified) {
-        setUser(user);
         const error = new Error(
           response.data.message || "请先验证您的邮箱地址",
-        ) as Error & { requiresVerification: boolean; email: string };
+        ) as Error & {
+          requiresVerification: boolean;
+          email: string;
+          registrationMessage: string;
+        };
         error.requiresVerification = true;
         error.email = email;
+        error.registrationMessage = response.data.message || "";
         throw error;
       }
 
@@ -136,6 +140,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(user);
       }
     } catch (error: unknown) {
+      // Registration pending email verification is signaled with a dedicated
+      // flag; let it pass through untouched so callers can react to it.
+      if (
+        error instanceof Error &&
+        (error as Error & { requiresVerification?: boolean })
+          .requiresVerification
+      ) {
+        throw error;
+      }
       // Extract error message from response
       const apiError = error as {
         response?: { data?: { error?: string } };

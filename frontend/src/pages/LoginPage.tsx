@@ -181,6 +181,7 @@ export function LoginPage() {
     loading: ssoConfigLoading,
   } = useSSOProviders();
   const [error, setError] = useState("");
+  const [registrationMessage, setRegistrationMessage] = useState("");
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [captchaData, setCaptchaData] = useState<{
     id: string;
@@ -191,8 +192,20 @@ export function LoginPage() {
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
 
-  const from =
-    (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
+  const locationState = location.state as
+    | { from?: { pathname: string }; registrationMessage?: string }
+    | undefined;
+  const from = locationState?.from?.pathname || "/";
+
+  useEffect(() => {
+    if (locationState?.registrationMessage) {
+      setRegistrationMessage(locationState.registrationMessage);
+      navigate(location.pathname, {
+        replace: true,
+        state: locationState.from ? { from: locationState.from } : undefined,
+      });
+    }
+  }, [location.pathname, locationState, navigate]);
 
   useEffect(() => {
     const loadCaptchaSettings = async () => {
@@ -316,6 +329,13 @@ export function LoginPage() {
         <CardContent>
           {allowLocalLogin && (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {registrationMessage && (
+                <Alert variant="default" className="mb-4">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{registrationMessage}</AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert
                   variant={emailVerified === false ? "default" : "destructive"}

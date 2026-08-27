@@ -436,7 +436,8 @@ export const enUS = {
     submit: "Register",
     haveAccount: "Already have an account?",
     login: "Login now",
-    success: "Registration successful, please check verification email",
+    success:
+      "Registration successful. A verification email has been sent to your inbox. Please click the link to complete verification.",
     passwordMismatch: "Passwords do not match",
     passwordTooShort: "Password must be at least 6 characters",
   },
