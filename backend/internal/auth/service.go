@@ -272,8 +272,8 @@ func (s *Service) ResendVerification(ctx context.Context, req ResendVerification
 }
 
 // sendVerificationEmail sends the email-verification message for a newly
-// created user. It returns true when the message was sent (so registration
-// requires verification); failures are logged and reported as false so a
+// created user. It returns `nil` when the message was sent (so registration
+// requires verification); failures are logged and reported as error so a
 // transient SMTP error does not block registration.
 func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, protocol, host string) error {
 	enabled, err := s.mailer.Enabled(ctx)
