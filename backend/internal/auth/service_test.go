@@ -545,8 +545,8 @@ func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
 		t.Fatalf("expected 1 email, got %d", len(capturedEmails))
 	}
 	email := capturedEmails[0]
-	if email.To != "alice@example.com" {
-		t.Errorf("expected To alice@example.com, got %q", email.To)
+	if email.To != "fresh@example.com" {
+		t.Errorf("expected To fresh@example.com (the new email), got %q", email.To)
 	}
 	if email.Subject != "Confirm Email Change" {
 		t.Errorf("unexpected subject %q", email.Subject)

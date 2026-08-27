@@ -429,10 +429,11 @@ func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pend
 		// Build verification link
 		verificationLink := buildLinkWithToken(req.Protocol, req.Host, verificationLinkPath, token)
 
-		// Send confirmation email
+		// Send confirmation email to the new address so the change is only
+		// completed after the new mailbox is confirmed.
 		if err := s.mailer.SendEmailChangeEmail(
 			ctx,
-			user.Email,
+			req.NewEmail,
 			&mailer.EmailChangeEmailTemplateData{
 				Name:     user.Username,
 				NewEmail: req.NewEmail,
