@@ -351,7 +351,8 @@ func TestSMTPClient_SendDoesNotHoldLockDuringDial(t *testing.T) {
 		t.Error("Enabled() starved while Send was dialing")
 	}
 
-	ln.Close()
+	// Teardown: the parked send fails on its own go-mail deadlines.
+	_ = ln.Close()
 }
 
 // TestService_ConcurrentSends_CapturedExactlyOnce fires concurrent sends
