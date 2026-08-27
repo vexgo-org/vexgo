@@ -208,6 +208,7 @@ export const zhCN = {
     testing: "测试中...",
     testFirst: "请先启用 SMTP",
     savePasswordFirst: "请先保存密码",
+    testSucceeded: "测试邮件已发送",
     testFailed: "测试失败",
     commonExamples: "常见邮箱服务配置示例",
     gmailExample: "Gmail: smtp.gmail.com:587 (TLS) 或 465 (SSL)",

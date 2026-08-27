@@ -104,8 +104,8 @@ export function SMTPSettingsPage() {
 
     setTesting(true);
     try {
-      const response = await configApi.testSMTP();
-      toast.success(response.data.message);
+      await configApi.testSMTP();
+      toast.success(t("smtpSettings.testSucceeded"));
     } catch (error: unknown) {
       console.error("Failed to send test email:", error);
       const apiError = error as { response?: { data?: { error?: string } } };
