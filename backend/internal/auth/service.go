@@ -46,12 +46,20 @@ var (
 	ErrGenerateToken   = errors.New("failed to generate verification token")
 	ErrSendEmail       = errors.New("failed to send verification email")
 
-	ErrInvalidResetToken  = errors.New("invalid reset token")
-	ErrQueryFailed        = errors.New("query failed")
-	ErrResetTokenExpired  = errors.New("reset token has expired")
-	ErrUpdatePassword     = errors.New("failed to update password")
-	ErrGenerateResetToken = errors.New("failed to generate reset token")
-	ErrSendResetEmail     = errors.New("failed to send email")
+	ErrInvalidResetToken        = errors.New("invalid reset token")
+	ErrInvalidVerificationToken = errors.New("invalid verification token")
+	ErrQueryFailed              = errors.New("query failed")
+	ErrResetTokenExpired        = errors.New("reset token has expired")
+	ErrUpdatePassword           = errors.New("failed to update password")
+	ErrGenerateResetToken       = errors.New("failed to generate reset token")
+	ErrSendResetEmail           = errors.New("failed to send email")
+
+	// Email-verification domain sentinels.
+	ErrVerificationTokenExpired = errors.New("verification token has expired")
+	ErrUpdateUserVerification   = errors.New("failed to update email verification status")
+	ErrEmailChangeNoPending     = errors.New("no pending email change")
+	ErrEmailChangeEmailInUse    = errors.New("this email is already used by another account")
+	ErrUpdateEmailChange        = errors.New("failed to update email")
 )
 
 const (

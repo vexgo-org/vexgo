@@ -52,17 +52,17 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
 	// Only email-change tokens may confirm an email change.
 	if !strings.HasPrefix(token, model.TokenPrefixEmailChange) {
 		slog.Warn("invalid verification token")
-		return fmt.Errorf("invalid verification token")
+		return ErrInvalidVerificationToken
 	}
 
 	user, err := s.repo.FindUserByToken(ctx, token)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			slog.Warn("invalid verification token")
-			return fmt.Errorf("invalid verification token")
+			return ErrInvalidVerificationToken
 		}
 		slog.Error("failed to query user for email change", "err", err)
-		return fmt.Errorf("failed to find user: %w", err)
+		return fmt.Errorf("failed to find user: %w", ErrQueryFailed)
 	}
 	slog.Debug("found user for email change",
 		"userID", user.ID,
@@ -73,26 +73,26 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
 	// Check if token is expired
 	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
 		slog.Warn("email change token expired", "expiresAt", user.TokenExpiresAt)
-		return fmt.Errorf("verification token has expired")
+		return ErrVerificationTokenExpired
 	}
 
 	// Check if there is a pending email
 	if user.PendingEmail == "" {
 		slog.Warn("no pending email in email change request")
-		return fmt.Errorf("no pending email change")
+		return ErrEmailChangeNoPending
 	}
 
 	// Check if the new email is already used by another user
 	existingUser, err := s.repo.FindUserByEmailExcluding(ctx, user.PendingEmail, user.ID)
 	if err == nil {
 		slog.Warn("email already in use by another user", "existingUserID", existingUser.ID)
-		return fmt.Errorf("email already in use by another account")
+		return ErrEmailChangeEmailInUse
 	}
 
 	// Update email address
 	if err := s.repo.UpdateVerifiedEmail(ctx, user.ID, user.PendingEmail); err != nil {
 		slog.Error("failed to update email", "err", err)
-		return fmt.Errorf("failed to update email: %w", err)
+		return ErrUpdateEmailChange
 	}
 
 	slog.Info("email change confirmed successfully", "newEmail", user.PendingEmail)
@@ -104,25 +104,25 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
 // cannot be cross-used to verify an email.
 func (s *Service) verifyEmailToken(ctx context.Context, token string) error {
 	if strings.HasPrefix(token, model.TokenPrefixReset) || strings.HasPrefix(token, model.TokenPrefixEmailChange) {
-		return fmt.Errorf("invalid verification token")
+		return ErrInvalidVerificationToken
 	}
 
 	user, err := s.repo.FindUserByToken(ctx, token)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return fmt.Errorf("invalid verification token")
+			return ErrInvalidVerificationToken
 		}
-		return fmt.Errorf("failed to find user: %w", err)
+		return fmt.Errorf("%w: %w", ErrQueryFailed, err)
 	}
 
 	// Check if token is expired
 	if user.TokenExpiresAt == nil || user.TokenExpiresAt.Before(time.Now()) {
-		return fmt.Errorf("verification token has expired")
+		return ErrVerificationTokenExpired
 	}
 
 	// Update user verification status
 	if err := s.repo.UpdateUserEmailVerified(ctx, user.ID); err != nil {
-		return fmt.Errorf("failed to update user verification status: %w", err)
+		return fmt.Errorf("%w: %w", ErrUpdateUserVerification, err)
 	}
 
 	return nil
