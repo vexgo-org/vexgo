@@ -456,7 +456,22 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 
 	emailChange, newEmail, err := h.svc.VerifyEmail(c.Request.Context(), token)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		switch {
+		case errors.Is(err, ErrInvalidVerificationToken):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrVerificationTokenExpired):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrEmailChangeNoPending), errors.Is(err, ErrEmailChangeEmailInUse):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrQueryFailed),
+			errors.Is(err, ErrUpdateUserVerification),
+			errors.Is(err, ErrUpdateEmailChange):
+			// Internal failures: log is already emitted by the service; do not
+			// leak the underlying error (e.g. DB dial string) to the client.
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+		}
 		return
 	}
 
