@@ -64,7 +64,8 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
 		slog.Error("failed to query user for email change", "err", err)
 		return fmt.Errorf("failed to find user: %w", ErrQueryFailed)
 	}
-	slog.Debug("found user for email change",
+	slog.Debug(
+		"found user for email change",
 		"userID", user.ID,
 		"username", user.Username,
 		"pendingEmail", user.PendingEmail,

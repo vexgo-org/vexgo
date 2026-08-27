@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
@@ -14,18 +16,65 @@ import (
 type Handler struct {
 	svc *Service
 	mw  *middleware.Auth
+
+	// linkScheme and linkHost come from the configured public site origin
+	// (BASE_URL / cfg.BaseURL). When empty, email links fall back to the
+	// request origin with reduced guarantees.
+	linkScheme string
+	linkHost   string
+
+	// honorForwardedProto mirrors cfg.BehindReverseProxy: X-Forwarded-Proto is
+	// only honored when the deployment declares itself to be behind a reverse
+	// proxy. Gin's trusted-proxies check filters the client IP but does not
+	// sanitize raw header reads, so this gate lives at the read site.
+	honorForwardedProto bool
 }
 
 // NewHandler creates an auth HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
+	scheme, host := parseLinkOrigin(deps.BaseURL)
+	return &Handler{
+		svc:                 NewService(deps),
+		mw:                  middleware.NewAuth(deps.DB, deps.JWTSecret),
+		linkScheme:          scheme,
+		linkHost:            host,
+		honorForwardedProto: deps.BehindReverseProxy,
+	}
 }
 
-// requestProtocolAndHost derives the protocol and host for building absolute
-// links, honoring X-Forwarded-Proto when behind a reverse proxy.
-func requestProtocolAndHost(c *gin.Context) (protocol, host string) {
+// parseLinkOrigin extracts scheme://host from a configured public origin.
+// Anything unusable (empty, unparseable, wrong scheme) logs a warning and
+// yields empty strings so callers can detect "not configured".
+func parseLinkOrigin(raw string) (scheme, host string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		slog.Warn("invalid base_url configured; emailed links will use the request origin", "baseURL", raw)
+		return "", ""
+	}
+	if trimmed := strings.Trim(u.Path, "/"); trimmed != "" {
+		slog.Warn("base_url contains a path; only its origin is used for emailed links", "baseURL", raw)
+	}
+	return u.Scheme, u.Host
+}
+
+// emailLinkOrigin derives the protocol and host used to build absolute links
+// inside emails (verification, password reset, email change).
+//
+// The configured site origin always wins: request-supplied values (Host,
+// X-Forwarded-Proto) never leak into emails when BASE_URL is set.
+// Without configuration, the request origin is used as a degraded fallback:
+// X-Forwarded-Proto is trusted only when behind_reverse_proxy is enabled —
+// otherwise a client could poison emailed links with a forged header.
+func (h *Handler) emailLinkOrigin(c *gin.Context) (protocol, host string) {
+	if h.linkHost != "" {
+		return h.linkScheme, h.linkHost
+	}
 	protocol = "http"
-	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+	if c.Request.TLS != nil || (h.honorForwardedProto && c.GetHeader("X-Forwarded-Proto") == "https") {
 		protocol = "https"
 	}
 	return protocol, c.Request.Host
@@ -118,12 +167,13 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	slog.Debug("registration request parsed successfully",
+	slog.Debug(
+		"registration request parsed successfully",
 		"email", req.Email,
 		"username", req.Username,
 	)
 
-	protocol, host := requestProtocolAndHost(c)
+	protocol, host := h.emailLinkOrigin(c)
 	result, err := h.svc.Register(c.Request.Context(), RegisterRequest{
 		Email:        req.Email,
 		Password:     req.Password,
@@ -320,7 +370,7 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 
 	userID := middleware.CurrentUserID(c)
 
-	protocol, host := requestProtocolAndHost(c)
+	protocol, host := h.emailLinkOrigin(c)
 	pending, err := h.svc.UpdateEmail(c.Request.Context(), UpdateEmailRequest{
 		UserID:   userID,
 		NewEmail: req.Email,
@@ -369,7 +419,7 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	protocol, host := requestProtocolAndHost(c)
+	protocol, host := h.emailLinkOrigin(c)
 	err := h.svc.RequestPasswordReset(c.Request.Context(), req.Email, protocol, host)
 	if err != nil {
 		switch {
@@ -400,7 +450,7 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 		return
 	}
 
-	protocol, host := requestProtocolAndHost(c)
+	protocol, host := h.emailLinkOrigin(c)
 	// Intentional discard (uniform anti-enumeration response above).
 	_ = h.svc.ResendVerification(c.Request.Context(), ResendVerificationRequest{
 		Email: req.Email, Protocol: protocol, Host: host,

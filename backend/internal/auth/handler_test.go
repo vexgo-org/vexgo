@@ -64,6 +64,119 @@ func TestResendVerification_UniformResponse(t *testing.T) {
 	}
 }
 
+// POSTs a registration request with attacker-controlled routing metadata
+// (spoofed Host + X-Forwarded-Proto) and returns the verification link found
+// in the captured email.
+func registerAndGetEmailedLink(t *testing.T, db *gorm.DB, baseURL string, behindProxy bool) string {
+	t.Helper()
+	enableSMTP(t, db)
+	captureEmails(t)
+
+	h := NewHandler(Deps{
+		DB:                 db,
+		JWTSecret:          testJWTSecret,
+		Files:              &fakeFiles{},
+		Mailer:             mailer.NewService(mailer.Deps{DB: db}),
+		Captcha:            captcha.NewService(captcha.Deps{DB: db}),
+		BaseURL:            baseURL,
+		BehindReverseProxy: behindProxy,
+	})
+	r := gin.New()
+	r.POST("/api/auth/register", h.Register)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register",
+		strings.NewReader(`{"email":"victim@example.com","password":"password123","username":"victim"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Host = "evil.example"                    // spoofed Host header
+	req.Header.Set("X-Forwarded-Proto", "https") // spoofed forwarding header
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	emails := capturedEmails
+	if len(emails) != 1 {
+		t.Fatalf("expected 1 email, got %d", len(emails))
+	}
+	return emails[0].TextBody
+}
+
+// Emailed links must be built from trusted configuration only: an attacker
+// able to set the Host header or X-Forwarded-Proto must never steer password
+// reset / verification links to a domain they control.
+func TestEmailLinkOrigin_NotPoisonedByRequestHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name        string
+		baseURL     string
+		behindProxy bool
+		wantScheme  string
+		wantHost    string // empty means "whatever the request carried"
+	}{
+		{
+			name:       "configured origin beats spoofed host and header",
+			baseURL:    "https://good.example",
+			wantScheme: "https", wantHost: "good.example",
+		},
+		{
+			name:        "configured origin wins even when forwarded headers are honored",
+			baseURL:     "http://good.example:8080",
+			behindProxy: true,
+			wantScheme:  "http", wantHost: "good.example:8080",
+		},
+		{
+			name:       "without config and without proxy, forged proto is ignored",
+			wantScheme: "http", wantHost: "evil.example",
+		},
+		{
+			name:        "without config behind proxy, forwarded proto is honored",
+			behindProxy: true,
+			wantScheme:  "https", wantHost: "evil.example",
+		},
+		{
+			name:       "invalid base_url falls back to request origin",
+			baseURL:    "not a url at all",
+			wantScheme: "http", wantHost: "evil.example",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, db := newTestService(t)
+			body := registerAndGetEmailedLink(t, db, tt.baseURL, tt.behindProxy)
+
+			wantPrefix := tt.wantScheme + "://" + tt.wantHost + "/verify-email?token="
+			if !strings.Contains(body, wantPrefix) {
+				t.Errorf("email link should start with %q, got:\n%s", wantPrefix, body)
+			}
+		})
+	}
+}
+
+func TestParseLinkOrigin(t *testing.T) {
+	tests := []struct {
+		raw    string
+		scheme string
+		host   string
+	}{
+		{"", "", ""},
+		{"   ", "", ""},
+		{"not a url", "", ""},
+		{"example.com", "", ""},             // missing scheme
+		{"ftp://files.example.com", "", ""}, // unsupported scheme
+		{"https://blog.example.com", "https", "blog.example.com"},
+		{"http://localhost:3001/", "http", "localhost:3001"},
+		{"https://host.example/base/path", "https", "host.example"}, // path ignored, origin kept
+	}
+	for _, tt := range tests {
+		scheme, host := parseLinkOrigin(tt.raw)
+		if scheme != tt.scheme || host != tt.host {
+			t.Errorf("parseLinkOrigin(%q) = (%q, %q), want (%q, %q)", tt.raw, scheme, host, tt.scheme, tt.host)
+		}
+	}
+}
+
 func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

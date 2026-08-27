@@ -74,6 +74,14 @@ type Deps struct {
 	Files     FileRemover
 	Mailer    *mailer.Service
 	Captcha   CaptchaChecker
+
+	// BaseURL is the public site origin (e.g. https://blog.example.com) used
+	// to build absolute links inside emails, sourced from BASE_URL / cfg.BaseURL.
+	// When set it overrides any request-supplied Host or forwarding header.
+	BaseURL string
+	// BehindReverseProxy enables honoring X-Forwarded-Proto when BaseURL is
+	// not configured. Mirrors cfg.BehindReverseProxy / behind_reverse_proxy.
+	BehindReverseProxy bool
 }
 
 // FileRemover is an alias for model.FileRemover kept for backward compatibility.
@@ -225,7 +233,8 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	slog.Debug("starting password hashing", "email", req.Email)
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		slog.Error("failed to hash password",
+		slog.Error(
+			"failed to hash password",
 			"email", req.Email,
 			"err", err,
 		)
@@ -242,20 +251,23 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		EmailVerified: false,
 	}
 
-	slog.Debug("creating new user",
+	slog.Debug(
+		"creating new user",
 		"username", req.Username,
 		"email", req.Email,
 		"role", model.RoleGuest,
 	)
 	if err := s.repo.CreateUser(ctx, &newUser); err != nil {
-		slog.Error("failed to create user in database",
+		slog.Error(
+			"failed to create user in database",
 			"username", req.Username,
 			"email", req.Email,
 			"err", err,
 		)
 		return nil, ErrCreateUser
 	}
-	slog.Info("user created successfully",
+	slog.Info(
+		"user created successfully",
 		"userID", newUser.ID,
 		"username", req.Username,
 		"email", req.Email,
@@ -371,7 +383,8 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		// Delete old avatar file
 		if err := s.files.Delete(user.Avatar); err != nil {
 			// Log error but continue execution to avoid avatar update failure
-			slog.Warn("failed to delete old avatar",
+			slog.Warn(
+				"failed to delete old avatar",
 				"url", user.Avatar,
 				"err", err,
 			)
@@ -619,7 +632,8 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// Verify captcha
 	slog.Debug("captcha verification enabled, validating user captcha")
 	if arg.ID == "" || arg.Token == "" || arg.X == 0 {
-		slog.Warn("captcha verification failed: missing required fields",
+		slog.Warn(
+			"captcha verification failed: missing required fields",
 			"email", arg.Email,
 			"captchaID", arg.ID,
 			"captchaX", arg.X,
@@ -629,7 +643,8 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// Query captcha
 	captcha, err := s.repo.FindCaptcha(ctx, arg.ID, arg.Token)
 	if err != nil {
-		slog.Warn("captcha verification failed: captcha not found or invalid token",
+		slog.Warn(
+			"captcha verification failed: captcha not found or invalid token",
 			"captchaID", arg.ID,
 			"email", arg.Email,
 		)
@@ -638,7 +653,8 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 
 	// Check if expired
 	if time.Now().After(captcha.ExpiresAt) {
-		slog.Warn("captcha verification failed: captcha expired",
+		slog.Warn(
+			"captcha verification failed: captcha expired",
 			"captchaID", arg.ID,
 			"expiresAt", captcha.ExpiresAt,
 			"email", arg.Email,
@@ -648,7 +664,8 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 
 	// Verify position (allow certain tolerance)
 	if math.Abs(float64(arg.X-captcha.X)) > float64(arg.Tolerance) {
-		slog.Warn("captcha verification failed: incorrect position",
+		slog.Warn(
+			"captcha verification failed: incorrect position",
 			"captchaID", arg.ID,
 			"userX", arg.X,
 			"correctX", captcha.X,
@@ -658,7 +675,8 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		return ErrCaptchaMismatch
 	}
 
-	slog.Debug("captcha verification passed",
+	slog.Debug(
+		"captcha verification passed",
 		"captchaID", arg.ID,
 		"email", arg.Email,
 	)
@@ -667,7 +685,8 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	if !captcha.Used {
 		captcha.Used = true
 		if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
-			slog.Error("failed to mark captcha as used",
+			slog.Error(
+				"failed to mark captcha as used",
 				"captchaID", arg.ID,
 				"email", arg.Email,
 				"err", err,
