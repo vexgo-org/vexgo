@@ -49,7 +49,6 @@ export const enUS = {
     registerSuccess: "Registration successful",
     emailVerified: "Email Verified",
     verifyEmail: "Verify Email",
-    resendVerification: "Resend Verification Email",
   },
 
   // Profile
@@ -646,9 +645,6 @@ export const enUS = {
     completeCaptcha: "Please complete the slider verification first",
     captchaCompleted: "Verification completed",
     emailNotVerified: "Email not verified",
-    resendVerification: "Resend Verification Email",
-    verificationSent:
-      "Verification email has been resent, please check your inbox",
     loginFailed: "Login failed, please check your email and password",
     securityVerification: "Security Verification",
     completeSlider: "Please complete the slider verification",

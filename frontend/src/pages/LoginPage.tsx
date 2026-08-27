@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { authApi, configApi } from "@/lib/api";
+import { configApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,15 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SliderCaptcha } from "@/components/ui/slider-captcha";
-import {
-  Loader2,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  CheckCircle,
-} from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { useSSOProviders, type SSOProvider } from "@/hooks/useSSOProviders";
 
 // ── SSO helpers ──────────────────────────────────────────────────────────────
@@ -312,24 +304,6 @@ export function LoginPage() {
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!email) {
-      setError(t("auth.email") + " " + t("common.required"));
-      return;
-    }
-    setLoading(true);
-    try {
-      await authApi.resendVerificationEmail();
-      setError("");
-      alert(t("loginPage.verificationSent"));
-    } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || t("common.error"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-16 flex justify-center">
       <Card className="w-full max-w-md">
@@ -349,19 +323,6 @@ export function LoginPage() {
                 >
                   <AlertDescription className="space-y-2">
                     <p className="font-medium">{error}</p>
-                    {emailVerified === false && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResendVerification}
-                        disabled={loading}
-                        className="mt-2"
-                      >
-                        <ArrowLeft className="w-3 h-3 mr-2" />
-                        {t("loginPage.resendVerification")}
-                      </Button>
-                    )}
                   </AlertDescription>
                 </Alert>
               )}

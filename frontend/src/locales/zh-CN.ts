@@ -49,7 +49,6 @@ export const zhCN = {
     registerSuccess: "注册成功",
     emailVerified: "邮箱已验证",
     verifyEmail: "验证邮箱",
-    resendVerification: "重新发送验证邮件",
   },
 
   // 个人信息
@@ -619,8 +618,6 @@ export const zhCN = {
     completeCaptcha: "请先完成滑块验证",
     captchaCompleted: "验证已完成",
     emailNotVerified: "邮箱未验证",
-    resendVerification: "重新发送验证邮件",
-    verificationSent: "验证邮件已重新发送，请检查您的邮箱",
     loginFailed: "登录失败，请检查邮箱和密码",
     securityVerification: "安全验证",
     completeSlider: "请完成滑块验证",

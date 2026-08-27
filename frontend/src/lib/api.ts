@@ -99,9 +99,6 @@ export const authApi = {
       "/auth/verification-status",
     ),
 
-  resendVerificationEmail: () =>
-    api.post<{ message: string }>("/auth/resend-verification"),
-
   verifyEmail: (token: string) =>
     api.get<{ message: string; require_relogin?: boolean; new_email?: string }>(
       `/verify-email?token=${token}`,
