@@ -417,19 +417,16 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	category, err := h.svc.CreateCategory(c.Request.Context(), u.Role, req.Name, req.Description)
 	if err != nil {
-		if errors.Is(err, ErrBadRequest) {
+		switch {
+		case errors.Is(err, ErrBadRequest):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Category name must not be blank"})
-			return
-		}
-		if errors.Is(err, ErrForbidden) {
+		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a category"})
-			return
-		}
-		if errors.Is(err, ErrDuplicateName) {
+		case errors.Is(err, ErrDuplicateName):
 			c.JSON(http.StatusConflict, gin.H{"error": "A category with this name already exists", "code": "duplicate_name"})
-			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
 		return
 	}
 
@@ -467,19 +464,16 @@ func (h *Handler) CreateTag(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	tag, err := h.svc.CreateTag(c.Request.Context(), u.Role, req.Name)
 	if err != nil {
-		if errors.Is(err, ErrBadRequest) {
+		switch {
+		case errors.Is(err, ErrBadRequest):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Tag name must not be blank"})
-			return
-		}
-		if errors.Is(err, ErrForbidden) {
+		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a tag"})
-			return
-		}
-		if errors.Is(err, ErrDuplicateName) {
+		case errors.Is(err, ErrDuplicateName):
 			c.JSON(http.StatusConflict, gin.H{"error": "A tag with this name already exists", "code": "duplicate_name"})
-			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		return
 	}
 
