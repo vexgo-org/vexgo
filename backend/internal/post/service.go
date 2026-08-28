@@ -21,6 +21,8 @@ var (
 	ErrGuestViewDenied = errors.New("guest view denied")
 	// ErrBadRequest means the request is invalid for the current state.
 	ErrBadRequest = errors.New("bad request")
+	// ErrDuplicateName means a category or tag with the same name already exists.
+	ErrDuplicateName = errors.New("duplicate name")
 )
 
 // Deps holds the dependencies required by the post domain.

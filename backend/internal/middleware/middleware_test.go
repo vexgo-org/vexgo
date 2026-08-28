@@ -345,6 +345,25 @@ func TestPermission_UsesContextRole(t *testing.T) {
 	}
 }
 
+func TestPermission_InvalidUserIDTypeFailsClosed(t *testing.T) {
+	// A context user ID of the wrong type means internal state was set up
+	// incorrectly; Permission must abort with an error status, not panic on
+	// a bare type assertion.
+	a := NewAuth(nil, testSecret)
+	r := gin.New()
+	r.GET("/admin", func(c *gin.Context) {
+		c.Set("userID", "not-a-uint")
+		c.Next()
+	}, a.Permission(model.RoleAdmin), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin", nil))
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for a non-uint user ID, got %d", w.Code)
+	}
+}
+
 func TestJWTAuth_NilDBUsesTokenRole(t *testing.T) {
 	tok := signToken(t, jwt.MapClaims{
 		"user_id":          float64(3),

@@ -165,9 +165,76 @@ Same guest-visibility rules as `/categories`.
 
 ---
 
-### GET /stats
+### POST /categories
 
-Get aggregate site statistics.
+Create a new category. Requires authentication, and the caller must be a contributor or above (`contributor`, `author`, `admin`, `super_admin`). The `guest` role and anonymous requests are rejected.
+
+**Request:**
+
+```json
+{
+  "name": "tech",
+  "description": "Technology-related posts"
+}
+```
+
+`name` is required; `description` is optional. Category names must be unique.
+
+**Error Responses:**
+
+- `401`: `{"error": "No authentication information provided"}` (missing/invalid token)
+- `403`: `{"error": "Insufficient permissions to create a category"}` (guest role or insufficient role)
+- `409`: `{"error": "A category with this name already exists", "code": "duplicate_name"}` (duplicate name)
+- `400`: `{"error": "..."}` (missing/invalid `name`)
+
+**Response (201):**
+
+```json
+{
+  "message": "Category created successfully",
+  "category": {
+    "id": 3,
+    "name": "tech",
+    "description": "Technology-related posts"
+  }
+}
+```
+
+---
+
+### POST /tags
+
+Create a new tag. Requires authentication, and the caller must be a contributor or above (`contributor`, `author`, `admin`, `super_admin`). The `guest` role and anonymous requests are rejected.
+
+**Request:**
+
+```json
+{
+  "name": "golang"
+}
+```
+
+`name` is required and uniquely identifies the tag.
+
+**Error Responses:**
+
+- `401`: `{"error": "No authentication information provided"}` (missing/invalid token)
+- `403`: `{"error": "Insufficient permissions to create a tag"}` (guest role or insufficient role)
+- `409`: `{"error": "A tag with this name already exists", "code": "duplicate_name"}` (duplicate name)
+- `400`: `{"error": "..."}` (missing/invalid `name`)
+
+**Response (201):**
+
+```json
+{
+  "message": "Tag created successfully",
+  "tag": { "id": 4, "name": "golang" }
+}
+```
+
+---
+
+### GET /stats
 
 **Response:**
 

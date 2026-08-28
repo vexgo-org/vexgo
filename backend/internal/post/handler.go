@@ -2,6 +2,7 @@ package post
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -136,7 +137,8 @@ func (h *Handler) CreatePost(c *gin.Context) {
 		Status     string   `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -186,7 +188,8 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		Status     string   `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -402,17 +405,28 @@ func (h *Handler) GetCategories(c *gin.Context) {
 // CreateCategory creates a category.
 func (h *Handler) CreateCategory(c *gin.Context) {
 	var req struct {
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
+		Name        string `json:"name" binding:"required,max=100"`
+		Description string `json:"description" binding:"max=500"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
-	category, err := h.svc.CreateCategory(c.Request.Context(), req.Name, req.Description)
+	u, _ := middleware.CurrentUser(c)
+	category, err := h.svc.CreateCategory(c.Request.Context(), u.Role, req.Name, req.Description)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
+		switch {
+		case errors.Is(err, ErrBadRequest):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Category name must not be blank"})
+		case errors.Is(err, ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a category"})
+		case errors.Is(err, ErrDuplicateName):
+			c.JSON(http.StatusConflict, gin.H{"error": "A category with this name already exists", "code": "duplicate_name"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
+		}
 		return
 	}
 
@@ -439,16 +453,27 @@ func (h *Handler) GetTags(c *gin.Context) {
 // CreateTag creates a tag.
 func (h *Handler) CreateTag(c *gin.Context) {
 	var req struct {
-		Name string `json:"name" binding:"required"`
+		Name string `json:"name" binding:"required,max=100"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
-	tag, err := h.svc.CreateTag(c.Request.Context(), req.Name)
+	u, _ := middleware.CurrentUser(c)
+	tag, err := h.svc.CreateTag(c.Request.Context(), u.Role, req.Name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
+		switch {
+		case errors.Is(err, ErrBadRequest):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tag name must not be blank"})
+		case errors.Is(err, ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a tag"})
+		case errors.Is(err, ErrDuplicateName):
+			c.JSON(http.StatusConflict, gin.H{"error": "A tag with this name already exists", "code": "duplicate_name"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
+		}
 		return
 	}
 

@@ -91,6 +91,8 @@ export function WritePostPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   // Determine the user role
   const isContributor = user?.role === "contributor";
@@ -339,6 +341,40 @@ export function WritePostPage() {
     }
   };
 
+  const canCreateCategory = isAuthenticated && !!user && user.role !== "guest";
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      return;
+    }
+    setCreatingCategory(true);
+
+    try {
+      const res = await categoriesApi.createCategory({ name, description: "" });
+      const created = res.data.category;
+      const normalized = { ...created, id: String(created.id) };
+      setCategories((prev) => [...prev, normalized]);
+      setCategory(normalized.name);
+      setNewCategoryName("");
+    } catch (err) {
+      if (isAxiosError<{ error?: string; code?: string }>(err)) {
+        if (err.response?.status === 409) {
+          alert(t("writePostPage.categoryDuplicate"));
+        } else if (err.response?.status === 403) {
+          alert(t("writePostPage.categoryCreateForbidden"));
+        } else if (err.response?.status === 400 && err.response.data?.error) {
+          alert(err.response.data.error);
+        } else {
+          alert(t("writePostPage.categoryCreateError"));
+        }
+      } else {
+        alert(t("writePostPage.categoryCreateError"));
+      }
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Form */}
@@ -444,6 +480,34 @@ export function WritePostPage() {
                 ))}
               </SelectContent>
             </Select>
+            {canCreateCategory && (
+              <div className="mt-2 flex gap-2">
+                <Input
+                  placeholder={t("writePostPage.newCategoryPlaceholder")}
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreateCategory();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCreateCategory}
+                  disabled={creatingCategory}
+                >
+                  {creatingCategory ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
+                  {t("writePostPage.createCategory")}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Tags */}

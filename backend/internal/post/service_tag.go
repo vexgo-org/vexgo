@@ -15,8 +15,18 @@ func (s *Service) Tags(ctx context.Context, userRole string) ([]model.Tag, error
 	return s.repo.FindAllTags(ctx)
 }
 
-// CreateTag creates a tag.
-func (s *Service) CreateTag(ctx context.Context, name string) (*model.Tag, error) {
+// CreateTag creates a tag. The name is trimmed, matching resolveTags, so
+// leading/trailing whitespace cannot create near-duplicates of an existing
+// tag; a blank name after trimming is rejected.
+func (s *Service) CreateTag(ctx context.Context, role, name string) (*model.Tag, error) {
+	if !model.IsContributor(role) {
+		return nil, ErrForbidden
+	}
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, ErrBadRequest
+	}
 	return s.repo.FindOrCreateTag(ctx, name)
 }
 
