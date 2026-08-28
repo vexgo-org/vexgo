@@ -5,7 +5,7 @@ addr: "0.0.0.0"
 port: 3001
 
 # Data directory (for storing SQLite database and uploaded media files)
-data: "./data"
+data_dir: "./data"
 
 # JWT secret key for signing tokens
 # IMPORTANT: Generate a secure random string for production!
