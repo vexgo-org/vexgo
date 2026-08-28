@@ -63,9 +63,11 @@ just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main
   - `config/` and `model/` are leaf packages — import no other backend module.
   - `model` holds GORM models plus cross-domain seams (`Notifier`, `FileRemover` in `model/interfaces.go`); it must not import application logic.
   - `config` is a pure setup module.
+  - `cli/` defines the cobra command line (flags, help, version, `.env` loading) and binds the flags to viper; it imports only `config`.
+  - Config keys live in `keyDefaults` (`internal/config/config.go`) with a matching `mapstructure` tag on `Config`; viper layers flags > config file > environment > defaults, so do not re-introduce per-source parsing.
   - Cross-domain calls go through consumer-declared interfaces where practical: `notification` implements `model.Notifier`, `upload` implements `model.FileRemover`; the consuming domain owns any interface it defines (e.g. auth's `CaptchaChecker`), with the composition root (`internal/app`) wiring concrete implementations.
   - `mailer.Service` is the exception to interface-based injection: it is injected as the concrete type (`*mailer.Service`) into `auth` and `settings`. It is send-only (SMTP side effect plus token-free rendering); account/token persistence lives in domain repositories, not in mailer. For tests, `mailer.SetMailCaptureHook` captures rendered emails instead of dialing SMTP — this package-level hook is the one sanctioned piece of mutable global state; tests must restore it with `t.Cleanup`.
-- Entry point `backend/cmd/vexgo/main.go` is thin (parses flags, calls `app.New(cfg)`); `internal/app` is the composition root that wires everything.
+- Entry point `backend/cmd/vexgo/main.go` is thin (resolves configuration via `cli.Execute`, then calls `app.New(cfg)`); `internal/app` is the composition root that wires everything.
 - The backend serves both the JSON API (`/api/...`) and server-side-rendered public pages (themes managed by `internal/public` and `internal/settings`).
 
 ### TypeScript / React (frontend)

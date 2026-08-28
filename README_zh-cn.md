@@ -534,12 +534,13 @@ go run ./cmd/vexgo
 
 ```text
 backend/
-  cmd/vexgo/main.go  # 入口：解析命令行参数，委托给 app.New()
+  cmd/vexgo/main.go  # 入口：通过 cli 解析配置，委托给 app.New()
   internal/
     app/             # 组合根：装配存储、数据库与所有领域模块
     auth/            # 注册、登录、JWT、个人资料、密码重置
+    cli/             # cobra 命令行：参数、帮助、版本、.env 加载
     comment/         # 评论与 AI 审核
-    config/          # 命令行 / 环境变量 / 配置文件解析，JWT、S3、SSO 初始化（纯配置，不依赖后端模块）
+    config/          # 基于 viper 的分层配置解析（参数 > 文件 > 环境变量 > 默认值），JWT、S3、SSO 初始化（纯配置，不依赖后端模块）
     database/        # 数据库连接、自动迁移、种子数据
     home/            # 站点统计
     mailer/          # SMTP 邮件构建与发送
