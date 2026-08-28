@@ -195,8 +195,18 @@ func Load(v *viper.Viper, configFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 	// []byte cannot be mapstructure-decoded from a string, so the JWT secret
-	// is read explicitly after the unmarshal.
-	cfg.JWTSecret = []byte(v.GetString("jwt_secret"))
+	// is read explicitly after the unmarshal. A value that is present but not
+	// a string (e.g. a nested map from a YAML type mistake) would silently
+	// degrade to "" and rotate the secret on every restart, so it is rejected
+	// outright. Absent, null, and empty values keep the documented random
+	// fallback in ComputeJWTSecret.
+	if secret := v.Get("jwt_secret"); secret != nil {
+		s, ok := secret.(string)
+		if !ok {
+			return nil, fmt.Errorf("jwt_secret: expected a string, got %T", secret)
+		}
+		cfg.JWTSecret = []byte(s)
+	}
 	// The comma-split decode hook does not trim whitespace around list items;
 	// keep "1.2.3.4, 5.6.7.8" usable.
 	for i, p := range cfg.TrustedProxies {

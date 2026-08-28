@@ -247,6 +247,48 @@ func TestJWTSecretFromEnv(t *testing.T) {
 	}
 }
 
+// A jwt_secret value that is present but not a string (a YAML type mistake)
+// must fail the load instead of silently degrading to "", which would rotate
+// the secret on every restart.
+func TestJWTSecretNonStringIsAnError(t *testing.T) {
+	for name, content := range map[string]string{
+		"nested map": "jwt_secret:\n  nested: map\n",
+		"number":     "jwt_secret: 12345\n",
+		"list":       "jwt_secret: [abc]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Load(viper.New(), writeConfig(t, content))
+			if err == nil {
+				t.Fatal("non-string jwt_secret should be an error")
+			}
+			if !strings.Contains(err.Error(), "jwt_secret") {
+				t.Fatalf("error should name the offending key, got %v", err)
+			}
+		})
+	}
+}
+
+func TestJWTSecretAbsentAndEmptyKeepFallback(t *testing.T) {
+	for name, content := range map[string]string{
+		"key absent":     "",
+		"null value":     "jwt_secret:\n",
+		"explicit empty": "jwt_secret: \"\"\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := Load(viper.New(), writeConfig(t, content))
+			if err != nil {
+				t.Fatalf("jwt_secret %q should not error, got %v", content, err)
+			}
+			if err := cfg.ComputeJWTSecret(); err != nil {
+				t.Fatal(err)
+			}
+			if len(cfg.JWTSecret) == 0 {
+				t.Fatal("fallback should generate a non-empty secret")
+			}
+		})
+	}
+}
+
 func TestComputeJWTSecretGeneratesFallback(t *testing.T) {
 	cfg := &Config{}
 	if err := cfg.ComputeJWTSecret(); err != nil {
