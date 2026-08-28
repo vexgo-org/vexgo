@@ -39,9 +39,9 @@ type App struct {
 func New(cfg *config.Config) (*App, error) {
 	setupLogging(cfg.LogLevel)
 
-	cfg.ComputeJWTSecret()
-	cfg.LoadSSOFromEnv()
-	cfg.LoadSSOFromConfig()
+	if err := cfg.ComputeJWTSecret(); err != nil {
+		return nil, fmt.Errorf("compute JWT secret: %w", err)
+	}
 
 	storage, err := initStorage(cfg)
 	if err != nil {

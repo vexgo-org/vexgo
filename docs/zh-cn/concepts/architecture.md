@@ -17,12 +17,13 @@ VexGo 是一个自托管的博客 CMS，由两部分组成：
 
 ```text
 backend/
-  cmd/vexgo/main.go         # 入口：解析参数，委托给 app 包处理
+  cmd/vexgo/main.go         # 入口：通过 cli 解析配置，委托给 app 包处理
   internal/
     app/                     # 组合根：组装所有依赖
     auth/                    # 注册、登录、JWT、个人资料、密码重置
+    cli/                     # cobra 命令行：参数、帮助、版本、.env 加载
     comment/                 # 评论和 AI 内容审核
-    config/                  # 参数 / 环境变量 / 配置文件解析，JWT、S3、SSO 初始化
+    config/                  # 基于 viper 的分层配置解析，JWT、S3、SSO 初始化
     database/                # 连接、自动迁移、种子数据
     home/                    # 站点统计
     mailer/                  # SMTP 邮件构建与发送
@@ -101,13 +102,13 @@ type Mailer interface {
 
 `internal/app/app.go` 包是组合根（也称"装配层"）。它：
 
-1. 通过 `config.ParseFlags()` 解析参数和加载配置。
-2. 计算运行时密钥（JWT、SSO）。
+1. 接收 `cli.Execute()` 解析完成的配置——cobra 负责命令行参数，viper 负责按「参数 > 配置文件 > 环境变量 > 默认值」分层。
+2. 确保 JWT 密钥存在（开发环境生成随机兜底值）并应用前端地址默认值；SSO 结构体在配置解析阶段派生。
 3. 打开数据库并运行迁移/种子数据。
 4. 创建存储（本地或 S3）。
 5. 实例化每个领域的依赖并将它们装配到路由器中。
 
-`cmd/vexgo/main.go` 是一个轻量入口，调用 `app.New(cfg)` 和 `app.Run()`。
+`cmd/vexgo/main.go` 是一个轻量入口，调用 `cli.Execute()`，然后调用 `app.New(cfg)` 和 `app.Run()`。
 
 ### 依赖规则
 
@@ -115,15 +116,17 @@ type Mailer interface {
 
 ```text
 cmd/vexgo/main.go
+    ├─→ internal/cli          ← cobra 命令树，将参数绑定到 viper
+    │       └─→ config        ← 分层解析（参数 > 文件 > 环境变量 > 默认值）
     └─→ internal/app          ← 组合根，导入所有包
-            ├─→ config         ← 参数/环境变量/文件解析（不导入领域包）
+            ├─→ config         ← 解析完成的 Config 类型（不导入领域包）
             ├─→ database       ← Open/AutoMigrate/Seed（导入 config、model）
             ├─→ router         ← 路由注册（导入所有领域 handler）
             └─→ internal/*     ← 各领域包
 
 叶子包（无内部导入）：
     model/         ← 数据模型 + 共享接口，被所有领域包导入
-    config/        ← 配置解析，被 app、auth、database、sso、upload 导入
+    config/        ← 配置解析，被 cli、app、auth、database、sso、upload 导入
 
 共享层：
     middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）
@@ -145,6 +148,8 @@ cmd/vexgo/main.go
 命令行参数  →  配置文件（YAML）  →  环境变量  →  默认值
   （最高优先级）                              （最低优先级）
 ```
+
+命令行使用 **cobra** 定义（`internal/cli`），各来源由 **viper** 分层（`internal/config`）。分层顺序的一个直接结果：配置文件中的显式 `false` 会覆盖环境变量中的 `true`——环境变量只填充配置文件未设置的键。
 
 `config.Config` 结构体保存所有运行时值。**不存在全局变量**——JWT 密钥、SSO 配置和前端 URL 是 `Config` 的字段，而非包级别变量。
 

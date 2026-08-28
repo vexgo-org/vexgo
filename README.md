@@ -534,12 +534,13 @@ The backend follows a domain-oriented layout under `backend/internal` with a com
 
 ```text
 backend/
-  cmd/vexgo/main.go  # entry point: parses flags, delegates to app.New()
+  cmd/vexgo/main.go  # entry point: resolves config via cli, delegates to app.New()
   internal/
     app/             # composition root: wires storage, DB, and every domain
     auth/            # registration, login, JWT, profile, password reset
+    cli/             # cobra command line: flags, help, version, .env loading
     comment/         # comments and AI-powered moderation
-    config/          # flag / env / config-file parsing, JWT, S3, SSO setup (pure setup, no backend imports)
+    config/          # layered config resolution via viper (flags > file > env > defaults), JWT, S3, SSO setup (pure setup, no backend imports)
     database/        # connection, auto-migration, seeding
     home/            # site statistics
     mailer/          # SMTP mail building and sending

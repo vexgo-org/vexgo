@@ -1,9 +1,6 @@
-// backend/config/sso.go
 package config
 
 import (
-	"os"
-	"strconv"
 	"strings"
 )
 
@@ -63,118 +60,38 @@ type SSOConfig struct {
 	AllowLocalLogin bool // ALLOW_LOCAL_LOGIN (default: true)
 }
 
-// LoadSSOFromEnv populates cfg.SSO from environment variables.
-// This is the baseline; config file values override via LoadFromConfig.
-func (cfg *Config) LoadSSOFromEnv() {
+// buildSSO derives cfg.SSO from the already-resolved flat fields. Layering
+// and defaults are handled by viper: the claim names and scope list carry
+// their defaults from the keyDefaults table by the time this runs.
+func (cfg *Config) buildSSO() {
 	cfg.SSO = SSOConfig{
 		GitHub: SSOProviderConfig{
-			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
-			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+			ClientID:     cfg.GitHubClientID,
+			ClientSecret: cfg.GitHubClientSecret,
 		},
 		Google: SSOProviderConfig{
-			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
 		},
 		OIDC: OIDCConfig{
-			Enabled:   parseBool("OIDC_ENABLED", false),
-			IssuerURL: os.Getenv("OIDC_ISSUER_URL"),
+			Enabled:   cfg.OIDCEnabled,
+			IssuerURL: cfg.OIDCIssuerURL,
 			SSOProviderConfig: SSOProviderConfig{
-				ClientID:     os.Getenv("OIDC_CLIENT_ID"),
-				ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
+				ClientID:     cfg.OIDCClientID,
+				ClientSecret: cfg.OIDCClientSecret,
 			},
-			AuthURL:       os.Getenv("OIDC_AUTH_URL"),
-			TokenURL:      os.Getenv("OIDC_TOKEN_URL"),
-			UserInfoURL:   os.Getenv("OIDC_USERINFO_URL"),
-			Scopes:        parseScopes("OIDC_SCOPES", []string{"openid", "profile", "email"}),
-			EmailClaim:    envDefault("OIDC_EMAIL_CLAIM", "email"),
-			NameClaim:     envDefault("OIDC_NAME_CLAIM", "name"),
-			GroupClaim:    envDefault("OIDC_GROUP_CLAIM", "groups"),
-			AllowedGroups: parseCommaSeparated("OIDC_ALLOWED_GROUPS"),
-			AutoRedirect:  parseBool("OIDC_AUTO_REDIRECT", false),
-			VerifyEmail:   parseBool("OIDC_VERIFY_EMAIL", false),
+			AuthURL:       cfg.OIDCAuthURL,
+			TokenURL:      cfg.OIDCTokenURL,
+			UserInfoURL:   cfg.OIDCUserInfoURL,
+			Scopes:        strings.Fields(cfg.OIDCScopes),
+			EmailClaim:    cfg.OIDCEmailClaim,
+			NameClaim:     cfg.OIDCNameClaim,
+			GroupClaim:    cfg.OIDCGroupClaim,
+			AllowedGroups: parseCommaSeparatedFromString(cfg.OIDCAllowedGroups),
+			AutoRedirect:  cfg.OIDCAutoRedirect,
+			VerifyEmail:   cfg.OIDCVerifyEmail,
 		},
-		AllowLocalLogin: parseBool("ALLOW_LOCAL_LOGIN", true),
-	}
-}
-
-// LoadSSOFromConfig applies config file values over the env-loaded SSO.
-// Only fields explicitly set in the config file are applied.
-func (cfg *Config) LoadSSOFromConfig() {
-	// GitHub OAuth
-	if cfg.fileSet["github_client_id"] || cfg.GitHubClientID != "" {
-		cfg.SSO.GitHub.ClientID = cfg.GitHubClientID
-	}
-	if cfg.fileSet["github_client_secret"] || cfg.GitHubClientSecret != "" {
-		cfg.SSO.GitHub.ClientSecret = cfg.GitHubClientSecret
-	}
-
-	// Google OAuth
-	if cfg.fileSet["google_client_id"] || cfg.GoogleClientID != "" {
-		cfg.SSO.Google.ClientID = cfg.GoogleClientID
-	}
-	if cfg.fileSet["google_client_secret"] || cfg.GoogleClientSecret != "" {
-		cfg.SSO.Google.ClientSecret = cfg.GoogleClientSecret
-	}
-
-	// OIDC Enabled
-	if cfg.fileSet["oidc_enabled"] {
-		cfg.SSO.OIDC.Enabled = cfg.OIDCEnabled
-	}
-
-	// OIDC Client credentials
-	if cfg.OIDCClientID != "" {
-		cfg.SSO.OIDC.ClientID = cfg.OIDCClientID
-	}
-	if cfg.OIDCClientSecret != "" {
-		cfg.SSO.OIDC.ClientSecret = cfg.OIDCClientSecret
-	}
-
-	// OIDC endpoints
-	if cfg.OIDCIssuerURL != "" {
-		cfg.SSO.OIDC.IssuerURL = cfg.OIDCIssuerURL
-	}
-	if cfg.OIDCAuthURL != "" {
-		cfg.SSO.OIDC.AuthURL = cfg.OIDCAuthURL
-	}
-	if cfg.OIDCTokenURL != "" {
-		cfg.SSO.OIDC.TokenURL = cfg.OIDCTokenURL
-	}
-	if cfg.OIDCUserInfoURL != "" {
-		cfg.SSO.OIDC.UserInfoURL = cfg.OIDCUserInfoURL
-	}
-
-	// OIDC Scopes
-	if cfg.OIDCScopes != "" {
-		cfg.SSO.OIDC.Scopes = strings.Fields(cfg.OIDCScopes)
-	}
-
-	// OIDC Claim names
-	if cfg.OIDCEmailClaim != "" {
-		cfg.SSO.OIDC.EmailClaim = cfg.OIDCEmailClaim
-	}
-	if cfg.OIDCNameClaim != "" {
-		cfg.SSO.OIDC.NameClaim = cfg.OIDCNameClaim
-	}
-	if cfg.OIDCGroupClaim != "" {
-		cfg.SSO.OIDC.GroupClaim = cfg.OIDCGroupClaim
-	}
-
-	// OIDC Allowed groups
-	if cfg.OIDCAllowedGroups != "" {
-		cfg.SSO.OIDC.AllowedGroups = parseCommaSeparatedFromString(cfg.OIDCAllowedGroups)
-	}
-
-	// OIDC UX options
-	if cfg.fileSet["oidc_auto_redirect"] {
-		cfg.SSO.OIDC.AutoRedirect = cfg.OIDCAutoRedirect
-	}
-	if cfg.fileSet["oidc_verify_email"] {
-		cfg.SSO.OIDC.VerifyEmail = cfg.OIDCVerifyEmail
-	}
-
-	// Global options
-	if cfg.fileSet["allow_local_login"] {
-		cfg.SSO.AllowLocalLogin = cfg.AllowLocalLogin
+		AllowLocalLogin: cfg.AllowLocalLogin,
 	}
 }
 
@@ -188,57 +105,6 @@ func parseCommaSeparatedFromString(s string) []string {
 	for _, p := range parts {
 		if trimmed := strings.TrimSpace(p); trimmed != "" {
 			result = append(result, trimmed)
-		}
-	}
-	return result
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-func envDefault(key, defaultVal string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return defaultVal
-}
-
-// parseBool parses a boolean environment variable, falling back to defaultVal
-// when the variable is unset or not a valid boolean.
-func parseBool(key string, defaultVal bool) bool {
-	v := os.Getenv(key)
-	if v == "" {
-		return defaultVal
-	}
-	b, err := strconv.ParseBool(v)
-	if err != nil {
-		return defaultVal
-	}
-	return b
-}
-
-// parseScopes parses a space-separated scope string.
-// Falls back to defaultScopes when the env var is unset.
-func parseScopes(key string, defaultScopes []string) []string {
-	v := os.Getenv(key)
-	if v == "" {
-		return defaultScopes
-	}
-	return strings.Fields(v)
-}
-
-// parseCommaSeparated parses a comma-separated list, trimming whitespace.
-// Returns nil (not an empty slice) when the env var is unset, so callers
-// can use `len(AllowedGroups) == 0` to mean "allow all".
-func parseCommaSeparated(key string) []string {
-	v := os.Getenv(key)
-	if v == "" {
-		return nil
-	}
-	parts := strings.Split(v, ",")
-	result := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if s := strings.TrimSpace(p); s != "" {
-			result = append(result, s)
 		}
 	}
 	return result
