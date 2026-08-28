@@ -165,6 +165,71 @@
 
 ---
 
+### POST /categories
+
+创建新分类。需要登录，且调用者必须是贡献者及以上角色（`contributor`、`author`、`admin`、`super_admin`）。`guest` 角色与未登录请求将被拒绝。
+
+**请求：**
+
+```json
+{
+  "name": "tech",
+  "description": "技术相关文章"
+}
+```
+
+`name` 为必填；`description` 为选填。分类名称必须唯一。
+
+**错误响应：**
+
+- `401`：`{"error": "No authentication information provided"}`（缺少或无效的令牌）
+- `403`：`{"error": "Insufficient permissions to create a category"}`（角色为 guest 或权限不足）
+- `409`：`{"error": "A category with this name already exists", "code": "duplicate_name"}`（名称重复）
+- `400`：`{"error": "..."}`（`name` 缺失或无效）
+
+**响应（201）：**
+
+```json
+{
+  "message": "Category created successfully",
+  "category": { "id": 3, "name": "tech", "description": "技术相关文章" }
+}
+```
+
+---
+
+### POST /tags
+
+创建新标签。需要登录，且调用者必须是贡献者及以上角色（`contributor`、`author`、`admin`、`super_admin`）。`guest` 角色与未登录请求将被拒绝。
+
+**请求：**
+
+```json
+{
+  "name": "golang"
+}
+```
+
+`name` 为必填，且唯一标识一个标签。
+
+**错误响应：**
+
+- `401`：`{"error": "No authentication information provided"}`（缺少或无效的令牌）
+- `403`：`{"error": "Insufficient permissions to create a tag"}`（角色为 guest 或权限不足）
+- `409`：`{"error": "A tag with this name already exists", "code": "duplicate_name"}`（名称重复）
+- `400`：`{"error": "..."}`（`name` 缺失或无效）
+
+**响应（201）：**
+
+```json
+{
+  "message": "Tag created successfully",
+  "tag": { "id": 4, "name": "golang" }
+}
+```
+
+---
+
 ### GET /stats
 
 获取站点聚合统计。
