@@ -266,6 +266,31 @@ func TestCreateCategory_BlankNameBadRequest(t *testing.T) {
 	}
 }
 
+// TestCreateCategory_BindingErrorDoesNotLeakDetails verifies that a malformed
+// request body surfaces the generic 400 message; the raw validator error
+// (field names, binding rules) is logged server-side, not echoed to clients.
+func TestCreateCategory_BindingErrorDoesNotLeakDetails(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, model.RoleContributor)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/categories", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("empty body: expected 400, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Invalid request payload") {
+		t.Errorf("expected generic error message, got %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "required") {
+		t.Errorf("binding error details must not be echoed to clients, got %s", w.Body.String())
+	}
+}
+
 // TestCreateCategory_LengthLimits verifies the handler-side caps that mirror
 // the model constraints (name size:100): 100 characters is accepted, 101 is
 // rejected with 400, and a description over 500 characters is rejected with

@@ -2,6 +2,7 @@ package post
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -136,7 +137,8 @@ func (h *Handler) CreatePost(c *gin.Context) {
 		Status     string   `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -186,7 +188,8 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		Status     string   `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -406,7 +409,8 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 		Description string `json:"description" binding:"max=500"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -455,7 +459,8 @@ func (h *Handler) CreateTag(c *gin.Context) {
 		Name string `json:"name" binding:"required,max=100"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 

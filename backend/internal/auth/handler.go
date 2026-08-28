@@ -94,7 +94,8 @@ func (h *Handler) Login(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("failed to bind login request JSON", "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -163,7 +164,8 @@ func (h *Handler) Register(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Error("failed to bind registration request JSON", "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -260,7 +262,8 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -292,7 +295,8 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -326,7 +330,8 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -364,7 +369,8 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -415,7 +421,8 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -446,7 +453,8 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 		Email string `json:"email" binding:"required,email"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
@@ -469,7 +477,8 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
