@@ -345,7 +345,7 @@ func (r *gormRepository) DeleteLikesByPostID(ctx context.Context, postID uint) e
 func (r *gormRepository) FindOrCreateTag(ctx context.Context, name string) (*model.Tag, error) {
 	var tag model.Tag
 	if err := r.db.WithContext(ctx).Where("name = ?", name).First(&tag).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			tag = model.Tag{Name: name}
 			if err := r.db.WithContext(ctx).Create(&tag).Error; err != nil {
 				// A concurrent request can create the tag between the lookup
