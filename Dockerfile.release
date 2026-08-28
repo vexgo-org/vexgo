@@ -1,0 +1,17 @@
+FROM alpine:latest
+
+ARG TARGETARCH
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY backend/vexgo-linux-${TARGETARCH} /app/vexgo
+
+EXPOSE 3001
+
+ENV ADDR=0.0.0.0
+ENV PORT=3001
+ENV DATA_DIR=/app/data
+
+CMD ["./vexgo"]
