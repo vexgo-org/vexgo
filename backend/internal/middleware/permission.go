@@ -23,7 +23,14 @@ func (a *Auth) Permission(requiredRoles ...string) gin.HandlerFunc {
 			return
 		}
 
-		userID := userIDInterface.(uint)
+		// The context value is written by JWTAuth as a uint; a value of any
+		// other type means internal state was set up incorrectly, so fail
+		// closed instead of panicking on a bare assertion.
+		userID, ok := userIDInterface.(uint)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "No user information provided"})
+			return
+		}
 
 		// Prefer the role already resolved by JWTAuth (fresh per request),
 		// falling back to a DB lookup when the context only carries the ID.
