@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -285,5 +286,73 @@ func TestInterspersedPositional(t *testing.T) {
 	}
 	if cfg.Port != 7000 {
 		t.Fatalf("flags after a positional argument should still apply, got %d", cfg.Port)
+	}
+}
+
+// =============================================================================
+// loadDotEnv — missing file logs info, other failures log a warning.
+// =============================================================================
+
+// captureLogs redirects the default slog logger into a buffer for the
+// duration of the test.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
+func TestLoadDotEnvMissingFileLogsInfo(t *testing.T) {
+	t.Chdir(t.TempDir())
+	buf := captureLogs(t)
+
+	loadDotEnv()
+
+	out := buf.String()
+	if !strings.Contains(out, "INFO") || !strings.Contains(out, "no .env file found") {
+		t.Fatalf("missing .env should log info, got %q", out)
+	}
+}
+
+func TestLoadDotEnvUnreadableLogsWarning(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	// A directory named .env opens fine but fails on read (EISDIR), which
+	// exercises the non-not-exist branch regardless of the user the tests
+	// run as (a chmod 000 file would be readable under root).
+	if err := os.Mkdir(filepath.Join(dir, ".env"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	buf := captureLogs(t)
+
+	loadDotEnv()
+
+	out := buf.String()
+	if !strings.Contains(out, "WARN") || !strings.Contains(out, "failed to load .env") {
+		t.Fatalf("unreadable .env should log a warning with the error, got %q", out)
+	}
+	if !strings.Contains(out, "err=") {
+		t.Fatalf("warning should carry the underlying error, got %q", out)
+	}
+}
+
+func TestLoadDotEnvValidFileSetsVariablesQuietly(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("VEXGO_DOTENV_TEST_VAR=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Unsetenv("VEXGO_DOTENV_TEST_VAR") })
+	buf := captureLogs(t)
+
+	loadDotEnv()
+
+	if os.Getenv("VEXGO_DOTENV_TEST_VAR") != "1" {
+		t.Fatal(".env variables should be set")
+	}
+	if buf.String() != "" {
+		t.Fatalf("valid .env should not log anything, got %q", buf.String())
 	}
 }

@@ -5,7 +5,9 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 
 	"github.com/joho/godotenv"
@@ -99,8 +101,17 @@ func resolveConfig(cmd *cobra.Command, configFile string) (*config.Config, error
 
 // loadDotEnv loads environment variables from a .env file (best-effort).
 // godotenv never overrides variables already present in the environment.
+// A missing file is the normal case; any other failure (permissions,
+// malformed content) is logged as a warning with the underlying error
+// instead of being silently swallowed.
 func loadDotEnv() {
-	if err := godotenv.Load(".env"); err != nil {
-		slog.Info("no .env file found, will use environment variables from the system")
+	err := godotenv.Load(".env")
+	if err == nil {
+		return
 	}
+	if errors.Is(err, fs.ErrNotExist) {
+		slog.Info("no .env file found, will use environment variables from the system")
+		return
+	}
+	slog.Warn("failed to load .env file, will use environment variables from the system", "err", err)
 }
