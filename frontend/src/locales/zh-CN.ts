@@ -880,6 +880,11 @@ export const zhCN = {
     slugRequired: "请输入 URL 别名",
     slugTaken: "该别名已被其他文章使用，请选择其他别名。",
     generateSlug: "从标题生成",
+    createCategory: "新建分类",
+    newCategoryPlaceholder: "新分类名称",
+    categoryCreateError: "创建分类失败",
+    categoryDuplicate: "该分类名称已存在",
+    categoryCreateForbidden: "你没有创建分类的权限",
   },
 
   // 通知中心页面

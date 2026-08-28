@@ -917,6 +917,11 @@ export const enUS = {
     slugTaken:
       "This slug is already taken by another post. Please choose a different one.",
     generateSlug: "Generate from title",
+    createCategory: "Create Category",
+    newCategoryPlaceholder: "New category name",
+    categoryCreateError: "Failed to create category",
+    categoryDuplicate: "A category with this name already exists",
+    categoryCreateForbidden: "You do not have permission to create categories",
   },
 
   // Notification Center Page
