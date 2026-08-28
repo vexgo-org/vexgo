@@ -2,6 +2,7 @@ package post
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -198,6 +199,69 @@ func TestCreateCategory_DuplicateNameMapping(t *testing.T) {
 	}
 	if dup.Code < 400 || dup.Code >= 500 {
 		t.Errorf("duplicate category name: expected 4xx, got %d (body=%s)", dup.Code, dup.Body.String())
+	}
+}
+
+// TestCreateCategory_BlankNameRejected verifies that blank category names are
+// rejected with ErrBadRequest and that surrounding whitespace is trimmed
+// before the name is stored, so " tech " and "tech" cannot coexist.
+func TestCreateCategory_BlankNameRejected(t *testing.T) {
+	svc, _, _, _ := newTestService(t)
+	ctx := context.Background()
+
+	for _, name := range []string{"", "   ", "\t\n"} {
+		if _, err := svc.CreateCategory(ctx, model.RoleContributor, name, ""); !errors.Is(err, ErrBadRequest) {
+			t.Errorf("blank category name %q: expected ErrBadRequest, got %v", name, err)
+		}
+	}
+
+	cat, err := svc.CreateCategory(ctx, model.RoleContributor, "  tech  ", "")
+	if err != nil {
+		t.Fatalf("trimmed name should be accepted, got error: %v", err)
+	}
+	if cat.Name != "tech" {
+		t.Errorf("category name should be stored trimmed, got %q", cat.Name)
+	}
+}
+
+// TestCreateTag_BlankNameRejected mirrors TestCreateCategory_BlankNameRejected
+// for tags: blank names are rejected and whitespace is trimmed, matching the
+// normalization resolveTags already applies when saving posts.
+func TestCreateTag_BlankNameRejected(t *testing.T) {
+	svc, _, _, _ := newTestService(t)
+	ctx := context.Background()
+
+	for _, name := range []string{"", "   ", "\t\n"} {
+		if _, err := svc.CreateTag(ctx, model.RoleContributor, name); !errors.Is(err, ErrBadRequest) {
+			t.Errorf("blank tag name %q: expected ErrBadRequest, got %v", name, err)
+		}
+	}
+
+	tag, err := svc.CreateTag(ctx, model.RoleContributor, "  golang  ")
+	if err != nil {
+		t.Fatalf("trimmed name should be accepted, got error: %v", err)
+	}
+	if tag.Name != "golang" {
+		t.Errorf("tag name should be stored trimmed, got %q", tag.Name)
+	}
+}
+
+// TestCreateCategory_BlankNameBadRequest verifies the HTTP mapping: a
+// whitespace-only name passes the binding:required check (it is non-empty) but
+// must surface as 400 via the service-level ErrBadRequest, not 500.
+func TestCreateCategory_BlankNameBadRequest(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, model.RoleContributor)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/categories", strings.NewReader(`{"name":"   "}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("whitespace-only category name: expected 400, got %d (body=%s)", w.Code, w.Body.String())
 	}
 }
 

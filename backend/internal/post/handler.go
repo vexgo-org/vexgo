@@ -413,6 +413,10 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	category, err := h.svc.CreateCategory(c.Request.Context(), u.Role, req.Name, req.Description)
 	if err != nil {
+		if errors.Is(err, ErrBadRequest) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Category name must not be blank"})
+			return
+		}
 		if errors.Is(err, ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a category"})
 			return
@@ -458,6 +462,10 @@ func (h *Handler) CreateTag(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	tag, err := h.svc.CreateTag(c.Request.Context(), u.Role, req.Name)
 	if err != nil {
+		if errors.Is(err, ErrBadRequest) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Tag name must not be blank"})
+			return
+		}
 		if errors.Is(err, ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a tag"})
 			return
