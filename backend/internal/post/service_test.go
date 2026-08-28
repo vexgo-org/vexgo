@@ -33,7 +33,9 @@ func (f *fakeRemover) Delete(url string) error {
 
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// TranslateError mirrors the production gorm.Config (internal/database),
+	// so unique-index violations surface as gorm.ErrDuplicatedKey.
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}

@@ -348,6 +348,15 @@ func (r *gormRepository) FindOrCreateTag(ctx context.Context, name string) (*mod
 		if err == gorm.ErrRecordNotFound {
 			tag = model.Tag{Name: name}
 			if err := r.db.WithContext(ctx).Create(&tag).Error; err != nil {
+				// A concurrent request can create the tag between the lookup
+				// and the insert; the unique index then rejects our create.
+				// Recover by returning the winner instead of failing.
+				if errors.Is(err, gorm.ErrDuplicatedKey) {
+					if retryErr := r.db.WithContext(ctx).Where("name = ?", name).First(&tag).Error; retryErr != nil {
+						return nil, retryErr
+					}
+					return &tag, nil
+				}
 				return nil, err
 			}
 			return &tag, nil
@@ -382,15 +391,19 @@ func (r *gormRepository) FindAllCategories(ctx context.Context) ([]model.Categor
 }
 
 func (r *gormRepository) CreateCategory(ctx context.Context, category *model.Category) error {
-	// Fail closed on a duplicate name rather than surfacing a raw unique-index
-	// violation; the handler maps ErrDuplicateName to a clear 409.
-	var existing model.Category
-	if err := r.db.WithContext(ctx).Where("name = ?", category.Name).First(&existing).Error; err == nil {
-		return ErrDuplicateName
-	} else if err != gorm.ErrRecordNotFound {
+	// The unique index on name is the source of truth for duplicates: insert
+	// directly and translate the constraint violation (GORM maps driver
+	// errors to gorm.ErrDuplicatedKey when opened with TranslateError) into
+	// ErrDuplicateName, which the handler renders as a 409. A select-then-
+	// insert pre-check would race: two concurrent creates could both pass the
+	// check and the loser would surface as an unmapped 500.
+	if err := r.db.WithContext(ctx).Create(category).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrDuplicateName
+		}
 		return err
 	}
-	return r.db.WithContext(ctx).Create(category).Error
+	return nil
 }
 
 func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User, error) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
 	}
@@ -375,6 +376,53 @@ func TestCreateTag_ServiceRoleCheck(t *testing.T) {
 	}
 }
 
+// TestFindOrCreateTag_UniqueIndexRaceRecovery simulates the concurrent-create
+// race deterministically: a before-create GORM callback plants the conflicting
+// tag between FindOrCreateTag's lookup and its insert, forcing the create to
+// hit the unique index. The plant runs on a separate session so it survives
+// the outer create's transaction rollback, mirroring a genuinely concurrent
+// insert on another connection (hence the file-backed database, since :memory:
+// is per-connection). FindOrCreateTag must recover by returning the existing
+// row instead of an error.
+func TestFindOrCreateTag_UniqueIndexRaceRecovery(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "tags.db")), &gorm.Config{TranslateError: true})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(2)
+	if err := db.AutoMigrate(&model.Tag{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	svc := NewService(Deps{DB: db, Notifier: &fakeNotifier{}, Files: &fakeRemover{}})
+
+	db.Callback().Create().Before("gorm:create").Register("plant_conflicting_tag", func(tx *gorm.DB) {
+		if tag, ok := tx.Statement.Dest.(*model.Tag); ok && tag.Name == "golang" {
+			plant := db.Session(&gorm.Session{SkipDefaultTransaction: true})
+			if err := plant.Exec(`INSERT INTO tags (name) VALUES (?)`, tag.Name).Error; err != nil {
+				t.Errorf("plant conflicting tag: %v", err)
+			}
+		}
+	})
+
+	tag, err := svc.CreateTag(context.Background(), model.RoleContributor, "golang")
+	if err != nil {
+		t.Fatalf("FindOrCreateTag should recover from a concurrent create, got error: %v", err)
+	}
+	if tag.Name != "golang" {
+		t.Errorf("recovered tag should be the existing row, got %q", tag.Name)
+	}
+
+	var count int64
+	db.Model(&model.Tag{}).Count(&count)
+	if count != 1 {
+		t.Errorf("expected exactly 1 tag row after race, got %d", count)
+	}
+}
+
 // TestCreateCategory_HandlerFailClosedNoMiddleware verifies AC2 at the HTTP
 // layer when the Permission middleware is NOT present: the handler must still
 // map a non-contributor service rejection to 403. This is currently RED because
@@ -383,7 +431,7 @@ func TestCreateTag_ServiceRoleCheck(t *testing.T) {
 // 403.
 func TestCreateCategory_HandlerFailClosedNoMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
 	}
