@@ -382,6 +382,14 @@ func (r *gormRepository) FindAllCategories(ctx context.Context) ([]model.Categor
 }
 
 func (r *gormRepository) CreateCategory(ctx context.Context, category *model.Category) error {
+	// Fail closed on a duplicate name rather than surfacing a raw unique-index
+	// violation; the handler maps ErrDuplicateName to a clear 409.
+	var existing model.Category
+	if err := r.db.WithContext(ctx).Where("name = ?", category.Name).First(&existing).Error; err == nil {
+		return ErrDuplicateName
+	} else if err != gorm.ErrRecordNotFound {
+		return err
+	}
 	return r.db.WithContext(ctx).Create(category).Error
 }
 

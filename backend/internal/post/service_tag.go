@@ -16,7 +16,10 @@ func (s *Service) Tags(ctx context.Context, userRole string) ([]model.Tag, error
 }
 
 // CreateTag creates a tag.
-func (s *Service) CreateTag(ctx context.Context, name string) (*model.Tag, error) {
+func (s *Service) CreateTag(ctx context.Context, role, name string) (*model.Tag, error) {
+	if !model.IsContributor(role) {
+		return nil, ErrForbidden
+	}
 	return s.repo.FindOrCreateTag(ctx, name)
 }
 

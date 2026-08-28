@@ -29,8 +29,14 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.PUT("/posts/:id", h.mw.JWTAuth(), h.UpdatePost)
 	api.DELETE("/posts/:id", h.mw.JWTAuth(), h.DeletePost)
 
-	api.POST("/categories", h.mw.JWTAuth(), h.CreateCategory)
-	api.POST("/tags", h.mw.JWTAuth(), h.CreateTag)
+	noGuest := h.mw.Permission(
+		model.RoleContributor,
+		model.RoleAuthor,
+		model.RoleAdmin,
+		model.RoleSuperAdmin,
+	)
+	api.POST("/categories", h.mw.JWTAuth(), noGuest, h.CreateCategory)
+	api.POST("/tags", h.mw.JWTAuth(), noGuest, h.CreateTag)
 
 	api.POST("/likes/:postId", h.mw.JWTAuth(), h.ToggleLike)
 

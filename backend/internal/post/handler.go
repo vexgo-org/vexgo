@@ -410,8 +410,17 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	category, err := h.svc.CreateCategory(c.Request.Context(), req.Name, req.Description)
+	u, _ := middleware.CurrentUser(c)
+	category, err := h.svc.CreateCategory(c.Request.Context(), u.Role, req.Name, req.Description)
 	if err != nil {
+		if errors.Is(err, ErrForbidden) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a category"})
+			return
+		}
+		if errors.Is(err, ErrDuplicateName) {
+			c.JSON(http.StatusConflict, gin.H{"error": "A category with this name already exists", "code": "duplicate_name"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
 		return
 	}
@@ -446,8 +455,17 @@ func (h *Handler) CreateTag(c *gin.Context) {
 		return
 	}
 
-	tag, err := h.svc.CreateTag(c.Request.Context(), req.Name)
+	u, _ := middleware.CurrentUser(c)
+	tag, err := h.svc.CreateTag(c.Request.Context(), u.Role, req.Name)
 	if err != nil {
+		if errors.Is(err, ErrForbidden) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a tag"})
+			return
+		}
+		if errors.Is(err, ErrDuplicateName) {
+			c.JSON(http.StatusConflict, gin.H{"error": "A tag with this name already exists", "code": "duplicate_name"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		return
 	}

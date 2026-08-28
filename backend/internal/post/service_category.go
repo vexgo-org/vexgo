@@ -15,7 +15,11 @@ func (s *Service) Categories(ctx context.Context, userRole string) ([]model.Cate
 }
 
 // CreateCategory creates a category.
-func (s *Service) CreateCategory(ctx context.Context, name, description string) (*model.Category, error) {
+func (s *Service) CreateCategory(ctx context.Context, role, name, description string) (*model.Category, error) {
+	if !model.IsContributor(role) {
+		return nil, ErrForbidden
+	}
+
 	category := &model.Category{Name: name, Description: description}
 	if err := s.repo.CreateCategory(ctx, category); err != nil {
 		return nil, err
