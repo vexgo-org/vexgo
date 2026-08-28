@@ -402,8 +402,8 @@ func (h *Handler) GetCategories(c *gin.Context) {
 // CreateCategory creates a category.
 func (h *Handler) CreateCategory(c *gin.Context) {
 	var req struct {
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
+		Name        string `json:"name" binding:"required,max=100"`
+		Description string `json:"description" binding:"max=500"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -452,7 +452,7 @@ func (h *Handler) GetTags(c *gin.Context) {
 // CreateTag creates a tag.
 func (h *Handler) CreateTag(c *gin.Context) {
 	var req struct {
-		Name string `json:"name" binding:"required"`
+		Name string `json:"name" binding:"required,max=100"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

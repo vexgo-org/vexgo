@@ -265,6 +265,57 @@ func TestCreateCategory_BlankNameBadRequest(t *testing.T) {
 	}
 }
 
+// TestCreateCategory_LengthLimits verifies the handler-side caps that mirror
+// the model constraints (name size:100): 100 characters is accepted, 101 is
+// rejected with 400, and a description over 500 characters is rejected with
+// 400 instead of failing at the database layer with a 500.
+func TestCreateCategory_LengthLimits(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, model.RoleContributor)
+
+	postCategory := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/categories", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+
+	name100 := strings.Repeat("a", 100)
+	name101 := strings.Repeat("a", 101)
+	desc501 := strings.Repeat("d", 501)
+
+	if w := postCategory(`{"name":"` + name100 + `"}`); w.Code != http.StatusCreated {
+		t.Errorf("100-char name: expected 201, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if w := postCategory(`{"name":"` + name101 + `"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("101-char name: expected 400, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if w := postCategory(`{"name":"ok","description":"` + desc501 + `"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("501-char description: expected 400, got %d (body=%s)", w.Code, w.Body.String())
+	}
+}
+
+// TestCreateTag_LengthLimit verifies the tag name cap matching the model's
+// size:100 constraint: 101 characters must be rejected with 400.
+func TestCreateTag_LengthLimit(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, model.RoleContributor)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tags", strings.NewReader(`{"name":"`+strings.Repeat("t", 101)+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("101-char tag name: expected 400, got %d (body=%s)", w.Code, w.Body.String())
+	}
+}
+
 // TestCreateCategory_ServiceRoleCheck verifies AC2 at the service layer: the
 // service must reject non-contributor roles (fail closed) even when no
 // middleware is involved. model.IsContributor covers contributor/author/admin/
