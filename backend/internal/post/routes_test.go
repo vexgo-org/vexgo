@@ -424,14 +424,17 @@ func TestFindOrCreateTag_UniqueIndexRaceRecovery(t *testing.T) {
 	}
 	svc := NewService(Deps{DB: db, Notifier: &fakeNotifier{}, Files: &fakeRemover{}})
 
-	db.Callback().Create().Before("gorm:create").Register("plant_conflicting_tag", func(tx *gorm.DB) {
+	callback := db.Callback().Create().Before("gorm:create")
+	if err := callback.Register("plant_conflicting_tag", func(tx *gorm.DB) {
 		if tag, ok := tx.Statement.Dest.(*model.Tag); ok && tag.Name == "golang" {
 			plant := db.Session(&gorm.Session{SkipDefaultTransaction: true})
 			if err := plant.Exec(`INSERT INTO tags (name) VALUES (?)`, tag.Name).Error; err != nil {
 				t.Errorf("plant conflicting tag: %v", err)
 			}
 		}
-	})
+	}); err != nil {
+		t.Fatalf("register plant callback: %v", err)
+	}
 
 	tag, err := svc.CreateTag(context.Background(), model.RoleContributor, "golang")
 	if err != nil {
