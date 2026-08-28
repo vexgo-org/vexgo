@@ -41,7 +41,7 @@ Example config file (abridged):
 # Server
 addr: "0.0.0.0"
 port: 3001
-data: "./data"
+data_dir: "./data"
 jwt_secret: "your-secret-key-change-this-in-production"
 log_level: "info"
 

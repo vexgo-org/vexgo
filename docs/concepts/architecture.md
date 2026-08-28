@@ -17,12 +17,13 @@ The backend follows a domain-oriented layout under `backend/internal` with a com
 
 ```text
 backend/
-  cmd/vexgo/main.go         # entry point: parses flags, delegates to app package
+  cmd/vexgo/main.go         # entry point: resolves config via cli, delegates to app package
   internal/
     app/                     # composition root: wires all dependencies together
     auth/                    # registration, login, JWT, profile, password reset
+    cli/                     # cobra command line: flags, help, version, .env loading
     comment/                 # comments and AI-powered moderation
-    config/                  # flag / env / config-file parsing, JWT, S3, SSO setup
+    config/                  # layered config resolution via viper, JWT, S3, SSO setup
     database/                # connection, auto-migration, seeding
     home/                    # site statistics
     mailer/                  # SMTP mail building and sending
@@ -102,13 +103,13 @@ These interfaces allow domains like `post`, `comment`, and `user` to trigger not
 
 The `internal/app/app.go` package is the composition root (also called the "wiring" layer). It:
 
-1. Parses flags and loads configuration via `config.ParseFlags()`.
-2. Computes runtime secrets (JWT, SSO).
+1. Receives the configuration resolved by `cli.Execute()` — cobra parses the flags, viper layers flags > config file > environment variables > defaults.
+2. Ensures the JWT secret exists (generating a random development fallback) and applies the frontend URL default; the SSO struct is derived during config resolution.
 3. Opens the database and runs migrations/seeding.
 4. Creates storage (local or S3).
 5. Instantiates every domain's dependencies and wires them into the router.
 
-`cmd/vexgo/main.go` is a thin entry point that calls `app.New(cfg)` and `app.Run()`.
+`cmd/vexgo/main.go` is a thin entry point that calls `cli.Execute()`, then `app.New(cfg)` and `app.Run()`.
 
 ### Dependency Rules
 
@@ -116,15 +117,17 @@ The package layout keeps the dependency graph **acyclic**:
 
 ```text
 cmd/vexgo/main.go
+    ├─→ internal/cli          ← cobra command tree, binds flags to viper
+    │       └─→ config        ← layered resolution (flags > file > env > defaults)
     └─→ internal/app          ← composition root, imports everything
-            ├─→ config         ← flag/env/file parsing (no domain imports)
+            ├─→ config         ← resolved Config type (no domain imports)
             ├─→ database       ← Open/AutoMigrate/Seed (imports config, model)
             ├─→ router         ← route registration (imports all domain handlers)
             └─→ internal/*     ← domain packages
 
 Leaf packages (no internal imports):
     model/         ← data models + shared interfaces, imported by every domain
-    config/        ← configuration parsing, imported by app, auth, database, sso, upload
+    config/        ← configuration parsing, imported by cli, app, auth, database, sso, upload
 
 Shared layer:
     middleware/     ← JWT auth, role permissions, request logging (imports model only)
@@ -146,6 +149,8 @@ Configuration is loaded through a three-layer priority chain:
 command line flags  →  config file (YAML)  →  environment variables  →  defaults
      (highest)                                                (lowest)
 ```
+
+The command line is defined with **cobra** (`internal/cli`), and the sources are layered with **viper** (`internal/config`). One consequence of the ordering: an explicit `false` in the config file overrides a `true` from the environment — environment variables only fill keys the config file leaves unset.
 
 The `config.Config` struct holds all runtime values. There are **no global variables** — the JWT secret, SSO config, and frontend URL are fields on `Config`, not package-level vars.
 

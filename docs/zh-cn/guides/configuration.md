@@ -41,7 +41,7 @@ cp examples/config.yml config.yml
 # 服务器
 addr: "0.0.0.0"
 port: 3001
-data: "./data"
+data_dir: "./data"
 jwt_secret: "your-secret-key-change-this-in-production"
 log_level: "info"
 
