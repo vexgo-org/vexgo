@@ -170,3 +170,29 @@ func TestNew_EmptyPassphraseRejected(t *testing.T) {
 		t.Error("expected an error for an empty passphrase, got nil")
 	}
 }
+
+// FuzzDecrypt asserts Decrypt never panics on arbitrary input: values without
+// the marker pass through, anything carrying the marker either decrypts or
+// returns an error.
+func FuzzDecrypt(f *testing.F) {
+	f.Add("")
+	f.Add("hunter2")
+	f.Add(EncryptedPrefix)
+	f.Add(EncryptedPrefix + "aGVsbG8=")
+	f.Add(EncryptedPrefix + "not-base64!!!")
+
+	c, err := New("fuzz-key")
+	if err != nil {
+		f.Fatalf("New error: %v", err)
+	}
+
+	f.Fuzz(func(t *testing.T, stored string) {
+		got, err := c.Decrypt(stored)
+		if err != nil {
+			return // errors are fine; panics are not
+		}
+		if !IsEncrypted(stored) && got != stored {
+			t.Errorf("plaintext passthrough violated: Decrypt(%q) = %q", stored, got)
+		}
+	})
+}
