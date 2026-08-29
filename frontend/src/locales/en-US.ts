@@ -612,10 +612,18 @@ export const enUS = {
     recentPosts: "Recent Posts",
     draftPosts: "Draft Posts",
     allCategories: "All Categories",
+    allTags: "All Tags",
     createCategory: "Create Category",
     categoryName: "Category Name",
     categoryDescription: "Category Description",
     add: "Add",
+    postCount: "{count} posts",
+    inUseHint: "Items still used by posts cannot be deleted",
+    tagsHint:
+      "Tags are created automatically from post tags. Only tags not used by any post can be deleted.",
+    deleteCategory: "Delete category",
+    deleteTag: "Delete tag",
+    actionFailed: "Operation failed",
     noRecords: "No records",
     loadingData: "Loading data...",
     overview: "Overview",
@@ -922,6 +930,11 @@ export const enUS = {
     categoryCreateError: "Failed to create category",
     categoryDuplicate: "A category with this name already exists",
     categoryCreateForbidden: "You do not have permission to create categories",
+    deleteCategory: "Delete the selected empty category",
+    categoryInUseHint:
+      "Categories still used by posts cannot be deleted. Select an empty category first.",
+    categoryDeleteForbidden: "You do not have permission to delete categories",
+    categoryDeleteError: "Failed to delete category",
   },
 
   // Notification Center Page

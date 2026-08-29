@@ -171,7 +171,8 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 
 	for _, url := range fileURLs {
 		if err := s.files.Delete(url); err != nil {
-			slog.Warn("failed to delete media file",
+			slog.Warn(
+				"failed to delete media file",
 				"url", url,
 				"err", err,
 			)

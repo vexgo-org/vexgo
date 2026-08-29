@@ -129,15 +129,20 @@
 
 ### GET /categories
 
-获取所有分类。
+获取所有分类。每一项都带有 `postCount`，即 `category` 字段等于该分类名称的文章数量。
 
 **响应：**
 
 ```json
 {
   "categories": [
-    { "id": 1, "name": "Default", "description": "Default category" },
-    { "id": 2, "name": "tech", "description": "" }
+    {
+      "id": 1,
+      "name": "Default",
+      "description": "Default category",
+      "postCount": 12
+    },
+    { "id": 2, "name": "tech", "description": "", "postCount": 0 }
   ]
 }
 ```
@@ -151,13 +156,13 @@
 
 ### GET /tags
 
-获取所有标签。
+获取所有标签。每一项都带有 `postCount`，即引用该标签的文章数量。
 
 **响应：**
 
 ```json
 {
-  "tags": [{ "id": 1, "name": "golang" }]
+  "tags": [{ "id": 1, "name": "golang", "postCount": 3 }]
 }
 ```
 
@@ -227,6 +232,52 @@
   "tag": { "id": 4, "name": "golang" }
 }
 ```
+
+---
+
+### DELETE /categories/:id
+
+删除分类。需要登录，且调用者必须是贡献者及以上角色（`contributor`、`author`、`admin`、`super_admin`）。`guest` 角色与未登录请求将被拒绝。
+
+仅当分类为**空**时才能删除——即没有任何文章的 `category` 字段等于该分类名称。仍在使用中的分类不会被强制删除或解除关联。
+
+**响应（200）：**
+
+```json
+{
+  "message": "Category deleted successfully"
+}
+```
+
+**错误响应：**
+
+- `401`：`{"error": "No authentication information provided"}`（缺少或无效的令牌）
+- `403`：`{"error": "Insufficient permissions to delete a category"}`（角色为 guest 或权限不足）
+- `400`：`{"error": "Category is used by N posts"}`（分类仍被文章引用）
+- `404`：`{"error": "Category does not exist"}`（`id` 不存在、为零或非数字）
+
+---
+
+### DELETE /tags/:id
+
+删除标签。需要登录，且调用者必须是贡献者及以上角色（`contributor`、`author`、`admin`、`super_admin`）。`guest` 角色与未登录请求将被拒绝。
+
+仅当标签为**空**时才能删除——即没有任何文章通过 `post_tags` 关联引用该标签。仍在使用中的标签不会被强制删除或解除关联。
+
+**响应（200）：**
+
+```json
+{
+  "message": "Tag deleted successfully"
+}
+```
+
+**错误响应：**
+
+- `401`：`{"error": "No authentication information provided"}`（缺少或无效的令牌）
+- `403`：`{"error": "Insufficient permissions to delete a tag"}`（角色为 guest 或权限不足）
+- `400`：`{"error": "Tag is used by N posts"}`（标签仍被文章引用）
+- `404`：`{"error": "Tag does not exist"}`（`id` 不存在、为零或非数字）
 
 ---
 

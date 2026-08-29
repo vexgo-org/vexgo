@@ -117,6 +117,8 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"DELETE /api/posts/:id",
 		"POST /api/categories",
 		"POST /api/tags",
+		"DELETE /api/categories/:id",
+		"DELETE /api/tags/:id",
 		"POST /api/likes/:postId",
 		"GET /api/moderation/pending",
 		"GET /api/moderation/approved",

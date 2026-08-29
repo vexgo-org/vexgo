@@ -129,15 +129,20 @@ Get a single post by numeric ID. Useful when the caller has an ID but not the sl
 
 ### GET /categories
 
-Get all categories.
+Get all categories. Each item carries `postCount`, the number of posts whose `category` field equals the category name.
 
 **Response:**
 
 ```json
 {
   "categories": [
-    { "id": 1, "name": "Default", "description": "Default category" },
-    { "id": 2, "name": "tech", "description": "" }
+    {
+      "id": 1,
+      "name": "Default",
+      "description": "Default category",
+      "postCount": 12
+    },
+    { "id": 2, "name": "tech", "description": "", "postCount": 0 }
   ]
 }
 ```
@@ -151,13 +156,13 @@ Get all categories.
 
 ### GET /tags
 
-Get all tags.
+Get all tags. Each item carries `postCount`, the number of posts referencing the tag.
 
 **Response:**
 
 ```json
 {
-  "tags": [{ "id": 1, "name": "golang" }]
+  "tags": [{ "id": 1, "name": "golang", "postCount": 3 }]
 }
 ```
 
@@ -231,6 +236,52 @@ Create a new tag. Requires authentication, and the caller must be a contributor 
   "tag": { "id": 4, "name": "golang" }
 }
 ```
+
+---
+
+### DELETE /categories/:id
+
+Delete a category. Requires authentication, and the caller must be a contributor or above (`contributor`, `author`, `admin`, `super_admin`). The `guest` role and anonymous requests are rejected.
+
+A category can only be deleted when it is **empty** — no post's `category` field equals the category name. Categories still in use are never force-deleted or unlinked.
+
+**Response (200):**
+
+```json
+{
+  "message": "Category deleted successfully"
+}
+```
+
+**Error Responses:**
+
+- `401`: `{"error": "No authentication information provided"}` (missing/invalid token)
+- `403`: `{"error": "Insufficient permissions to delete a category"}` (guest role or insufficient role)
+- `400`: `{"error": "Category is used by N posts"}` (the category is still referenced by posts)
+- `404`: `{"error": "Category does not exist"}` (unknown, zero or non-numeric `id`)
+
+---
+
+### DELETE /tags/:id
+
+Delete a tag. Requires authentication, and the caller must be a contributor or above (`contributor`, `author`, `admin`, `super_admin`). The `guest` role and anonymous requests are rejected.
+
+A tag can only be deleted when it is **empty** — no post references it via the `post_tags` association. Tags still in use are never force-deleted or unlinked.
+
+**Response (200):**
+
+```json
+{
+  "message": "Tag deleted successfully"
+}
+```
+
+**Error Responses:**
+
+- `401`: `{"error": "No authentication information provided"}` (missing/invalid token)
+- `403`: `{"error": "Insufficient permissions to delete a tag"}` (guest role or insufficient role)
+- `400`: `{"error": "Tag is used by N posts"}` (the tag is still referenced by posts)
+- `404`: `{"error": "Tag does not exist"}` (unknown, zero or non-numeric `id`)
 
 ---
 

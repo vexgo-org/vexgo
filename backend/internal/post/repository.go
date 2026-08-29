@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -66,9 +67,24 @@ type Repository interface {
 	ReplaceTagsAssociation(ctx context.Context, post *model.Post, tags []model.Tag) error
 	ClearTagsAssociation(ctx context.Context, post *model.Post) error
 	FindAllTags(ctx context.Context) ([]model.Tag, error)
+	// DeleteTagIfEmpty deletes the tag unless posts still reference it. It
+	// returns whether the row was deleted and, when it was not, how many
+	// posts reference it; a missing tag yields gorm.ErrRecordNotFound.
+	DeleteTagIfEmpty(ctx context.Context, id uint) (deleted bool, usage int64, err error)
+	// BatchCountTagUsage counts referencing posts per tag from the post_tags
+	// join table in a single grouped query.
+	BatchCountTagUsage(ctx context.Context, tagIDs []uint) (map[uint]int64, error)
 
 	FindAllCategories(ctx context.Context) ([]model.Category, error)
 	CreateCategory(ctx context.Context, category *model.Category) error
+	// DeleteCategoryIfEmpty deletes the category unless posts still reference
+	// it by name. It returns whether the row was deleted and, when it was
+	// not, how many posts reference it; a missing category yields
+	// gorm.ErrRecordNotFound.
+	DeleteCategoryIfEmpty(ctx context.Context, id uint) (deleted bool, usage int64, err error)
+	// BatchCountCategoryUsage counts posts per category name in a single
+	// grouped query over the posts table.
+	BatchCountCategoryUsage(ctx context.Context, names []string) (map[string]int64, error)
 
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
 	GetGuestViewSetting(ctx context.Context) bool
@@ -382,12 +398,126 @@ func (r *gormRepository) FindAllTags(ctx context.Context) ([]model.Tag, error) {
 	return tags, nil
 }
 
+// DeleteTagIfEmpty deletes a tag only when the post_tags join table holds no
+// rows for it. The emptiness guard and the delete are one conditional
+// statement inside a transaction, so a post attaching the tag concurrently
+// either commits first (blocking the delete) or after (leaving no dangling
+// join row).
+func (r *gormRepository) DeleteTagIfEmpty(ctx context.Context, id uint) (deleted bool, usage int64, err error) {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tag model.Tag
+		if err := tx.First(&tag, id).Error; err != nil {
+			return err
+		}
+		result := tx.Where("id = ? AND NOT EXISTS (SELECT 1 FROM post_tags pt WHERE pt.tag_id = tags.id)", id).
+			Delete(&model.Tag{})
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted = result.RowsAffected > 0
+		if deleted {
+			return nil
+		}
+		if err := tx.Table("post_tags").Where("tag_id = ?", id).Count(&usage).Error; err != nil {
+			return err
+		}
+		if usage == 0 {
+			// The tag vanished between the lookup and the delete; report the
+			// row as missing rather than an empty in-use result.
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+	return deleted, usage, err
+}
+
+func (r *gormRepository) BatchCountTagUsage(ctx context.Context, tagIDs []uint) (map[uint]int64, error) {
+	if len(tagIDs) == 0 {
+		return make(map[uint]int64), nil
+	}
+	type result struct {
+		TagID uint
+		Count int64
+	}
+	var results []result
+	err := r.db.WithContext(ctx).Table("post_tags").
+		Select("tag_id, COUNT(*) as count").
+		Where("tag_id IN ?", tagIDs).
+		Group("tag_id").
+		Find(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("count tag usage: %w", err)
+	}
+	counts := make(map[uint]int64, len(tagIDs))
+	for _, res := range results {
+		counts[res.TagID] = res.Count
+	}
+	return counts, nil
+}
+
 func (r *gormRepository) FindAllCategories(ctx context.Context) ([]model.Category, error) {
 	var categories []model.Category
 	if err := r.db.WithContext(ctx).Find(&categories).Error; err != nil {
 		return nil, err
 	}
 	return categories, nil
+}
+
+// DeleteCategoryIfEmpty deletes a category only when no post's category
+// column (a plain string holding the category name) equals its name. The
+// emptiness guard and the delete are one conditional statement inside a
+// transaction, so a post published with the category concurrently either
+// commits first (blocking the delete) or after (leaving no dangling state).
+func (r *gormRepository) DeleteCategoryIfEmpty(ctx context.Context, id uint) (deleted bool, usage int64, err error) {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var category model.Category
+		if err := tx.First(&category, id).Error; err != nil {
+			return err
+		}
+		result := tx.Where("id = ? AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.category = categories.name)", id).
+			Delete(&model.Category{})
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted = result.RowsAffected > 0
+		if deleted {
+			return nil
+		}
+		if err := tx.Model(&model.Post{}).Where("category = ?", category.Name).Count(&usage).Error; err != nil {
+			return err
+		}
+		if usage == 0 {
+			// The category vanished between the lookup and the delete; report
+			// the row as missing rather than an empty in-use result.
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+	return deleted, usage, err
+}
+
+func (r *gormRepository) BatchCountCategoryUsage(ctx context.Context, names []string) (map[string]int64, error) {
+	if len(names) == 0 {
+		return make(map[string]int64), nil
+	}
+	type result struct {
+		Category string
+		Count    int64
+	}
+	var results []result
+	err := r.db.WithContext(ctx).Model(&model.Post{}).
+		Select("category, COUNT(*) as count").
+		Where("category IN ?", names).
+		Group("category").
+		Find(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("count category usage: %w", err)
+	}
+	counts := make(map[string]int64, len(names))
+	for _, res := range results {
+		counts[res.Category] = res.Count
+	}
+	return counts, nil
 }
 
 func (r *gormRepository) CreateCategory(ctx context.Context, category *model.Category) error {

@@ -37,6 +37,8 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	)
 	api.POST("/categories", h.mw.JWTAuth(), noGuest, h.CreateCategory)
 	api.POST("/tags", h.mw.JWTAuth(), noGuest, h.CreateTag)
+	api.DELETE("/categories/:id", h.mw.JWTAuth(), noGuest, h.DeleteCategory)
+	api.DELETE("/tags/:id", h.mw.JWTAuth(), noGuest, h.DeleteTag)
 
 	api.POST("/likes/:postId", h.mw.JWTAuth(), h.ToggleLike)
 

@@ -2,6 +2,7 @@ package post
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -448,6 +449,86 @@ func (h *Handler) GetTags(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"tags": tags})
+}
+
+// DeleteCategory deletes an empty category (contributor and above; 403 for
+// insufficient roles is produced by the middleware).
+func (h *Handler) DeleteCategory(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Category does not exist"})
+		return
+	}
+
+	u, _ := middleware.CurrentUser(c)
+	err := h.svc.DeleteCategory(c.Request.Context(), u.Role, id)
+	if err != nil {
+		var inUse *InUseError
+		switch {
+		case errors.Is(err, ErrCategoryNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Category does not exist"})
+		case errors.As(err, &inUse):
+			c.JSON(http.StatusBadRequest, gin.H{"error": inUseMessage("Category", inUse.Count)})
+		case errors.Is(err, ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to delete a category"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
+}
+
+// DeleteTag deletes an empty tag (contributor and above; 403 for insufficient
+// roles is produced by the middleware).
+func (h *Handler) DeleteTag(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Tag does not exist"})
+		return
+	}
+
+	u, _ := middleware.CurrentUser(c)
+	err := h.svc.DeleteTag(c.Request.Context(), u.Role, id)
+	if err != nil {
+		var inUse *InUseError
+		switch {
+		case errors.Is(err, ErrTagNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Tag does not exist"})
+		case errors.As(err, &inUse):
+			c.JSON(http.StatusBadRequest, gin.H{"error": inUseMessage("Tag", inUse.Count)})
+		case errors.Is(err, ErrForbidden):
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to delete a tag"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tag"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tag deleted successfully"})
+}
+
+// parseIDParam parses a numeric route :id, reporting whether it is valid.
+// Zero, non-numeric and out-of-range values cannot identify a row and are
+// treated as missing resources. The bit size matches uint so the conversion
+// can never truncate silently.
+func parseIDParam(c *gin.Context) (uint, bool) {
+	id64, err := strconv.ParseUint(c.Param("id"), 10, strconv.IntSize)
+	if err != nil || id64 == 0 {
+		return 0, false
+	}
+	return uint(id64), true
+}
+
+// inUseMessage renders the rejection message for a category or tag that
+// posts still reference.
+func inUseMessage(kind string, count int64) string {
+	noun := "posts"
+	if count == 1 {
+		noun = "post"
+	}
+	return fmt.Sprintf("%s is used by %d %s", kind, count, noun)
 }
 
 // CreateTag creates a tag.

@@ -160,11 +160,16 @@ export const categoriesApi = {
 
   createCategory: (data: { name: string; description?: string }) =>
     api.post<{ message: string; category: Category }>("/categories", data),
+
+  deleteCategory: (id: string) =>
+    api.delete<{ message: string }>(`/categories/${id}`),
 };
 
 // Tag-related APIs
 export const tagsApi = {
   getTags: () => api.get<{ tags: Tag[] }>("/tags"),
+
+  deleteTag: (id: string) => api.delete<{ message: string }>(`/tags/${id}`),
 };
 
 // Comment-related APIs

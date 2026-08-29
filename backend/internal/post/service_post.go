@@ -343,7 +343,8 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	}
 	for url := range uniqueImages {
 		if err := s.files.Delete(url); err != nil {
-			slog.Warn("failed to delete image",
+			slog.Warn(
+				"failed to delete image",
 				"url", url,
 				"err", err,
 			)

@@ -44,6 +44,8 @@ type Post struct {
 type Tag struct {
 	ID   uint   `json:"id" gorm:"primaryKey"`
 	Name string `json:"name" gorm:"size:100;uniqueIndex"`
+	// Non-database field: number of posts referencing the tag
+	PostCount int64 `json:"postCount" gorm:"-"`
 }
 
 // Category groups posts under a named, optionally described bucket.
@@ -51,6 +53,8 @@ type Category struct {
 	ID          uint   `json:"id" gorm:"primaryKey"`
 	Name        string `json:"name" gorm:"size:100;uniqueIndex"`
 	Description string `json:"description"`
+	// Non-database field: number of posts referencing the category by name
+	PostCount int64 `json:"postCount" gorm:"-"`
 }
 
 // Like model
