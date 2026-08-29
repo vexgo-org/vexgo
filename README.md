@@ -150,8 +150,7 @@ data: "./data"
 # You can generate one with: openssl rand -base64 32
 jwt_secret: "your-secret-key-change-this-in-production"
 
-# Passphrase used to encrypt secrets at rest in the database (SMTP password,
-# AI and comment-moderation API keys) with AES-256-GCM.
+# Passphrase used to encrypt secrets at rest in the database (SMTP password, AI and comment-moderation API keys) with AES-256-GCM.
 # IMPORTANT: Generate a secure random string for production!
 # You can generate one with: openssl rand -base64 32
 # When empty, these secrets are stored in plaintext (a warning is logged at startup).

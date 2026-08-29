@@ -150,12 +150,11 @@ data: "./data"
 # 可以使用以下命令生成：openssl rand -base64 32
 jwt_secret: "your-secret-key-change-this-in-production"
 
-# Passphrase used to encrypt secrets at rest in the database (SMTP password,
-# AI and comment-moderation API keys) with AES-256-GCM.
-# IMPORTANT: Generate a secure random string for production!
-# You can generate one with: openssl rand -base64 32
-# When empty, these secrets are stored in plaintext (a warning is logged at startup).
-# Existing plaintext values are encrypted in place on the first start with a key set.
+# 用于以 AES-256-GCM 加密数据库中静态存储的机密信息（SMTP 密码、AI 和评论审核 API 密钥）的口令。
+# 重要：生产环境必须使用安全的随机字符串！
+# 可以使用以下命令生成：openssl rand -base64 32
+# 留空时，这些机密信息将以明文存储（启动时会记录一条警告）。
+# 设置密钥后首次启动时，已有的明文值会被原地加密。
 settings_encryption_key: ""
 
 # 日志级别："debug", "info", "warn", "error"
