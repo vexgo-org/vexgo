@@ -458,7 +458,9 @@ func (s *Service) ListModeration(
 	return s.repo.ListModeration(ctx, status, offset, limit)
 }
 
-// SetStatus approves or rejects a comment.
+// SetStatus approves or rejects a comment. Approving clears the moderation
+// reason: the comment becomes publicly visible, and its internal moderation
+// data must not be exposed through the public comment API.
 func (s *Service) SetStatus(ctx context.Context, id string, status model.CommentStatus) (*model.Comment, error) {
 	comment, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -469,6 +471,9 @@ func (s *Service) SetStatus(ctx context.Context, id string, status model.Comment
 	}
 
 	comment.Status = status
+	if status == model.CommentStatusPublished {
+		comment.ModerationReason = ""
+	}
 	if err := s.repo.Save(ctx, comment); err != nil {
 		return nil, err
 	}

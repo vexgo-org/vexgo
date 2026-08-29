@@ -584,3 +584,57 @@ func TestUpdateModerationConfig_RepoErrorDoesNotWipeStoredKey(t *testing.T) {
 		t.Errorf("stored api key must not change when the update fails: before %q, after %q", before.ApiKey, after.ApiKey)
 	}
 }
+
+// Approving a rejected comment must clear its moderation reason: the comment
+// becomes publicly visible and its internal moderation data must not leak
+// through the public comment API.
+func TestSetStatus_ApproveClearsModerationReason(t *testing.T) {
+	ctx := context.Background()
+	svc, _, db := newTestService(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		KeywordFilterEnabled: true,
+		BlockKeywords:        "spam",
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+
+	comment, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "buy spam"})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if comment.ModerationReason == "" {
+		t.Fatalf("expected a moderation reason on the rejected comment")
+	}
+
+	approved, err := svc.SetStatus(ctx, strconv.FormatUint(uint64(comment.ID), 10), model.CommentStatusPublished)
+	if err != nil {
+		t.Fatalf("SetStatus error: %v", err)
+	}
+	if approved.Status != model.CommentStatusPublished {
+		t.Errorf("expected published, got %s", approved.Status)
+	}
+	if approved.ModerationReason != "" {
+		t.Errorf("expected moderation reason cleared on approval, got %q", approved.ModerationReason)
+	}
+
+	var stored model.Comment
+	if err := db.First(&stored, comment.ID).Error; err != nil {
+		t.Fatalf("load stored comment: %v", err)
+	}
+	if stored.ModerationReason != "" {
+		t.Errorf("expected stored moderation reason cleared, got %q", stored.ModerationReason)
+	}
+
+	// The public read path must not expose the internal reason.
+	public, err := svc.ListByPost(ctx, strconv.FormatUint(uint64(post.ID), 10), 0, "")
+	if err != nil {
+		t.Fatalf("ListByPost error: %v", err)
+	}
+	if len(public) != 1 || public[0].ModerationReason != "" {
+		t.Errorf("expected public list without moderation reason, got %+v", public)
+	}
+}
