@@ -97,11 +97,11 @@ func configureLLM(t *testing.T, svc *Service, manual bool, endpoint string) {
 // rejects with the model's reason persisted.
 func TestCreate_LLMVerdicts(t *testing.T) {
 	cases := []struct {
-		name          string
-		reply         string
-		manual        bool
-		wantStatus    model.CommentStatus
-		wantReason    string
+		name       string
+		reply      string
+		manual     bool
+		wantStatus model.CommentStatus
+		wantReason string
 	}{
 		{"approve, manual off", `{"approved": true, "reason": ""}`, false, model.CommentStatusPublished, ""},
 		{"approve, manual on", `{"approved": true, "reason": "fine"}`, true, model.CommentStatusPending, ""},
@@ -146,8 +146,8 @@ func TestCreate_LLMVerdicts(t *testing.T) {
 // fails closed to pending, even with manual review off.
 func TestCreate_LLMFailures_PendingEvenWithoutManualReview(t *testing.T) {
 	cases := []struct {
-		name    string
-		setup   func(t *testing.T, svc *Service) *fakeLLMServer
+		name  string
+		setup func(t *testing.T, svc *Service) *fakeLLMServer
 	}{
 		{
 			name: "http 500",
