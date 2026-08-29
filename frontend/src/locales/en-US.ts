@@ -162,16 +162,23 @@ export const enUS = {
     loadFailed: "Failed to load configuration",
     basicSettings: "Basic Settings",
     basicSettingsDesc:
-      "Configure comment moderation toggle and basic parameters",
-    enableAIModeration: "Enable AI Comment Moderation",
-    enableAIModerationDesc:
-      "When enabled, new comments will be moderated by AI before being displayed",
-    autoApproveLowRisk: "Auto-approve low-risk comments",
-    autoApproveLowRiskDesc:
-      "When enabled, comments with risk scores below threshold will be automatically approved",
-    minScoreThreshold: "Minimum Score Threshold",
-    minScoreThresholdDesc:
-      "Comments with scores below this threshold will be rejected (0-1)",
+      "Choose how new comments are moderated; with every switch off, comments are published immediately",
+    manualReview: "Manual Review",
+    manualReviewDesc:
+      "Hold every new comment in the moderation queue until an admin approves or rejects it",
+    keywordFilter: "Keyword Filter",
+    keywordFilterDesc:
+      "Automatically reject comments containing a blocked keyword",
+    llmReview: "LLM Review",
+    llmReviewDesc:
+      "Send new comments to the configured LLM for review; on any failure the comment is held for manual review",
+    switchesHint:
+      "The keyword filter and LLM review can only reject comments — an enabled manual review always has the final say",
+    testConnection: "Test Connection",
+    testing: "Testing...",
+    testConnectionHint:
+      "Sends a test comment through the saved LLM configuration",
+    testFailed: "LLM moderation test failed",
     apiConfig: "API Configuration",
     apiConfigDesc: "Configure API key and endpoint for AI service provider",
     modelProvider: "Model Provider",
@@ -538,6 +545,7 @@ export const enUS = {
     approvedDesc: "Comments reviewed and publicly displayed",
     rejectedDesc: "Rejected comments will not be displayed",
     anonymous: "Anonymous user",
+    reasonLabel: "Reason: ",
   },
 
   // AI Settings Page

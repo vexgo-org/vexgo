@@ -287,6 +287,12 @@ export function CommentModerationPage() {
                       <div className="bg-muted/50 rounded p-3 mt-2">
                         <p className="text-sm">{comment.content}</p>
                       </div>
+                      {comment.moderationReason && (
+                        <p className="text-sm text-destructive mt-2">
+                          {t("commentModeration.reasonLabel")}
+                          {comment.moderationReason}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
