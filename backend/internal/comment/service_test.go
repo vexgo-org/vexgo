@@ -67,7 +67,10 @@ func seedPost(t *testing.T, db *gorm.DB, authorID uint) model.Post {
 	return p
 }
 
-func TestCreate_AutoApproved(t *testing.T) {
+// TC-CMOD-001: with every moderation switch off (fresh install), a new
+// comment is published immediately with no moderation artifacts, and the post
+// author is notified.
+func TestCreate_AllSwitchesOff_Publishes(t *testing.T) {
 	ctx := context.Background()
 	svc, notifier, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
@@ -80,6 +83,9 @@ func TestCreate_AutoApproved(t *testing.T) {
 	}
 	if comment.Status != model.CommentStatusPublished {
 		t.Errorf("expected published, got %s", comment.Status)
+	}
+	if comment.ModerationReason != "" {
+		t.Errorf("expected no moderation reason, got %q", comment.ModerationReason)
 	}
 	if count != 1 {
 		t.Errorf("expected count 1, got %d", count)
@@ -99,16 +105,17 @@ func TestCreate_AutoApproved(t *testing.T) {
 	}
 }
 
-func TestCreate_ModerationDisabledManualApproval(t *testing.T) {
+// TC-CMOD-002: with only manual review on, every new comment is held as
+// pending and nobody is notified.
+func TestCreate_ManualReviewOnly_Pends(t *testing.T) {
 	ctx := context.Background()
-	svc, _, db := newTestService(t)
+	svc, notifier, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
 	post := seedPost(t, db, author.ID)
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
 	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled:            false,
-		AutoApproveEnabled: false,
+		ManualReviewEnabled: true,
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
@@ -120,9 +127,45 @@ func TestCreate_ModerationDisabledManualApproval(t *testing.T) {
 	if comment.Status != model.CommentStatusPending {
 		t.Errorf("expected pending, got %s", comment.Status)
 	}
+	if len(notifier.calls) != 0 {
+		t.Errorf("expected no notifications for a pending comment, got %v", notifier.calls)
+	}
 }
 
-func TestCreate_ModerationRejectsBlockedKeyword(t *testing.T) {
+// TC-CMOD-003: the keyword filter alone rejects a matching comment with the
+// matched keyword persisted as the reason, and nobody is notified.
+func TestCreate_KeywordHit_RejectsWithReason(t *testing.T) {
+	ctx := context.Background()
+	svc, notifier, db := newTestService(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		KeywordFilterEnabled: true,
+		BlockKeywords:        "spam, ad",
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+
+	// Matching is case-insensitive and reports the first matched keyword.
+	comment, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "totally SPAM-free"})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if comment.Status != model.CommentStatusRejected {
+		t.Errorf("expected rejected, got %s", comment.Status)
+	}
+	if comment.ModerationReason != "Contains blocked keyword: spam" {
+		t.Errorf("expected keyword rejection reason, got %q", comment.ModerationReason)
+	}
+	if len(notifier.calls) != 0 {
+		t.Errorf("expected no notifications for a rejected comment, got %v", notifier.calls)
+	}
+}
+
+// TC-CMOD-004: the keyword filter alone publishes a comment without hits.
+func TestCreate_KeywordNoHit_Publishes(t *testing.T) {
 	ctx := context.Background()
 	svc, _, db := newTestService(t)
 	author := seedUser(t, db, "author", model.RoleContributor)
@@ -130,18 +173,18 @@ func TestCreate_ModerationRejectsBlockedKeyword(t *testing.T) {
 	commenter := seedUser(t, db, "commenter", model.RoleGuest)
 
 	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled:       true,
-		BlockKeywords: "spam,ad",
+		KeywordFilterEnabled: true,
+		BlockKeywords:        "spam,ad",
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
 
-	comment, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "buy now spam"})
+	comment, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "lovely article"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if comment.Status != model.CommentStatusRejected {
-		t.Errorf("expected rejected, got %s", comment.Status)
+	if comment.Status != model.CommentStatusPublished {
+		t.Errorf("expected published, got %s", comment.Status)
 	}
 }
 
@@ -326,8 +369,7 @@ func TestUpdateModerationConfig_PreservesApiKey(t *testing.T) {
 	svc, _, db := newTestService(t)
 
 	config, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: true,
-		ApiKey:  "secret-key",
+		ApiKey: "secret-key",
 	})
 	if err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
@@ -344,9 +386,7 @@ func TestUpdateModerationConfig_PreservesApiKey(t *testing.T) {
 		t.Errorf("expected stored api key, got %q", stored.ApiKey)
 	}
 
-	_, err = svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: false,
-	})
+	_, err = svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{})
 	if err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
@@ -378,8 +418,7 @@ func TestUpdateModerationConfig_EncryptsApiKeyWithCipher(t *testing.T) {
 	svc, db, cipher := newTestServiceWithCipher(t)
 
 	resp, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: true,
-		ApiKey:  "secret-key",
+		ApiKey: "secret-key",
 	})
 	if err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
@@ -424,8 +463,7 @@ func TestUpdateModerationConfig_PlaintextWithoutCipher(t *testing.T) {
 	svc.cipher = nil
 
 	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: true,
-		ApiKey:  "secret-key",
+		ApiKey: "secret-key",
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
@@ -446,15 +484,12 @@ func TestUpdateModerationConfig_EmptyApiKeyKeepsStoredValueDecryptable(t *testin
 	svc, db, cipher := newTestServiceWithCipher(t)
 
 	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: true,
-		ApiKey:  "secret-key",
+		ApiKey: "secret-key",
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
 
-	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: false,
-	}); err != nil {
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{}); err != nil {
 		t.Fatalf("UpdateModerationConfig (no key) error: %v", err)
 	}
 
@@ -486,8 +521,8 @@ func TestModerationConfig_UndecryptableKeyTreatedAsUnset(t *testing.T) {
 		t.Fatalf("Encrypt error: %v", err)
 	}
 	if err := db.Create(&model.CommentModerationConfig{
-		Enabled: true,
-		ApiKey:  encrypted,
+		LLMReviewEnabled: true,
+		ApiKey:           encrypted,
 	}).Error; err != nil {
 		t.Fatalf("failed to seed moderation config: %v", err)
 	}
@@ -525,8 +560,7 @@ func TestUpdateModerationConfig_RepoErrorDoesNotWipeStoredKey(t *testing.T) {
 	svc, db, _ := newTestServiceWithCipher(t)
 
 	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
-		Enabled: true,
-		ApiKey:  "secret-key",
+		ApiKey: "secret-key",
 	}); err != nil {
 		t.Fatalf("UpdateModerationConfig error: %v", err)
 	}
@@ -538,7 +572,7 @@ func TestUpdateModerationConfig_RepoErrorDoesNotWipeStoredKey(t *testing.T) {
 
 	svc.repo = &flakyModerationRepo{Repository: svc.repo}
 
-	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{Enabled: false}); err == nil {
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{}); err == nil {
 		t.Fatal("expected an error when the moderation-config read fails, got nil")
 	}
 

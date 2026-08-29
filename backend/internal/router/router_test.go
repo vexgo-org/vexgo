@@ -92,6 +92,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"PUT /api/moderation/comments/reject/:id",
 		"GET /api/moderation/comments/config",
 		"PUT /api/moderation/comments/config",
+		"POST /api/moderation/comments/config/test",
 		// home
 		"GET /api/stats",
 		// notification

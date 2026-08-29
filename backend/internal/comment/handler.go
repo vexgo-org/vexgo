@@ -149,15 +149,15 @@ func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
 // UpdateCommentModerationConfig updates comment moderation configuration
 func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 	var req struct {
-		Enabled            bool    `json:"enabled"`
-		ModelProvider      string  `json:"modelProvider"`
-		ApiKey             string  `json:"apiKey"` // if empty, don't update
-		ApiEndpoint        string  `json:"apiEndpoint"`
-		ModelName          string  `json:"modelName"`
-		ModerationPrompt   string  `json:"moderationPrompt"`
-		BlockKeywords      string  `json:"blockKeywords"`
-		AutoApproveEnabled bool    `json:"autoApproveEnabled"`
-		MinScoreThreshold  float64 `json:"minScoreThreshold"`
+		ManualReviewEnabled  bool   `json:"manualReviewEnabled"`
+		KeywordFilterEnabled bool   `json:"keywordFilterEnabled"`
+		LLMReviewEnabled     bool   `json:"llmReviewEnabled"`
+		ModelProvider        string `json:"modelProvider"`
+		ApiKey               string `json:"apiKey"` // if empty, don't update
+		ApiEndpoint          string `json:"apiEndpoint"`
+		ModelName            string `json:"modelName"`
+		ModerationPrompt     string `json:"moderationPrompt"`
+		BlockKeywords        string `json:"blockKeywords"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -167,17 +167,21 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 	}
 
 	config, err := h.svc.UpdateModerationConfig(c.Request.Context(), UpdateModerationConfigRequest{
-		Enabled:            req.Enabled,
-		ModelProvider:      req.ModelProvider,
-		ApiKey:             req.ApiKey,
-		ApiEndpoint:        req.ApiEndpoint,
-		ModelName:          req.ModelName,
-		ModerationPrompt:   req.ModerationPrompt,
-		BlockKeywords:      req.BlockKeywords,
-		AutoApproveEnabled: req.AutoApproveEnabled,
-		MinScoreThreshold:  req.MinScoreThreshold,
+		ManualReviewEnabled:  req.ManualReviewEnabled,
+		KeywordFilterEnabled: req.KeywordFilterEnabled,
+		LLMReviewEnabled:     req.LLMReviewEnabled,
+		ModelProvider:        req.ModelProvider,
+		ApiKey:               req.ApiKey,
+		ApiEndpoint:          req.ApiEndpoint,
+		ModelName:            req.ModelName,
+		ModerationPrompt:     req.ModerationPrompt,
+		BlockKeywords:        req.BlockKeywords,
 	})
 	if err != nil {
+		if errors.Is(err, ErrLLMConfigIncomplete) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment moderation configuration"})
 		return
 	}
@@ -185,6 +189,25 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Comment moderation configuration updated successfully",
 		"config":  config,
+	})
+}
+
+// TestModerationConfig verifies the stored LLM moderation configuration by
+// calling the configured endpoint with a test prompt.
+func (h *Handler) TestModerationConfig(c *gin.Context) {
+	result, err := h.svc.TestModerationLLM(c.Request.Context())
+	if err != nil {
+		if errors.Is(err, ErrLLMConfigIncomplete) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  result.Message,
+		"response": result.Response,
 	})
 }
 
