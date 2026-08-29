@@ -30,8 +30,8 @@ func Open(cfg *config.Config, dataDir string) (*gorm.DB, error) {
 	}
 
 	switch dbType {
-	case "mysql":
-		// MySQL connection - use config values with environment fallback
+	case "mysql", "mariadb":
+		// MySQL/MariaDB connection - use config values with environment fallback
 		return openMySQL(cfg)
 	case "postgres":
 		// PostgreSQL connection - use config values with environment fallback
