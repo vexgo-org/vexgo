@@ -8,6 +8,7 @@ Before exposing VexGo to the internet:
 
 - [ ] Change the default super admin password
 - [ ] Set a strong `JWT_SECRET` (e.g. `openssl rand -base64 32`)
+- [ ] Set `SETTINGS_ENCRYPTION_KEY` (e.g. `openssl rand -base64 32`) so SMTP password and AI/comment-moderation API keys are encrypted at rest
 - [ ] Put VexGo behind a reverse proxy with HTTPS
 - [ ] Set `BASE_URL` to your public URL (required for SSO callbacks)
 - [ ] Set `behind_reverse_proxy: true` and configure `trusted_proxies` (or set `BEHIND_REVERSE_PROXY=true` / `TRUSTED_PROXIES=...`)
@@ -155,6 +156,10 @@ pg_dump -U vexgo_user vexgo_db > vexgo-db-$(date +%F).sql
 Restore with `psql -U vexgo_user vexgo_db < backup.sql`.
 
 Schedule backups with cron or systemd timers, and store them off-machine (e.g. an S3 bucket or another server).
+
+> If `SETTINGS_ENCRYPTION_KEY` is set, back it up together with the database: a
+> backup restored without the key cannot decrypt the stored SMTP password and
+> API keys (the server keeps running; an admin must re-enter the secrets in the UI).
 
 ---
 

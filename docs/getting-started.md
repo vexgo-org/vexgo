@@ -67,7 +67,7 @@ The default password is public knowledge — change it before doing anything els
 1. Click your avatar in the top right corner and open your **Profile**.
 2. Change your password and save.
 
-> **Security note:** anyone who can reach your instance can log in with the default credentials. Change the password immediately, and set a strong `JWT_SECRET` before deploying publicly. See [Deployment](/guides/deployment) for production hardening.
+> **Security note:** anyone who can reach your instance can log in with the default credentials. Change the password immediately, and set a strong `JWT_SECRET` and `SETTINGS_ENCRYPTION_KEY` (used to encrypt the SMTP password and AI/comment-moderation API keys at rest) before deploying publicly. See [Deployment](/guides/deployment) for production hardening.
 
 ## Step 5: Write Your First Post
 

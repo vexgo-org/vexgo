@@ -8,6 +8,7 @@
 
 - [ ] 修改默认超级管理员密码
 - [ ] 设置强 `JWT_SECRET`（例如 `openssl rand -base64 32`）
+- [ ] 设置 `SETTINGS_ENCRYPTION_KEY`（例如 `openssl rand -base64 32`），使 SMTP 密码及 AI/评论审核 API 密钥静态加密
 - [ ] 将 VexGo 放在带 HTTPS 的反向代理之后
 - [ ] 将 `BASE_URL` 设置为公网地址（SSO 回调必需）
 - [ ] 设置 `behind_reverse_proxy: true` 并配置 `trusted_proxies`（或设置 `BEHIND_REVERSE_PROXY=true` / `TRUSTED_PROXIES=...`）
@@ -155,6 +156,8 @@ pg_dump -U vexgo_user vexgo_db > vexgo-db-$(date +%F).sql
 使用 `psql -U vexgo_user vexgo_db < backup.sql` 恢复。
 
 用 cron 或 systemd 定时器定期备份，并存储到机器之外（如 S3 桶或其他服务器）。
+
+> 如果设置了 `SETTINGS_ENCRYPTION_KEY`，请将其与数据库一起备份：恢复备份时若没有该密钥，将无法解密已存储的 SMTP 密码与 API 密钥（服务器仍可运行，但需要管理员在后台重新录入这些敏感信息）。
 
 ---
 

@@ -32,17 +32,18 @@ Run `./vexgo --help` for the authoritative list.
 
 ### Server
 
-| Variable               | Default   | Description                                                                                                                                                                                           |
-| ---------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ADDR`                 | `0.0.0.0` | Server listen address                                                                                                                                                                                 |
-| `PORT`                 | `3001`    | Server listen port                                                                                                                                                                                    |
-| `DATA_DIR`             | `./data`  | Data directory path                                                                                                                                                                                   |
-| `JWT_SECRET`           | —         | JWT secret key (**required in production**)                                                                                                                                                           |
-| `LOG_LEVEL`            | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                       |
-| `BASE_URL`             | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required behind a reverse proxy. |
-| `FRONTEND_URL`         | —         | Frontend origin used when building user-facing links. Falls back to `http://localhost:5173` (the Vite dev server).                                                                                    |
-| `BEHIND_REVERSE_PROXY` | `false`   | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                                                                                                      |
-| `TRUSTED_PROXIES`      | —         | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks.                                                                                |
+| Variable                  | Default   | Description                                                                                                                                                                                                          |
+| ------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADDR`                    | `0.0.0.0` | Server listen address                                                                                                                                                                                                |
+| `PORT`                    | `3001`    | Server listen port                                                                                                                                                                                                   |
+| `DATA_DIR`                | `./data`  | Data directory path                                                                                                                                                                                                  |
+| `JWT_SECRET`              | —         | JWT secret key (**required in production**)                                                                                                                                                                          |
+| `SETTINGS_ENCRYPTION_KEY` | —         | Passphrase used to encrypt secrets at rest in the database (SMTP password, AI and comment-moderation API keys) with AES-256-GCM. When empty, these secrets are stored in plaintext (a warning is logged at startup). |
+| `LOG_LEVEL`               | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                                      |
+| `BASE_URL`                | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required behind a reverse proxy.                |
+| `FRONTEND_URL`            | —         | Frontend origin used when building user-facing links. Falls back to `http://localhost:5173` (the Vite dev server).                                                                                                   |
+| `BEHIND_REVERSE_PROXY`    | `false`   | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                                                                                                                     |
+| `TRUSTED_PROXIES`         | —         | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks.                                                                                               |
 
 ### Database
 
@@ -117,17 +118,18 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 
 ### Server
 
-| YAML key               | Default   | Description                                       |
-| ---------------------- | --------- | ------------------------------------------------- |
-| `addr`                 | `0.0.0.0` | Listen address                                    |
-| `port`                 | `3001`    | Listen port                                       |
-| `data_dir`             | `./data`  | Data directory path                               |
-| `jwt_secret`           | —         | JWT secret key (**required in production**)       |
-| `log_level`            | `info`    | `debug`, `info`, `warn`, `error`                  |
-| `base_url`             | —         | Public base URL, e.g. `https://vexgo.example.com` |
-| `frontend_url`         | —         | Frontend origin for user-facing links             |
-| `behind_reverse_proxy` | `false`   | Honor `X-Forwarded-*` headers when `true`         |
-| `trusted_proxies`      | `[]`      | List of trusted proxy IPs/CIDRs                   |
+| YAML key                  | Default   | Description                                                                                                                                      |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `addr`                    | `0.0.0.0` | Listen address                                                                                                                                   |
+| `port`                    | `3001`    | Listen port                                                                                                                                      |
+| `data_dir`                | `./data`  | Data directory path                                                                                                                              |
+| `jwt_secret`              | —         | JWT secret key (**required in production**)                                                                                                      |
+| `settings_encryption_key` | —         | Passphrase for encrypting secrets at rest (SMTP password, AI and comment-moderation API keys). Empty = plaintext storage with a startup warning. |
+| `log_level`               | `info`    | `debug`, `info`, `warn`, `error`                                                                                                                 |
+| `base_url`                | —         | Public base URL, e.g. `https://vexgo.example.com`                                                                                                |
+| `frontend_url`            | —         | Frontend origin for user-facing links                                                                                                            |
+| `behind_reverse_proxy`    | `false`   | Honor `X-Forwarded-*` headers when `true`                                                                                                        |
+| `trusted_proxies`         | `[]`      | List of trusted proxy IPs/CIDRs                                                                                                                  |
 
 ### Database
 
@@ -181,41 +183,57 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 
 ## Environment ↔ Config File ↔ Flag Cross-Reference
 
-| Setting            | Environment variable   | Config file key        | CLI flag     |
-| ------------------ | ---------------------- | ---------------------- | ------------ |
-| Listen address     | `ADDR`                 | `addr`                 | `--addr, -a` |
-| Listen port        | `PORT`                 | `port`                 | `--port, -p` |
-| Data directory     | `DATA_DIR`             | `data_dir`             | `--data, -d` |
-| JWT secret         | `JWT_SECRET`           | `jwt_secret`           | —            |
-| Log level          | `LOG_LEVEL`            | `log_level`            | —            |
-| Base URL           | `BASE_URL`             | `base_url`             | —            |
-| Frontend URL       | `FRONTEND_URL`         | `frontend_url`         | —            |
-| Reverse proxy      | `BEHIND_REVERSE_PROXY` | `behind_reverse_proxy` | —            |
-| Trusted proxies    | `TRUSTED_PROXIES`      | `trusted_proxies`      | —            |
-| DB type            | `DB_TYPE`              | `db_type`              | —            |
-| DB host            | `DB_HOST`              | `db_host`              | —            |
-| DB port            | `DB_PORT`              | `db_port`              | —            |
-| DB user            | `DB_USER`              | `db_user`              | —            |
-| DB password        | `DB_PASSWORD`          | `db_password`          | —            |
-| DB name            | `DB_NAME`              | `db_name`              | —            |
-| DB SSL mode        | `DB_SSL_MODE`          | `db_ssl_mode`          | —            |
-| GitHub client ID   | `GITHUB_CLIENT_ID`     | `github_client_id`     | —            |
-| GitHub secret      | `GITHUB_CLIENT_SECRET` | `github_client_secret` | —            |
-| Google client ID   | `GOOGLE_CLIENT_ID`     | `google_client_id`     | —            |
-| Google secret      | `GOOGLE_CLIENT_SECRET` | `google_client_secret` | —            |
-| OIDC enabled       | `OIDC_ENABLED`         | `oidc_enabled`         | —            |
-| OIDC issuer        | `OIDC_ISSUER_URL`      | `oidc_issuer_url`      | —            |
-| OIDC client ID     | `OIDC_CLIENT_ID`       | `oidc_client_id`       | —            |
-| OIDC secret        | `OIDC_CLIENT_SECRET`   | `oidc_client_secret`   | —            |
-| OIDC auto redirect | `OIDC_AUTO_REDIRECT`   | `oidc_auto_redirect`   | —            |
-| OIDC verify email  | `OIDC_VERIFY_EMAIL`    | `oidc_verify_email`    | —            |
-| S3 enabled         | `S3_ENABLED`           | `s3_enabled`           | —            |
-| S3 endpoint        | `S3_ENDPOINT`          | `s3_endpoint`          | —            |
-| S3 region          | `S3_REGION`            | `s3_region`            | —            |
-| S3 bucket          | `S3_BUCKET`            | `s3_bucket`            | —            |
-| S3 access key      | `S3_ACCESS_KEY`        | `s3_access_key`        | —            |
-| S3 secret key      | `S3_SECRET_KEY`        | `s3_secret_key`        | —            |
+| Setting                 | Environment variable      | Config file key           | CLI flag     |
+| ----------------------- | ------------------------- | ------------------------- | ------------ |
+| Listen address          | `ADDR`                    | `addr`                    | `--addr, -a` |
+| Listen port             | `PORT`                    | `port`                    | `--port, -p` |
+| Data directory          | `DATA_DIR`                | `data_dir`                | `--data, -d` |
+| JWT secret              | `JWT_SECRET`              | `jwt_secret`              | —            |
+| Settings encryption key | `SETTINGS_ENCRYPTION_KEY` | `settings_encryption_key` | —            |
+| Log level               | `LOG_LEVEL`               | `log_level`               | —            |
+| Base URL                | `BASE_URL`                | `base_url`                | —            |
+| Frontend URL            | `FRONTEND_URL`            | `frontend_url`            | —            |
+| Reverse proxy           | `BEHIND_REVERSE_PROXY`    | `behind_reverse_proxy`    | —            |
+| Trusted proxies         | `TRUSTED_PROXIES`         | `trusted_proxies`         | —            |
+| DB type                 | `DB_TYPE`                 | `db_type`                 | —            |
+| DB host                 | `DB_HOST`                 | `db_host`                 | —            |
+| DB port                 | `DB_PORT`                 | `db_port`                 | —            |
+| DB user                 | `DB_USER`                 | `db_user`                 | —            |
+| DB password             | `DB_PASSWORD`             | `db_password`             | —            |
+| DB name                 | `DB_NAME`                 | `db_name`                 | —            |
+| DB SSL mode             | `DB_SSL_MODE`             | `db_ssl_mode`             | —            |
+| GitHub client ID        | `GITHUB_CLIENT_ID`        | `github_client_id`        | —            |
+| GitHub secret           | `GITHUB_CLIENT_SECRET`    | `github_client_secret`    | —            |
+| Google client ID        | `GOOGLE_CLIENT_ID`        | `google_client_id`        | —            |
+| Google secret           | `GOOGLE_CLIENT_SECRET`    | `google_client_secret`    | —            |
+| OIDC enabled            | `OIDC_ENABLED`            | `oidc_enabled`            | —            |
+| OIDC issuer             | `OIDC_ISSUER_URL`         | `oidc_issuer_url`         | —            |
+| OIDC client ID          | `OIDC_CLIENT_ID`          | `oidc_client_id`          | —            |
+| OIDC secret             | `OIDC_CLIENT_SECRET`      | `oidc_client_secret`      | —            |
+| OIDC auto redirect      | `OIDC_AUTO_REDIRECT`      | `oidc_auto_redirect`      | —            |
+| OIDC verify email       | `OIDC_VERIFY_EMAIL`       | `oidc_verify_email`       | —            |
+| S3 enabled              | `S3_ENABLED`              | `s3_enabled`              | —            |
+| S3 endpoint             | `S3_ENDPOINT`             | `s3_endpoint`             | —            |
+| S3 region               | `S3_REGION`               | `s3_region`               | —            |
+| S3 bucket               | `S3_BUCKET`               | `s3_bucket`               | —            |
+| S3 access key           | `S3_ACCESS_KEY`           | `s3_access_key`           | —            |
+| S3 secret key           | `S3_SECRET_KEY`           | `s3_secret_key`           | —            |
 
 Only `addr`, `port`, and `data` have command-line flags. Every other setting is configured through an environment variable or a config-file key.
 
 > **Note:** `base_url` (or `BASE_URL`) is a general server setting, not an SSO-specific one: it is also used to build emailed links for email verification, password reset and email change. When it is unset those links fall back to the request origin, which is vulnerable to host-header poisoning by anyone who can reach the server directly.
+
+## Secrets at Rest Encryption
+
+The SMTP password and the AI / comment-moderation API keys are stored in the database. Because a DB dump is a common backup/restore artifact, VexGo can encrypt these secrets at rest under `SETTINGS_ENCRYPTION_KEY` (AES-256-GCM; the key is derived from the configured passphrase with scrypt).
+
+Behavior:
+
+- **With a key set:** saved secrets are stored as values with the `enc:v1:` marker; existing plaintext values are encrypted in place once on startup (idempotent — already-encrypted values are left untouched). Reads decrypt transparently.
+- **Without a key:** secrets are stored as plaintext exactly as before, and a prominent warning is logged at startup.
+- **Wrong or rotated key:** the affected secret is treated as unset with an error logged (naming the setting) — the server keeps running, but the affected feature (SMTP sending, AI calls, AI comment moderation) must be re-saved by an admin in the UI.
+
+> **Note:** losing the key means every encrypted secret must be re-entered in
+> the admin UI, so back it up together with the database. API responses always
+> mask these secrets regardless of encryption, and an empty secret on update
+> means "keep the existing value".

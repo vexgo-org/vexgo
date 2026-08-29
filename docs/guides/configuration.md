@@ -43,6 +43,7 @@ addr: "0.0.0.0"
 port: 3001
 data_dir: "./data"
 jwt_secret: "your-secret-key-change-this-in-production"
+settings_encryption_key: "" # encrypts SMTP password and AI/comment-moderation API keys at rest (empty = plaintext)
 log_level: "info"
 
 # Behind a reverse proxy? Set this so X-Forwarded-* headers are honored.
@@ -71,15 +72,16 @@ For a full annotated config file, see [examples/config.yml](https://github.com/v
 
 Every setting can also be provided as an environment variable. This is the natural fit for Docker and systemd deployments.
 
-| Variable               | Default   | Description                                     |
-| ---------------------- | --------- | ----------------------------------------------- |
-| `ADDR`                 | `0.0.0.0` | Listen address                                  |
-| `PORT`                 | `3001`    | Listen port                                     |
-| `DATA_DIR`             | `./data`  | Data directory (SQLite DB and media)            |
-| `JWT_SECRET`           | —         | JWT signing secret (**required in production**) |
-| `LOG_LEVEL`            | `info`    | `debug`, `info`, `warn`, `error`                |
-| `BEHIND_REVERSE_PROXY` | `false`   | Honor `X-Forwarded-*` headers when `true`       |
-| `TRUSTED_PROXIES`      | —         | Comma-separated trusted proxy IPs/CIDRs         |
+| Variable                  | Default   | Description                                                                                                                                      |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ADDR`                    | `0.0.0.0` | Listen address                                                                                                                                   |
+| `PORT`                    | `3001`    | Listen port                                                                                                                                      |
+| `DATA_DIR`                | `./data`  | Data directory (SQLite DB and media)                                                                                                             |
+| `JWT_SECRET`              | —         | JWT signing secret (**required in production**)                                                                                                  |
+| `SETTINGS_ENCRYPTION_KEY` | —         | Passphrase for encrypting secrets at rest (SMTP password, AI and comment-moderation API keys). Empty = plaintext storage with a startup warning. |
+| `LOG_LEVEL`               | `info`    | `debug`, `info`, `warn`, `error`                                                                                                                 |
+| `BEHIND_REVERSE_PROXY`    | `false`   | Honor `X-Forwarded-*` headers when `true`                                                                                                        |
+| `TRUSTED_PROXIES`         | —         | Comma-separated trusted proxy IPs/CIDRs                                                                                                          |
 
 ### Database
 
@@ -284,6 +286,10 @@ docker run -d --name vexgo \
 ```
 
 > **MinIO/Wasabi:** set `S3_FORCE_PATH=true` — most S3-compatible services require path-style URLs.
+
+## Secrets at Rest Encryption
+
+The SMTP password and the AI / comment-moderation API keys are stored in the database. Set `SETTINGS_ENCRYPTION_KEY` (or `settings_encryption_key`) to encrypt them at rest with AES-256-GCM. With a key set, existing plaintext values are encrypted in place on the next startup; without one, secrets are stored as plaintext and a warning is logged at startup. See the [Configuration Reference](/reference/configuration#secrets-at-rest-encryption) for the full behavior, including wrong-key handling.
 
 ## What's Configurable at Runtime?
 
