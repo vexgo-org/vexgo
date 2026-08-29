@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -353,5 +355,198 @@ func TestUpdateModerationConfig_PreservesApiKey(t *testing.T) {
 	}
 	if stored.ApiKey != "secret-key" {
 		t.Errorf("expected api key preserved, got %q", stored.ApiKey)
+	}
+}
+
+// newTestServiceWithCipher builds a comment service wired with a real cipher
+// (test passphrase) plus the underlying DB, for encryption-at-rest tests.
+func newTestServiceWithCipher(t *testing.T) (*Service, *gorm.DB, *secrets.Cipher) {
+	t.Helper()
+	db := newTestDB(t)
+	cipher, err := secrets.New("test-encryption-key")
+	if err != nil {
+		t.Fatalf("failed to create cipher: %v", err)
+	}
+	svc := NewService(Deps{DB: db, Notifier: &fakeNotifier{}, Cipher: cipher})
+	return svc, db, cipher
+}
+
+// TC-ENC-015: with a cipher wired, the moderation API key is stored as
+// enc:v1: ciphertext, never as plaintext, while GET responses stay masked.
+func TestUpdateModerationConfig_EncryptsApiKeyWithCipher(t *testing.T) {
+	ctx := context.Background()
+	svc, db, cipher := newTestServiceWithCipher(t)
+
+	resp, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		Enabled: true,
+		ApiKey:  "secret-key",
+	})
+	if err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+	if resp.ApiKey != "" {
+		t.Errorf("expected api key masked in response, got %q", resp.ApiKey)
+	}
+
+	var stored model.CommentModerationConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+	if !secrets.IsEncrypted(stored.ApiKey) {
+		t.Errorf("expected stored api key to carry the encrypted marker, got %q", stored.ApiKey)
+	}
+	if strings.Contains(stored.ApiKey, "secret-key") {
+		t.Errorf("stored api key must not contain the plaintext, got %q", stored.ApiKey)
+	}
+
+	decrypted, err := cipher.Decrypt(stored.ApiKey)
+	if err != nil {
+		t.Fatalf("Decrypt error: %v", err)
+	}
+	if decrypted != "secret-key" {
+		t.Errorf("expected stored ciphertext to decrypt to the original, got %q", decrypted)
+	}
+
+	masked, err := svc.GetModerationConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetModerationConfig error: %v", err)
+	}
+	if masked.ApiKey != "" {
+		t.Errorf("expected masked api key from GET, got %q", masked.ApiKey)
+	}
+}
+
+// TC-ENC-016: without a configured cipher, the moderation API key is stored
+// as plaintext exactly as before the feature (no-key fallback).
+func TestUpdateModerationConfig_PlaintextWithoutCipher(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newTestServiceWithCipher(t)
+	svc.cipher = nil
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		Enabled: true,
+		ApiKey:  "secret-key",
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+
+	var stored model.CommentModerationConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+	if stored.ApiKey != "secret-key" {
+		t.Errorf("expected plaintext fallback storage, got %q", stored.ApiKey)
+	}
+}
+
+// TC-ENC-017: an update without an API key keeps the stored ciphertext, and
+// the preserved value still decrypts.
+func TestUpdateModerationConfig_EmptyApiKeyKeepsStoredValueDecryptable(t *testing.T) {
+	ctx := context.Background()
+	svc, db, cipher := newTestServiceWithCipher(t)
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		Enabled: true,
+		ApiKey:  "secret-key",
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		Enabled: false,
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig (no key) error: %v", err)
+	}
+
+	var stored model.CommentModerationConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+	decrypted, err := cipher.Decrypt(stored.ApiKey)
+	if err != nil {
+		t.Fatalf("Decrypt error: %v", err)
+	}
+	if decrypted != "secret-key" {
+		t.Errorf("expected preserved api key to stay decryptable, got %q", decrypted)
+	}
+}
+
+// TC-ENC-018: an undecryptable stored api key (wrong/rotated key) must not
+// crash the server; the key is treated as unset on read.
+func TestModerationConfig_UndecryptableKeyTreatedAsUnset(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newTestServiceWithCipher(t)
+
+	other, err := secrets.New("other-key")
+	if err != nil {
+		t.Fatalf("failed to create other cipher: %v", err)
+	}
+	encrypted, err := other.Encrypt("rotated-key")
+	if err != nil {
+		t.Fatalf("Encrypt error: %v", err)
+	}
+	if err := db.Create(&model.CommentModerationConfig{
+		Enabled: true,
+		ApiKey:  encrypted,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed moderation config: %v", err)
+	}
+
+	config, err := svc.GetModerationConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetModerationConfig error: %v", err)
+	}
+	if config.ApiKey != "" {
+		t.Errorf("expected undecryptable key to be treated as unset, got %q", config.ApiKey)
+	}
+
+	// The internal read path must also degrade gracefully, not panic.
+	if _, err := svc.moderationConfig(ctx); err != nil {
+		t.Fatalf("moderationConfig error: %v", err)
+	}
+}
+
+// flakyModerationRepo fails every moderation-config read to simulate a
+// transient persistence error. It embeds the real Repository so only the
+// read needs overriding.
+type flakyModerationRepo struct {
+	Repository
+}
+
+func (f *flakyModerationRepo) GetModerationConfig(_ context.Context) (model.CommentModerationConfig, error) {
+	return model.CommentModerationConfig{}, errors.New("transient persistence failure")
+}
+
+// Regression: when the read that decides create-vs-update fails with a real
+// (non-"not found") error, the update must abort instead of wiping the
+// stored API key with a zero value.
+func TestUpdateModerationConfig_RepoErrorDoesNotWipeStoredKey(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newTestServiceWithCipher(t)
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		Enabled: true,
+		ApiKey:  "secret-key",
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+
+	var before model.CommentModerationConfig
+	if err := db.First(&before).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+
+	svc.repo = &flakyModerationRepo{Repository: svc.repo}
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{Enabled: false}); err == nil {
+		t.Fatal("expected an error when the moderation-config read fails, got nil")
+	}
+
+	var after model.CommentModerationConfig
+	if err := db.First(&after).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	if after.ApiKey != before.ApiKey {
+		t.Errorf("stored api key must not change when the update fails: before %q, after %q", before.ApiKey, after.ApiKey)
 	}
 }

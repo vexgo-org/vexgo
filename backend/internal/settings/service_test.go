@@ -3,11 +3,13 @@ package settings
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -268,5 +270,237 @@ func TestThemePreview_UnknownTheme(t *testing.T) {
 	svc, _ := newTestService(t)
 	if _, err := svc.ThemePreview("no-such-theme"); !errors.Is(err, ErrThemeNotFound) {
 		t.Errorf("expected ErrThemeNotFound, got %v", err)
+	}
+}
+
+// newTestServiceWithCipher builds a settings service wired with a real cipher
+// (test passphrase) plus the underlying DB, for encryption-at-rest tests.
+func newTestServiceWithCipher(t *testing.T) (*Service, *gorm.DB, *secrets.Cipher) {
+	t.Helper()
+	db := newTestDB(t)
+	cipher, err := secrets.New("test-encryption-key")
+	if err != nil {
+		t.Fatalf("failed to create cipher: %v", err)
+	}
+	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
+	svc := NewService(Deps{DB: db, Themes: renderer, Mailer: mailer.NewService(mailer.Deps{DB: db}), Cipher: cipher})
+	return svc, db, cipher
+}
+
+// TC-ENC-009: with a cipher wired, the SMTP password is stored as
+// enc:v1: ciphertext, never as plaintext, while API responses stay masked.
+func TestUpdateSMTPConfig_EncryptsPasswordWithCipher(t *testing.T) {
+	svc, db, cipher := newTestServiceWithCipher(t)
+
+	resp, err := svc.UpdateSMTPConfig(context.Background(), SMTPConfigRequest{
+		Enabled:   true,
+		Host:      "smtp.example.com",
+		Port:      587,
+		Username:  "user",
+		Password:  "plain-secret",
+		FromEmail: "a@example.com",
+	})
+	if err != nil {
+		t.Fatalf("UpdateSMTPConfig error: %v", err)
+	}
+	if resp.Password != "" {
+		t.Errorf("expected password masked in response, got %q", resp.Password)
+	}
+
+	var stored model.SMTPConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	if !secrets.IsEncrypted(stored.Password) {
+		t.Errorf("expected stored password to carry the encrypted marker, got %q", stored.Password)
+	}
+	if strings.Contains(stored.Password, "plain-secret") {
+		t.Errorf("stored password must not contain the plaintext, got %q", stored.Password)
+	}
+
+	decrypted, err := cipher.Decrypt(stored.Password)
+	if err != nil {
+		t.Fatalf("Decrypt error: %v", err)
+	}
+	if decrypted != "plain-secret" {
+		t.Errorf("expected stored ciphertext to decrypt to the original, got %q", decrypted)
+	}
+
+	got, err := svc.GetSMTPConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetSMTPConfig error: %v", err)
+	}
+	if got.Password != "" {
+		t.Errorf("expected masked password from GET, got %q", got.Password)
+	}
+}
+
+// TC-ENC-010: without a configured cipher, secrets are stored as plaintext
+// exactly as before the feature (no-key fallback).
+func TestUpdateSMTPConfig_PlaintextWithoutCipher(t *testing.T) {
+	svc, db, _ := newTestServiceWithCipher(t)
+	svc.cipher = nil
+
+	if _, err := svc.UpdateSMTPConfig(context.Background(), SMTPConfigRequest{
+		Enabled:   true,
+		Host:      "smtp.example.com",
+		Port:      587,
+		Username:  "user",
+		Password:  "plain-secret",
+		FromEmail: "a@example.com",
+	}); err != nil {
+		t.Fatalf("UpdateSMTPConfig error: %v", err)
+	}
+
+	var stored model.SMTPConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	if stored.Password != "plain-secret" {
+		t.Errorf("expected plaintext fallback storage, got %q", stored.Password)
+	}
+}
+
+// TC-ENC-011: an update without a password keeps the stored ciphertext, and
+// the preserved value still decrypts.
+func TestUpdateSMTPConfig_EmptyPasswordKeepsStoredValueDecryptable(t *testing.T) {
+	svc, db, cipher := newTestServiceWithCipher(t)
+
+	if _, err := svc.UpdateSMTPConfig(context.Background(), SMTPConfigRequest{
+		Enabled:   true,
+		Host:      "smtp.example.com",
+		Port:      587,
+		Username:  "user",
+		Password:  "plain-secret",
+		FromEmail: "a@example.com",
+	}); err != nil {
+		t.Fatalf("UpdateSMTPConfig error: %v", err)
+	}
+
+	if _, err := svc.UpdateSMTPConfig(context.Background(), SMTPConfigRequest{
+		Enabled:   false,
+		Host:      "smtp2.example.com",
+		Port:      465,
+		Username:  "user",
+		Password:  "",
+		FromEmail: "a@example.com",
+	}); err != nil {
+		t.Fatalf("UpdateSMTPConfig (no password) error: %v", err)
+	}
+
+	var stored model.SMTPConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	decrypted, err := cipher.Decrypt(stored.Password)
+	if err != nil {
+		t.Fatalf("Decrypt error: %v", err)
+	}
+	if decrypted != "plain-secret" {
+		t.Errorf("expected preserved password to stay decryptable, got %q", decrypted)
+	}
+}
+
+// TC-ENC-012: with a cipher wired, the AI API key is stored as enc:v1:
+// ciphertext while responses stay masked.
+func TestUpdateAIConfig_EncryptsApiKeyWithCipher(t *testing.T) {
+	svc, db, cipher := newTestServiceWithCipher(t)
+
+	resp, err := svc.UpdateAIConfig(context.Background(), AIConfigRequest{
+		Enabled:     true,
+		Provider:    "openai",
+		ApiEndpoint: "https://api.example.com/v1",
+		ApiKey:      "sk-test-key",
+		ModelName:   "gpt-3.5-turbo",
+	})
+	if err != nil {
+		t.Fatalf("UpdateAIConfig error: %v", err)
+	}
+	if resp.ApiKey != "" {
+		t.Errorf("expected API key masked in response, got %q", resp.ApiKey)
+	}
+
+	var stored model.AIConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	if !secrets.IsEncrypted(stored.ApiKey) {
+		t.Errorf("expected stored API key to carry the encrypted marker, got %q", stored.ApiKey)
+	}
+
+	decrypted, err := cipher.Decrypt(stored.ApiKey)
+	if err != nil {
+		t.Fatalf("Decrypt error: %v", err)
+	}
+	if decrypted != "sk-test-key" {
+		t.Errorf("expected stored ciphertext to decrypt to the original, got %q", decrypted)
+	}
+}
+
+// TC-ENC-013: an update without an API key keeps the stored ciphertext, and
+// the preserved value still decrypts.
+func TestUpdateAIConfig_EmptyApiKeyKeepsStoredValueDecryptable(t *testing.T) {
+	svc, db, cipher := newTestServiceWithCipher(t)
+
+	if _, err := svc.UpdateAIConfig(context.Background(), AIConfigRequest{
+		Enabled:     true,
+		Provider:    "openai",
+		ApiEndpoint: "https://api.example.com/v1",
+		ApiKey:      "sk-test-key",
+		ModelName:   "gpt-3.5-turbo",
+	}); err != nil {
+		t.Fatalf("UpdateAIConfig error: %v", err)
+	}
+
+	if _, err := svc.UpdateAIConfig(context.Background(), AIConfigRequest{
+		Enabled:     false,
+		Provider:    "openai",
+		ApiEndpoint: "https://api2.example.com/v1",
+		ApiKey:      "",
+		ModelName:   "gpt-4",
+	}); err != nil {
+		t.Fatalf("UpdateAIConfig (no key) error: %v", err)
+	}
+
+	var stored model.AIConfig
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	decrypted, err := cipher.Decrypt(stored.ApiKey)
+	if err != nil {
+		t.Fatalf("Decrypt error: %v", err)
+	}
+	if decrypted != "sk-test-key" {
+		t.Errorf("expected preserved API key to stay decryptable, got %q", decrypted)
+	}
+}
+
+// TC-ENC-014: an undecryptable stored AI key (wrong/rotated key) must not
+// crash the server; the key is treated as unset and the test call reports the
+// incomplete-configuration error.
+func TestTestAI_UndecryptableKeyTreatedAsUnset(t *testing.T) {
+	svc, db, _ := newTestServiceWithCipher(t)
+
+	// Store a value encrypted under a different passphrase.
+	other, err := secrets.New("other-key")
+	if err != nil {
+		t.Fatalf("failed to create other cipher: %v", err)
+	}
+	encrypted, err := other.Encrypt("sk-rotated")
+	if err != nil {
+		t.Fatalf("Encrypt error: %v", err)
+	}
+	if err := db.Create(&model.AIConfig{
+		Enabled:     true,
+		Provider:    "openai",
+		ApiEndpoint: "https://api.example.com/v1",
+		ApiKey:      encrypted,
+		ModelName:   "gpt-3.5-turbo",
+	}).Error; err != nil {
+		t.Fatalf("failed to seed AI config: %v", err)
+	}
+
+	if _, err := svc.TestAI(context.Background()); !errors.Is(err, ErrAIIncomplete) {
+		t.Errorf("expected ErrAIIncomplete for undecryptable key, got %v", err)
 	}
 }

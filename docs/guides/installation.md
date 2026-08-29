@@ -144,6 +144,7 @@ docker run -d \
   -e ADDR=0.0.0.0 \
   -e PORT=3001 \
   -e JWT_SECRET=your-secret-key-change-this-in-production \
+  -e SETTINGS_ENCRYPTION_KEY=your-very-long-random-secret-here-change-this-in-production \
   --restart unless-stopped \
   ghcr.io/vexgo-org/vexgo:latest
 ```
@@ -185,6 +186,7 @@ services:
       - ADDR=0.0.0.0
       - PORT=3001
       - JWT_SECRET=your-secret-key-change-this-in-production
+      - SETTINGS_ENCRYPTION_KEY=your-very-long-random-secret-here-change-this-in-production
       - DB_TYPE=postgres
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -325,6 +327,7 @@ sudo nixos-rebuild switch
       port = 3001;
       data = "/var/lib/vexgo";
       jwt_secret = "your-secret-key-change-this-in-production";
+      settings_encryption_key = "your-very-long-random-secret-here-change-this-in-production";
       log_level = "info";
     };
   };

@@ -150,6 +150,14 @@ data: "./data"
 # You can generate one with: openssl rand -base64 32
 jwt_secret: "your-secret-key-change-this-in-production"
 
+# Passphrase used to encrypt secrets at rest in the database (SMTP password,
+# AI and comment-moderation API keys) with AES-256-GCM.
+# IMPORTANT: Generate a secure random string for production!
+# You can generate one with: openssl rand -base64 32
+# When empty, these secrets are stored in plaintext (a warning is logged at startup).
+# Existing plaintext values are encrypted in place on the first start with a key set.
+settings_encryption_key: ""
+
 # Logging level: "debug", "info", "warn", "error"
 log_level: "info"
 
@@ -294,16 +302,17 @@ You can also configure the application using environment variables.
 
 #### Server
 
-| Variable               | Default   | Description                                                                                                                                                                                                                                                  |
-| ---------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ADDR`                 | `0.0.0.0` | Server listen address                                                                                                                                                                                                                                        |
-| `PORT`                 | `3001`    | Server listen port                                                                                                                                                                                                                                           |
-| `DATA_DIR`             | `./data`  | Data directory path                                                                                                                                                                                                                                          |
-| `JWT_SECRET`           | —         | JWT secret key (required for production)                                                                                                                                                                                                                     |
-| `LOG_LEVEL`            | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                                                                              |
-| `BASE_URL`             | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required when running behind a reverse proxy.                                           |
-| `BEHIND_REVERSE_PROXY` | `false`   | Set to `true` if the server is behind a reverse proxy (nginx, Cloudflare, etc.). This enables proper handling of `X-Forwarded-*` headers.                                                                                                                    |
-| `TRUSTED_PROXIES`      | —         | Comma-separated list of trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. If empty, defaults to common private networks (127.0.0.1, ::1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12). Example: `TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
+| Variable                  | Default   | Description                                                                                                                                                                                                                                                  |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ADDR`                    | `0.0.0.0` | Server listen address                                                                                                                                                                                                                                        |
+| `PORT`                    | `3001`    | Server listen port                                                                                                                                                                                                                                           |
+| `DATA_DIR`                | `./data`  | Data directory path                                                                                                                                                                                                                                          |
+| `JWT_SECRET`              | —         | JWT secret key (required for production)                                                                                                                                                                                                                     |
+| `SETTINGS_ENCRYPTION_KEY` | —         | Passphrase used to encrypt secrets at rest in the database (SMTP password, AI and comment-moderation API keys) with AES-256-GCM. When empty, these secrets are stored in plaintext (a warning is logged at startup).                                         |
+| `LOG_LEVEL`               | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                                                                              |
+| `BASE_URL`                | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required when running behind a reverse proxy.                                           |
+| `BEHIND_REVERSE_PROXY`    | `false`   | Set to `true` if the server is behind a reverse proxy (nginx, Cloudflare, etc.). This enables proper handling of `X-Forwarded-*` headers.                                                                                                                    |
+| `TRUSTED_PROXIES`         | —         | Comma-separated list of trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. If empty, defaults to common private networks (127.0.0.1, ::1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12). Example: `TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
 
 #### Database
 

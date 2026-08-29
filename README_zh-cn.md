@@ -150,6 +150,14 @@ data: "./data"
 # 可以使用以下命令生成：openssl rand -base64 32
 jwt_secret: "your-secret-key-change-this-in-production"
 
+# Passphrase used to encrypt secrets at rest in the database (SMTP password,
+# AI and comment-moderation API keys) with AES-256-GCM.
+# IMPORTANT: Generate a secure random string for production!
+# You can generate one with: openssl rand -base64 32
+# When empty, these secrets are stored in plaintext (a warning is logged at startup).
+# Existing plaintext values are encrypted in place on the first start with a key set.
+settings_encryption_key: ""
+
 # 日志级别："debug", "info", "warn", "error"
 log_level: "info"
 
@@ -294,16 +302,17 @@ s3_disable_bucket_in_custom_url: false
 
 #### Server
 
-| 变量                   | 默认值    | 说明                                                                                                                                                                                                                           |
-| ---------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ADDR`                 | `0.0.0.0` | 服务监听地址                                                                                                                                                                                                                   |
-| `PORT`                 | `3001`    | 服务监听端口                                                                                                                                                                                                                   |
-| `DATA_DIR`             | `./data`  | 数据目录路径                                                                                                                                                                                                                   |
-| `JWT_SECRET`           | —         | JWT 签名密钥（生产环境必填）                                                                                                                                                                                                   |
-| `LOG_LEVEL`            | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                                                                                                                                                     |
-| `BASE_URL`             | —         | 实例的公网地址（如 `https://vexgo.example.com`）。用于生成 OAuth 回调地址和邮件中的链接（邮箱验证、密码重置、换绑邮箱）。反向代理后必须设置。                                                                                  |
-| `BEHIND_REVERSE_PROXY` | `false`   | 设置为 `true` 表示服务器位于反向代理（如 nginx、Cloudflare 等）之后。启用后才会正确处理 `X-Forwarded-*` 头部。                                                                                                                 |
-| `TRUSTED_PROXIES`      | —         | 受信任的代理 IP/CIDR 列表（逗号分隔）。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。如果留空，默认使用常见私有网络（127.0.0.1、::1、192.168.0.0/16、10.0.0.0/8、172.16.0.0/12）。示例：`TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
+| 变量                      | 默认值    | 说明                                                                                                                                                                                                                           |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ADDR`                    | `0.0.0.0` | 服务监听地址                                                                                                                                                                                                                   |
+| `PORT`                    | `3001`    | 服务监听端口                                                                                                                                                                                                                   |
+| `DATA_DIR`                | `./data`  | 数据目录路径                                                                                                                                                                                                                   |
+| `JWT_SECRET`              | —         | JWT 签名密钥（生产环境必填）                                                                                                                                                                                                   |
+| `SETTINGS_ENCRYPTION_KEY` | —         | 用于在数据库中对静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）做 AES-256-GCM 加密的口令。留空时这些信息以明文存储（启动时会记录警告）。                                                                                     |
+| `LOG_LEVEL`               | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                                                                                                                                                     |
+| `BASE_URL`                | —         | 实例的公网地址（如 `https://vexgo.example.com`）。用于生成 OAuth 回调地址和邮件中的链接（邮箱验证、密码重置、换绑邮箱）。反向代理后必须设置。                                                                                  |
+| `BEHIND_REVERSE_PROXY`    | `false`   | 设置为 `true` 表示服务器位于反向代理（如 nginx、Cloudflare 等）之后。启用后才会正确处理 `X-Forwarded-*` 头部。                                                                                                                 |
+| `TRUSTED_PROXIES`         | —         | 受信任的代理 IP/CIDR 列表（逗号分隔）。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。如果留空，默认使用常见私有网络（127.0.0.1、::1、192.168.0.0/16、10.0.0.0/8、172.16.0.0/12）。示例：`TRUSTED_PROXIES="192.168.1.100, 10.0.0.1"` |
 
 #### Database
 

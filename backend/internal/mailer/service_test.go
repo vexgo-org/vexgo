@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -509,5 +510,115 @@ func TestClient_Send_MessageValidation(t *testing.T) {
 	noBody.HTMLBody = ""
 	if err := c.Send(ctx, noBody); err == nil || !strings.Contains(err.Error(), "body is required") {
 		t.Errorf("expected body error, got %v", err)
+	}
+}
+
+// fakeClient records the SMTP config handed to LoadConfig instead of building
+// a real mail client, so tests can assert on the decrypted password.
+type fakeClient struct {
+	loadedConfig *model.SMTPConfig
+	loadErr      error
+}
+
+func (f *fakeClient) LoadConfig(cfg *model.SMTPConfig) error {
+	if f.loadErr != nil {
+		return f.loadErr
+	}
+	f.loadedConfig = cfg
+	return nil
+}
+
+func (f *fakeClient) Send(_ context.Context, _ Message) error { return nil }
+
+func (f *fakeClient) Enabled() bool { return f.loadedConfig != nil && f.loadedConfig.Enabled }
+
+// newTestServiceWithClient builds a mailer service with an injected fake
+// SMTP client and cipher, for encryption-at-rest tests.
+func newTestServiceWithClient(t *testing.T, cipher SecretCipher) (*Service, *fakeClient, *gorm.DB) {
+	t.Helper()
+	db := newTestDB(t)
+	client := &fakeClient{}
+	svc := NewService(Deps{DB: db, Cipher: cipher, Client: client})
+	return svc, client, db
+}
+
+// TC-ENC-019: when the stored SMTP password is encrypted, the mailer loads
+// the SMTP client with the decrypted password.
+func TestReadConfig_DecryptsStoredPassword(t *testing.T) {
+	cipher, err := secrets.New("test-encryption-key")
+	if err != nil {
+		t.Fatalf("failed to create cipher: %v", err)
+	}
+	svc, client, db := newTestServiceWithClient(t, cipher)
+
+	encrypted, err := cipher.Encrypt("smtp-password")
+	if err != nil {
+		t.Fatalf("Encrypt error: %v", err)
+	}
+	cfg := model.SMTPConfig{
+		Enabled:   true,
+		Host:      "127.0.0.1",
+		Port:      2525,
+		FromEmail: "admin@vexgo.example",
+		Password:  encrypted,
+	}
+	if err := db.Create(&cfg).Error; err != nil {
+		t.Fatalf("failed to seed smtp config: %v", err)
+	}
+
+	capture := &emailCapture{}
+	capture.install(t)
+	if err := svc.SendTestSMTPEmail(context.Background(), "to@example.com", &TestSMTPEmailTemplateData{}); err != nil {
+		t.Fatalf("SendTestSMTPEmail error: %v", err)
+	}
+
+	if client.loadedConfig == nil {
+		t.Fatal("expected LoadConfig to be called on the client")
+	}
+	if client.loadedConfig.Password != "smtp-password" {
+		t.Errorf("expected decrypted password passed to client, got %q", client.loadedConfig.Password)
+	}
+}
+
+// TC-ENC-020: an undecryptable stored password (wrong/rotated key) must not
+// crash the server; the password is treated as unset and an error naming the
+// setting is logged.
+func TestReadConfig_UndecryptablePasswordTreatedAsUnset(t *testing.T) {
+	writer, err := secrets.New("original-key")
+	if err != nil {
+		t.Fatalf("failed to create writer cipher: %v", err)
+	}
+	reader, err := secrets.New("rotated-key")
+	if err != nil {
+		t.Fatalf("failed to create reader cipher: %v", err)
+	}
+	svc, client, db := newTestServiceWithClient(t, reader)
+
+	encrypted, err := writer.Encrypt("smtp-password")
+	if err != nil {
+		t.Fatalf("Encrypt error: %v", err)
+	}
+	cfg := model.SMTPConfig{
+		Enabled:   true,
+		Host:      "127.0.0.1",
+		Port:      2525,
+		FromEmail: "admin@vexgo.example",
+		Password:  encrypted,
+	}
+	if err := db.Create(&cfg).Error; err != nil {
+		t.Fatalf("failed to seed smtp config: %v", err)
+	}
+
+	capture := &emailCapture{}
+	capture.install(t)
+	if err := svc.SendTestSMTPEmail(context.Background(), "to@example.com", &TestSMTPEmailTemplateData{}); err != nil {
+		t.Fatalf("SendTestSMTPEmail error: %v", err)
+	}
+
+	if client.loadedConfig == nil {
+		t.Fatal("expected LoadConfig to be called on the client despite the undecryptable password")
+	}
+	if client.loadedConfig.Password != "" {
+		t.Errorf("expected undecryptable password treated as unset, got %q", client.loadedConfig.Password)
 	}
 }

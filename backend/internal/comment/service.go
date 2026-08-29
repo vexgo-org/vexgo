@@ -25,11 +25,21 @@ var (
 	ErrForbidden = errors.New("forbidden")
 )
 
+// SecretCipher is the seam for encrypting the moderation API key at rest. It
+// is implemented by the secrets package and injected so it can be faked
+// in tests. A nil cipher means no key is configured: the key is stored as
+// plaintext.
+type SecretCipher interface {
+	Encrypt(plaintext string) (string, error)
+	Decrypt(stored string) (string, error)
+}
+
 // Deps holds the dependencies required by the comment domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Notifier  Notifier
+	Cipher    SecretCipher
 }
 
 // Notifier is the seam for creating notifications. It is implemented by the
@@ -40,11 +50,12 @@ type Notifier = model.Notifier
 type Service struct {
 	repo     Repository
 	notifier Notifier
+	cipher   SecretCipher
 }
 
 // NewService creates a comment service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier}
+	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier, cipher: deps.Cipher}
 }
 
 // defaultModerationPrompt is used by the moderation checker when no custom
@@ -66,7 +77,9 @@ func defaultModerationConfig() model.CommentModerationConfig {
 }
 
 // moderationConfig loads the comment moderation configuration, falling back to
-// the default values when no row exists.
+// the default values when no row exists. The stored API key is decrypted for
+// internal use; an undecryptable key (e.g. after a key rotation) is treated as
+// unset with an error naming the setting.
 func (s *Service) moderationConfig(ctx context.Context) (model.CommentModerationConfig, error) {
 	config, err := s.repo.GetModerationConfig(ctx)
 	if err != nil {
@@ -74,6 +87,16 @@ func (s *Service) moderationConfig(ctx context.Context) (model.CommentModeration
 			return defaultModerationConfig(), nil
 		}
 		return config, err
+	}
+	if config.ApiKey != "" && s.cipher != nil {
+		decrypted, decErr := s.cipher.Decrypt(config.ApiKey)
+		if decErr != nil {
+			slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it",
+				"setting", "comment_moderation.api_key", "err", decErr)
+			config.ApiKey = ""
+		} else {
+			config.ApiKey = decrypted
+		}
 	}
 	return config, nil
 }
@@ -299,50 +322,61 @@ func (s *Service) UpdateModerationConfig(
 	ctx context.Context,
 	req UpdateModerationConfigRequest,
 ) (model.CommentModerationConfig, error) {
-	config, err := s.moderationConfig(ctx)
-	if err != nil {
-		return config, err
+	// Single fetch decides create vs update; any persistence error other than
+	// "no row yet" aborts the update so a stored key can never be wiped by a
+	// transient read failure.
+	raw, getErr := s.repo.GetModerationConfig(ctx)
+	isCreate := errors.Is(getErr, gorm.ErrRecordNotFound)
+	if getErr != nil && !isCreate {
+		return model.CommentModerationConfig{}, fmt.Errorf("load comment moderation config: %w", getErr)
 	}
 
-	_, getErr := s.repo.GetModerationConfig(ctx)
-	isCreate := errors.Is(getErr, gorm.ErrRecordNotFound)
+	config := model.CommentModerationConfig{
+		Enabled:            req.Enabled,
+		ModelProvider:      req.ModelProvider,
+		ApiEndpoint:        req.ApiEndpoint,
+		ModelName:          req.ModelName,
+		ModerationPrompt:   req.ModerationPrompt,
+		BlockKeywords:      req.BlockKeywords,
+		AutoApproveEnabled: req.AutoApproveEnabled,
+		MinScoreThreshold:  req.MinScoreThreshold,
+	}
 
-	if isCreate {
-		// Create new configuration
-		config = model.CommentModerationConfig{
-			Enabled:            req.Enabled,
-			ModelProvider:      req.ModelProvider,
-			ApiKey:             req.ApiKey,
-			ApiEndpoint:        req.ApiEndpoint,
-			ModelName:          req.ModelName,
-			ModerationPrompt:   req.ModerationPrompt,
-			BlockKeywords:      req.BlockKeywords,
-			AutoApproveEnabled: req.AutoApproveEnabled,
-			MinScoreThreshold:  req.MinScoreThreshold,
+	// The API key is only overwritten when a non-empty value is provided;
+	// otherwise the stored (possibly encrypted) value is kept exactly as read.
+	switch {
+	case req.ApiKey != "":
+		apiKey, encErr := s.encryptSecret(req.ApiKey, "comment_moderation.api_key")
+		if encErr != nil {
+			return model.CommentModerationConfig{}, encErr
 		}
-	} else {
-		// Update existing configuration
-		config.Enabled = req.Enabled
-		config.ModelProvider = req.ModelProvider
-		config.ApiEndpoint = req.ApiEndpoint
-		config.ModelName = req.ModelName
-		config.ModerationPrompt = req.ModerationPrompt
-		config.BlockKeywords = req.BlockKeywords
-		config.AutoApproveEnabled = req.AutoApproveEnabled
-		config.MinScoreThreshold = req.MinScoreThreshold
-		// Only update if new API key is provided
-		if req.ApiKey != "" {
-			config.ApiKey = req.ApiKey
-		}
+		config.ApiKey = apiKey
+	case !isCreate:
+		config.ApiKey = raw.ApiKey
 	}
 
 	if err := s.repo.SaveModerationConfig(ctx, &config); err != nil {
-		return config, err
+		return model.CommentModerationConfig{}, fmt.Errorf("save comment moderation config: %w", err)
 	}
 
 	// Don't return sensitive information
 	config.ApiKey = ""
 	return config, nil
+}
+
+// encryptSecret encrypts a secret before it is stored. Empty values are
+// passed through, and without a configured cipher the plaintext is stored
+// as-is (no-key fallback). Errors are wrapped with the setting name so the
+// admin can tell which secret failed to save.
+func (s *Service) encryptSecret(value, setting string) (string, error) {
+	if value == "" || s.cipher == nil {
+		return value, nil
+	}
+	encrypted, err := s.cipher.Encrypt(value)
+	if err != nil {
+		return "", fmt.Errorf("encrypt %s: %w", setting, err)
+	}
+	return encrypted, nil
 }
 
 // ListModeration returns the paginated comments with the given status

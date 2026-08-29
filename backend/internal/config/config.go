@@ -71,6 +71,12 @@ type Config struct {
 	GoogleClientID     string `mapstructure:"google_client_id"`     // Google OAuth 2.0 Client ID
 	GoogleClientSecret string `mapstructure:"google_client_secret"` // Google OAuth 2.0 Client Secret
 
+	// SettingsEncryptionKey is the passphrase used to encrypt secrets at rest
+	// in the database (SMTP password, AI and comment-moderation API keys) with
+	// AES-256-GCM. When empty, those secrets are stored in plaintext and a
+	// warning is logged at startup.
+	SettingsEncryptionKey string `mapstructure:"settings_encryption_key"`
+
 	// Global options
 	AllowLocalLogin bool `mapstructure:"allow_local_login"` // Allow password-based login (default: true)
 
@@ -135,6 +141,8 @@ var keyDefaults = map[string]any{
 
 	"google_client_id":     "",
 	"google_client_secret": "",
+
+	"settings_encryption_key": "",
 
 	"allow_local_login": true,
 

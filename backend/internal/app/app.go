@@ -43,6 +43,11 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("compute JWT secret: %w", err)
 	}
 
+	cipher, err := initCipher(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("init cipher: %w", err)
+	}
+
 	storage, err := initStorage(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init storage: %w", err)
@@ -59,6 +64,18 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("seed database: %w", err)
 	}
 
+	// Encrypt still-plaintext secrets in place when a key is configured.
+	// Idempotent: values already carrying the encrypted marker are skipped.
+	if cipher != nil {
+		migrated, err := database.MigrateSecretsAtRest(db, cipher)
+		if err != nil {
+			return nil, fmt.Errorf("migrate secrets at rest: %w", err)
+		}
+		if migrated > 0 {
+			slog.Info("encrypted plaintext secrets at rest", "count", migrated)
+		}
+	}
+
 	// gin.New (no default logger) + explicit recovery: request logging is done
 	// once by middleware.RequestLogger below, avoiding double log lines.
 	r := gin.New()
@@ -73,7 +90,7 @@ func New(cfg *config.Config) (*App, error) {
 	// Shared service instances: construct each once and reuse it across the
 	// domains that depend on it.
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
-	mailerSvc := mailer.NewService(mailer.Deps{DB: db})
+	mailerSvc := mailer.NewService(mailer.Deps{DB: db, Cipher: cipher})
 	captchaSvc := captcha.NewService(captcha.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 
 	router.RegisterAPIRoutes(r, router.Deps{
@@ -87,6 +104,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
+			Cipher:    cipher,
 		},
 		Post: post.Deps{
 			DB:        db,
@@ -133,6 +151,7 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 			Themes:    renderer,
 			Mailer:    mailerSvc,
+			Cipher:    cipher,
 		},
 	})
 

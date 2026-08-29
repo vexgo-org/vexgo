@@ -33,6 +33,7 @@ backend/
     post/                    # post CRUD, categories, tags, likes
     public/                  # embedded frontend, themes, SSR renderer, static routes
     router/                  # route registration (composes every domain)
+    secrets/                 # AES-256-GCM encryption of secrets stored in the database
     settings/                # admin configuration (SMTP, AI, general, theme)
     sso/                     # GitHub / Google / OIDC login
     upload/                  # file upload (local disk or S3)
@@ -106,8 +107,9 @@ The `internal/app/app.go` package is the composition root (also called the "wiri
 1. Receives the configuration resolved by `cli.Execute()` — cobra parses the flags, viper layers flags > config file > environment variables > defaults.
 2. Ensures the JWT secret exists (generating a random development fallback) and applies the frontend URL default; the SSO struct is derived during config resolution.
 3. Opens the database and runs migrations/seeding.
-4. Creates storage (local or S3).
-5. Instantiates every domain's dependencies and wires them into the router.
+4. Builds the at-rest cipher from `settings_encryption_key` (a warning is logged when unset, meaning secrets stay in plaintext) and runs `database.MigrateSecretsAtRest` to encrypt still-plaintext secrets in place (idempotent).
+5. Creates storage (local or S3).
+6. Instantiates every domain's dependencies and wires them into the router.
 
 `cmd/vexgo/main.go` is a thin entry point that calls `cli.Execute()`, then `app.New(cfg)` and `app.Run()`.
 
@@ -128,6 +130,8 @@ cmd/vexgo/main.go
 Leaf packages (no internal imports):
     model/         ← data models + shared interfaces, imported by every domain
     config/        ← configuration parsing, imported by cli, app, auth, database, sso, upload
+    secrets/       ← AES-256-GCM cipher for secrets at rest; domains consume it
+                     through their own SecretCipher interfaces, wired by app
 
 Shared layer:
     middleware/     ← JWT auth, role permissions, request logging (imports model only)

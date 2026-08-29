@@ -43,6 +43,7 @@ addr: "0.0.0.0"
 port: 3001
 data_dir: "./data"
 jwt_secret: "your-secret-key-change-this-in-production"
+settings_encryption_key: "" # 对 SMTP 密码及 AI/评论审核 API 密钥做静态加密（留空 = 明文存储）
 log_level: "info"
 
 # 位于反向代理之后？设为 true 以正确解析 X-Forwarded-* 请求头
@@ -71,15 +72,16 @@ s3_bucket: "my-bucket"
 
 每个设置都可以通过环境变量提供，这在 Docker 和 systemd 部署中很自然。
 
-| 变量                   | 默认值    | 说明                                    |
-| ---------------------- | --------- | --------------------------------------- |
-| `ADDR`                 | `0.0.0.0` | 监听地址                                |
-| `PORT`                 | `3001`    | 监听端口                                |
-| `DATA_DIR`             | `./data`  | 数据目录（SQLite 数据库和媒体文件）     |
-| `JWT_SECRET`           | —         | JWT 签名密钥（**生产环境必填**）        |
-| `LOG_LEVEL`            | `info`    | `debug`、`info`、`warn`、`error`        |
-| `BEHIND_REVERSE_PROXY` | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头 |
-| `TRUSTED_PROXIES`      | —         | 逗号分隔的可信代理 IP/CIDR              |
+| 变量                      | 默认值    | 说明                                                                                         |
+| ------------------------- | --------- | -------------------------------------------------------------------------------------------- |
+| `ADDR`                    | `0.0.0.0` | 监听地址                                                                                     |
+| `PORT`                    | `3001`    | 监听端口                                                                                     |
+| `DATA_DIR`                | `./data`  | 数据目录（SQLite 数据库和媒体文件）                                                          |
+| `JWT_SECRET`              | —         | JWT 签名密钥（**生产环境必填**）                                                             |
+| `SETTINGS_ENCRYPTION_KEY` | —         | 加密静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）的口令。留空 = 明文存储并输出启动警告。 |
+| `LOG_LEVEL`               | `info`    | `debug`、`info`、`warn`、`error`                                                             |
+| `BEHIND_REVERSE_PROXY`    | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                      |
+| `TRUSTED_PROXIES`         | —         | 逗号分隔的可信代理 IP/CIDR                                                                   |
 
 ### 数据库
 
@@ -284,6 +286,10 @@ docker run -d --name vexgo \
 ```
 
 > **MinIO/Wasabi：** 请设置 `S3_FORCE_PATH=true`——大多数 S3 兼容服务需要路径风格 URL。
+
+## 静态敏感信息加密
+
+SMTP 密码以及 AI / 评论审核 API 密钥存储在数据库中。设置 `SETTINGS_ENCRYPTION_KEY`（或 `settings_encryption_key`）即可使用 AES-256-GCM 对其静态加密。设置密钥后，存量明文会在下次启动时一次性就地加密；未设置时，这些信息以明文存储并在启动时记录警告。完整行为（包括密钥错误时的处理）参见[配置参考](/zh-cn/reference/configuration#静态敏感信息加密)。
 
 ## 哪些配置在运行时管理？
 
