@@ -201,7 +201,7 @@ func (s *Service) moderationDecision(
 ) (model.CommentStatus, string) {
 	if config.KeywordFilterEnabled {
 		if keyword, hit := matchBlockedKeyword(content, config.BlockKeywords); hit {
-			return model.CommentStatusRejected, "Contains blocked keyword: " + keyword
+			return model.CommentStatusRejected, truncateReason("Contains blocked keyword: " + keyword)
 		}
 	}
 
@@ -212,7 +212,7 @@ func (s *Service) moderationDecision(
 			return model.CommentStatusPending, "LLM review failed; held for manual review"
 		}
 		if !verdict.Approved {
-			return model.CommentStatusRejected, verdict.Reason
+			return model.CommentStatusRejected, truncateReason(verdict.Reason)
 		}
 		if config.ManualReviewEnabled {
 			return model.CommentStatusPending, ""
@@ -236,6 +236,21 @@ func matchBlockedKeyword(content, blockKeywords string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// maxModerationReason is the storage limit of the moderation_reason column
+// (model.Comment.ModerationReason, gorm size:500).
+const maxModerationReason = 500
+
+// truncateReason caps a moderation reason at the column limit, counting
+// runes, so an oversized model reply or keyword cannot break comment
+// persistence on strict databases (MySQL/PostgreSQL).
+func truncateReason(reason string) string {
+	runes := []rune(reason)
+	if len(runes) <= maxModerationReason {
+		return reason
+	}
+	return string(runes[:maxModerationReason])
 }
 
 // notifyPostAuthor notifies the post author unless they wrote the comment.

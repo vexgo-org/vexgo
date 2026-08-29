@@ -415,3 +415,38 @@ func TestBuildModerationPrompt(t *testing.T) {
 		}
 	})
 }
+
+// A moderation reason that exceeds the moderation_reason column limit (an
+// oversized model reply or keyword) must be truncated so comment persistence
+// cannot fail on strict databases.
+func TestCreate_ModerationReasonTruncatedToColumnLimit(t *testing.T) {
+	svc, _, db := newTestService(t)
+	oversized := strings.Repeat("语", 600) // 600 runes, far past the 500-rune column
+	fake := newFakeLLMServer(t, `{"approved": false, "reason": "`+oversized+`"}`, http.StatusOK)
+	configureLLM(t, svc, false, fake.URL)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+
+	comment, _, err := svc.Create(context.Background(), CreateRequest{
+		PostID: post.ID, UserID: commenter.ID, Content: "some comment",
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if comment.Status != model.CommentStatusRejected {
+		t.Errorf("expected rejected, got %s", comment.Status)
+	}
+	if got := len([]rune(comment.ModerationReason)); got != maxModerationReason {
+		t.Errorf("expected reason truncated to %d runes, got %d", maxModerationReason, got)
+	}
+
+	// The persisted row must match (the insert itself must not error).
+	var stored model.Comment
+	if err := db.First(&stored, comment.ID).Error; err != nil {
+		t.Fatalf("load stored comment: %v", err)
+	}
+	if got := len([]rune(stored.ModerationReason)); got != maxModerationReason {
+		t.Errorf("expected stored reason truncated to %d runes, got %d", maxModerationReason, got)
+	}
+}
