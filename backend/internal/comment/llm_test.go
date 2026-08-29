@@ -450,3 +450,30 @@ func TestCreate_ModerationReasonTruncatedToColumnLimit(t *testing.T) {
 		t.Errorf("expected stored reason truncated to %d runes, got %d", maxModerationReason, got)
 	}
 }
+
+// A response body larger than the read cap must fail closed to pending
+// instead of growing memory without bound.
+func TestCreate_OversizedLLMResponse_Pends(t *testing.T) {
+	svc, _, db := newTestService(t)
+	// Valid JSON whose body exceeds the 64 KiB read cap; truncation cuts the
+	// JSON mid-value, so the decode must fail and the comment be held.
+	huge := `{"choices":[{"message":{"content":"` + strings.Repeat("a", 128<<10) + `"}}]}`
+	fake := newFakeLLMServer(t, "", http.StatusOK)
+	fake.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(huge))
+	})
+	configureLLM(t, svc, false, fake.URL)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+
+	comment, _, err := svc.Create(context.Background(), CreateRequest{
+		PostID: post.ID, UserID: commenter.ID, Content: "some comment",
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if comment.Status != model.CommentStatusPending {
+		t.Errorf("expected fail-closed pending, got %s", comment.Status)
+	}
+}

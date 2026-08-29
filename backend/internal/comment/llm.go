@@ -18,6 +18,10 @@ import (
 // on an unresponsive endpoint.
 const llmTimeout = 15 * time.Second
 
+// llmMaxResponseBytes caps how much of a chat completion response body is
+// read, so a misbehaving endpoint cannot grow server memory without bound.
+const llmMaxResponseBytes = 64 << 10 // 64 KiB
+
 // moderationVerdict is the strict JSON decision the moderation prompt asks
 // the model to return.
 type moderationVerdict struct {
@@ -118,7 +122,7 @@ func (s *Service) callLLM(
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, llmMaxResponseBytes)).Decode(&result); err != nil {
 		return "", fmt.Errorf("parse LLM moderation response: %w", err)
 	}
 	if len(result.Choices) == 0 || result.Choices[0].Message.Content == "" {
