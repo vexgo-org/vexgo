@@ -478,7 +478,7 @@
 {
   "id": "uuid",
   "token": "captcha_token",
-  "thumbX": 150,
+  "thumbX": 25,
   "thumbY": 80,
   "thumbWidth": 60,
   "thumbHeight": 60,
@@ -491,7 +491,7 @@
 **备注：**
 
 - `image` 是主图，`thumb` 是拼图块；两者都是可直接渲染的 data-URI base64 字符串
-- `thumbX`/`thumbY`/`thumbWidth`/`thumbHeight` 描述拼图块在主图中的展示位置；客户端需要将拼图块拖到对应的缺口处并提交拖放坐标
+- `thumbX`/`thumbY`/`thumbWidth`/`thumbHeight` 描述拼图块在主图中的初始展示位置和尺寸；客户端需要将拼图块拖到对应的缺口处并提交拖放坐标
 - 正确的拖放位置不会暴露给客户端
 - 验证码只能验证一次，5 分钟后过期
 

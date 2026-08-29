@@ -480,7 +480,7 @@ Generate a sliding puzzle captcha.
 {
   "id": "uuid",
   "token": "captcha_token",
-  "thumbX": 150,
+  "thumbX": 25,
   "thumbY": 80,
   "thumbWidth": 60,
   "thumbHeight": 60,
@@ -494,9 +494,9 @@ Generate a sliding puzzle captcha.
 
 - `image` is the master image and `thumb` is the puzzle tile; both are
   data-URI base64 strings ready to be rendered directly
-- `thumbX`/`thumbY`/`thumbWidth`/`thumbHeight` describe where the tile is
-  displayed inside the master image; the client must drag the tile to the
-  matching hole and submit the drop coordinates
+- `thumbX`/`thumbY`/`thumbWidth`/`thumbHeight` describe the tile's initial
+  display position and size inside the master image; the client must drag the
+  tile to the matching hole and submit the drop coordinates
 - The correct drop position is never exposed to the client
 - A captcha can be verified only once and expires after 5 minutes
 

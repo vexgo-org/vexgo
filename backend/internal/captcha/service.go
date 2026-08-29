@@ -161,13 +161,14 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 		return nil, fmt.Errorf("%w: %v", ErrEncodePuzzleImage, err)
 	}
 
-	// The block display coordinates are the answer the client must match
-	// when dropping the tile.
+	// block.X/Y is the hole the client must drop the tile on — that is the
+	// answer. block.DX/DY is only the tile's initial display position and
+	// must never be used for validation.
 	captcha := model.Captcha{
 		ID:        uuid.New().String(),
 		Token:     uuid.New().String(),
-		X:         block.DX,
-		Y:         block.DY,
+		X:         block.X,
+		Y:         block.Y,
 		Width:     block.Width,
 		Height:    block.Height,
 		BgImage:   masterImage,
@@ -182,8 +183,8 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 	return &Captcha{
 		ID:          captcha.ID,
 		Token:       captcha.Token,
-		ThumbX:      captcha.X,
-		ThumbY:      captcha.Y,
+		ThumbX:      block.DX,
+		ThumbY:      block.DY,
 		ThumbWidth:  captcha.Width,
 		ThumbHeight: captcha.Height,
 		Image:       masterImage,

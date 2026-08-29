@@ -91,16 +91,45 @@ func TestGenerateCaptcha(t *testing.T) {
 		t.Errorf("expected tile to fit the master image, got y %d height %d", captcha.ThumbY, captcha.ThumbHeight)
 	}
 
-	// persisted for later verification
+	// persisted for later verification; the stored answer is the hole
+	// position, while thumbX/thumbY is the tile's initial display position
 	var stored model.Captcha
 	if err := db.First(&stored, "id = ?", captcha.ID).Error; err != nil {
 		t.Fatalf("failed to load captcha: %v", err)
 	}
-	if stored.X != captcha.ThumbX || stored.Y != captcha.ThumbY {
-		t.Errorf("expected stored answer (%d, %d), got (%d, %d)", captcha.ThumbX, captcha.ThumbY, stored.X, stored.Y)
+	if stored.X <= 0 || stored.X+stored.Width > captchaImageWidth {
+		t.Errorf("expected in-bounds hole position x %d", stored.X)
+	}
+	if stored.Y < 0 || stored.Y+stored.Height > captchaImageHeight {
+		t.Errorf("expected in-bounds hole position y %d", stored.Y)
 	}
 	if stored.Width != captcha.ThumbWidth || stored.Height != captcha.ThumbHeight {
 		t.Errorf("expected stored size %dx%d, got %dx%d", captcha.ThumbWidth, captcha.ThumbHeight, stored.Width, stored.Height)
+	}
+}
+
+// TestGenerateCaptcha_AnswerIsHolePosition guards the coordinate mapping: the
+// persisted answer must be the hole position (block.X), not the tile's initial
+// display position (block.DX). The two ranges overlap only marginally, so
+// assert that the stored answer is not always equal to the display position.
+func TestGenerateCaptcha_AnswerIsHolePosition(t *testing.T) {
+	svc, db := newTestService(t)
+	differ := false
+	for range 8 {
+		captcha, err := svc.GenerateCaptcha(context.Background())
+		if err != nil {
+			t.Fatalf("GenerateCaptcha error: %v", err)
+		}
+		var stored model.Captcha
+		if err := db.First(&stored, "id = ?", captcha.ID).Error; err != nil {
+			t.Fatalf("failed to load captcha: %v", err)
+		}
+		if stored.X != captcha.ThumbX {
+			differ = true
+		}
+	}
+	if !differ {
+		t.Errorf("stored answer always equals the tile display position; expected the hole position")
 	}
 }
 
@@ -110,12 +139,16 @@ func TestVerifyCaptcha(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCaptcha error: %v", err)
 	}
+	var stored model.Captcha
+	if err := db.First(&stored, "id = ?", captcha.ID).Error; err != nil {
+		t.Fatalf("failed to load captcha: %v", err)
+	}
 
 	// correct position passes and marks as used
-	if err := svc.VerifyCaptcha(context.Background(), captcha.ID, captcha.Token, captcha.ThumbX, captcha.ThumbY); err != nil {
+	if err := svc.VerifyCaptcha(context.Background(), captcha.ID, captcha.Token, stored.X, stored.Y); err != nil {
 		t.Fatalf("VerifyCaptcha error: %v", err)
 	}
-	if err := svc.VerifyCaptcha(context.Background(), captcha.ID, captcha.Token, captcha.ThumbX, captcha.ThumbY); !errors.Is(err, ErrCaptchaUsed) {
+	if err := svc.VerifyCaptcha(context.Background(), captcha.ID, captcha.Token, stored.X, stored.Y); !errors.Is(err, ErrCaptchaUsed) {
 		t.Errorf("expected ErrCaptchaUsed on second use, got %v", err)
 	}
 
@@ -124,12 +157,16 @@ func TestVerifyCaptcha(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCaptcha error: %v", err)
 	}
-	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, captcha2.ThumbX+100, captcha2.ThumbY); !errors.Is(err, ErrCaptchaMismatch) {
+	var stored2 model.Captcha
+	if err := db.First(&stored2, "id = ?", captcha2.ID).Error; err != nil {
+		t.Fatalf("failed to load captcha: %v", err)
+	}
+	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, stored2.X+100, stored2.Y); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong x, got %v", err)
 	}
 
 	// wrong y position
-	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, captcha2.ThumbX, captcha2.ThumbY+100); !errors.Is(err, ErrCaptchaMismatch) {
+	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, stored2.X, stored2.Y+100); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
 	}
 
@@ -158,14 +195,18 @@ func TestVerifyCaptcha(t *testing.T) {
 }
 
 func TestVerifyCaptcha_ToleranceBounded(t *testing.T) {
-	svc, _ := newTestService(t)
+	svc, db := newTestService(t)
 	captcha, err := svc.GenerateCaptcha(context.Background())
 	if err != nil {
 		t.Fatalf("GenerateCaptcha error: %v", err)
 	}
+	var stored model.Captcha
+	if err := db.First(&stored, "id = ?", captcha.ID).Error; err != nil {
+		t.Fatalf("failed to load captcha: %v", err)
+	}
 
 	// Within the padding window the submission passes
-	if err := svc.VerifyCaptcha(context.Background(), captcha.ID, captcha.Token, captcha.ThumbX+verifyPadding, captcha.ThumbY+verifyPadding); err != nil {
+	if err := svc.VerifyCaptcha(context.Background(), captcha.ID, captcha.Token, stored.X+verifyPadding, stored.Y+verifyPadding); err != nil {
 		t.Errorf("expected drop within padding to pass, got %v", err)
 	}
 
@@ -174,14 +215,22 @@ func TestVerifyCaptcha_ToleranceBounded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCaptcha error: %v", err)
 	}
-	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, captcha2.ThumbX+verifyPadding*2, captcha2.ThumbY); !errors.Is(err, ErrCaptchaMismatch) {
+	var stored2 model.Captcha
+	if err := db.First(&stored2, "id = ?", captcha2.ID).Error; err != nil {
+		t.Fatalf("failed to load captcha: %v", err)
+	}
+	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, stored2.X+verifyPadding*2, stored2.Y); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch beyond padding on x, got %v", err)
 	}
 	captcha3, err := svc.GenerateCaptcha(context.Background())
 	if err != nil {
 		t.Fatalf("GenerateCaptcha error: %v", err)
 	}
-	if err := svc.VerifyCaptcha(context.Background(), captcha3.ID, captcha3.Token, captcha3.ThumbX, captcha3.ThumbY+verifyPadding*2); !errors.Is(err, ErrCaptchaMismatch) {
+	var stored3 model.Captcha
+	if err := db.First(&stored3, "id = ?", captcha3.ID).Error; err != nil {
+		t.Fatalf("failed to load captcha: %v", err)
+	}
+	if err := svc.VerifyCaptcha(context.Background(), captcha3.ID, captcha3.Token, stored3.X, stored3.Y+verifyPadding*2); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch beyond padding on y, got %v", err)
 	}
 }
