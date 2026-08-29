@@ -90,7 +90,7 @@ func dropLegacyModerationColumn(db *gorm.DB, column string) error {
 		return nil
 	}
 	var query string
-	switch db.Dialector.Name() {
+	switch db.Name() {
 	case "mysql":
 		query = fmt.Sprintf("ALTER TABLE `comment_moderation_configs` DROP COLUMN `%s`", column)
 	default: // sqlite and postgres accept double-quoted identifiers
