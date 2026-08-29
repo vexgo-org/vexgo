@@ -33,14 +33,18 @@ func (h *Handler) GenerateCaptcha(c *gin.Context) {
 		return
 	}
 
-	// Return captcha information (without correct answer)
+	// Return captcha information (without correct answer); the shape maps
+	// directly onto the go-captcha-react Slide component's data prop.
 	c.JSON(http.StatusOK, gin.H{
-		"id":         captcha.ID,
-		"token":      captcha.Token,
-		"bg_image":   captcha.BgImage,
-		"puzzle_img": captcha.PuzzleImg,
-		"y":          captcha.Y, // Return puzzle y coordinate
-		"expires_at": captcha.ExpiresAt,
+		"id":          captcha.ID,
+		"token":       captcha.Token,
+		"thumbX":      captcha.ThumbX,
+		"thumbY":      captcha.ThumbY,
+		"thumbWidth":  captcha.ThumbWidth,
+		"thumbHeight": captcha.ThumbHeight,
+		"image":       captcha.Image,
+		"thumb":       captcha.Thumb,
+		"expires_at":  captcha.ExpiresAt,
 	})
 }
 
@@ -50,6 +54,7 @@ func (h *Handler) VerifyCaptcha(c *gin.Context) {
 		ID    string `json:"id" binding:"required"`
 		Token string `json:"token" binding:"required"`
 		X     int    `json:"x" binding:"required"`
+		Y     int    `json:"y" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -58,7 +63,7 @@ func (h *Handler) VerifyCaptcha(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.VerifyCaptcha(c.Request.Context(), req.ID, req.Token, req.X)
+	err := h.svc.VerifyCaptcha(c.Request.Context(), req.ID, req.Token, req.X, req.Y)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaNotFound):

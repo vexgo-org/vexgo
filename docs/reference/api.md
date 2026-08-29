@@ -480,28 +480,36 @@ Generate a sliding puzzle captcha.
 {
   "id": "uuid",
   "token": "captcha_token",
-  "bg_image": "data:image/png;base64,...",
-  "puzzle_img": "data:image/png;base64,...",
-  "y": 100,
+  "thumbX": 150,
+  "thumbY": 80,
+  "thumbWidth": 60,
+  "thumbHeight": 60,
+  "image": "data:image/jpeg;base64,...",
+  "thumb": "data:image/png;base64,...",
   "expires_at": "2026-03-17T21:14:35Z"
 }
 ```
 
 **Notes:**
 
-- Only the X coordinate is verified; `y` is returned for the frontend
+- `image` is the master image and `thumb` is the puzzle tile; both are
+  data-URI base64 strings ready to be rendered directly
+- `thumbX`/`thumbY`/`thumbWidth`/`thumbHeight` describe where the tile is
+  displayed inside the master image; the client must drag the tile to the
+  matching hole and submit the drop coordinates
+- The correct drop position is never exposed to the client
 - A captcha can be verified only once and expires after 5 minutes
 
 ---
 
 ### POST /captcha/verify
 
-Verify a captcha token and position.
+Verify a captcha token and drop position.
 
 **Request:**
 
 ```json
-{ "id": "uuid", "token": "token", "x": 150 }
+{ "id": "uuid", "token": "token", "x": 150, "y": 80 }
 ```
 
 **Response (success):**
@@ -517,7 +525,8 @@ Verify a captcha token and position.
 - `400`: `{"error": "Captcha has expired"}`
 - `400`: `{"error": "Verification failed, please try again"}`
 
-X position verification allows ±10 pixel tolerance.
+Both `x` and `y` are verified against the stored answer with a ±5 pixel
+tolerance per axis.
 
 ---
 
@@ -536,7 +545,8 @@ Register a new user account.
   "username": "username",
   "captcha_id": "uuid",
   "captcha_token": "token",
-  "captcha_x": 150
+  "captcha_x": 150,
+  "captcha_y": 80
 }
 ```
 
@@ -565,7 +575,8 @@ Register a new user account.
 **Notes:**
 
 - Captcha fields are required when `captchaEnabled` is turned on in general settings
-- `captcha_id`, `captcha_token` and `captcha_x` may be empty strings / 0 when captcha is disabled
+- `captcha_id`, `captcha_token`, `captcha_x` and `captcha_y` may be empty
+  strings / 0 when captcha is disabled
 
 ---
 
@@ -581,7 +592,8 @@ Login with email and password.
   "password": "password123",
   "captcha_id": "uuid",
   "captcha_token": "token",
-  "captcha_x": 150
+  "captcha_x": 150,
+  "captcha_y": 80
 }
 ```
 

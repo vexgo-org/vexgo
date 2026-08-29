@@ -189,6 +189,7 @@ export function LoginPage() {
     id: string;
     token: string;
     x: number;
+    y: number;
   } | null>(null);
   const [isCaptchaModalOpen, setIsCaptchaModalOpen] = useState(false);
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
@@ -226,17 +227,11 @@ export function LoginPage() {
     id: string;
     token: string;
     x: number;
+    y: number;
   }) => {
+    // The captcha dialog already pre-verified this challenge on drop; keep
+    // the data so the login submit re-checks it server-side.
     setCaptchaData(data);
-    try {
-      await fetch("/api/captcha/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: data.id, token: data.token, x: data.x }),
-      });
-    } catch (error) {
-      console.error("Pre-verification failed:", error);
-    }
     setIsCaptchaVerified(true);
   };
 

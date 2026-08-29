@@ -202,17 +202,27 @@ func TestLogin_WithCaptcha(t *testing.T) {
 		t.Errorf("expected ErrCaptchaRequiredLogin, got %v", err)
 	}
 
-	// wrong position
+	// missing captcha y coordinate
 	captcha := model.Captcha{ID: "c1", Token: "t1", X: 100, Y: 50, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
 	if err := db.Create(&captcha).Error; err != nil {
 		t.Fatalf("failed to seed captcha: %v", err)
 	}
-	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 10}); !errors.Is(err, ErrCaptchaMismatch) {
-		t.Errorf("expected ErrCaptchaMismatch, got %v", err)
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100}); !errors.Is(err, ErrCaptchaRequired) {
+		t.Errorf("expected ErrCaptchaRequired for missing y, got %v", err)
+	}
+
+	// wrong x position
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 10, CaptchaY: 50}); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong x, got %v", err)
+	}
+
+	// wrong y position
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100, CaptchaY: 20}); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
 	}
 
 	// correct position passes
-	token, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100})
+	token, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100, CaptchaY: 50})
 	if err != nil {
 		t.Fatalf("Login with captcha error: %v", err)
 	}
@@ -226,6 +236,44 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	}
 	if !stored.Used {
 		t.Errorf("expected captcha marked as used")
+	}
+
+	// The submit-time re-check is idempotent: an already-used captcha still
+	// passes here because the pre-verification on drop already marked it.
+	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100, CaptchaY: 50}); err != nil {
+		t.Errorf("expected idempotent re-check to pass for used captcha, got %v", err)
+	}
+}
+
+func TestRegister_WithCaptcha(t *testing.T) {
+	svc, _, db := newTestService(t)
+	settings := model.GeneralSettings{CaptchaEnabled: true, RegistrationEnabled: true}
+	if err := db.Create(&settings).Error; err != nil {
+		t.Fatalf("failed to enable captcha: %v", err)
+	}
+
+	// missing captcha fields
+	if _, err := svc.Register(context.Background(), RegisterRequest{Email: "new@example.com", Password: "password123", Username: "newbie", Protocol: "http", Host: "localhost"}); !errors.Is(err, ErrCaptchaRequired) {
+		t.Errorf("expected ErrCaptchaRequired, got %v", err)
+	}
+
+	captcha := model.Captcha{ID: "c2", Token: "t2", X: 80, Y: 40, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
+	if err := db.Create(&captcha).Error; err != nil {
+		t.Fatalf("failed to seed captcha: %v", err)
+	}
+
+	// wrong y position
+	if _, err := svc.Register(context.Background(), RegisterRequest{Email: "new@example.com", Password: "password123", Username: "newbie", CaptchaID: "c2", CaptchaToken: "t2", CaptchaX: 80, CaptchaY: 20, Protocol: "http", Host: "localhost"}); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
+	}
+
+	// correct position passes
+	result, err := svc.Register(context.Background(), RegisterRequest{Email: "new@example.com", Password: "password123", Username: "newbie", CaptchaID: "c2", CaptchaToken: "t2", CaptchaX: 80, CaptchaY: 40, Protocol: "http", Host: "localhost"})
+	if err != nil {
+		t.Fatalf("Register with captcha error: %v", err)
+	}
+	if result.User == nil {
+		t.Errorf("expected user")
 	}
 }
 

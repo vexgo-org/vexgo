@@ -90,6 +90,7 @@ func (h *Handler) Login(c *gin.Context) {
 		CaptchaID    string `json:"captcha_id"`
 		CaptchaToken string `json:"captcha_token"`
 		CaptchaX     int    `json:"captcha_x"`
+		CaptchaY     int    `json:"captcha_y"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -107,6 +108,7 @@ func (h *Handler) Login(c *gin.Context) {
 		CaptchaID:    req.CaptchaID,
 		CaptchaToken: req.CaptchaToken,
 		CaptchaX:     req.CaptchaX,
+		CaptchaY:     req.CaptchaY,
 	})
 	if err != nil {
 		switch {
@@ -160,6 +162,7 @@ func (h *Handler) Register(c *gin.Context) {
 		CaptchaID    string `json:"captcha_id"`
 		CaptchaToken string `json:"captcha_token"`
 		CaptchaX     int    `json:"captcha_x"`
+		CaptchaY     int    `json:"captcha_y"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -183,6 +186,7 @@ func (h *Handler) Register(c *gin.Context) {
 		CaptchaID:    req.CaptchaID,
 		CaptchaToken: req.CaptchaToken,
 		CaptchaX:     req.CaptchaX,
+		CaptchaY:     req.CaptchaY,
 		Protocol:     protocol,
 		Host:         host,
 	})

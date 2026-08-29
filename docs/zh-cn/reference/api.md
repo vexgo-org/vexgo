@@ -478,28 +478,33 @@
 {
   "id": "uuid",
   "token": "captcha_token",
-  "bg_image": "data:image/png;base64,...",
-  "puzzle_img": "data:image/png;base64,...",
-  "y": 100,
+  "thumbX": 150,
+  "thumbY": 80,
+  "thumbWidth": 60,
+  "thumbHeight": 60,
+  "image": "data:image/jpeg;base64,...",
+  "thumb": "data:image/png;base64,...",
   "expires_at": "2026-03-17T21:14:35Z"
 }
 ```
 
 **备注：**
 
-- 只验证 X 坐标；`y` 返回给前端使用
+- `image` 是主图，`thumb` 是拼图块；两者都是可直接渲染的 data-URI base64 字符串
+- `thumbX`/`thumbY`/`thumbWidth`/`thumbHeight` 描述拼图块在主图中的展示位置；客户端需要将拼图块拖到对应的缺口处并提交拖放坐标
+- 正确的拖放位置不会暴露给客户端
 - 验证码只能验证一次，5 分钟后过期
 
 ---
 
 ### POST /captcha/verify
 
-验证验证码 token 和位置。
+验证验证码 token 和拖放位置。
 
 **请求：**
 
 ```json
-{ "id": "uuid", "token": "token", "x": 150 }
+{ "id": "uuid", "token": "token", "x": 150, "y": 80 }
 ```
 
 **响应（成功）：**
@@ -515,7 +520,7 @@
 - `400`：`{"error": "Captcha has expired"}`
 - `400`：`{"error": "Verification failed, please try again"}`
 
-X 位置验证允许 ±10 像素容差。
+`x` 和 `y` 两个坐标都会与存储的答案比对，每个坐标允许 ±5 像素容差。
 
 ---
 
@@ -534,7 +539,8 @@ X 位置验证允许 ±10 像素容差。
   "username": "username",
   "captcha_id": "uuid",
   "captcha_token": "token",
-  "captcha_x": 150
+  "captcha_x": 150,
+  "captcha_y": 80
 }
 ```
 
@@ -563,7 +569,7 @@ X 位置验证允许 ±10 像素容差。
 **备注：**
 
 - 当通用设置中启用了 `captchaEnabled` 时，验证码字段为必填
-- 当验证码被禁用时，`captcha_id`、`captcha_token` 和 `captcha_x` 可以是空字符串 / 0
+- 当验证码被禁用时，`captcha_id`、`captcha_token`、`captcha_x` 和 `captcha_y` 可以是空字符串 / 0
 
 ---
 
@@ -579,7 +585,8 @@ X 位置验证允许 ±10 像素容差。
   "password": "password123",
   "captcha_id": "uuid",
   "captcha_token": "token",
-  "captcha_x": 150
+  "captcha_x": 150,
+  "captcha_y": 80
 }
 ```
 

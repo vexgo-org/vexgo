@@ -167,6 +167,7 @@ export function RegisterPage() {
     id: string;
     token: string;
     x: number;
+    y: number;
   } | null>(null);
   const [isCaptchaModalOpen, setIsCaptchaModalOpen] = useState(false);
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
@@ -195,27 +196,11 @@ export function RegisterPage() {
     id: string;
     token: string;
     x: number;
+    y: number;
   }) => {
+    // The captcha dialog already pre-verified this challenge on drop; keep
+    // the data so the register submit re-checks it server-side.
     setCaptchaData(data);
-
-    // Call the pre-verify endpoint to mark the captcha as used
-    try {
-      await fetch("/api/captcha/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: data.id,
-          token: data.token,
-          x: data.x,
-        }),
-      });
-    } catch (error) {
-      console.error("Pre-verification failed:", error);
-      // Keep the data even if pre-verification fails so the user can still try to register
-    }
-
     setIsCaptchaVerified(true);
     // Do not auto-register; wait for the user to click the register button
   };
