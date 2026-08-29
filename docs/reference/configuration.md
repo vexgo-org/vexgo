@@ -49,7 +49,7 @@ Run `./vexgo --help` for the authoritative list.
 
 | Variable      | Default   | Description                                                         |
 | ------------- | --------- | ------------------------------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | Database type: `sqlite`, `mysql`, or `postgres`                     |
+| `DB_TYPE`     | `sqlite`  | Database type: `sqlite`, `mysql`, `postgres`, or `mariadb`          |
 | `DB_HOST`     | —         | Database host (required for mysql/postgres)                         |
 | `DB_PORT`     | —         | Database port (required for mysql/postgres)                         |
 | `DB_USER`     | —         | Database username (required for mysql/postgres)                     |
@@ -135,7 +135,7 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 
 | YAML key      | Default   | Description                                 |
 | ------------- | --------- | ------------------------------------------- |
-| `db_type`     | `sqlite`  | `sqlite`, `mysql`, or `postgres`            |
+| `db_type`     | `sqlite`  | `sqlite`, `mysql`, `postgres`, or `mariadb` |
 | `db_host`     | —         | Host (required for mysql/postgres)          |
 | `db_port`     | —         | Port (required for mysql/postgres)          |
 | `db_user`     | —         | Username (required for mysql/postgres)      |

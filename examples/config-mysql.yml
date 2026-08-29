@@ -46,10 +46,10 @@ trusted_proxies: []
 # ==================== Database Configuration ====================
 
 # Database type
-# Options: "sqlite", "mysql", "postgres"
+# Options: "sqlite", "mysql", "postgres", "mariadb"
 db_type: "mysql"
 
-# When db_type is "mysql", configure the following parameters
+# When db_type is "mysql" or "mariadb", configure the following parameters
 db_host: "127.0.0.1"
 db_port: 3306
 db_user: "vexgo_user"

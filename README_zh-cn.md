@@ -184,10 +184,10 @@ trusted_proxies: []
 # ==================== 数据库配置 ====================
 
 # 数据库类型
-# 可选值: "sqlite", "mysql", "postgres"
+# 可选值: "sqlite", "mysql", "postgres", "mariadb"
 db_type: "sqlite"
 
-# 当 db_type 为 "mysql" 时，配置以下参数
+# 当 db_type 为 "mysql" 或 "mariadb" 时，配置以下参数
 # db_host: "127.0.0.1"
 # db_port: 3306
 # db_user: "your_username"
@@ -316,15 +316,15 @@ s3_disable_bucket_in_custom_url: false
 
 #### Database
 
-| 变量          | 默认值    | 说明                                      |
-| ------------- | --------- | ----------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | 数据库类型：`sqlite`、`mysql`、`postgres` |
-| `DB_HOST`     | —         | 数据库主机（mysql/postgres 必填）         |
-| `DB_PORT`     | —         | 数据库端口（mysql/postgres 必填）         |
-| `DB_USER`     | —         | 数据库用户名（mysql/postgres 必填）       |
-| `DB_PASSWORD` | —         | 数据库密码（mysql/postgres 必填）         |
-| `DB_NAME`     | —         | 数据库名称（mysql/postgres 必填）         |
-| `DB_SSL_MODE` | `disable` | Postgres SSL 模式                         |
+| 变量          | 默认值    | 说明                                                 |
+| ------------- | --------- | ---------------------------------------------------- |
+| `DB_TYPE`     | `sqlite`  | 数据库类型：`sqlite`、`mysql`、`postgres`、`mariadb` |
+| `DB_HOST`     | —         | 数据库主机（mysql/postgres 必填）                    |
+| `DB_PORT`     | —         | 数据库端口（mysql/postgres 必填）                    |
+| `DB_USER`     | —         | 数据库用户名（mysql/postgres 必填）                  |
+| `DB_PASSWORD` | —         | 数据库密码（mysql/postgres 必填）                    |
+| `DB_NAME`     | —         | 数据库名称（mysql/postgres 必填）                    |
+| `DB_SSL_MODE` | `disable` | Postgres SSL 模式                                    |
 
 #### SSO / 单点登录
 

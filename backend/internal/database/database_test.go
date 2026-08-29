@@ -1,8 +1,11 @@
 package database
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/config"
@@ -243,5 +246,101 @@ func TestSeed_PreservesExistingAdmin(t *testing.T) {
 	}
 	if admin.Email != "custom-admin@example.com" {
 		t.Errorf("expected existing admin email preserved, got %q", admin.Email)
+	}
+}
+
+// freePort returns an unused TCP port on loopback. The MySQL driver is eager
+// (gorm.Open dials the server immediately), so pointing it at a free, unbound
+// port yields a deterministic connection-refused error with no live database.
+func freePort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve port: %v", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	_ = l.Close()
+	return port
+}
+
+// TestOpenMariaDBRoutesToMySQL verifies that the "mariadb" DB type is treated
+// identically to "mysql": it must take the MySQL connection path (not fall
+// through to SQLite or PostgreSQL) and use the configured host/port.
+func TestOpenMariaDBRoutesToMySQL(t *testing.T) {
+	port := freePort(t)
+	cfg := &config.Config{
+		DBType:     "mariadb",
+		DBUser:     "vexgo",
+		DBHost:     "127.0.0.1",
+		DBPort:     port,
+		DBName:     "vexgo",
+		DBPassword: "secret",
+	}
+
+	db, err := Open(cfg, "")
+	if db != nil {
+		t.Fatalf("expected no DB handle for unreachable MariaDB, got %v", db)
+	}
+	if err == nil {
+		t.Fatal("expected connection error for unreachable MariaDB, got nil")
+	}
+	// The error must originate from the MySQL connection path, proving
+	// "mariadb" routes to openMySQL rather than SQLite/PostgreSQL.
+	if !strings.Contains(err.Error(), "MySQL") {
+		t.Fatalf("expected MySQL connection error, got: %v", err)
+	}
+	// And it must have attempted the configured host/port (config-driven DSN).
+	if !strings.Contains(err.Error(), fmt.Sprintf("127.0.0.1:%d", port)) {
+		t.Fatalf("expected connection attempt at configured host/port, got: %v", err)
+	}
+}
+
+// TestOpenMariaDBViaEnv verifies the "mariadb" type resolves from the
+// DB_TYPE environment variable and uses the DB_PORT env fallback.
+func TestOpenMariaDBViaEnv(t *testing.T) {
+	t.Setenv("DB_TYPE", "mariadb")
+	port := freePort(t)
+	t.Setenv("DB_PORT", fmt.Sprintf("%d", port))
+
+	cfg := &config.Config{
+		DBType: "", // force fallback to environment variable
+		DBHost: "127.0.0.1",
+		DBName: "vexgo",
+		DBUser: "vexgo",
+	}
+
+	db, err := Open(cfg, "")
+	if db != nil {
+		t.Fatalf("expected no DB handle, got %v", db)
+	}
+	if err == nil {
+		t.Fatal("expected connection error, got nil")
+	}
+	if !strings.Contains(err.Error(), "MySQL") {
+		t.Fatalf("expected MariaDB (via env) to route to MySQL path, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), fmt.Sprintf("127.0.0.1:%d", port)) {
+		t.Fatalf("expected DB_PORT env fallback to be used, got: %v", err)
+	}
+}
+
+// TestOpenMySQLStillRoutesToMySQL guards against regressions: the explicit
+// "mysql" type must continue to take the MySQL path.
+func TestOpenMySQLStillRoutesToMySQL(t *testing.T) {
+	port := freePort(t)
+	cfg := &config.Config{
+		DBType: "mysql",
+		DBHost: "127.0.0.1",
+		DBPort: port,
+		DBName: "vexgo",
+		DBUser: "vexgo",
+	}
+
+	db, err := Open(cfg, "")
+	if db != nil {
+		t.Fatalf("expected no DB handle, got %v", db)
+	}
+	if err == nil || !strings.Contains(err.Error(), "MySQL") {
+		t.Fatalf("expected MySQL routing, got err=%v", err)
 	}
 }

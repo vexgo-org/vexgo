@@ -49,7 +49,7 @@
 
 | 变量          | 默认值    | 说明                                                                |
 | ------------- | --------- | ------------------------------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | 数据库类型：`sqlite`、`mysql` 或 `postgres`                         |
+| `DB_TYPE`     | `sqlite`  | 数据库类型：`sqlite`、`mysql`、`postgres` 或 `mariadb`              |
 | `DB_HOST`     | —         | 数据库主机（mysql/postgres 必填）                                   |
 | `DB_PORT`     | —         | 数据库端口（mysql/postgres 必填）                                   |
 | `DB_USER`     | —         | 数据库用户名（mysql/postgres 必填）                                 |
@@ -133,15 +133,15 @@
 
 ### 数据库
 
-| YAML 键       | 默认值    | 说明                            |
-| ------------- | --------- | ------------------------------- |
-| `db_type`     | `sqlite`  | `sqlite`、`mysql` 或 `postgres` |
-| `db_host`     | —         | 主机（mysql/postgres 必填）     |
-| `db_port`     | —         | 端口（mysql/postgres 必填）     |
-| `db_user`     | —         | 用户名（mysql/postgres 必填）   |
-| `db_password` | —         | 密码（mysql/postgres 必填）     |
-| `db_name`     | —         | 数据库名（mysql/postgres 必填） |
-| `db_ssl_mode` | `disable` | Postgres SSL 模式               |
+| YAML 键       | 默认值    | 说明                                       |
+| ------------- | --------- | ------------------------------------------ |
+| `db_type`     | `sqlite`  | `sqlite`、`mysql`、`postgres` 或 `mariadb` |
+| `db_host`     | —         | 主机（mysql/postgres 必填）                |
+| `db_port`     | —         | 端口（mysql/postgres 必填）                |
+| `db_user`     | —         | 用户名（mysql/postgres 必填）              |
+| `db_password` | —         | 密码（mysql/postgres 必填）                |
+| `db_name`     | —         | 数据库名（mysql/postgres 必填）            |
+| `db_ssl_mode` | `disable` | Postgres SSL 模式                          |
 
 ### SSO
 

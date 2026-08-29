@@ -46,7 +46,7 @@ trusted_proxies: []
 # ==================== Database Configuration ====================
 
 # Database type
-# Options: "sqlite", "mysql", "postgres"
+# Options: "sqlite", "mysql", "postgres", "mariadb"
 db_type: "postgres"
 
 # PostgreSQL specific configuration
