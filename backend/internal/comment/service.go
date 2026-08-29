@@ -91,7 +91,8 @@ func (s *Service) moderationConfig(ctx context.Context) (model.CommentModeration
 	if config.ApiKey != "" && s.cipher != nil {
 		decrypted, decErr := s.cipher.Decrypt(config.ApiKey)
 		if decErr != nil {
-			slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it", "setting", "comment_moderation.api_key", "err", decErr)
+			slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it",
+				"setting", "comment_moderation.api_key", "err", decErr)
 			config.ApiKey = ""
 		} else {
 			config.ApiKey = decrypted

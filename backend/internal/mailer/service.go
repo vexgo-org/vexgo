@@ -150,7 +150,8 @@ func (s *Service) readConfig(ctx context.Context) error {
 	if cfg.Password != "" && s.cipher != nil {
 		decrypted, decErr := s.cipher.Decrypt(cfg.Password)
 		if decErr != nil {
-			slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it", "setting", "smtp_config.password", "err", decErr)
+			slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it",
+				"setting", "smtp_config.password", "err", decErr)
 			cfg.Password = ""
 		} else {
 			cfg.Password = decrypted

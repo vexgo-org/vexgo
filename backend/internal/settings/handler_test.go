@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -39,10 +40,21 @@ func newTestAdminRouter(t *testing.T) (*gin.Engine, *gorm.DB, *secrets.Cipher) {
 		t.Fatalf("get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.SMTPConfig{}, &model.GeneralSettings{}, &model.AIConfig{}, &model.ThemeConfig{}); err != nil {
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SMTPConfig{},
+		&model.GeneralSettings{},
+		&model.AIConfig{},
+		&model.ThemeConfig{},
+	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	if err := db.Create(&model.User{Username: "admin", Email: "admin@example.com", Role: model.RoleSuperAdmin, PasswordVersion: 1}).Error; err != nil {
+	if err := db.Create(&model.User{
+		Username:        "admin",
+		Email:           "admin@example.com",
+		Role:            model.RoleSuperAdmin,
+		PasswordVersion: 1,
+	}).Error; err != nil {
 		t.Fatalf("seed admin user: %v", err)
 	}
 
@@ -92,13 +104,22 @@ func doSMTPRequest(t *testing.T, r *gin.Engine, token, body string) *httptest.Re
 	return w
 }
 
+// smtpSaveBody builds a PUT /api/config/smtp payload for the given host and
+// password (empty password means "keep the stored value").
+func smtpSaveBody(host, password string) string {
+	return fmt.Sprintf(
+		`{"enabled":true,"host":%q,"port":587,"username":"user","password":%q,"fromEmail":"a@example.com"}`,
+		host, password,
+	)
+}
+
 // TC-ENC-025: through the admin API, a saved SMTP password is stored as
 // ciphertext in the raw DB row and GET returns an empty password.
 func TestSMTPRoutes_StoresEncryptedPasswordAndMasksResponses(t *testing.T) {
 	r, db, cipher := newTestAdminRouter(t)
 	token := mintAdminToken(t)
 
-	w := doSMTPRequest(t, r, token, `{"enabled":true,"host":"smtp.example.com","port":587,"username":"user","password":"plain-secret","fromEmail":"a@example.com"}`)
+	w := doSMTPRequest(t, r, token, smtpSaveBody("smtp.example.com", "plain-secret"))
 	if w.Code != http.StatusOK {
 		t.Fatalf("PUT /config/smtp status = %d, body: %s", w.Code, w.Body.String())
 	}
@@ -139,11 +160,11 @@ func TestSMTPRoutes_EmptyPasswordKeepsStoredValueDecryptable(t *testing.T) {
 	r, db, cipher := newTestAdminRouter(t)
 	token := mintAdminToken(t)
 
-	if w := doSMTPRequest(t, r, token, `{"enabled":true,"host":"smtp.example.com","port":587,"username":"user","password":"plain-secret","fromEmail":"a@example.com"}`); w.Code != http.StatusOK {
+	if w := doSMTPRequest(t, r, token, smtpSaveBody("smtp.example.com", "plain-secret")); w.Code != http.StatusOK {
 		t.Fatalf("first PUT status = %d, body: %s", w.Code, w.Body.String())
 	}
 
-	if w := doSMTPRequest(t, r, token, `{"enabled":false,"host":"smtp2.example.com","port":465,"username":"user","password":"","fromEmail":"a@example.com"}`); w.Code != http.StatusOK {
+	if w := doSMTPRequest(t, r, token, smtpSaveBody("smtp2.example.com", "")); w.Code != http.StatusOK {
 		t.Fatalf("second PUT status = %d, body: %s", w.Code, w.Body.String())
 	}
 

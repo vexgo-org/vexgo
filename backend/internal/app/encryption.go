@@ -25,7 +25,8 @@ type secretCipher interface {
 // *secrets.Cipher would leak a non-nil interface and break that check.)
 func initCipher(cfg *config.Config) (secretCipher, error) {
 	if cfg.SettingsEncryptionKey == "" {
-		slog.Warn("settings_encryption_key is not set; SMTP password and AI/comment-moderation API keys will be stored in plaintext")
+		slog.Warn("SMTP password and AI/comment-moderation API keys will be stored in plaintext",
+			"reason", "settings_encryption_key is not set")
 		return nil, nil
 	}
 

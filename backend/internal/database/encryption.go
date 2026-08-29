@@ -25,54 +25,38 @@ type Encrypter interface {
 // (from a previous run) are left untouched, so repeated startups and re-runs
 // are no-ops.
 func MigrateSecretsAtRest(db *gorm.DB, c Encrypter) (int, error) {
-	migrated := 0
-
-	// SMTP password.
-	rows, err := plaintextSecrets(db, &model.SMTPConfig{}, "password")
-	if err != nil {
-		return migrated, err
-	}
-	for _, row := range rows {
-		encrypted, err := c.Encrypt(row.value)
-		if err != nil {
-			return migrated, fmt.Errorf("encrypt smtp password (id=%d): %w", row.id, err)
-		}
-		if err := db.Model(&model.SMTPConfig{}).Where("id = ?", row.id).UpdateColumn("password", encrypted).Error; err != nil {
-			return migrated, fmt.Errorf("store encrypted smtp password (id=%d): %w", row.id, err)
-		}
-		migrated++
+	// Each target is one secret column: a readable label for error messages,
+	// the owning model, and the column holding the secret.
+	targets := []struct {
+		label  string
+		model  any
+		column string
+	}{
+		{label: "smtp password", model: &model.SMTPConfig{}, column: "password"},
+		{label: "ai api key", model: &model.AIConfig{}, column: "api_key"},
+		{label: "moderation api key", model: &model.CommentModerationConfig{}, column: "api_key"},
 	}
 
-	// AI API key.
-	rows, err = plaintextSecrets(db, &model.AIConfig{}, "api_key")
-	if err != nil {
-		return migrated, err
-	}
-	for _, row := range rows {
-		encrypted, err := c.Encrypt(row.value)
+	var migrated int
+	for _, target := range targets {
+		rows, err := plaintextSecrets(db, target.model, target.column)
 		if err != nil {
-			return migrated, fmt.Errorf("encrypt ai api key (id=%d): %w", row.id, err)
+			return migrated, err
 		}
-		if err := db.Model(&model.AIConfig{}).Where("id = ?", row.id).UpdateColumn("api_key", encrypted).Error; err != nil {
-			return migrated, fmt.Errorf("store encrypted ai api key (id=%d): %w", row.id, err)
+		for _, row := range rows {
+			encrypted, err := c.Encrypt(row.value)
+			if err != nil {
+				return migrated, fmt.Errorf("encrypt %s (id=%d): %w", target.label, row.id, err)
+			}
+			err = db.Model(target.model).
+				Where("id = ?", row.id).
+				UpdateColumn(target.column, encrypted).
+				Error
+			if err != nil {
+				return migrated, fmt.Errorf("store encrypted %s (id=%d): %w", target.label, row.id, err)
+			}
+			migrated++
 		}
-		migrated++
-	}
-
-	// Comment-moderation API key.
-	rows, err = plaintextSecrets(db, &model.CommentModerationConfig{}, "api_key")
-	if err != nil {
-		return migrated, err
-	}
-	for _, row := range rows {
-		encrypted, err := c.Encrypt(row.value)
-		if err != nil {
-			return migrated, fmt.Errorf("encrypt moderation api key (id=%d): %w", row.id, err)
-		}
-		if err := db.Model(&model.CommentModerationConfig{}).Where("id = ?", row.id).UpdateColumn("api_key", encrypted).Error; err != nil {
-			return migrated, fmt.Errorf("store encrypted moderation api key (id=%d): %w", row.id, err)
-		}
-		migrated++
 	}
 
 	return migrated, nil
@@ -97,7 +81,7 @@ func plaintextSecrets(db *gorm.DB, dest any, column string) ([]plaintextSecret, 
 		}
 	}()
 
-	var out []plaintextSecret
+	out := []plaintextSecret{}
 	for rows.Next() {
 		var id uint
 		var value string
