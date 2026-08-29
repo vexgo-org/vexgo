@@ -34,8 +34,8 @@ func seedEncryptionFixtures(t *testing.T, db *gorm.DB) {
 		&model.SMTPConfig{Enabled: false, Host: "no-password.example.com", Password: ""},
 		&model.AIConfig{Enabled: true, ApiKey: "ai-plain"},
 		&model.AIConfig{Enabled: false, ApiKey: ""},
-		&model.CommentModerationConfig{Enabled: true, ApiKey: "mod-plain"},
-		&model.CommentModerationConfig{Enabled: false, ApiKey: ""},
+		&model.CommentModerationConfig{LLMReviewEnabled: true, ApiKey: "mod-plain"},
+		&model.CommentModerationConfig{LLMReviewEnabled: false, ApiKey: ""},
 	}
 	for _, f := range fixtures {
 		if err := db.Create(f).Error; err != nil {
@@ -83,7 +83,7 @@ func TestMigrateSecretsAtRest_EncryptsPlaintextSecrets(t *testing.T) {
 	}
 
 	var mod model.CommentModerationConfig
-	if err := db.First(&mod, "enabled = ?", true).Error; err != nil {
+	if err := db.First(&mod, "llm_review_enabled = ?", true).Error; err != nil {
 		t.Fatalf("failed to load moderation config: %v", err)
 	}
 	if got, err := cipher.Decrypt(mod.ApiKey); err != nil || got != "mod-plain" {

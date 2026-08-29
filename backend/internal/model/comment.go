@@ -25,7 +25,10 @@ type Comment struct {
 	User      User          `json:"author" gorm:"foreignKey:UserID"`
 	Content   string        `json:"content" gorm:"type:text"`
 	Status    CommentStatus `json:"status" gorm:"size:20;default:'published'"` // published, pending, rejected
-	ParentID  *uint         `json:"parentId,omitempty"`
+	// ModerationReason records why the comment was rejected or held for
+	// manual review (keyword hit, LLM verdict, or LLM failure).
+	ModerationReason string `json:"moderationReason,omitempty" gorm:"size:500"`
+	ParentID         *uint  `json:"parentId,omitempty"`
 	CreatedAt time.Time     `json:"createdAt"`
 	UpdatedAt time.Time     `json:"updatedAt"`
 }

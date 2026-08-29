@@ -48,20 +48,23 @@ type Captcha struct {
 	CreatedAt time.Time `json:"created_at"`                    // Creation time
 }
 
-// CommentModerationConfig stores comment moderation configuration
+// CommentModerationConfig stores comment moderation configuration. The three
+// switches are independent: the keyword filter and LLM review only reject
+// content, while manual review holds every comment that is not published or
+// rejected. All default to false, which publishes new comments immediately.
 type CommentModerationConfig struct {
-	ID                 uint      `json:"id" gorm:"primaryKey"`
-	Enabled            bool      `json:"enabled" gorm:"default:false"`             // Whether AI comment moderation is enabled
-	ModelProvider      string    `json:"modelProvider" gorm:"default:''"`          // AI model provider (openai, azure, etc.)
-	ApiKey             string    `json:"apiKey" gorm:"size:512;default:''"`        // API key (encrypted at rest)
-	ApiEndpoint        string    `json:"apiEndpoint" gorm:"default:''"`            // API endpoint
-	ModelName          string    `json:"modelName" gorm:"default:'gpt-3.5-turbo'"` // Model name
-	ModerationPrompt   string    `json:"moderationPrompt" gorm:"default:''"`       // Moderation prompt
-	BlockKeywords      string    `json:"blockKeywords" gorm:"size:500;default:''"` // Blocked keywords, comma-separated
-	AutoApproveEnabled bool      `json:"autoApproveEnabled"`                       // Whether to auto-approve low-risk comments
-	MinScoreThreshold  float64   `json:"minScoreThreshold" gorm:"default:0.5"`     // Minimum score threshold (below this score will be rejected)
-	CreatedAt          time.Time `json:"createdAt"`
-	UpdatedAt          time.Time `json:"updatedAt"`
+	ID                   uint      `json:"id" gorm:"primaryKey"`
+	ManualReviewEnabled  bool      `json:"manualReviewEnabled" gorm:"default:false"`  // Hold every new comment for manual approval
+	KeywordFilterEnabled bool      `json:"keywordFilterEnabled" gorm:"default:false"` // Reject comments containing blocked keywords
+	LLMReviewEnabled     bool      `json:"llmReviewEnabled" gorm:"default:false"`     // Reject comments flagged by the configured LLM
+	ModelProvider        string    `json:"modelProvider" gorm:"default:''"`           // AI model provider (openai, azure, etc.)
+	ApiKey               string    `json:"apiKey" gorm:"size:512;default:''"`         // API key (encrypted at rest)
+	ApiEndpoint          string    `json:"apiEndpoint" gorm:"default:''"`             // API endpoint
+	ModelName            string    `json:"modelName" gorm:"default:'gpt-3.5-turbo'"`  // Model name
+	ModerationPrompt     string    `json:"moderationPrompt" gorm:"default:''"`        // Moderation prompt
+	BlockKeywords        string    `json:"blockKeywords" gorm:"size:500;default:''"`  // Blocked keywords, comma-separated
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
 }
 
 // AIConfig stores AI model API configuration
