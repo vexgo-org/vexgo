@@ -199,15 +199,15 @@ VexGo has two moderation pipelines — one for posts, one for comments. Both rev
 
 When an author publishes a post, it can go straight to `published` (if the author has publishing rights) or to `pending` for admin review. Admins approve or reject it, optionally attaching a rejection reason.
 
-### Comment moderation (AI-powered)
+### Comment moderation
 
-Comment moderation is configurable from the admin panel:
+Comment moderation is driven by three independent switches, configurable from the admin panel (all default to off, which publishes new comments immediately):
 
-- **Keyword blocking** — comments containing blocked keywords are held or rejected
-- **AI scoring** — a configured LLM (OpenAI-compatible API) scores each comment against a prompt; comments below the score threshold are held for review
-- **Auto-approve** — when moderation is disabled, comments pass through immediately
+- **Keyword filter** — comments containing a blocked keyword are rejected outright; the LLM is not called
+- **LLM review** — the configured LLM (OpenAI-compatible API) reviews each comment against a prompt. A reject verdict rejects the comment; an approve verdict is published only when manual review is off. Any LLM failure (network, timeout, non-200, non-JSON reply) holds the comment as `pending` — the pipeline is fail-closed, so a broken or fooled model can at worst send comments to the review queue, never publish junk
+- **Manual review** — every comment that was not published or rejected waits in the queue for an admin decision ("manual final review")
 
-The moderation configuration (prompt, keywords, thresholds, model) lives in the database and is managed via the admin panel or the `/moderation` API endpoints.
+The moderation configuration (switches, prompt, keywords, model) lives in the database and is managed via the admin panel or the `/moderation` API endpoints. Installations upgrading from the single "enable AI moderation" toggle are migrated to the new switches automatically at startup.
 
 ## Theme System
 

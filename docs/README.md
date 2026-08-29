@@ -44,7 +44,7 @@ This site is the official documentation for VexGo. It is organized into four sec
 - **🚀 High Performance** — built with Go and Gin
 - **🔐 Secure Authentication** — JWT-based user system with role-based permissions (`guest` / `contributor` / `author` / `admin` / `super_admin`)
 - **📝 Rich Content** — Markdown editor, categories, tags, drafts, likes, and comments
-- **🛡️ AI-Powered Moderation** — automatic comment moderation with configurable prompts, keyword blocking, and score thresholds
+- **🛡️ Configurable Comment Moderation** — independent manual-review, keyword-filter, and LLM-review switches with fail-closed LLM fallback
 - **🖼️ Media Management** — built-in file storage with S3-compatible support
 - **🎨 Theme System** — server-side-rendered themes, switchable and uploadable from the admin panel
 - **🔔 Notifications** — in-app message inbox for likes, comments, and other events
