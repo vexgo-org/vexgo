@@ -11,7 +11,7 @@ type SMTPConfig struct {
 	Host      string    `json:"host" gorm:"size:255"`         // SMTP server address
 	Port      int       `json:"port"`                         // SMTP port
 	Username  string    `json:"username" gorm:"size:255"`     // Email account
-	Password  string    `json:"password" gorm:"size:255"`     // Email password or authorization code
+	Password  string    `json:"password" gorm:"size:512"`     // Email password or authorization code (encrypted at rest when a settings_encryption_key is configured)
 	FromEmail string    `json:"fromEmail" gorm:"size:255"`    // Sender email
 	FromName  string    `json:"fromName" gorm:"size:100"`     // Sender name
 	TestEmail string    `json:"testEmail" gorm:"size:255"`    // Test email recipient
@@ -53,7 +53,7 @@ type CommentModerationConfig struct {
 	ID                 uint      `json:"id" gorm:"primaryKey"`
 	Enabled            bool      `json:"enabled" gorm:"default:false"`             // Whether AI comment moderation is enabled
 	ModelProvider      string    `json:"modelProvider" gorm:"default:''"`          // AI model provider (openai, azure, etc.)
-	ApiKey             string    `json:"apiKey" gorm:"default:''"`                 // API key
+	ApiKey             string    `json:"apiKey" gorm:"size:512;default:''"`        // API key (encrypted at rest when a settings_encryption_key is configured)
 	ApiEndpoint        string    `json:"apiEndpoint" gorm:"default:''"`            // API endpoint
 	ModelName          string    `json:"modelName" gorm:"default:'gpt-3.5-turbo'"` // Model name
 	ModerationPrompt   string    `json:"moderationPrompt" gorm:"default:''"`       // Moderation prompt
@@ -70,7 +70,7 @@ type AIConfig struct {
 	Enabled     bool      `json:"enabled" gorm:"default:false"`                      // Whether AI model is enabled
 	Provider    string    `json:"provider" gorm:"size:50;default:'openai'"`          // Provider (openai, azure, etc.)
 	ApiEndpoint string    `json:"apiEndpoint" gorm:"size:500;default:''"`            // API endpoint URL
-	ApiKey      string    `json:"apiKey" gorm:"size:255;default:''"`                 // API key
+	ApiKey      string    `json:"apiKey" gorm:"size:512;default:''"`                 // API key (encrypted at rest when a settings_encryption_key is configured)
 	ModelName   string    `json:"modelName" gorm:"size:100;default:'gpt-3.5-turbo'"` // Model name
 	CreatedAt   time.Time `json:"created_at"`                                        // Creation time
 	UpdatedAt   time.Time `json:"updated_at"`                                        // Update time
