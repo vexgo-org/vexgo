@@ -76,14 +76,15 @@ func NewService(deps Deps) *Service {
 
 // encryptSecret encrypts a secret before it is stored. Empty values are passed
 // through, and without a configured cipher the plaintext is stored as-is
-// (no-key fallback).
-func (s *Service) encryptSecret(value string) (string, error) {
+// (no-key fallback). Errors are wrapped with the setting name so the admin
+// can tell which secret failed to save.
+func (s *Service) encryptSecret(value, setting string) (string, error) {
 	if value == "" || s.cipher == nil {
 		return value, nil
 	}
 	encrypted, err := s.cipher.Encrypt(value)
 	if err != nil {
-		return "", fmt.Errorf("encrypt secret: %w", err)
+		return "", fmt.Errorf("encrypt %s: %w", setting, err)
 	}
 	return encrypted, nil
 }
@@ -148,7 +149,7 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
-			password, encErr := s.encryptSecret(req.Password)
+			password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
 			if encErr != nil {
 				return model.SMTPConfig{}, encErr
 			}
@@ -180,7 +181,7 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 
 		// Only update password if new password is provided
 		if req.Password != "" {
-			password, encErr := s.encryptSecret(req.Password)
+			password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
 			if encErr != nil {
 				return config, encErr
 			}
@@ -354,7 +355,7 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
-			apiKey, encErr := s.encryptSecret(req.ApiKey)
+			apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
 			if encErr != nil {
 				return model.AIConfig{}, encErr
 			}
@@ -380,7 +381,7 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 
 		// Only update API key if new API key is provided
 		if req.ApiKey != "" {
-			apiKey, encErr := s.encryptSecret(req.ApiKey)
+			apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
 			if encErr != nil {
 				return config, encErr
 			}

@@ -109,5 +109,8 @@ func plaintextSecrets(db *gorm.DB, dest any, column string) ([]plaintextSecret, 
 		}
 		out = append(out, plaintextSecret{id: id, value: value})
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate plaintext secrets: %w", err)
+	}
+	return out, nil
 }

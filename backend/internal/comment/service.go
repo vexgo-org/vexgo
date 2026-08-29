@@ -327,7 +327,7 @@ func (s *Service) UpdateModerationConfig(
 	raw, getErr := s.repo.GetModerationConfig(ctx)
 	isCreate := errors.Is(getErr, gorm.ErrRecordNotFound)
 	if getErr != nil && !isCreate {
-		return model.CommentModerationConfig{}, getErr
+		return model.CommentModerationConfig{}, fmt.Errorf("load comment moderation config: %w", getErr)
 	}
 
 	config := model.CommentModerationConfig{
@@ -345,7 +345,7 @@ func (s *Service) UpdateModerationConfig(
 	// otherwise the stored (possibly encrypted) value is kept exactly as read.
 	switch {
 	case req.ApiKey != "":
-		apiKey, encErr := s.encryptSecret(req.ApiKey)
+		apiKey, encErr := s.encryptSecret(req.ApiKey, "comment_moderation.api_key")
 		if encErr != nil {
 			return model.CommentModerationConfig{}, encErr
 		}
@@ -355,7 +355,7 @@ func (s *Service) UpdateModerationConfig(
 	}
 
 	if err := s.repo.SaveModerationConfig(ctx, &config); err != nil {
-		return model.CommentModerationConfig{}, err
+		return model.CommentModerationConfig{}, fmt.Errorf("save comment moderation config: %w", err)
 	}
 
 	// Don't return sensitive information
@@ -365,14 +365,15 @@ func (s *Service) UpdateModerationConfig(
 
 // encryptSecret encrypts a secret before it is stored. Empty values are
 // passed through, and without a configured cipher the plaintext is stored
-// as-is (no-key fallback).
-func (s *Service) encryptSecret(value string) (string, error) {
+// as-is (no-key fallback). Errors are wrapped with the setting name so the
+// admin can tell which secret failed to save.
+func (s *Service) encryptSecret(value, setting string) (string, error) {
 	if value == "" || s.cipher == nil {
 		return value, nil
 	}
 	encrypted, err := s.cipher.Encrypt(value)
 	if err != nil {
-		return "", fmt.Errorf("encrypt secret: %w", err)
+		return "", fmt.Errorf("encrypt %s: %w", setting, err)
 	}
 	return encrypted, nil
 }
