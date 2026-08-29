@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -18,7 +19,7 @@ func (s *Service) Tags(ctx context.Context, userRole string) ([]model.Tag, error
 	}
 	tags, err := s.repo.FindAllTags(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find tags: %w", err)
 	}
 	s.fillTagUsage(ctx, tags)
 	return tags, nil
@@ -69,7 +70,7 @@ func (s *Service) DeleteTag(ctx context.Context, role string, id uint) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrTagNotFound
 		}
-		return err
+		return fmt.Errorf("delete tag: %w", err)
 	}
 	if !deleted {
 		return &InUseError{Count: usage}

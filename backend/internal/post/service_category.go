@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -18,7 +19,7 @@ func (s *Service) Categories(ctx context.Context, userRole string) ([]model.Cate
 	}
 	categories, err := s.repo.FindAllCategories(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find categories: %w", err)
 	}
 	s.fillCategoryUsage(ctx, categories)
 	return categories, nil
@@ -57,7 +58,7 @@ func (s *Service) DeleteCategory(ctx context.Context, role string, id uint) erro
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrCategoryNotFound
 		}
-		return err
+		return fmt.Errorf("delete category: %w", err)
 	}
 	if !deleted {
 		return &InUseError{Count: usage}
