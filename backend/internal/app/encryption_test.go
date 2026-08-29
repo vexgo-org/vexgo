@@ -8,6 +8,7 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/config"
 	"github.com/vexgo-org/vexgo/backend/internal/secrets"
+	"github.com/vexgo-org/vexgo/backend/internal/settings"
 )
 
 // captureLogs swaps the default slog logger for one writing to a buffer and
@@ -73,5 +74,21 @@ func TestInitCipher_RejectsEmptyKeyExplicitly(t *testing.T) {
 	// the cipher.
 	if _, err := secrets.New(""); err == nil {
 		t.Error("expected an error for an empty passphrase, got nil")
+	}
+}
+
+// Regression: without a key, the value handed to the domains' SecretCipher
+// fields must be a true nil interface — a typed nil *secrets.Cipher would
+// make the services' `cipher == nil` fallback checks silently pass and panic
+// on first use.
+func TestInitCipher_NoKeyLeavesDepsCipherNil(t *testing.T) {
+	cipher, err := initCipher(&config.Config{SettingsEncryptionKey: ""})
+	if err != nil {
+		t.Fatalf("initCipher error: %v", err)
+	}
+
+	deps := settings.Deps{Cipher: cipher}
+	if deps.Cipher != nil {
+		t.Error("expected a truly nil SecretCipher in Deps, got a typed-nil interface")
 	}
 }

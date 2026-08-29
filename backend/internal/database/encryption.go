@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Encrypter is the seam the migration needs from the cipher: sealing a
+// plaintext secret. It is satisfied by secrets.Cipher.
+type Encrypter interface {
+	Encrypt(plaintext string) (string, error)
+}
+
 // MigrateSecretsAtRest encrypts the plaintext secrets at rest in place: the
 // SMTP password and the AI / comment-moderation API keys. It runs once at
 // startup when a settings_encryption_key is configured, before any service
@@ -18,7 +24,7 @@ import (
 // The migration is idempotent: values already carrying the encrypted marker
 // (from a previous run) are left untouched, so repeated startups and re-runs
 // are no-ops.
-func MigrateSecretsAtRest(db *gorm.DB, c *secrets.Cipher) (int, error) {
+func MigrateSecretsAtRest(db *gorm.DB, c Encrypter) (int, error) {
 	migrated := 0
 
 	// SMTP password.
