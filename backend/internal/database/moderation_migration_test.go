@@ -93,7 +93,8 @@ func TestMigrateLegacyModerationConfig_Mapping(t *testing.T) {
 	}
 
 	if manual, keyword, llm := switchValues(t, db, oldDefault); manual || keyword || llm {
-		t.Errorf("old default (enabled=false, auto=true) should map to all off, got manual=%v keyword=%v llm=%v", manual, keyword, llm)
+		t.Errorf("old default (enabled=false, auto=true) should map to all off, got manual=%v keyword=%v llm=%v",
+			manual, keyword, llm)
 	}
 	if manual, keyword, llm := switchValues(t, db, manualHold); !manual || keyword || llm {
 		t.Errorf("enabled=false, auto=false should map to manual only, got manual=%v keyword=%v llm=%v", manual, keyword, llm)
@@ -114,7 +115,8 @@ func TestMigrateLegacyModerationConfig_Mapping(t *testing.T) {
 
 	// Data other than the switches must survive the migration untouched.
 	var apiKey string
-	if err := db.Raw("SELECT api_key FROM comment_moderation_configs WHERE id = ?", aiEnabled).Scan(&apiKey).Error; err != nil {
+	readKey := db.Raw("SELECT api_key FROM comment_moderation_configs WHERE id = ?", aiEnabled).Scan(&apiKey)
+	if err := readKey.Error; err != nil {
 		t.Fatalf("read api key: %v", err)
 	}
 	if apiKey != "stored-key" {
@@ -137,7 +139,8 @@ func TestMigrateLegacyModerationConfig_Idempotent(t *testing.T) {
 	}
 
 	// Simulate an admin turning the LLM switch back off after the migration.
-	if err := db.Exec("UPDATE comment_moderation_configs SET llm_review_enabled = ? WHERE id = ?", false, id).Error; err != nil {
+	adminUpdate := db.Exec("UPDATE comment_moderation_configs SET llm_review_enabled = ? WHERE id = ?", false, id)
+	if err := adminUpdate.Error; err != nil {
 		t.Fatalf("admin update: %v", err)
 	}
 

@@ -54,10 +54,10 @@ type Captcha struct {
 // rejected. All default to false, which publishes new comments immediately.
 type CommentModerationConfig struct {
 	ID                   uint      `json:"id" gorm:"primaryKey"`
-	ManualReviewEnabled  bool      `json:"manualReviewEnabled" gorm:"default:false"`  // Hold every new comment for manual approval
-	KeywordFilterEnabled bool      `json:"keywordFilterEnabled" gorm:"default:false"` // Reject comments containing blocked keywords
-	LLMReviewEnabled     bool      `json:"llmReviewEnabled" gorm:"default:false"`     // Reject comments flagged by the configured LLM
-	ModelProvider        string    `json:"modelProvider" gorm:"default:''"`           // AI model provider (openai, azure, etc.)
+	ManualReviewEnabled  bool      `json:"manualReviewEnabled" gorm:"default:false"`  // Hold comments for manual approval
+	KeywordFilterEnabled bool      `json:"keywordFilterEnabled" gorm:"default:false"` // Reject on blocked keyword hits
+	LLMReviewEnabled     bool      `json:"llmReviewEnabled" gorm:"default:false"`     // Reject comments flagged by the LLM
+	ModelProvider        string    `json:"modelProvider" gorm:"default:''"`           // AI provider (openai, azure, etc.)
 	ApiKey               string    `json:"apiKey" gorm:"size:512;default:''"`         // API key (encrypted at rest)
 	ApiEndpoint          string    `json:"apiEndpoint" gorm:"default:''"`             // API endpoint
 	ModelName            string    `json:"modelName" gorm:"default:'gpt-3.5-turbo'"`  // Model name

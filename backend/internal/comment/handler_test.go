@@ -151,8 +151,9 @@ func TestModerationConfig_RoundTripAndValidation(t *testing.T) {
 	}
 
 	fake := newFakeLLMServer(t, `{"approved": true, "reason": "ok"}`, http.StatusOK)
-	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/config", adminToken,
-		`{"manualReviewEnabled": true, "llmReviewEnabled": true, "apiKey": "test-key", "apiEndpoint": "`+fake.URL+`", "modelName": "test-model"}`)
+	payload := `{"manualReviewEnabled": true, "llmReviewEnabled": true, "apiKey": "test-key",` +
+		` "apiEndpoint": "` + fake.URL + `", "modelName": "test-model"}`
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/config", adminToken, payload)
 	if w.Code != http.StatusOK {
 		t.Fatalf("config update failed: %d %s", w.Code, w.Body.String())
 	}
