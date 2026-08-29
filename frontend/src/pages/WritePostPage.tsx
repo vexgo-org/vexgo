@@ -29,6 +29,7 @@ import {
   Image as ImageIcon,
   Plus,
   ArrowLeft,
+  Trash2,
 } from "lucide-react";
 
 // Post fields from the backend may be looser than the frontend Post type (category may be numeric, tags may be an object array)
@@ -93,6 +94,7 @@ export function WritePostPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState(false);
 
   // Determine the user role
   const isContributor = user?.role === "contributor";
@@ -375,6 +377,40 @@ export function WritePostPage() {
     }
   };
 
+  // The category currently chosen in the Select; deletable only when no
+  // post references it (the backend enforces this and returns 400 otherwise).
+  const selectedCategory = categories.find((cat) => cat.name === category);
+  const canDeleteSelected =
+    !!selectedCategory && (selectedCategory.postCount ?? 0) === 0;
+
+  const handleDeleteCategory = async () => {
+    if (!selectedCategory || !canDeleteSelected) {
+      return;
+    }
+    setDeletingCategory(true);
+    try {
+      await categoriesApi.deleteCategory(selectedCategory.id);
+      setCategories((prev) =>
+        prev.filter((cat) => cat.id !== selectedCategory.id),
+      );
+      setCategory("");
+    } catch (err) {
+      if (isAxiosError<{ error?: string }>(err)) {
+        if (err.response?.status === 403) {
+          alert(t("writePostPage.categoryDeleteForbidden"));
+        } else if (err.response?.status === 400 && err.response.data?.error) {
+          alert(err.response.data.error);
+        } else {
+          alert(t("writePostPage.categoryDeleteError"));
+        }
+      } else {
+        alert(t("writePostPage.categoryDeleteError"));
+      }
+    } finally {
+      setDeletingCategory(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Form */}
@@ -483,6 +519,7 @@ export function WritePostPage() {
             {canCreateCategory && (
               <div className="mt-2 flex gap-2">
                 <Input
+                  className="flex-1"
                   placeholder={t("writePostPage.newCategoryPlaceholder")}
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
@@ -506,6 +543,26 @@ export function WritePostPage() {
                   )}
                   {t("writePostPage.createCategory")}
                 </Button>
+                <span
+                  title={
+                    canDeleteSelected
+                      ? t("writePostPage.deleteCategory")
+                      : t("writePostPage.categoryInUseHint")
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDeleteCategory}
+                    disabled={deletingCategory || !canDeleteSelected}
+                  >
+                    {deletingCategory ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                </span>
               </div>
             )}
           </div>

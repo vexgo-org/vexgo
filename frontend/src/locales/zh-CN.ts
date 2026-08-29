@@ -892,6 +892,10 @@ export const zhCN = {
     categoryCreateError: "创建分类失败",
     categoryDuplicate: "该分类名称已存在",
     categoryCreateForbidden: "你没有创建分类的权限",
+    deleteCategory: "删除选中的空分类",
+    categoryInUseHint: "仍被文章使用的分类无法删除，请先选中一个空分类。",
+    categoryDeleteForbidden: "你没有删除分类的权限",
+    categoryDeleteError: "删除分类失败",
   },
 
   // 通知中心页面

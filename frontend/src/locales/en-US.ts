@@ -930,6 +930,11 @@ export const enUS = {
     categoryCreateError: "Failed to create category",
     categoryDuplicate: "A category with this name already exists",
     categoryCreateForbidden: "You do not have permission to create categories",
+    deleteCategory: "Delete the selected empty category",
+    categoryInUseHint:
+      "Categories still used by posts cannot be deleted. Select an empty category first.",
+    categoryDeleteForbidden: "You do not have permission to delete categories",
+    categoryDeleteError: "Failed to delete category",
   },
 
   // Notification Center Page
