@@ -44,12 +44,21 @@ var (
 	ErrPreviewNotFound     = errors.New("preview image not found")
 )
 
+// SecretCipher is the seam for encrypting secrets at rest. It is implemented
+// by the secrets package and injected so it can be faked in tests. A nil
+// cipher means no key is configured: secrets are stored as plaintext.
+type SecretCipher interface {
+	Encrypt(plaintext string) (string, error)
+	Decrypt(stored string) (string, error)
+}
+
 // Deps holds the dependencies required by the settings domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Themes    *public.Renderer
 	Mailer    *mailer.Service
+	Cipher    SecretCipher
 }
 
 // Service contains the business logic of the settings domain.
@@ -57,11 +66,42 @@ type Service struct {
 	repo   Repository
 	themes *public.Renderer
 	mailer *mailer.Service
+	cipher SecretCipher
 }
 
 // NewService creates a settings service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), themes: deps.Themes, mailer: deps.Mailer}
+	return &Service{repo: NewRepository(deps.DB), themes: deps.Themes, mailer: deps.Mailer, cipher: deps.Cipher}
+}
+
+// encryptSecret encrypts a secret before it is stored. Empty values are passed
+// through, and without a configured cipher the plaintext is stored as-is
+// (no-key fallback).
+func (s *Service) encryptSecret(value string) (string, error) {
+	if value == "" || s.cipher == nil {
+		return value, nil
+	}
+	encrypted, err := s.cipher.Encrypt(value)
+	if err != nil {
+		return "", fmt.Errorf("encrypt secret: %w", err)
+	}
+	return encrypted, nil
+}
+
+// decryptSecret decrypts a stored secret for internal use. Values without the
+// encrypted marker are passed through unchanged. When decryption fails (e.g.
+// the key was rotated) the secret is treated as unset and an error naming the
+// affected setting is logged; the admin must re-save the secret.
+func (s *Service) decryptSecret(stored, setting string) string {
+	if stored == "" || s.cipher == nil {
+		return stored
+	}
+	decrypted, err := s.cipher.Decrypt(stored)
+	if err != nil {
+		slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it", "setting", setting, "err", err)
+		return ""
+	}
+	return decrypted
 }
 
 // SMTPConfigRequest carries the fields accepted when updating the SMTP config.
@@ -108,12 +148,16 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
+			password, encErr := s.encryptSecret(req.Password)
+			if encErr != nil {
+				return model.SMTPConfig{}, encErr
+			}
 			config = model.SMTPConfig{
 				Enabled:   req.Enabled,
 				Host:      req.Host,
 				Port:      req.Port,
 				Username:  req.Username,
-				Password:  req.Password,
+				Password:  password,
 				FromEmail: req.FromEmail,
 				FromName:  req.FromName,
 				TestEmail: req.TestEmail,
@@ -136,7 +180,11 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 
 		// Only update password if new password is provided
 		if req.Password != "" {
-			config.Password = req.Password
+			password, encErr := s.encryptSecret(req.Password)
+			if encErr != nil {
+				return config, encErr
+			}
+			config.Password = password
 		}
 
 		if err := s.repo.SaveSMTPConfig(ctx, &config); err != nil {
@@ -306,11 +354,15 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Create new configuration
+			apiKey, encErr := s.encryptSecret(req.ApiKey)
+			if encErr != nil {
+				return model.AIConfig{}, encErr
+			}
 			config = model.AIConfig{
 				Enabled:     req.Enabled,
 				Provider:    req.Provider,
 				ApiEndpoint: req.ApiEndpoint,
-				ApiKey:      req.ApiKey,
+				ApiKey:      apiKey,
 				ModelName:   req.ModelName,
 			}
 			if err := s.repo.CreateAIConfig(ctx, &config); err != nil {
@@ -328,7 +380,11 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 
 		// Only update API key if new API key is provided
 		if req.ApiKey != "" {
-			config.ApiKey = req.ApiKey
+			apiKey, encErr := s.encryptSecret(req.ApiKey)
+			if encErr != nil {
+				return config, encErr
+			}
+			config.ApiKey = apiKey
 		}
 
 		if err := s.repo.SaveAIConfig(ctx, &config); err != nil {
@@ -357,6 +413,9 @@ func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 		}
 		return nil, err
 	}
+
+	// The API key is stored encrypted; decrypt it for the outbound call.
+	config.ApiKey = s.decryptSecret(config.ApiKey, "ai_config.api_key")
 
 	// Check if enabled
 	if !config.Enabled {
@@ -485,6 +544,9 @@ func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 		}
 		return nil, err
 	}
+
+	// The API key is stored encrypted; decrypt it for the outbound call.
+	config.ApiKey = s.decryptSecret(config.ApiKey, "ai_config.api_key")
 
 	// Check if enabled
 	if !config.Enabled {
