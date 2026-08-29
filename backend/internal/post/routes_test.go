@@ -529,7 +529,10 @@ func seedInUseTag(t *testing.T, db *gorm.DB) model.Tag {
 	if err := db.Create(&tag).Error; err != nil {
 		t.Fatalf("seed tag: %v", err)
 	}
-	post := model.Post{Slug: "tagged", Title: "t", Content: "c", Category: "misc", Status: model.PostStatusPublished, Tags: []model.Tag{{ID: tag.ID}}}
+	post := model.Post{
+		Slug: "tagged", Title: "t", Content: "c", Category: "misc",
+		Status: model.PostStatusPublished, Tags: []model.Tag{{ID: tag.ID}},
+	}
 	if err := db.Create(&post).Error; err != nil {
 		t.Fatalf("seed post: %v", err)
 	}
@@ -616,7 +619,9 @@ func TestDeleteTag_RoleGating(t *testing.T) {
 // TestDeleteCategory_MissingOrInvalidID asserts the 404 mapping for both a
 // well-formed but nonexistent id and a non-numeric id.
 func TestDeleteCategory_MissingOrInvalidID(t *testing.T) {
-	for _, path := range []string{"/api/categories/999", "/api/categories/not-a-number", "/api/categories/0", "/api/categories/99999999999999999999"} {
+	for _, path := range []string{
+		"/api/categories/999", "/api/categories/not-a-number", "/api/categories/0", "/api/categories/99999999999999999999",
+	} {
 		t.Run(path, func(t *testing.T) {
 			r, db := newTestRouter(t)
 			u := seedRoleUser(t, db, model.RoleContributor)
