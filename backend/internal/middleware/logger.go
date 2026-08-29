@@ -27,7 +27,8 @@ func RequestLogger() gin.HandlerFunc {
 		}
 
 		// Log request start
-		slog.Debug("request started",
+		slog.Debug(
+			"request started",
 			"method", c.Request.Method,
 			"path", path,
 			"userID", userID,

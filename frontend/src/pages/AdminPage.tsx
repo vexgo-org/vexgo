@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
-import { statsApi, postsApi, categoriesApi } from "@/lib/api";
-import type { Post, Category } from "@/types";
+import { statsApi, postsApi, categoriesApi, tagsApi } from "@/lib/api";
+import type { Post, Category, Tag as TagType } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,11 +47,13 @@ export function AdminPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [draftPosts, setDraftPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<TagType[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryDesc, setNewCategoryDesc] = useState("");
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "posts" | "drafts" | "categories"
+    "overview" | "posts" | "drafts" | "categories" | "tags"
   >("overview");
 
   useEffect(() => {
@@ -66,23 +69,34 @@ export function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsRes, postsRes, draftPostsRes, categoriesRes] =
+      const [statsRes, postsRes, draftPostsRes, categoriesRes, tagsRes] =
         await Promise.all([
           statsApi.getStats(),
           postsApi.getPosts({ limit: 10 }),
           postsApi.getDraftPosts({ limit: 10 }),
           categoriesApi.getCategories(),
+          tagsApi.getTags(),
         ]);
 
       setStats(statsRes.data.stats);
       setPosts(postsRes.data.posts);
       setDraftPosts(draftPostsRes.data.posts);
       setCategories(categoriesRes.data.categories);
+      setTags(tagsRes.data.tags);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // apiErrorMessage extracts the server-provided error message from a failed
+  // API call, falling back to a generic message.
+  const apiErrorMessage = (error: unknown, fallback: string) => {
+    if (isAxiosError<{ error?: string }>(error) && error.response?.data.error) {
+      return error.response.data.error;
+    }
+    return fallback;
   };
 
   const handleCreateCategory = async () => {
@@ -95,9 +109,33 @@ export function AdminPage() {
       });
       setNewCategoryName("");
       setNewCategoryDesc("");
+      setActionError("");
       loadData();
     } catch (error) {
       console.error("Failed to create category:", error);
+      setActionError(apiErrorMessage(error, t("adminData.actionFailed")));
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      await categoriesApi.deleteCategory(categoryId);
+      setActionError("");
+      loadData();
+    } catch (error) {
+      console.error("Failed to delete category:", error);
+      setActionError(apiErrorMessage(error, t("adminData.actionFailed")));
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string) => {
+    try {
+      await tagsApi.deleteTag(tagId);
+      setActionError("");
+      loadData();
+    } catch (error) {
+      console.error("Failed to delete tag:", error);
+      setActionError(apiErrorMessage(error, t("adminData.actionFailed")));
     }
   };
 
@@ -269,17 +307,20 @@ export function AdminPage() {
       <Tabs
         value={activeTab}
         onValueChange={(v) =>
-          setActiveTab(v as "overview" | "posts" | "drafts" | "categories")
+          setActiveTab(
+            v as "overview" | "posts" | "drafts" | "categories" | "tags",
+          )
         }
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-4 max-w-md">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="overview">{t("adminData.overview")}</TabsTrigger>
           <TabsTrigger value="posts">{t("adminData.posts")}</TabsTrigger>
           <TabsTrigger value="drafts">{t("adminData.draftPosts")}</TabsTrigger>
           <TabsTrigger value="categories">
             {t("adminData.allCategories")}
           </TabsTrigger>
+          <TabsTrigger value="tags">{t("adminData.allTags")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
@@ -538,6 +579,9 @@ export function AdminPage() {
               <CardTitle>{t("adminData.allCategories")}</CardTitle>
             </CardHeader>
             <CardContent>
+              {actionError && (
+                <p className="mb-4 text-sm text-destructive">{actionError}</p>
+              )}
               {/* Add New Category */}
               <div className="flex gap-4 mb-6">
                 <div className="flex-1">
@@ -563,13 +607,91 @@ export function AdminPage() {
               {/* Category List */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {categories.map((category) => (
-                  <div key={category.id} className="p-4 border rounded-lg">
-                    <h3 className="font-medium">{category.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {category.description || t("common.noDescription")}
-                    </p>
+                  <div
+                    key={category.id}
+                    className="p-4 border rounded-lg flex items-start justify-between gap-4"
+                  >
+                    <div className="flex-1">
+                      <h3 className="font-medium">{category.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {category.description || t("common.noDescription")}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t("adminData.postCount", {
+                          count: category.postCount ?? 0,
+                        })}
+                      </p>
+                    </div>
+                    <span
+                      title={
+                        (category.postCount ?? 0) > 0
+                          ? t("adminData.inUseHint")
+                          : t("adminData.deleteCategory")
+                      }
+                    >
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={(category.postCount ?? 0) > 0}
+                        onClick={() => handleDeleteCategory(category.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </span>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tags" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("adminData.allTags")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                {t("adminData.tagsHint")}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tags.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    {t("adminData.noRecords")}
+                  </p>
+                ) : (
+                  tags.map((tag) => (
+                    <div
+                      key={tag.id}
+                      className="p-4 border rounded-lg flex items-start justify-between gap-4"
+                    >
+                      <div>
+                        <h3 className="font-medium">{tag.name}</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {t("adminData.postCount", {
+                            count: tag.postCount ?? 0,
+                          })}
+                        </p>
+                      </div>
+                      <span
+                        title={
+                          (tag.postCount ?? 0) > 0
+                            ? t("adminData.inUseHint")
+                            : t("adminData.deleteTag")
+                        }
+                      >
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={(tag.postCount ?? 0) > 0}
+                          onClick={() => handleDeleteTag(tag.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

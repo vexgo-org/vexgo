@@ -5,6 +5,7 @@ package post
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -23,7 +24,22 @@ var (
 	ErrBadRequest = errors.New("bad request")
 	// ErrDuplicateName means a category or tag with the same name already exists.
 	ErrDuplicateName = errors.New("duplicate name")
+	// ErrCategoryNotFound means the category does not exist.
+	ErrCategoryNotFound = errors.New("category not found")
+	// ErrTagNotFound means the tag does not exist.
+	ErrTagNotFound = errors.New("tag not found")
 )
+
+// InUseError means a category or tag is still referenced by posts; Count
+// carries the number of referencing posts so callers can render it.
+type InUseError struct {
+	Count int64
+}
+
+// Error renders the in-use reason.
+func (e *InUseError) Error() string {
+	return fmt.Sprintf("in use by %d posts", e.Count)
+}
 
 // Deps holds the dependencies required by the post domain.
 type Deps struct {

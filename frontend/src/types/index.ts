@@ -73,6 +73,7 @@ export interface Category {
   id: string;
   name: string;
   description: string;
+  postCount?: number;
   createdAt?: string;
 }
 
@@ -80,6 +81,7 @@ export interface Category {
 export interface Tag {
   id: string;
   name: string;
+  postCount?: number;
   createdAt?: string;
 }
 

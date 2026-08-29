@@ -166,7 +166,8 @@ func buildAssetManifestFromURLs(urls []string, referenced map[string]bool) Asset
 
 		if ext == ".css" {
 			if existing, ok := m.CSS[assetName]; ok && existing != assetURL && !referenced[assetURL] {
-				slog.Warn("duplicate CSS asset",
+				slog.Warn(
+					"duplicate CSS asset",
 					"asset", assetName,
 					"existing", existing,
 					"duplicate", assetURL,
@@ -176,7 +177,8 @@ func buildAssetManifestFromURLs(urls []string, referenced map[string]bool) Asset
 			m.CSS[assetName] = assetURL
 		} else {
 			if existing, ok := m.JS[assetName]; ok && existing != assetURL && !referenced[assetURL] {
-				slog.Warn("duplicate JS asset",
+				slog.Warn(
+					"duplicate JS asset",
 					"asset", assetName,
 					"existing", existing,
 					"duplicate", assetURL,

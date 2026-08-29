@@ -2,6 +2,7 @@ package post
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +39,7 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		t.Fatalf("get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Tag{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Tag{}, &model.Post{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -491,5 +492,258 @@ func TestCreateCategory_HandlerFailClosedNoMiddleware(t *testing.T) {
 	if w.Code != http.StatusForbidden {
 		t.Errorf("authenticated guest without Permission middleware: expected 403, got %d (body=%s)",
 			w.Code, w.Body.String())
+	}
+}
+
+// doDelete issues a DELETE against path with an optional bearer token.
+func doDelete(t *testing.T, r *gin.Engine, path, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodDelete, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// seedInUseCategory creates a category named "tech" referenced by one post.
+func seedInUseCategory(t *testing.T, db *gorm.DB) model.Category {
+	t.Helper()
+	category := model.Category{Name: "tech"}
+	if err := db.Create(&category).Error; err != nil {
+		t.Fatalf("seed category: %v", err)
+	}
+	post := model.Post{Slug: "uses-tech", Title: "t", Content: "c", Category: "tech", Status: model.PostStatusPublished}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("seed post: %v", err)
+	}
+	return category
+}
+
+// seedInUseTag creates a tag named "golang" referenced by one post through
+// the post_tags join table.
+func seedInUseTag(t *testing.T, db *gorm.DB) model.Tag {
+	t.Helper()
+	tag := model.Tag{Name: "golang"}
+	if err := db.Create(&tag).Error; err != nil {
+		t.Fatalf("seed tag: %v", err)
+	}
+	post := model.Post{Slug: "tagged", Title: "t", Content: "c", Category: "misc", Status: model.PostStatusPublished, Tags: []model.Tag{{ID: tag.ID}}}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("seed post: %v", err)
+	}
+	return tag
+}
+
+// TestDeleteCategory_RoleGating exercises the AC1 acceptance criteria for
+// DELETE /api/categories/:id against the real middleware+handler chain:
+// anonymous requests get 401, guest and unknown roles 403, and the four
+// contributor-level roles delete the empty category with 200.
+func TestDeleteCategory_RoleGating(t *testing.T) {
+	cases := []struct {
+		name     string
+		role     string // "" means no token at all
+		wantCode int
+	}{
+		{"anonymous", "", http.StatusUnauthorized},
+		{"guest", model.RoleGuest, http.StatusForbidden},
+		{"contributor", model.RoleContributor, http.StatusOK},
+		{"author", model.RoleAuthor, http.StatusOK},
+		{"admin", model.RoleAdmin, http.StatusOK},
+		{"super_admin", model.RoleSuperAdmin, http.StatusOK},
+		{"unknown_role", "wizard", http.StatusForbidden},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			category := model.Category{Name: "tech"}
+			if err := db.Create(&category).Error; err != nil {
+				t.Fatalf("seed category: %v", err)
+			}
+			var token string
+			if tc.role != "" {
+				u := seedRoleUser(t, db, tc.role)
+				token = mintToken(t, u.ID, tc.role)
+			}
+			w := doDelete(t, r, "/api/categories/"+idString(category.ID), token)
+			if w.Code != tc.wantCode {
+				t.Errorf("DELETE /api/categories role=%q: expected %d, got %d (body=%s)",
+					tc.role, tc.wantCode, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestDeleteTag_RoleGating mirrors TestDeleteCategory_RoleGating for tags.
+func TestDeleteTag_RoleGating(t *testing.T) {
+	cases := []struct {
+		name     string
+		role     string
+		wantCode int
+	}{
+		{"anonymous", "", http.StatusUnauthorized},
+		{"guest", model.RoleGuest, http.StatusForbidden},
+		{"contributor", model.RoleContributor, http.StatusOK},
+		{"author", model.RoleAuthor, http.StatusOK},
+		{"admin", model.RoleAdmin, http.StatusOK},
+		{"super_admin", model.RoleSuperAdmin, http.StatusOK},
+		{"unknown_role", "wizard", http.StatusForbidden},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			tag := model.Tag{Name: "golang"}
+			if err := db.Create(&tag).Error; err != nil {
+				t.Fatalf("seed tag: %v", err)
+			}
+			var token string
+			if tc.role != "" {
+				u := seedRoleUser(t, db, tc.role)
+				token = mintToken(t, u.ID, tc.role)
+			}
+			w := doDelete(t, r, "/api/tags/"+idString(tag.ID), token)
+			if w.Code != tc.wantCode {
+				t.Errorf("DELETE /api/tags role=%q: expected %d, got %d (body=%s)",
+					tc.role, tc.wantCode, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestDeleteCategory_MissingOrInvalidID asserts the 404 mapping for both a
+// well-formed but nonexistent id and a non-numeric id.
+func TestDeleteCategory_MissingOrInvalidID(t *testing.T) {
+	for _, path := range []string{"/api/categories/999", "/api/categories/not-a-number", "/api/categories/0", "/api/categories/99999999999999999999"} {
+		t.Run(path, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			u := seedRoleUser(t, db, model.RoleContributor)
+			token := mintToken(t, u.ID, model.RoleContributor)
+			w := doDelete(t, r, path, token)
+			if w.Code != http.StatusNotFound {
+				t.Errorf("%s: expected 404, got %d (body=%s)", path, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestDeleteTag_MissingOrInvalidID mirrors TestDeleteCategory_MissingOrInvalidID.
+func TestDeleteTag_MissingOrInvalidID(t *testing.T) {
+	for _, path := range []string{"/api/tags/999", "/api/tags/not-a-number", "/api/tags/0", "/api/tags/99999999999999999999"} {
+		t.Run(path, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			u := seedRoleUser(t, db, model.RoleContributor)
+			token := mintToken(t, u.ID, model.RoleContributor)
+			w := doDelete(t, r, path, token)
+			if w.Code != http.StatusNotFound {
+				t.Errorf("%s: expected 404, got %d (body=%s)", path, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestDeleteCategory_InUseMapping asserts the AC2 HTTP contract: deleting a
+// category that posts still reference returns 400 with the usage count in the
+// message, and the category survives.
+func TestDeleteCategory_InUseMapping(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, model.RoleContributor)
+	category := seedInUseCategory(t, db)
+
+	w := doDelete(t, r, "/api/categories/"+idString(category.ID), token)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("in-use category: expected 400, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Category is used by 1 post") {
+		t.Errorf("expected usage count in message, got %s", w.Body.String())
+	}
+
+	var count int64
+	db.Model(&model.Category{}).Where("id = ?", category.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("in-use category was deleted")
+	}
+}
+
+// TestDeleteTag_InUseMapping mirrors TestDeleteCategory_InUseMapping for tags
+// and additionally asserts no dangling join-row cleanup happened.
+func TestDeleteTag_InUseMapping(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, model.RoleContributor)
+	tag := seedInUseTag(t, db)
+
+	w := doDelete(t, r, "/api/tags/"+idString(tag.ID), token)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("in-use tag: expected 400, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Tag is used by 1 post") {
+		t.Errorf("expected usage count in message, got %s", w.Body.String())
+	}
+
+	var count int64
+	db.Model(&model.Tag{}).Where("id = ?", tag.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("in-use tag was deleted")
+	}
+	db.Table("post_tags").Where("tag_id = ?", tag.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("expected the join row to remain, got %d", count)
+	}
+}
+
+// TestLists_ExposePostCount asserts AC3: GET /api/categories and GET /api/tags
+// return a per-item postCount via batch queries.
+func TestLists_ExposePostCount(t *testing.T) {
+	r, db := newTestRouter(t)
+	category := seedInUseCategory(t, db)
+	tag := seedInUseTag(t, db)
+	db.Create(&model.Category{Name: "empty"})
+	db.Create(&model.Tag{Name: "lonely"})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/categories", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/categories: expected 200, got %d", w.Code)
+	}
+	var catRes struct {
+		Categories []model.Category `json:"categories"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &catRes); err != nil {
+		t.Fatalf("decode categories: %v", err)
+	}
+	counts := map[uint]int64{}
+	for _, c := range catRes.Categories {
+		counts[c.ID] = c.PostCount
+	}
+	if counts[category.ID] != 1 {
+		t.Errorf("expected used category count 1, got %d", counts[category.ID])
+	}
+	for _, c := range catRes.Categories {
+		if c.Name == "empty" && c.PostCount != 0 {
+			t.Errorf("expected empty category count 0, got %d", c.PostCount)
+		}
+	}
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/tags", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/tags: expected 200, got %d", w.Code)
+	}
+	var tagRes struct {
+		Tags []model.Tag `json:"tags"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &tagRes); err != nil {
+		t.Fatalf("decode tags: %v", err)
+	}
+	tagCounts := map[uint]int64{}
+	for _, tag := range tagRes.Tags {
+		tagCounts[tag.ID] = tag.PostCount
+	}
+	if tagCounts[tag.ID] != 1 {
+		t.Errorf("expected used tag count 1, got %d", tagCounts[tag.ID])
 	}
 }
