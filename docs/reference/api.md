@@ -1232,12 +1232,15 @@ Get pending comments for moderation.
       "user": { "id": 2, "username": "user1" },
       "post": { "id": 1, "title": "My Post" },
       "status": "pending",
+      "moderationReason": "",
       "createdAt": "2026-03-17T21:14:35Z"
     }
   ],
   "pagination": { "total": 1, "page": 1, "limit": 10, "totalPages": 1 }
 }
 ```
+
+`moderationReason` records why a comment was rejected or held (a blocked keyword, the LLM verdict, or an LLM failure). It is populated on rejected comments, cleared when a comment is approved, and empty otherwise.
 
 #### GET /moderation/comments/approved
 
@@ -1275,23 +1278,27 @@ Get the comment moderation configuration (API key masked).
 
 ```json
 {
-  "enabled": false,
+  "manualReviewEnabled": false,
+  "keywordFilterEnabled": false,
+  "llmReviewEnabled": false,
   "modelProvider": "",
   "apiKey": "",
   "apiEndpoint": "",
   "modelName": "gpt-3.5-turbo",
-  "moderationPrompt": "Please review the following comment for compliance. ...",
-  "blockKeywords": "spam,advertisement",
-  "autoApproveEnabled": true,
-  "minScoreThreshold": 0.5
+  "moderationPrompt": "You are a comment moderation assistant. ...",
+  "blockKeywords": "spam,advertisement"
 }
 ```
 
 **Notes:**
 
-- When `enabled` is `true`, new comments are created with status `pending` and run through the moderation engine
-- When `autoApproveEnabled` is `true`, comments pass automatically when moderation is disabled
-- The current moderation engine is keyword-based (blocked keywords plus simple content checks); an AI API integration is planned
+- All three switches are independent and default to `false`; with every switch off, new comments are published immediately.
+- Moderation runs in a fixed order and short-circuits on the first decision:
+  1. **Keyword filter** (if on): a comment containing a blocked keyword is rejected; the LLM is not called.
+  2. **LLM review** (if on): the stored OpenAI-compatible endpoint reviews the comment. A reject verdict rejects the comment; an approve verdict is held for manual review when that switch is on, else published. **Any LLM failure (network, timeout, non-200, non-JSON reply) holds the comment as `pending`, even when manual review is off** (fail-closed).
+  3. **Manual review** (if on): the comment is held as `pending`.
+  4. Otherwise the comment is published.
+- Enabling `llmReviewEnabled` without a stored (or provided) API key and endpoint is rejected with `400`.
 
 #### PUT /moderation/comments/config
 
@@ -1305,14 +1312,29 @@ Update the comment moderation configuration.
 {
   "message": "Comment moderation configuration updated successfully",
   "config": {
-    "enabled": true,
+    "manualReviewEnabled": true,
+    "keywordFilterEnabled": true,
+    "llmReviewEnabled": true,
     "modelProvider": "openai",
-    "modelName": "gpt-3.5-turbo",
-    "autoApproveEnabled": true,
-    "minScoreThreshold": 0.5
+    "modelName": "gpt-3.5-turbo"
   }
 }
 ```
+
+#### POST /moderation/comments/config/test
+
+Verify the stored LLM moderation configuration by sending a short test comment through the real review path. Requires `llmReviewEnabled` credentials (API key, endpoint, model name) to be configured.
+
+**Response:**
+
+```json
+{
+  "message": "LLM moderation endpoint reachable",
+  "response": "model gpt-3.5-turbo replied: approved=true, reason=ok"
+}
+```
+
+**Errors:** `400` when the configuration is incomplete; `500` with the upstream error when the endpoint is unreachable or replies unexpectedly.
 
 ### Posts Moderation
 

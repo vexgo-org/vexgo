@@ -22,4 +22,5 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.PUT("/moderation/comments/reject/:id", h.mw.JWTAuth(), admin, h.RejectComment)
 	api.GET("/moderation/comments/config", h.mw.JWTAuth(), admin, h.GetCommentModerationConfig)
 	api.PUT("/moderation/comments/config", h.mw.JWTAuth(), admin, h.UpdateCommentModerationConfig)
+	api.POST("/moderation/comments/config/test", h.mw.JWTAuth(), admin, h.TestModerationConfig)
 }

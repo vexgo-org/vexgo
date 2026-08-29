@@ -93,6 +93,7 @@ export interface Comment {
   author?: User;
   content: string;
   parentId: string | null;
+  moderationReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,15 +101,15 @@ export interface Comment {
 // Comment moderation config types
 export interface CommentModerationConfig {
   id: string;
-  enabled: boolean;
+  manualReviewEnabled: boolean;
+  keywordFilterEnabled: boolean;
+  llmReviewEnabled: boolean;
   modelProvider: string;
   apiKey: string;
   apiEndpoint: string;
   modelName: string;
   moderationPrompt: string;
   blockKeywords: string;
-  autoApproveEnabled: boolean;
-  minScoreThreshold: number;
   createdAt: string;
   updatedAt: string;
 }

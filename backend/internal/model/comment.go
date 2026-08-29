@@ -18,14 +18,17 @@ const (
 // GORM automatically creates foreign key
 
 type Comment struct {
-	ID        uint          `json:"id" gorm:"primaryKey"`
-	PostID    uint          `json:"postId"`
-	Post      Post          `json:"-" gorm:"foreignKey:PostID"`
-	UserID    uint          `json:"userId"`
-	User      User          `json:"author" gorm:"foreignKey:UserID"`
-	Content   string        `json:"content" gorm:"type:text"`
-	Status    CommentStatus `json:"status" gorm:"size:20;default:'published'"` // published, pending, rejected
-	ParentID  *uint         `json:"parentId,omitempty"`
-	CreatedAt time.Time     `json:"createdAt"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	ID      uint          `json:"id" gorm:"primaryKey"`
+	PostID  uint          `json:"postId"`
+	Post    Post          `json:"-" gorm:"foreignKey:PostID"`
+	UserID  uint          `json:"userId"`
+	User    User          `json:"author" gorm:"foreignKey:UserID"`
+	Content string        `json:"content" gorm:"type:text"`
+	Status  CommentStatus `json:"status" gorm:"size:20;default:'published'"` // published, pending, rejected
+	// ModerationReason records why the comment was rejected or held for
+	// manual review (keyword hit, LLM verdict, or LLM failure).
+	ModerationReason string    `json:"moderationReason,omitempty" gorm:"size:500"`
+	ParentID         *uint     `json:"parentId,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }

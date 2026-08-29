@@ -32,15 +32,15 @@ export function CommentConfigPage() {
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<CommentModerationConfig>({
     id: "",
-    enabled: false,
+    manualReviewEnabled: false,
+    keywordFilterEnabled: false,
+    llmReviewEnabled: false,
     modelProvider: "",
     apiKey: "",
     apiEndpoint: "",
     modelName: "gpt-3.5-turbo",
     moderationPrompt: t("commentConfig.moderationPromptPlaceholder"),
     blockKeywords: "",
-    autoApproveEnabled: true,
-    minScoreThreshold: 0.5,
     createdAt: "",
     updatedAt: "",
   });
@@ -74,6 +74,26 @@ export function CommentConfigPage() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [testing, setTesting] = useState(false);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const response = await configApi.testCommentModeration();
+      toast.success(
+        `${response.data?.message ?? ""} ${response.data?.response ?? ""}`.trim(),
+      );
+    } catch (error: unknown) {
+      console.error("Failed to test LLM moderation endpoint:", error);
+      const apiError = error as { response?: { data?: { error?: string } } };
+      toast.error(
+        apiError.response?.data?.error || t("commentConfig.testFailed"),
+      );
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -125,54 +145,49 @@ export function CommentConfigPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>{t("commentConfig.enableAIModeration")}</Label>
+                <Label>{t("commentConfig.manualReview")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  {t("commentConfig.enableAIModerationDesc")}
+                  {t("commentConfig.manualReviewDesc")}
                 </p>
               </div>
               <Switch
-                checked={config.enabled}
+                checked={config.manualReviewEnabled}
                 onCheckedChange={(checked) =>
-                  setConfig({ ...config, enabled: checked })
+                  setConfig({ ...config, manualReviewEnabled: checked })
                 }
               />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>{t("commentConfig.autoApproveLowRisk")}</Label>
+                <Label>{t("commentConfig.keywordFilter")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  {t("commentConfig.autoApproveLowRiskDesc")}
+                  {t("commentConfig.keywordFilterDesc")}
                 </p>
               </div>
               <Switch
-                checked={config.autoApproveEnabled}
+                checked={config.keywordFilterEnabled}
                 onCheckedChange={(checked) =>
-                  setConfig({ ...config, autoApproveEnabled: checked })
+                  setConfig({ ...config, keywordFilterEnabled: checked })
                 }
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="minScore">
-                {t("commentConfig.minScoreThreshold")}
-              </Label>
-              <Input
-                id="minScore"
-                type="number"
-                min="0"
-                max="1"
-                step="0.1"
-                value={config.minScoreThreshold}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    minScoreThreshold: parseFloat(e.target.value),
-                  })
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("commentConfig.llmReview")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("commentConfig.llmReviewDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={config.llmReviewEnabled}
+                onCheckedChange={(checked) =>
+                  setConfig({ ...config, llmReviewEnabled: checked })
                 }
               />
-              <p className="text-sm text-muted-foreground">
-                {t("commentConfig.minScoreThresholdDesc")}
-              </p>
             </div>
+            <p className="text-sm text-muted-foreground">
+              {t("commentConfig.switchesHint")}
+            </p>
           </CardContent>
         </Card>
 
@@ -245,6 +260,21 @@ export function CommentConfigPage() {
                 }
                 placeholder={t("commentConfig.apiEndpointPlaceholder")}
               />
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={testing}
+              >
+                <Bot className="h-4 w-4 mr-2" />
+                {testing
+                  ? t("commentConfig.testing")
+                  : t("commentConfig.testConnection")}
+              </Button>
+              <p className="text-sm text-muted-foreground mt-2">
+                {t("commentConfig.testConnectionHint")}
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -1273,23 +1273,27 @@ SSO 回调端点；提供商重定向到这里。
 
 ```json
 {
-  "enabled": false,
+  "manualReviewEnabled": false,
+  "keywordFilterEnabled": false,
+  "llmReviewEnabled": false,
   "modelProvider": "",
   "apiKey": "",
   "apiEndpoint": "",
   "modelName": "gpt-3.5-turbo",
-  "moderationPrompt": "Please review the following comment for compliance. ...",
-  "blockKeywords": "spam,advertisement",
-  "autoApproveEnabled": true,
-  "minScoreThreshold": 0.5
+  "moderationPrompt": "You are a comment moderation assistant. ...",
+  "blockKeywords": "spam,advertisement"
 }
 ```
 
 **备注：**
 
-- 当 `enabled` 为 `true` 时，新评论以 `pending` 状态创建并通过审核引擎处理
-- 当 `autoApproveEnabled` 为 `true` 且审核被禁用时，评论自动通过
-- 当前的审核引擎基于关键词（屏蔽关键词加简单内容检查）；AI API 集成计划中
+- 三个开关相互独立，默认均为 `false`；全部关闭时，新评论立即发布。
+- 审核按固定顺序执行，并在第一个决策处短路：
+  1. **关键词过滤**（开启时）：包含屏蔽关键词的评论被拒绝，不再调用 LLM。
+  2. **大模型审核**（开启时）：由已配置的 OpenAI 兼容端点审核评论。拒绝结论则评论被拒绝；通过结论在人工审核开启时进入待审队列，否则发布。**任何 LLM 故障（网络、超时、非 200、非 JSON 响应）都会使评论保持 `pending`，即使人工审核未开启**（fail-closed）。
+  3. **人工审核**（开启时）：评论保持 `pending`。
+  4. 否则评论直接发布。
+- 在没有已存储（或本次提供）的 API 密钥与端点时开启 `llmReviewEnabled`，请求将以 `400` 被拒绝。
 
 #### PUT /moderation/comments/config
 
@@ -1303,14 +1307,29 @@ SSO 回调端点；提供商重定向到这里。
 {
   "message": "Comment moderation configuration updated successfully",
   "config": {
-    "enabled": true,
+    "manualReviewEnabled": true,
+    "keywordFilterEnabled": true,
+    "llmReviewEnabled": true,
     "modelProvider": "openai",
-    "modelName": "gpt-3.5-turbo",
-    "autoApproveEnabled": true,
-    "minScoreThreshold": 0.5
+    "modelName": "gpt-3.5-turbo"
   }
 }
 ```
+
+#### POST /moderation/comments/config/test
+
+向已保存的大模型审核配置发送一条测试评论，验证连通性。需要已配置大模型凭据（API 密钥、端点、模型名称）。
+
+**响应：**
+
+```json
+{
+  "message": "LLM moderation endpoint reachable",
+  "response": "model gpt-3.5-turbo replied: approved=true, reason=ok"
+}
+```
+
+**错误：** 配置不完整时返回 `400`；端点不可达或响应异常时返回 `500` 并附带上游错误信息。
 
 ### 帖子审核
 

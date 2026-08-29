@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,9 @@ var (
 	ErrUserNotFound = errors.New("user not found")
 	// ErrForbidden means the acting user may not modify this comment.
 	ErrForbidden = errors.New("forbidden")
+	// ErrLLMConfigIncomplete means LLM review is enabled (or tested) without
+	// a stored API key and endpoint.
+	ErrLLMConfigIncomplete = errors.New("LLM review requires an API key and endpoint")
 )
 
 // SecretCipher is the seam for encrypting the moderation API key at rest. It
@@ -48,31 +52,39 @@ type Notifier = model.Notifier
 
 // Service contains the business logic of the comment domain.
 type Service struct {
-	repo     Repository
-	notifier Notifier
-	cipher   SecretCipher
+	repo      Repository
+	notifier  Notifier
+	cipher    SecretCipher
+	llmClient *http.Client
 }
 
 // NewService creates a comment service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier, cipher: deps.Cipher}
+	return &Service{
+		repo:      NewRepository(deps.DB),
+		notifier:  deps.Notifier,
+		cipher:    deps.Cipher,
+		llmClient: &http.Client{Timeout: llmTimeout},
+	}
 }
 
-// defaultModerationPrompt is used by the moderation checker when no custom
-// prompt is configured.
-const defaultModerationPrompt = "Please review the following comment for compliance. " +
-	"If the comment contains illegal content, personal attacks, or inappropriate material, " +
-	"return 'REJECT'; if the comment is compliant, return 'APPROVE'. " +
-	"Only return the result, no explanation.\n\nComment content:\n{{content}}"
+// defaultModerationPrompt asks the model for a strict JSON verdict so the
+// reply can be parsed mechanically; any other reply counts as a moderation
+// failure and holds the comment for manual review.
+const defaultModerationPrompt = `You are a comment moderation assistant. Review the comment below ` +
+	`for illegal content, personal attacks, spam, or inappropriate material.
+Respond with strict JSON only and no other text: {"approved": true, "reason": "short explanation"}.
+Set "approved" to false when the comment must be rejected.
+
+Comment content:
+{{content}}`
 
 // defaultModerationConfig returns the configuration used when no row exists.
+// With every switch off, new comments are published immediately.
 func defaultModerationConfig() model.CommentModerationConfig {
 	return model.CommentModerationConfig{
-		Enabled:            false,
-		ModelName:          "gpt-3.5-turbo",
-		ModerationPrompt:   defaultModerationPrompt,
-		AutoApproveEnabled: true,
-		MinScoreThreshold:  0.5,
+		ModelName:        "gpt-3.5-turbo",
+		ModerationPrompt: defaultModerationPrompt,
 	}
 }
 
@@ -134,9 +146,11 @@ type CreateRequest struct {
 	ParentID *uint
 }
 
-// Create creates a comment, applies moderation, and notifies the post author
-// and (for replies) the parent comment author. It returns the created comment
-// (with author preloaded) and the published comment count for the post.
+// Create creates a comment with its moderation status decided before
+// persistence (a single write carries the final status), and notifies the
+// post author and (for replies) the parent comment author only when the
+// comment is published. It returns the created comment (with author
+// preloaded on read paths) and the comment count for the post.
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment, int64, error) {
 	config, err := s.moderationConfig(ctx)
 	if err != nil {
@@ -151,52 +165,92 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment
 	if req.ParentID != nil {
 		comment.ParentID = req.ParentID
 	}
-
-	// Set comment status
-	if config.Enabled {
-		// If AI moderation enabled, set to pending status first
-		comment.Status = model.CommentStatusPending
-	} else if config.AutoApproveEnabled {
-		// If AI moderation not enabled, decide whether to auto-approve based on config
-		comment.Status = model.CommentStatusPublished
-	} else {
-		// Still requires manual moderation
-		comment.Status = model.CommentStatusPending
-	}
+	comment.Status, comment.ModerationReason = s.moderationDecision(ctx, req.Content, config)
 
 	if err := s.repo.Create(ctx, &comment); err != nil {
 		return nil, 0, err
 	}
 
-	// If AI moderation enabled, perform moderation
-	if config.Enabled {
-		approved, _, err := moderateCommentAI(req.Content, config)
-		if err != nil {
-			// If AI moderation fails, log error but don't affect comment creation
-			slog.Warn("AI moderation failed, defaulting to published", "err", err)
-			comment.Status = model.CommentStatusPublished
-		} else if approved {
-			comment.Status = model.CommentStatusPublished
-		} else {
-			comment.Status = model.CommentStatusRejected
-		}
-
-		// Update comment status
-		if err := s.repo.Save(ctx, &comment); err != nil {
-			return nil, 0, err
+	// Pending and rejected comments are invisible to their recipients, so
+	// they must not generate notifications.
+	if comment.Status == model.CommentStatusPublished {
+		s.notifyPostAuthor(ctx, req.PostID, req.UserID, req.Content)
+		if req.ParentID != nil {
+			s.notifyParentAuthor(ctx, *req.ParentID, req.UserID, req.Content)
 		}
 	}
 
-	// Return created comment and updated comment count
 	count, _ := s.repo.CountByPostID(ctx, req.PostID)
+	return &comment, count, nil
+}
 
-	// Create notifications
-	s.notifyPostAuthor(ctx, req.PostID, req.UserID, req.Content)
-	if req.ParentID != nil {
-		s.notifyParentAuthor(ctx, *req.ParentID, req.UserID, req.Content)
+// moderationDecision runs the moderation pipeline for one new comment and
+// returns the final status and reason, short-circuiting on the first
+// decision:
+//
+//  1. keyword filter (if on): a hit rejects the comment, the LLM is not called;
+//  2. LLM review (if on): a reject verdict rejects; an approve verdict is
+//     held for manual review when that switch is on, else published; any
+//     LLM failure fails closed to pending, even with manual review off;
+//  3. manual review (if on): the comment is held as pending;
+//  4. otherwise the comment is published.
+func (s *Service) moderationDecision(
+	ctx context.Context,
+	content string,
+	config model.CommentModerationConfig,
+) (model.CommentStatus, string) {
+	if config.KeywordFilterEnabled {
+		if keyword, hit := matchBlockedKeyword(content, config.BlockKeywords); hit {
+			return model.CommentStatusRejected, truncateReason("Contains blocked keyword: " + keyword)
+		}
 	}
 
-	return &comment, count, nil
+	if config.LLMReviewEnabled {
+		verdict, err := s.reviewWithLLM(ctx, content, config)
+		if err != nil {
+			slog.Warn("LLM moderation failed; holding comment for manual review", "err", err)
+			return model.CommentStatusPending, "LLM review failed; held for manual review"
+		}
+		if !verdict.Approved {
+			return model.CommentStatusRejected, truncateReason(verdict.Reason)
+		}
+		if config.ManualReviewEnabled {
+			return model.CommentStatusPending, ""
+		}
+		return model.CommentStatusPublished, ""
+	}
+
+	if config.ManualReviewEnabled {
+		return model.CommentStatusPending, ""
+	}
+	return model.CommentStatusPublished, ""
+}
+
+// matchBlockedKeyword reports whether content contains any comma-separated
+// blocked keyword, case-insensitively, returning the matched keyword.
+func matchBlockedKeyword(content, blockKeywords string) (string, bool) {
+	for keyword := range strings.SplitSeq(blockKeywords, ",") {
+		keyword = strings.TrimSpace(keyword)
+		if keyword != "" && strings.Contains(strings.ToLower(content), strings.ToLower(keyword)) {
+			return keyword, true
+		}
+	}
+	return "", false
+}
+
+// maxModerationReason is the storage limit of the moderation_reason column
+// (model.Comment.ModerationReason, gorm size:500).
+const maxModerationReason = 500
+
+// truncateReason caps a moderation reason at the column limit, counting
+// runes, so an oversized model reply or keyword cannot break comment
+// persistence on strict databases (MySQL/PostgreSQL).
+func truncateReason(reason string) string {
+	runes := []rune(reason)
+	if len(runes) <= maxModerationReason {
+		return reason
+	}
+	return string(runes[:maxModerationReason])
 }
 
 // notifyPostAuthor notifies the post author unless they wrote the comment.
@@ -304,20 +358,22 @@ func (s *Service) GetModerationConfig(ctx context.Context) (model.CommentModerat
 
 // UpdateModerationConfigRequest carries the fields accepted by the admin API.
 type UpdateModerationConfigRequest struct {
-	Enabled            bool
-	ModelProvider      string
-	ApiKey             string
-	ApiEndpoint        string
-	ModelName          string
-	ModerationPrompt   string
-	BlockKeywords      string
-	AutoApproveEnabled bool
-	MinScoreThreshold  float64
+	ManualReviewEnabled  bool
+	KeywordFilterEnabled bool
+	LLMReviewEnabled     bool
+	ModelProvider        string
+	ApiKey               string
+	ApiEndpoint          string
+	ModelName            string
+	ModerationPrompt     string
+	BlockKeywords        string
 }
 
 // UpdateModerationConfig creates or updates the comment moderation
 // configuration. The API key is only overwritten when a non-empty value is
-// provided. The returned configuration has the API key masked.
+// provided. Enabling LLM review without a stored or provided API key and
+// endpoint is rejected with ErrLLMConfigIncomplete. The returned
+// configuration has the API key masked.
 func (s *Service) UpdateModerationConfig(
 	ctx context.Context,
 	req UpdateModerationConfigRequest,
@@ -332,14 +388,14 @@ func (s *Service) UpdateModerationConfig(
 	}
 
 	config := model.CommentModerationConfig{
-		Enabled:            req.Enabled,
-		ModelProvider:      req.ModelProvider,
-		ApiEndpoint:        req.ApiEndpoint,
-		ModelName:          req.ModelName,
-		ModerationPrompt:   req.ModerationPrompt,
-		BlockKeywords:      req.BlockKeywords,
-		AutoApproveEnabled: req.AutoApproveEnabled,
-		MinScoreThreshold:  req.MinScoreThreshold,
+		ManualReviewEnabled:  req.ManualReviewEnabled,
+		KeywordFilterEnabled: req.KeywordFilterEnabled,
+		LLMReviewEnabled:     req.LLMReviewEnabled,
+		ModelProvider:        req.ModelProvider,
+		ApiEndpoint:          req.ApiEndpoint,
+		ModelName:            req.ModelName,
+		ModerationPrompt:     req.ModerationPrompt,
+		BlockKeywords:        req.BlockKeywords,
 	}
 
 	// The API key is only overwritten when a non-empty value is provided;
@@ -353,6 +409,18 @@ func (s *Service) UpdateModerationConfig(
 		config.ApiKey = apiKey
 	case !isCreate:
 		config.ApiKey = raw.ApiKey
+	}
+
+	// LLM review needs working credentials: a provided key, or — on update —
+	// a previously stored one (a non-empty stored value, encrypted or not).
+	if req.LLMReviewEnabled {
+		apiKey := req.ApiKey
+		if apiKey == "" && !isCreate {
+			apiKey = raw.ApiKey
+		}
+		if apiKey == "" || req.ApiEndpoint == "" {
+			return model.CommentModerationConfig{}, ErrLLMConfigIncomplete
+		}
 	}
 
 	if err := s.repo.SaveModerationConfig(ctx, &config); err != nil {
@@ -390,7 +458,9 @@ func (s *Service) ListModeration(
 	return s.repo.ListModeration(ctx, status, offset, limit)
 }
 
-// SetStatus approves or rejects a comment.
+// SetStatus approves or rejects a comment. Approving clears the moderation
+// reason: the comment becomes publicly visible, and its internal moderation
+// data must not be exposed through the public comment API.
 func (s *Service) SetStatus(ctx context.Context, id string, status model.CommentStatus) (*model.Comment, error) {
 	comment, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -401,37 +471,12 @@ func (s *Service) SetStatus(ctx context.Context, id string, status model.Comment
 	}
 
 	comment.Status = status
+	if status == model.CommentStatusPublished {
+		comment.ModerationReason = ""
+	}
 	if err := s.repo.Save(ctx, comment); err != nil {
 		return nil, err
 	}
 
 	return comment, nil
-}
-
-// moderateCommentAI performs keyword-based moderation. It is intentionally
-// simple; a real AI API call can replace it later.
-func moderateCommentAI(content string, config model.CommentModerationConfig) (bool, string, error) {
-	if !config.Enabled {
-		return true, "", nil // if not enabled, auto approve
-	}
-
-	// Check blocked keywords
-	if config.BlockKeywords != "" {
-		keywords := strings.SplitSeq(config.BlockKeywords, ",")
-		for keyword := range keywords {
-			keyword = strings.TrimSpace(keyword)
-			if keyword != "" && strings.Contains(strings.ToLower(content), strings.ToLower(keyword)) {
-				return false, "Contains blocked keyword: " + keyword, nil
-			}
-		}
-	}
-
-	// Simulate AI moderation logic (should be replaced with real AI API call in production)
-	lowerContent := strings.ToLower(content)
-	if strings.Contains(lowerContent, "垃圾") || strings.Contains(lowerContent, "spam") ||
-		strings.Contains(lowerContent, "广告") || strings.Contains(lowerContent, "ad") {
-		return false, "AI detected non-compliant content", nil
-	}
-
-	return true, "", nil
 }

@@ -17,7 +17,7 @@ VexGo is a lightweight, self-hosted blog content management system designed for 
 - **🚀 High Performance**: Built with Go and Gin for fast, efficient processing
 - **🔐 Secure Authentication**: JWT-based user system with role-based permissions (user / admin / super_admin)
 - **📝 Rich Content**: Markdown editor, categories, tags, drafts, likes, and comments
-- **🛡️ AI-Powered Moderation**: Automatic comment moderation with configurable prompts, keyword blocking, and score thresholds
+- **🛡️ Configurable Comment Moderation**: Independent manual-review, keyword-filter, and LLM-review switches with fail-closed LLM fallback
 - **🖼️ Media Management**: Built-in file storage with S3-compatible support
 - **🎨 Theme System**: Server-side-rendered themes, switchable and uploadable from the admin panel
 - **🔔 Notifications**: In-app notification inbox for likes, comments, and other events

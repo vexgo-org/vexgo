@@ -286,6 +286,11 @@ export const configApi = {
       data,
     ),
 
+  testCommentModeration: () =>
+    api.post<{ message: string; response: string }>(
+      "/moderation/comments/config/test",
+    ),
+
   // AI config-related APIs
   getAIConfig: () => api.get<AIConfig>("/config/ai"),
 

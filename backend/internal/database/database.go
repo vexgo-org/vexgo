@@ -203,6 +203,12 @@ func AutoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	// Map the legacy single AI-moderation toggle onto the explicit moderation
+	// switches before anything reads the config row.
+	if _, err := MigrateLegacyModerationConfig(db); err != nil {
+		return err
+	}
+
 	// Backfill slugs for existing posts that don't have one yet.
 	return backfillSlugs(db)
 }
