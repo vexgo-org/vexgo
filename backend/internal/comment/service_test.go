@@ -505,3 +505,48 @@ func TestModerationConfig_UndecryptableKeyTreatedAsUnset(t *testing.T) {
 		t.Fatalf("moderationConfig error: %v", err)
 	}
 }
+
+// flakyModerationRepo fails every moderation-config read to simulate a
+// transient persistence error. It embeds the real Repository so only the
+// read needs overriding.
+type flakyModerationRepo struct {
+	Repository
+}
+
+func (f *flakyModerationRepo) GetModerationConfig(_ context.Context) (model.CommentModerationConfig, error) {
+	return model.CommentModerationConfig{}, errors.New("transient persistence failure")
+}
+
+// Regression: when the read that decides create-vs-update fails with a real
+// (non-"not found") error, the update must abort instead of wiping the
+// stored API key with a zero value.
+func TestUpdateModerationConfig_RepoErrorDoesNotWipeStoredKey(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newTestServiceWithCipher(t)
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{
+		Enabled: true,
+		ApiKey:  "secret-key",
+	}); err != nil {
+		t.Fatalf("UpdateModerationConfig error: %v", err)
+	}
+
+	var before model.CommentModerationConfig
+	if err := db.First(&before).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+
+	svc.repo = &flakyModerationRepo{Repository: svc.repo}
+
+	if _, err := svc.UpdateModerationConfig(ctx, UpdateModerationConfigRequest{Enabled: false}); err == nil {
+		t.Fatal("expected an error when the moderation-config read fails, got nil")
+	}
+
+	var after model.CommentModerationConfig
+	if err := db.First(&after).Error; err != nil {
+		t.Fatalf("failed to load stored config: %v", err)
+	}
+	if after.ApiKey != before.ApiKey {
+		t.Errorf("stored api key must not change when the update fails: before %q, after %q", before.ApiKey, after.ApiKey)
+	}
+}

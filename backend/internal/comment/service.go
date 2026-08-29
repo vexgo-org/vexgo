@@ -321,57 +321,41 @@ func (s *Service) UpdateModerationConfig(
 	ctx context.Context,
 	req UpdateModerationConfigRequest,
 ) (model.CommentModerationConfig, error) {
-	config, err := s.moderationConfig(ctx)
-	if err != nil {
-		return config, err
-	}
-
+	// Single fetch decides create vs update; any persistence error other than
+	// "no row yet" aborts the update so a stored key can never be wiped by a
+	// transient read failure.
 	raw, getErr := s.repo.GetModerationConfig(ctx)
 	isCreate := errors.Is(getErr, gorm.ErrRecordNotFound)
+	if getErr != nil && !isCreate {
+		return model.CommentModerationConfig{}, getErr
+	}
 
-	if isCreate {
-		// Create new configuration
+	config := model.CommentModerationConfig{
+		Enabled:            req.Enabled,
+		ModelProvider:      req.ModelProvider,
+		ApiEndpoint:        req.ApiEndpoint,
+		ModelName:          req.ModelName,
+		ModerationPrompt:   req.ModerationPrompt,
+		BlockKeywords:      req.BlockKeywords,
+		AutoApproveEnabled: req.AutoApproveEnabled,
+		MinScoreThreshold:  req.MinScoreThreshold,
+	}
+
+	// The API key is only overwritten when a non-empty value is provided;
+	// otherwise the stored (possibly encrypted) value is kept exactly as read.
+	switch {
+	case req.ApiKey != "":
 		apiKey, encErr := s.encryptSecret(req.ApiKey)
 		if encErr != nil {
 			return model.CommentModerationConfig{}, encErr
 		}
-		config = model.CommentModerationConfig{
-			Enabled:            req.Enabled,
-			ModelProvider:      req.ModelProvider,
-			ApiKey:             apiKey,
-			ApiEndpoint:        req.ApiEndpoint,
-			ModelName:          req.ModelName,
-			ModerationPrompt:   req.ModerationPrompt,
-			BlockKeywords:      req.BlockKeywords,
-			AutoApproveEnabled: req.AutoApproveEnabled,
-			MinScoreThreshold:  req.MinScoreThreshold,
-		}
-	} else {
-		// Update existing configuration
-		config.Enabled = req.Enabled
-		config.ModelProvider = req.ModelProvider
-		config.ApiEndpoint = req.ApiEndpoint
-		config.ModelName = req.ModelName
-		config.ModerationPrompt = req.ModerationPrompt
-		config.BlockKeywords = req.BlockKeywords
-		config.AutoApproveEnabled = req.AutoApproveEnabled
-		config.MinScoreThreshold = req.MinScoreThreshold
-		// Only update if new API key is provided; otherwise keep the stored
-		// value exactly as read from the database (config above carries the
-		// already-decrypted key, so restore the raw stored form).
-		if req.ApiKey != "" {
-			apiKey, encErr := s.encryptSecret(req.ApiKey)
-			if encErr != nil {
-				return config, encErr
-			}
-			config.ApiKey = apiKey
-		} else {
-			config.ApiKey = raw.ApiKey
-		}
+		config.ApiKey = apiKey
+	case !isCreate:
+		config.ApiKey = raw.ApiKey
 	}
 
 	if err := s.repo.SaveModerationConfig(ctx, &config); err != nil {
-		return config, err
+		return model.CommentModerationConfig{}, err
 	}
 
 	// Don't return sensitive information
