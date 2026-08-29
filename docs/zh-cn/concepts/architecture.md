@@ -33,6 +33,7 @@ backend/
     post/                    # 文章 CRUD、分类、标签、点赞
     public/                  # 嵌入的前端、主题、SSR 渲染器、静态路由
     router/                  # 路由注册（组合所有领域）
+    secrets/                 # 数据库中敏感信息的 AES-256-GCM 加密
     settings/                # 管理员配置（SMTP、AI、通用、主题）
     sso/                     # GitHub / Google / OIDC 登录
     upload/                  # 文件上传（本地磁盘或 S3）
@@ -105,8 +106,9 @@ type Mailer interface {
 1. 接收 `cli.Execute()` 解析完成的配置——cobra 负责命令行参数，viper 负责按「参数 > 配置文件 > 环境变量 > 默认值」分层。
 2. 确保 JWT 密钥存在（开发环境生成随机兜底值）并应用前端地址默认值；SSO 结构体在配置解析阶段派生。
 3. 打开数据库并运行迁移/种子数据。
-4. 创建存储（本地或 S3）。
-5. 实例化每个领域的依赖并将它们装配到路由器中。
+4. 从 `settings_encryption_key` 构建静态加密 cipher（未设置时记录警告，敏感信息保持明文存储），并运行 `database.MigrateSecretsAtRest` 将仍为明文的敏感信息就地加密（幂等）。
+5. 创建存储（本地或 S3）。
+6. 实例化每个领域的依赖并将它们装配到路由器中。
 
 `cmd/vexgo/main.go` 是一个轻量入口，调用 `cli.Execute()`，然后调用 `app.New(cfg)` 和 `app.Run()`。
 
@@ -127,6 +129,8 @@ cmd/vexgo/main.go
 叶子包（无内部导入）：
     model/         ← 数据模型 + 共享接口，被所有领域包导入
     config/        ← 配置解析，被 cli、app、auth、database、sso、upload 导入
+    secrets/       ← 静态敏感信息的 AES-256-GCM cipher；各领域通过自己的
+                     SecretCipher 接口消费，由 app 装配
 
 共享层：
     middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）

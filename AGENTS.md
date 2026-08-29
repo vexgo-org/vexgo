@@ -60,9 +60,10 @@ just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main
 - Pass dependencies explicitly via `Deps` structs (see `router.Deps`) — no global mutable state, except the single sanctioned test seam `mailer.SetMailCaptureHook` (see below).
 - Imports use the full module path: `github.com/vexgo-org/vexgo/backend/internal/<package>`.
 - Package dependency rules (acyclic graph):
-  - `config/` and `model/` are leaf packages — import no other backend module.
+  - `config/`, `model/`, and `secrets/` are leaf packages — import no other backend module.
   - `model` holds GORM models plus cross-domain seams (`Notifier`, `FileRemover` in `model/interfaces.go`); it must not import application logic.
   - `config` is a pure setup module.
+  - `secrets` provides AES-256-GCM encryption at rest for DB-stored secrets (SMTP password, AI/comment-moderation API keys). Consuming domains declare their own narrow `SecretCipher` interface; the composition root builds `secrets.Cipher` from `settings_encryption_key` (nil when unset → plaintext fallback) and `database.MigrateSecretsAtRest` encrypts plaintext values in place at startup.
   - `cli/` defines the cobra command line (flags, help, version, `.env` loading) and binds the flags to viper; it imports only `config`.
   - Config keys live in `keyDefaults` (`internal/config/config.go`) with a matching `mapstructure` tag on `Config`; viper layers flags > config file > environment > defaults, so do not re-introduce per-source parsing.
   - Cross-domain calls go through consumer-declared interfaces where practical: `notification` implements `model.Notifier`, `upload` implements `model.FileRemover`; the consuming domain owns any interface it defines (e.g. auth's `CaptchaChecker`), with the composition root (`internal/app`) wiring concrete implementations.
