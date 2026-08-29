@@ -4,17 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"gorm.io/gorm"
 )
 
+// SecretCipher is the seam for decrypting the SMTP password stored at rest.
+// It is implemented by the secrets package and injected so it can be
+// faked in tests. A nil cipher means no key is configured: the stored
+// password is used as-is.
+type SecretCipher interface {
+	Encrypt(plaintext string) (string, error)
+	Decrypt(stored string) (string, error)
+}
+
 type Deps struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	Cipher SecretCipher
+	// Client overrides the SMTP client; nil uses the real one. Intended for
+	// tests so they can assert on the configuration handed to LoadConfig.
+	Client SMTPMailer
 }
 
 type Service struct {
 	repo   Repository
 	client SMTPMailer
+	cipher SecretCipher
 }
 
 // mailCaptureHook, when non-nil, receives the rendered parts of outgoing
@@ -29,9 +44,14 @@ func SetMailCaptureHook(hook func(to, subject, textBody, htmlBody string)) {
 }
 
 func NewService(deps Deps) *Service {
+	client := deps.Client
+	if client == nil {
+		client = NewClient()
+	}
 	return &Service{
-		client: NewClient(),
+		client: client,
 		repo:   NewRepository(deps.DB),
+		cipher: deps.Cipher,
 	}
 }
 
@@ -116,12 +136,25 @@ func (s *Service) Enabled(ctx context.Context) (bool, error) {
 	return cfg.Enabled, nil
 }
 
-// readConfig reads SMTP configuration from database, and
-// updates the configuraiton of SMTP client.
+// readConfig reads SMTP configuration from database, decrypts the stored
+// password, and updates the configuration of SMTP client.
 func (s *Service) readConfig(ctx context.Context) error {
 	cfg, err := s.repo.GetSMTPSetting(ctx)
 	if err != nil {
 		return fmt.Errorf("read SMTP configuration failed: %w", err)
+	}
+
+	// The password is stored encrypted; decrypt it for the SMTP handshake.
+	// An undecryptable password (e.g. after a key rotation) is treated as
+	// unset so the server keeps running; the admin must re-save the secret.
+	if cfg.Password != "" && s.cipher != nil {
+		decrypted, decErr := s.cipher.Decrypt(cfg.Password)
+		if decErr != nil {
+			slog.Error("failed to decrypt stored secret, treating it as unset; please re-save it", "setting", "smtp_config.password", "err", decErr)
+			cfg.Password = ""
+		} else {
+			cfg.Password = decrypted
+		}
 	}
 
 	if err := s.client.LoadConfig(cfg); err != nil {
