@@ -1,6 +1,7 @@
 package comment
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -227,5 +228,92 @@ func TestModerationRoutes_RoleGating(t *testing.T) {
 				t.Errorf("got %d, want %d (%s)", w.Code, tt.want, w.Body.String())
 			}
 		})
+	}
+}
+
+// Exercise the remaining queue and comment endpoints end to end: manual
+// review holds a comment as pending (TC-CMOD-002), an admin approves and
+// rejects it through the queue endpoints (TC-CMOD-022), approved/rejected
+// lists reflect the outcome, the public list shows published comments only,
+// and the author can delete their own comment.
+func TestModerationQueue_ApproveRejectDelete(t *testing.T) {
+	r, db := newTestRouter(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+	moderator := seedHandlerUser(t, db, "moderator", model.RoleAdmin)
+	adminToken := mintHandlerToken(t, moderator.ID, model.RoleAdmin)
+	userToken := mintHandlerToken(t, commenter.ID, model.RoleContributor)
+
+	w := doJSON(t, r, http.MethodPut, "/api/moderation/comments/config", adminToken,
+		`{"manualReviewEnabled": true}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("config update failed: %d %s", w.Code, w.Body.String())
+	}
+
+	create := func(content string) string {
+		w := doJSON(t, r, http.MethodPost, "/api/comments", userToken,
+			`{"postId": "`+strconv.FormatUint(uint64(post.ID), 10)+`", "content": "`+content+`"}`)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("create comment failed: %d %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"requiresModeration":true`) {
+			t.Errorf("comment %q should require moderation: %s", content, w.Body.String())
+		}
+		var body struct {
+			Comment struct {
+				ID uint `json:"id"`
+			} `json:"comment"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode create response: %v", err)
+		}
+		return strconv.FormatUint(uint64(body.Comment.ID), 10)
+	}
+
+	pendingID := create("hold me")
+	rejectID := create("reject me")
+	publishID := create("publish me")
+
+	// Approve two, reject one.
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/approve/"+pendingID, adminToken, "")
+	if w.Code != http.StatusOK {
+		t.Errorf("approve failed: %d %s", w.Code, w.Body.String())
+	}
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/approve/"+publishID, adminToken, "")
+	if w.Code != http.StatusOK {
+		t.Errorf("approve failed: %d %s", w.Code, w.Body.String())
+	}
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/reject/"+rejectID, adminToken, "")
+	if w.Code != http.StatusOK {
+		t.Errorf("reject failed: %d %s", w.Code, w.Body.String())
+	}
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/approve/99999", adminToken, "")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 approving a missing comment, got %d", w.Code)
+	}
+
+	// The approved list carries the two approved comments.
+	w = doJSON(t, r, http.MethodGet, "/api/moderation/comments/approved", adminToken, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "hold me") {
+		t.Errorf("expected approved comment in approved list: %d %s", w.Code, w.Body.String())
+	}
+
+	// The public post list shows published comments only.
+	w = doJSON(t, r, http.MethodGet, "/api/comments/post/"+strconv.FormatUint(uint64(post.ID), 10), "", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("public comment list failed: %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "publish me") || !strings.Contains(w.Body.String(), "hold me") {
+		t.Errorf("expected approved comments in the public list: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "reject me") {
+		t.Errorf("public list must hide rejected comments: %s", w.Body.String())
+	}
+
+	// The author can delete their own published comment.
+	w = doJSON(t, r, http.MethodDelete, "/api/comments/"+publishID, userToken, "")
+	if w.Code != http.StatusOK {
+		t.Errorf("delete failed: %d %s", w.Code, w.Body.String())
 	}
 }
