@@ -39,7 +39,7 @@ type Config struct {
 	BaseURL string `mapstructure:"base_url"`
 
 	// Database configuration
-	DBType     string `mapstructure:"db_type"`     // Database type: "sqlite", "mysql", or "postgres"
+	DBType     string `mapstructure:"db_type"`     // Database type: "sqlite", "mysql", "mariadb", or "postgres"
 	DBHost     string `mapstructure:"db_host"`     // Database host
 	DBPort     int    `mapstructure:"db_port"`     // Database port
 	DBUser     string `mapstructure:"db_user"`     // Database user

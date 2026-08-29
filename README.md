@@ -184,10 +184,10 @@ trusted_proxies: []
 # ==================== Database Configuration ====================
 
 # Database type
-# Options: "sqlite", "mysql", "postgres"
+# Options: "sqlite", "mysql", "postgres", "mariadb"
 db_type: "sqlite"
 
-# When db_type is "mysql", configure the following parameters
+# When db_type is "mysql" or "mariadb", configure the following parameters
 # db_host: "127.0.0.1"
 # db_port: 3306
 # db_user: "your_username"
@@ -316,15 +316,15 @@ You can also configure the application using environment variables.
 
 #### Database
 
-| Variable      | Default   | Description                                     |
-| ------------- | --------- | ----------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | Database type: `sqlite`, `mysql`, or `postgres` |
-| `DB_HOST`     | —         | Database host (required for mysql/postgres)     |
-| `DB_PORT`     | —         | Database port (required for mysql/postgres)     |
-| `DB_USER`     | —         | Database username (required for mysql/postgres) |
-| `DB_PASSWORD` | —         | Database password (required for mysql/postgres) |
-| `DB_NAME`     | —         | Database name (required for mysql/postgres)     |
-| `DB_SSL_MODE` | `disable` | SSL mode for postgres                           |
+| Variable      | Default   | Description                                                |
+| ------------- | --------- | ---------------------------------------------------------- |
+| `DB_TYPE`     | `sqlite`  | Database type: `sqlite`, `mysql`, `postgres`, or `mariadb` |
+| `DB_HOST`     | —         | Database host (required for mysql/postgres)                |
+| `DB_PORT`     | —         | Database port (required for mysql/postgres)                |
+| `DB_USER`     | —         | Database username (required for mysql/postgres)            |
+| `DB_PASSWORD` | —         | Database password (required for mysql/postgres)            |
+| `DB_NAME`     | —         | Database name (required for mysql/postgres)                |
+| `DB_SSL_MODE` | `disable` | SSL mode for postgres                                      |
 
 #### SSO / Single Sign-On
 

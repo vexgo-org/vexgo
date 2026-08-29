@@ -51,7 +51,7 @@ behind_reverse_proxy: false
 trusted_proxies: []
 
 # 数据库
-db_type: "sqlite" # sqlite | mysql | postgres
+db_type: "sqlite" # sqlite | mysql | postgres | mariadb
 
 # SSO
 github_client_id: ""
@@ -87,7 +87,7 @@ s3_bucket: "my-bucket"
 
 | 变量          | 默认值    | 说明                                                                |
 | ------------- | --------- | ------------------------------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | `sqlite`、`mysql` 或 `postgres`                                     |
+| `DB_TYPE`     | `sqlite`  | `sqlite`、`mysql`、`postgres` 或 `mariadb`                          |
 | `DB_HOST`     | —         | 主机（mysql/postgres 必填）                                         |
 | `DB_PORT`     | —         | 端口（mysql/postgres 必填）                                         |
 | `DB_USER`     | —         | 用户名（mysql/postgres 必填）                                       |

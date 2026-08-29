@@ -51,7 +51,7 @@ behind_reverse_proxy: false
 trusted_proxies: []
 
 # Database
-db_type: "sqlite" # sqlite | mysql | postgres
+db_type: "sqlite" # sqlite | mysql | postgres | mariadb
 
 # SSO
 github_client_id: ""
@@ -87,7 +87,7 @@ Every setting can also be provided as an environment variable. This is the natur
 
 | Variable      | Default   | Description                                                         |
 | ------------- | --------- | ------------------------------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | `sqlite`, `mysql`, or `postgres`                                    |
+| `DB_TYPE`     | `sqlite`  | `sqlite`, `mysql`, `postgres`, or `mariadb`                         |
 | `DB_HOST`     | —         | Host (required for mysql/postgres)                                  |
 | `DB_PORT`     | —         | Port (required for mysql/postgres)                                  |
 | `DB_USER`     | —         | Username (required for mysql/postgres)                              |
