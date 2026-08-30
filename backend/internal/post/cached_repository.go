@@ -2,6 +2,8 @@ package post
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -96,9 +98,19 @@ func (r *cachedRepository) setJSON(ctx context.Context, key string, v any) {
 	}
 }
 
+// listFilterKey hashes the free-form filter components (category, status) so
+// cache keys stay fixed-size regardless of request input. Searches never
+// reach a cache key: List bypasses the cache entirely when a search term is
+// present.
+func listFilterKey(categoryID, status string) string {
+	sum := sha256.Sum256([]byte(categoryID + "\x00" + status))
+	return hex.EncodeToString(sum[:8])
+}
+
 // FindBySlug serves the post by slug through the cache. The stored copy is
 // the pristine database row; per-request enrichment (privacy filtering, like
 // and comment counts) happens in the service on a freshly decoded copy.
+// Not-found lookups are never cached.
 func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
 	key := fmt.Sprintf("post:g%s:slug:%s", r.generation(ctx), slug)
 	var post model.Post
@@ -115,9 +127,12 @@ func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.
 }
 
 // List serves guest-visible list pages through the cache; authenticated
-// queries are user-dependent and always hit the database.
+// queries and search queries always hit the database. Search is excluded
+// because its keys would be attacker-enumerable and unbounded in size, and
+// empty pages are not cached so keys only ever exist for real content —
+// together these bound the key space to what the posts table actually holds.
 func (r *cachedRepository) List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {
-	if (userRole != "" && userRole != model.RoleGuest) || userID != 0 {
+	if (userRole != "" && userRole != model.RoleGuest) || userID != 0 || f.Search != "" {
 		return r.Repository.List(ctx, userRole, userID, f)
 	}
 
@@ -125,7 +140,7 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 		Posts []model.Post
 		Total int64
 	}
-	key := fmt.Sprintf("post:g%s:list:%d:%d:%s:%s:%s", r.generation(ctx), f.Page, f.Limit, f.CategoryID, f.Status, f.Search)
+	key := fmt.Sprintf("post:g%s:list:%d:%d:%s", r.generation(ctx), f.Page, f.Limit, listFilterKey(f.CategoryID, f.Status))
 	var page listPage
 	if r.getJSON(ctx, key, &page) {
 		// An absent slice must stay an empty JSON array, not null.
@@ -139,6 +154,9 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	if err != nil {
 		return posts, total, err
 	}
+	if len(posts) == 0 {
+		return posts, total, err
+	}
 	if posts == nil {
 		posts = []model.Post{}
 	}
@@ -147,7 +165,7 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 }
 
 // Popular serves the published-posts pool through the cache; scoring,
-// sorting and limiting happen in the service.
+// sorting and limiting happen in the service. Empty pools are not cached.
 func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
 	key := "post:g" + r.generation(ctx) + ":popular"
 	var posts []model.Post
@@ -162,6 +180,9 @@ func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
 	if err != nil {
 		return posts, err
 	}
+	if len(posts) == 0 {
+		return posts, err
+	}
 	if posts == nil {
 		posts = []model.Post{}
 	}
@@ -169,7 +190,8 @@ func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
 	return posts, nil
 }
 
-// Latest serves the most recent published posts through the cache.
+// Latest serves the most recent published posts through the cache. Empty
+// results are not cached.
 func (r *cachedRepository) Latest(ctx context.Context, limit int) ([]model.Post, error) {
 	key := fmt.Sprintf("post:g%s:latest:%d", r.generation(ctx), limit)
 	var posts []model.Post
@@ -182,6 +204,9 @@ func (r *cachedRepository) Latest(ctx context.Context, limit int) ([]model.Post,
 
 	posts, err := r.Repository.Latest(ctx, limit)
 	if err != nil {
+		return posts, err
+	}
+	if len(posts) == 0 {
 		return posts, err
 	}
 	if posts == nil {

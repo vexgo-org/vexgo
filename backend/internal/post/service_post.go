@@ -26,6 +26,19 @@ type ListQuery struct {
 	Search   string
 }
 
+// maxSearchLength caps the search term: an unbounded LIKE pattern is both an
+// expensive database query and a bloated cache key on every request.
+const maxSearchLength = 200
+
+// truncateRunes shortens s to at most n runes without splitting one.
+func truncateRunes(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n])
+}
+
 // List returns the paginated post list with role-based visibility, filters,
 // and per-post like/comment counts.
 func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, error) {
@@ -33,6 +46,8 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, e
 	if q.UserRole == "" && !s.allowGuestView(ctx) {
 		return nil, 0, ErrGuestViewDenied
 	}
+
+	q.Search = truncateRunes(q.Search, maxSearchLength)
 
 	posts, total, err := s.repo.List(ctx, q.UserRole, q.UserID, ListFilter{
 		Page: q.Page, Limit: q.Limit, CategoryID: q.Category, Search: q.Search,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -197,26 +198,59 @@ func TestCachedRepository_ListCachesGuestOnly(t *testing.T) {
 	}
 }
 
-func TestCachedRepository_EmptyGuestListStaysEmpty(t *testing.T) {
+func TestCachedRepository_EmptyGuestListNotCached(t *testing.T) {
 	ctx := context.Background()
 	r, repo, _ := newCachedFakeRepo()
 	repo.post = nil
 
-	// First page: empty straight from the database.
-	posts, total, err := r.List(ctx, "", 0, ListFilter{Page: 1, Limit: 10})
-	if err != nil || total != 0 || len(posts) != 0 {
-		t.Fatalf("first page = %d posts, total %d, %v; want empty", len(posts), total, err)
+	// Empty pages are never cached: every request for a page beyond the
+	// content re-queries the database, so crafted page numbers cannot grow
+	// the key space.
+	for range 2 {
+		posts, total, err := r.List(ctx, "", 0, ListFilter{Page: 99, Limit: 10})
+		if err != nil || total != 0 || len(posts) != 0 {
+			t.Fatalf("page = %d posts, total %d, %v; want empty", len(posts), total, err)
+		}
 	}
-	// Cached page: a decoded null slice must come back as an empty slice.
-	posts, total, err = r.List(ctx, "", 0, ListFilter{Page: 1, Limit: 10})
-	if err != nil || total != 0 {
-		t.Fatalf("cached page errored: %v", err)
+	if repo.listCalls != 2 {
+		t.Fatalf("expected 2 underlying calls for empty pages, got %d", repo.listCalls)
 	}
-	if posts == nil {
-		t.Fatal("cached empty list decoded as nil; want empty non-nil slice")
+}
+
+// TestCachedRepository_SearchBypassesCache checks that search queries always
+// hit the database: their keys would be attacker-enumerable and unbounded.
+func TestCachedRepository_SearchBypassesCache(t *testing.T) {
+	ctx := context.Background()
+	r, repo, cache := newCachedFakeRepo()
+
+	for range 2 {
+		if _, _, err := r.List(ctx, "", 0, ListFilter{Page: 1, Limit: 10, Search: "hello"}); err != nil {
+			t.Fatalf("search List: %v", err)
+		}
 	}
-	if len(posts) != 0 || total != 0 {
-		t.Fatalf("cached page = %d posts, total %d; want empty", len(posts), total)
+	if repo.listCalls != 2 {
+		t.Fatalf("expected every search to hit the database, underlying calls = %d", repo.listCalls)
+	}
+	for key := range cache.values {
+		if strings.Contains(key, "list:") {
+			t.Fatalf("search term leaked into a list cache key: %q", key)
+		}
+	}
+}
+
+// TestCachedRepository_ListKeyHashesFilters checks that the free-form filter
+// components are hashed, keeping keys fixed-size.
+func TestCachedRepository_ListKeyHashesFilters(t *testing.T) {
+	ctx := context.Background()
+	r, _, cache := newCachedFakeRepo()
+
+	if _, _, err := r.List(ctx, "", 0, ListFilter{Page: 1, Limit: 10, CategoryID: "golang"}); err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for key := range cache.values {
+		if strings.Contains(key, "golang") {
+			t.Fatalf("raw category leaked into a list cache key: %q", key)
+		}
 	}
 }
 

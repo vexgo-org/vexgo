@@ -133,6 +133,10 @@ valkey_enabled: false
 #   valkey://127.0.0.1:6379/0
 #   redis://:password@127.0.0.1:6379/0
 #   rediss://127.0.0.1:6379/0  (TLS)
+# Keep the server private (loopback / trusted network, password, TLS):
+# everything in it is treated as trusted and served to users. Configure a
+# maxmemory limit with allkeys-lru eviction — rate-limit keys rotate per
+# client IP and the instance cannot bound them on its own.
 valkey_url: ""
 
 # ==================== S3 Storage Configuration ====================

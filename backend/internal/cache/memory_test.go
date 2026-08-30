@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -114,5 +115,67 @@ func TestMemoryCacheNoTTLMeansNoExpiration(t *testing.T) {
 	// (past time.Now() either way).
 	if value, ok, _ := c.Get(ctx, "k"); !ok || value != "v" {
 		t.Fatalf("Get(k) = %q, %v; want hit", value, ok)
+	}
+}
+
+// TestMemoryCache_SweepsExpiredEntries checks that expired entries are swept
+// once the map passes the sweep threshold, so keys that are never read again
+// cannot accumulate.
+func TestMemoryCache_SweepsExpiredEntries(t *testing.T) {
+	ctx := context.Background()
+	c := NewMemory()
+
+	// One long-lived entry and one that is already expired.
+	if err := c.Set(ctx, "live", "v", time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := c.Set(ctx, "dead", "v", time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	time.Sleep(2 * time.Millisecond)
+
+	// Push the map over the sweep threshold.
+	for i := range memorySweepThreshold {
+		if err := c.Set(ctx, strconv.Itoa(i), "v", time.Minute); err != nil {
+			t.Fatalf("Set: %v", err)
+		}
+	}
+
+	c.mu.Lock()
+	_, deadExists := c.entries[keyPrefix+"dead"]
+	_, liveExists := c.entries[keyPrefix+"live"]
+	c.mu.Unlock()
+
+	if deadExists {
+		t.Fatal("expired entry survived the sweep")
+	}
+	if !liveExists {
+		t.Fatal("live entry was swept")
+	}
+}
+
+// TestMemoryCache_StopsStoringAtCap checks that new keys past the hard cap
+// are not stored (reads become misses) while existing keys stay overwritable.
+func TestMemoryCache_StopsStoringAtCap(t *testing.T) {
+	ctx := context.Background()
+	c := NewMemory()
+
+	for i := range memoryMaxEntries {
+		if err := c.Set(ctx, strconv.Itoa(i), "v", time.Minute); err != nil {
+			t.Fatalf("Set: %v", err)
+		}
+	}
+	if err := c.Set(ctx, "overflow", "v", time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if _, ok, _ := c.Get(ctx, "overflow"); ok {
+		t.Fatal("entry stored past the cap; want miss")
+	}
+	// Overwriting an existing key still works at the cap.
+	if err := c.Set(ctx, "0", "v2", time.Minute); err != nil {
+		t.Fatalf("Set overwrite: %v", err)
+	}
+	if value, ok, _ := c.Get(ctx, "0"); !ok || value != "v2" {
+		t.Fatalf("Get(0) = %q, %v; want v2 hit", value, ok)
 	}
 }
