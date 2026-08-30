@@ -201,6 +201,22 @@ db_type: "sqlite"
 # db_name: "vexgo"
 # db_ssl_mode: "disable"  # 可选值: "disable", "require", "verify-ca", "verify-full"
 
+# ==================== 内容缓存与 Valkey ====================
+
+# 公开读路径的内容缓存（文章列表、文章详情、热门、最新、首页统计）。
+# 开启时读取经由缓存提供：未启用 valkey 时使用进程内内存，
+# 启用 valkey 时使用配置的 valkey 服务器。关闭时所有读取直达数据库。
+cache_enabled: true
+
+# 为上述内容缓存以及共享状态（限流、OAuth 登录 state）启用
+# Valkey（兼容 Redis），使多实例可以部署在负载均衡之后。
+# 关闭（默认）时一切状态保留在进程内存中。
+valkey_enabled: false
+
+# Valkey 连接 URL（valkey_enabled 为 true 时必填）。
+# 末尾路径（"/1"）或 "db" 查询参数可选择逻辑数据库；两者默认为 0 号库。
+# valkey_url: "valkey://127.0.0.1:6379"
+
 # ==================== SSO 配置 ====================
 
 # -------------------- GitHub OAuth --------------------
@@ -442,6 +458,16 @@ sudo docker run -d --name vexgo \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
   ghcr.io/vexgo-org/vexgo:latest
 ```
+
+#### 内容缓存与 Valkey
+
+| 变量             | 默认值  | 说明                                                                                                                   |
+| ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_ENABLED`  | `false` | 公开读路径（文章列表、文章详情、热门、最新、首页统计）经内容缓存提供；`false` 时所有读取直达数据库。                   |
+| `VALKEY_ENABLED` | `false` | 将可缓存状态存入 Valkey（兼容 Redis）：内容缓存（当 `CACHE_ENABLED=true`）以及限流、OAuth 登录 state，多实例共享。     |
+| `VALKEY_URL`     | —       | Valkey 连接 URL，如 `valkey://127.0.0.1:6379`（`VALKEY_ENABLED=true` 时必填；也接受 `redis://` 与 TLS 的 `rediss://`） |
+
+> **注意：** `VALKEY_ENABLED=false` 时内容缓存运行在进程内内存中，限流与 OAuth state 也是每进程一份——仅适用于单实例。在负载均衡后运行多个实例必须设置 `VALKEY_ENABLED=true`。启用后服务器必须在启动时可达（fail-fast），并应保持私有、配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略。
 
 ## 数据库
 

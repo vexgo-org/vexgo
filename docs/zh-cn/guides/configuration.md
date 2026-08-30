@@ -130,6 +130,14 @@ s3_bucket: "my-bucket"
 
 > 当 `S3_ENABLED=true` 时，上传的媒体文件存储到配置的桶中，而非本地 `data` 目录。
 
+### 内容缓存与 Valkey
+
+| 变量             | 默认值  | 说明                                                                                                                   |
+| ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_ENABLED`  | `false` | 公开读路径（文章列表、文章详情、热门、最新、首页统计）经内容缓存提供；`false` 时所有读取直达数据库。                   |
+| `VALKEY_ENABLED` | `false` | 将可缓存状态存入 Valkey（兼容 Redis）：内容缓存（当 `CACHE_ENABLED=true`）以及限流、OAuth 登录 state，多实例共享。     |
+| `VALKEY_URL`     | —       | Valkey 连接 URL，如 `valkey://127.0.0.1:6379`（`VALKEY_ENABLED=true` 时必填；也接受 `redis://` 与 TLS 的 `rediss://`） |
+
 ---
 
 ## 配置数据库
@@ -286,6 +294,34 @@ docker run -d --name vexgo \
 ```
 
 > **MinIO/Wasabi：** 请设置 `S3_FORCE_PATH=true`——大多数 S3 兼容服务需要路径风格 URL。
+
+## 内容缓存与 Valkey
+
+VexGo 为公开读路径（文章列表、文章详情、热门/最新、首页统计）提供读穿透缓存，并可将限流预算与 OAuth 登录 state 移出进程。两个开关独立控制：
+
+- **`cache_enabled`**（默认 `false`）——内容缓存。`false` 时所有公开读取直达数据库。
+- **`valkey_enabled`**（默认 `false`）——将可缓存状态存入 Valkey（兼容 Redis）服务器：内容缓存（`cache_enabled` 开启时）**以及**多实例必须达成一致的共享状态（限流、OAuth 登录 state）。
+
+```yaml
+cache_enabled: true
+valkey_enabled: true
+valkey_url: "valkey://127.0.0.1:6379"
+```
+
+行为矩阵：
+
+| `cache_enabled` | `valkey_enabled` | 内容缓存后端           | 限流 / OAuth state          |
+| --------------- | ---------------- | ---------------------- | --------------------------- |
+| `false`         | —                | 关闭（读取直达数据库） | 每进程一份 / valkey（见下） |
+| `true`          | `false`          | 进程内内存             | 每进程一份（仅限单实例）    |
+| `true`          | `true`           | Valkey                 | Valkey，多实例共享          |
+
+注意事项：
+
+- `valkey_enabled: true` 时服务器必须在启动时可达——URL 错误或服务器不可达会在启动阶段直接报错退出，而不是等到请求时才失败。
+- 多实例部署必须设置 `valkey_enabled: true`；否则限流预算与 OAuth state 是每进程一份。
+- 保持 Valkey 服务器私有（回环/可信网络、URL 中带密码、必要时用 `rediss://` 走 TLS），并配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略——限流键按客户端 IP 轮换，应用层无法设界。
+- 廉价读取（如单篇文章）对部署位置敏感：缓存往返必须比它替代的数据库查询更便宜。请将 Valkey 与应用同宿主部署，或保持低 RTT 网络路径。
 
 ## 静态敏感信息加密
 

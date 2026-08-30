@@ -112,6 +112,14 @@
 | `S3_CUSTOM_DOMAIN`                | —       | 公开文件 URL 的自定义域名，如 `cdn.example.com`（例如桶前的 CDN） |
 | `S3_DISABLE_BUCKET_IN_CUSTOM_URL` | `false` | 自定义域名 URL 中不包含桶名（默认包含）                           |
 
+### 内容缓存与 Valkey
+
+| 变量             | 默认值  | 说明                                                                                                                                                                       |
+| ---------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_ENABLED`  | `false` | 公开读路径（文章列表、文章详情、热门、最新、首页统计）经内容缓存提供；`false` 时所有读取直达数据库。                                                                       |
+| `VALKEY_ENABLED` | `false` | 将可缓存状态存入 Valkey（兼容 Redis）：内容缓存（当 `CACHE_ENABLED=true`）以及限流、OAuth 登录 state，多实例共享。                                                         |
+| `VALKEY_URL`     | —       | Valkey 连接 URL，如 `valkey://127.0.0.1:6379`（`VALKEY_ENABLED=true` 时必填）。末尾路径（"/1"）或 `db` 查询参数可选择逻辑数据库；也接受 `redis://` 与 `rediss://`（TLS）。 |
+
 ## 配置文件键
 
 配置文件使用相同设置的小写 YAML 键。仓库中的示例配置文件为 `examples/config.yml`，通过 `-c examples/config.yml` 加载。
@@ -182,6 +190,14 @@
 | `s3_custom_domain`                | —       | 公开 URL 的自定义域名     |
 | `s3_disable_bucket_in_custom_url` | `false` | 自定义域名 URL 中省略桶名 |
 
+### 缓存与 Valkey
+
+| YAML key         | 默认值  | 说明                                                                                             |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `cache_enabled`  | `false` | 公开读路径的内容缓存；`false` = 读取直达数据库                                                   |
+| `valkey_enabled` | `false` | 将内容缓存（`cache_enabled: true` 时）与共享状态（限流、OAuth 登录 state）存入 Valkey            |
+| `valkey_url`     | —       | Valkey 连接 URL；`valkey_enabled: true` 时必填。末尾路径（"/1"）或 `db` 查询参数可选择逻辑数据库 |
+
 ## 环境变量 ↔ 配置文件 ↔ 命令行对照
 
 | 设置                 | 环境变量                        | 配置文件键                      | CLI 参数     |
@@ -220,6 +236,9 @@
 | S3 桶                | `S3_BUCKET`                     | `s3_bucket`                     | —            |
 | S3 Access Key        | `S3_ACCESS_KEY`                 | `s3_access_key`                 | —            |
 | S3 Secret Key        | `S3_SECRET_KEY`                 | `s3_secret_key`                 | —            |
+| 内容缓存             | `CACHE_ENABLED`                 | `cache_enabled`                 | —            |
+| Valkey 开关          | `VALKEY_ENABLED`                | `valkey_enabled`                | —            |
+| Valkey URL           | `VALKEY_URL`                    | `valkey_url`                    | —            |
 
 只有 `addr`、`port` 和 `data` 提供命令行参数，其余设置均通过环境变量或配置文件键配置。
 

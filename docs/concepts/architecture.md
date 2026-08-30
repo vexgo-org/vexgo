@@ -21,6 +21,7 @@ backend/
   internal/
     app/                     # composition root: wires all dependencies together
     auth/                    # registration, login, JWT, profile, password reset
+    cache/                   # cache backends: in-process memory + Valkey (valkey-io/valkey-go)
     cli/                     # cobra command line: flags, help, version, .env loading
     comment/                 # comments and AI-powered moderation
     config/                  # layered config resolution via viper, JWT, S3, SSO setup
@@ -99,6 +100,18 @@ type Mailer interface {
 ```
 
 These interfaces allow domains like `post`, `comment`, and `user` to trigger notifications and file cleanup — and `auth`/`verification` to send email — without importing the concrete implementations, keeping the dependency graph acyclic.
+
+### Cache Backends (`internal/cache/`)
+
+`internal/cache` is a **leaf package** (it imports no other backend module) providing one `Cache` interface — `Get`/`Set`/`Delete`/`GetDel`/`Incr` — with two implementations: an in-process memory backend and a Valkey (Redis-compatible) backend built on `valkey-io/valkey-go`. All keys are namespaced with a `vexgo:` prefix so the server can be shared with unrelated applications.
+
+Following the consumer-declared seam convention, no domain imports `cache`. Instead:
+
+- `middleware` declares `CounterStore` — the atomic increment behind the distributed fixed-window rate limiter
+- `sso` declares `StateStore` — one-time OAuth state via `Set`/`GetDel`
+- `post` and `home` declare `ReadCache` — the read-through decorators for the public read paths
+
+`cache.Cache` satisfies all of these structurally, and the composition root injects the concrete backend (memory, or a valkey connection dialed and PINGed at startup). Runtime store errors fail **open** in the rate limiter (availability over abuse protection) and fail **closed** in the SSO state check (CSRF protection stays intact).
 
 ### Composition Root (`internal/app/`)
 

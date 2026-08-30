@@ -64,6 +64,33 @@ db_type: "sqlite"
 # db_name: "vexgo"
 # db_ssl_mode: "disable"  # Options: "disable", "require", "verify-ca", "verify-full"
 
+# ==================== Valkey Cache Configuration ====================
+
+# Content cache for the public read paths (post lists, post by slug,
+# popular, latest, home stats). Enabled (default) reads are served through a
+# cache: in-process memory unless valkey is enabled, in which case the
+# configured valkey server is used. Disabled, every read goes to the
+# database directly. Rate limiting and SSO state are governed by
+# valkey_enabled regardless of this switch.
+cache_enabled: true
+
+# Enable Valkey (Redis-compatible) backed caching. When enabled, rate limiting
+# and SSO state (and public content caching) are stored in Valkey so multiple
+# instances can share one state. When disabled (default), everything is kept
+# in memory, which only suits single-instance deployments.
+valkey_enabled: false
+
+# Valkey connection URL (required when valkey_enabled is true).
+# Examples:
+#   valkey://127.0.0.1:6379
+#   redis://:password@127.0.0.1:6379
+#   rediss://127.0.0.1:6379  (TLS)
+# Keep the server private (loopback / trusted network, password, TLS):
+# everything in it is treated as trusted and served to users. Configure a
+# maxmemory limit with allkeys-lru eviction — rate-limit keys rotate per
+# client IP and the instance cannot bound them on its own.
+valkey_url: ""
+
 # ==================== SSO Configuration ====================
 
 # -------------------- GitHub OAuth --------------------
@@ -119,25 +146,6 @@ oidc_verify_email: false # If true, require email_verified=true in the ID token
 # -------------------- Global Options --------------------
 # Set to false to enforce SSO-only (disable password login)
 allow_local_login: true
-
-# ==================== Valkey Cache Configuration ====================
-
-# Enable Valkey (Redis-compatible) backed caching. When enabled, rate limiting
-# and SSO state (and public content caching) are stored in Valkey so multiple
-# instances can share one state. When disabled (default), everything is kept
-# in memory, which only suits single-instance deployments.
-valkey_enabled: false
-
-# Valkey connection URL (required when valkey_enabled is true).
-# Examples:
-#   valkey://127.0.0.1:6379/0
-#   redis://:password@127.0.0.1:6379/0
-#   rediss://127.0.0.1:6379/0  (TLS)
-# Keep the server private (loopback / trusted network, password, TLS):
-# everything in it is treated as trusted and served to users. Configure a
-# maxmemory limit with allkeys-lru eviction — rate-limit keys rotate per
-# client IP and the instance cannot bound them on its own.
-valkey_url: ""
 
 # ==================== S3 Storage Configuration ====================
 

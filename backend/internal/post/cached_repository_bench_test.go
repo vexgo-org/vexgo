@@ -47,7 +47,7 @@ const benchValkeyURLEnv = "VEXGO_BENCH_VALKEY_URL"
 
 // benchDefaultValkeyURL is the real Valkey server the "valkey" wiring
 // connects to when benchValkeyURLEnv is unset.
-const benchDefaultValkeyURL = "valkey://127.0.0.1:16379/0"
+const benchDefaultValkeyURL = "valkey://127.0.0.1:16379"
 
 const (
 	benchPostCount     = 100
