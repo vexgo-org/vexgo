@@ -240,3 +240,22 @@ func TestFixedWindowRateLimitStore_PropagatesErrors(t *testing.T) {
 		t.Fatal("expected error from store backend, got nil")
 	}
 }
+
+// TestRateLimitStores_NonPositiveBudgetDenies checks the defensive guards: a
+// non-positive budget denies the request instead of dividing by it, without
+// touching the store.
+func TestRateLimitStores_NonPositiveBudgetDenies(t *testing.T) {
+	ctx := context.Background()
+
+	counters := &fakeCounterStore{}
+	if allowed, err := NewFixedWindowRateLimitStore(counters).Allow(ctx, "auth:10.0.0.1", 0, time.Minute); allowed || err != nil {
+		t.Fatalf("fixed window: Allow(0) = %v, %v; want false, nil", allowed, err)
+	}
+	if len(counters.counts) != 0 {
+		t.Fatal("fixed window: denied request consumed a counter")
+	}
+
+	if allowed, err := newMemoryRateLimitStore().Allow(ctx, "auth:10.0.0.1", -1, time.Minute); allowed || err != nil {
+		t.Fatalf("memory: Allow(-1) = %v, %v; want false, nil", allowed, err)
+	}
+}

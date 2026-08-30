@@ -9,6 +9,12 @@
 //
 // Every key is namespaced with a fixed prefix so the server can share a
 // Valkey instance with unrelated applications.
+//
+// Security note: the cache backend is a trusted component. Everything written
+// to it is decoded and served to users, so callers must only store data users
+// are allowed to see (the post decorator filters author data to guest
+// visibility for exactly this reason). Run the server on a private network
+// with authentication, and TLS (rediss:// / valkeys://) where appropriate.
 package cache
 
 import (

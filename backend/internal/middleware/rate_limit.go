@@ -62,6 +62,10 @@ type fixedWindowRateLimitStore struct {
 // Allow increments the key's counter and allows the request while the window
 // budget is not spent.
 func (s *fixedWindowRateLimitStore) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
+	if limit <= 0 {
+		// Defensive: a non-positive budget denies instead of dividing by it.
+		return false, nil
+	}
 	n, err := s.counters.Incr(ctx, "rl:"+key, window)
 	if err != nil {
 		return false, err
@@ -89,6 +93,11 @@ func newMemoryRateLimitStore() *memoryRateLimitStore {
 // (burst = limit) and refill to limit per window, matching the fixed-window
 // budget. Sweep and the entry cap keep the map bounded.
 func (s *memoryRateLimitStore) Allow(_ context.Context, key string, limit int, window time.Duration) (bool, error) {
+	if limit <= 0 {
+		// Defensive: a non-positive budget denies instead of dividing by it.
+		return false, nil
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
