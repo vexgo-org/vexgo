@@ -74,6 +74,13 @@ func (r *gormRepository) FindUserByEmailExcluding(
 }
 
 func (r *gormRepository) FindUserByToken(ctx context.Context, token string) (*model.User, error) {
+	if token == "" {
+		// An empty lookup must never resolve: cleared tokens are stored as
+		// the empty sentinel, so a missing/empty parameter would otherwise
+		// match whichever account last cleared its token. (The hashing below
+		// already fails to match it; this guard is the explicit contract.)
+		return nil, gorm.ErrRecordNotFound
+	}
 	var user model.User
 	// Tokens are stored hashed (tokenStorageForm); the presented raw token is
 	// hashed the same way before the lookup, so the plaintext never exists in

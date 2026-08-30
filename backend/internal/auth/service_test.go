@@ -573,6 +573,14 @@ func TestResetPassword(t *testing.T) {
 		t.Errorf("expected ErrInvalidResetToken, got %v", err)
 	}
 
+	// empty token must not resolve to an account whose token was cleared
+	if err := svc.ResetPassword(context.Background(), "", "newpass123"); !errors.Is(err, ErrInvalidResetToken) {
+		t.Errorf("expected ErrInvalidResetToken for empty token, got %v", err)
+	}
+	if _, err := svc.repo.FindUserByToken(context.Background(), ""); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("expected ErrRecordNotFound for empty token lookup, got %v", err)
+	}
+
 	// expired token (with the correct reset- prefix, so it reaches the
 	// expiry check instead of being rejected by the prefix check)
 	expiredAt := time.Now().Add(-1 * time.Minute)
