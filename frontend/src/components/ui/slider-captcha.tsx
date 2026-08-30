@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GoCaptcha from "go-captcha-react";
 import { Button } from "./button";
 import { RefreshCw, CheckCircle, X } from "lucide-react";
@@ -45,6 +45,40 @@ export function SliderCaptcha({
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState("");
   const slideRef = useRef<SlideCaptchaRef>(null);
+
+  // The Slide component resets its internal tile position whenever the data/
+  // config/events prop identities change, so memoize them and only hand over
+  // new identities when a fresh captcha is loaded; otherwise every unrelated
+  // re-render (e.g. setIsVerified) would snap the tile back to its start.
+  const slideData = useMemo(
+    () =>
+      captchaData
+        ? {
+            thumbX: captchaData.thumbX,
+            thumbY: captchaData.thumbY,
+            thumbWidth: captchaData.thumbWidth,
+            thumbHeight: captchaData.thumbHeight,
+            image: captchaData.image,
+            thumb: captchaData.thumb,
+          }
+        : {
+            thumbX: 0,
+            thumbY: 0,
+            thumbWidth: 0,
+            thumbHeight: 0,
+            image: "",
+            thumb: "",
+          },
+    [captchaData],
+  );
+  const slideConfig = useMemo(
+    () => ({
+      width: 320,
+      height: 160,
+      title: t("sliderCaptcha.dragHint"),
+    }),
+    [t],
+  );
 
   // Generate a captcha
   const generateCaptcha = useCallback(async () => {
@@ -131,6 +165,18 @@ export function SliderCaptcha({
     [captchaData, onSuccess, onClose, generateCaptcha, t],
   );
 
+  const slideEvents = useMemo(
+    () => ({
+      confirm: (point: { x: number; y: number }) => {
+        verifyCaptcha(point.x, point.y);
+      },
+      refresh: () => {
+        generateCaptcha();
+      },
+    }),
+    [verifyCaptcha, generateCaptcha],
+  );
+
   // Do not render anything if the dialog is closed
   if (!isOpen) return null;
 
@@ -169,27 +215,9 @@ export function SliderCaptcha({
           <div className="space-y-4">
             <GoCaptcha.Slide
               ref={slideRef}
-              data={{
-                thumbX: captchaData.thumbX,
-                thumbY: captchaData.thumbY,
-                thumbWidth: captchaData.thumbWidth,
-                thumbHeight: captchaData.thumbHeight,
-                image: captchaData.image,
-                thumb: captchaData.thumb,
-              }}
-              config={{
-                width: 320,
-                height: 160,
-                title: t("sliderCaptcha.dragHint"),
-              }}
-              events={{
-                confirm: (point) => {
-                  verifyCaptcha(point.x, point.y);
-                },
-                refresh: () => {
-                  generateCaptcha();
-                },
-              }}
+              data={slideData}
+              config={slideConfig}
+              events={slideEvents}
             />
 
             {/* Refresh button */}
