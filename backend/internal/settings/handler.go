@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
@@ -16,6 +17,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// themeIDPattern is the allowlist for theme directory names coming from
+// uploaded theme metadata: letters, digits, underscore and dash only, so the
+// value can never traverse out of the themes directory.
+var themeIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Handler exposes the settings domain over HTTP.
 type Handler struct {
@@ -467,8 +473,11 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		}
 	}
 
-	// Ensure the theme ID is valid
-	if themeDir == "" || themeDir == public.DefaultTheme {
+	// Ensure the theme ID is valid. The ID may come from the uploaded
+	// vexgo-theme.json, so it is treated as untrusted input: anything but a
+	// plain directory name would make filepath.Join below escape the themes
+	// directory (arbitrary RemoveAll/MkdirAll/write).
+	if themeDir == "" || themeDir == public.DefaultTheme || !themeIDPattern.MatchString(themeDir) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
 		return
 	}

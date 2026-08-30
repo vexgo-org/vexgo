@@ -708,8 +708,15 @@ func (s *Service) ThemePreview(themeID string) (string, error) {
 		return "", ErrPreviewNotSpecified
 	}
 
-	// Build preview image path
-	previewPath := filepath.Join(s.themes.DataDir(), public.ThemesDir, themeID, themeInfo.Preview)
+	// Build preview image path. Preview comes from the theme's own metadata,
+	// so treat it as untrusted: reject anything that escapes the theme
+	// directory ("../../etc/passwd" would otherwise be served verbatim).
+	themeBasePath := filepath.Join(s.themes.DataDir(), public.ThemesDir, themeID)
+	cleanPreview := filepath.Clean(themeInfo.Preview)
+	if !public.IsPathInside(themeBasePath, cleanPreview) {
+		return "", ErrPreviewNotFound
+	}
+	previewPath := filepath.Join(themeBasePath, cleanPreview)
 
 	// Check if preview image exists
 	if _, err := os.Stat(previewPath); os.IsNotExist(err) {

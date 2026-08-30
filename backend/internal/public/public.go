@@ -168,8 +168,10 @@ func (r *Renderer) activeTheme() string {
 	return config.ActiveTheme
 }
 
-// isSafePath verifies that targetPath is within basePath
-func isSafePath(basePath, targetPath string) bool {
+// IsPathInside verifies that targetPath is within basePath. Exported because
+// other domains resolve untrusted paths against theme directories too (e.g.
+// settings theme previews) and must apply the same containment check.
+func IsPathInside(basePath, targetPath string) bool {
 	absBase, err := filepath.Abs(basePath)
 	if err != nil {
 		return false
@@ -216,7 +218,7 @@ func (r *Renderer) getFileContent(themeID, relativePath string) ([]byte, string,
 		}
 
 		themeBasePath := filepath.Join(r.dataDir, ThemesDir, themeID)
-		if !isSafePath(themeBasePath, cleanPath) {
+		if !IsPathInside(themeBasePath, cleanPath) {
 			return nil, "", false
 		}
 
