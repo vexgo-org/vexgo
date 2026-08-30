@@ -342,3 +342,29 @@ func TestGetListenAddr(t *testing.T) {
 		t.Fatalf("GetListenAddr: got %q", got)
 	}
 }
+
+func TestCacheEnabledDefaultsFalse(t *testing.T) {
+	cfg := loadOrFail(t, "")
+	if cfg.CacheEnabled {
+		t.Fatal("CacheEnabled should default to false")
+	}
+	if cfg.ValkeyEnabled {
+		t.Fatal("ValkeyEnabled should default to false")
+	}
+}
+
+func TestCacheEnabledEnvOverride(t *testing.T) {
+	t.Setenv("CACHE_ENABLED", "false")
+	cfg := loadOrFail(t, "")
+	if cfg.CacheEnabled {
+		t.Fatal("CACHE_ENABLED=false should disable CacheEnabled")
+	}
+}
+
+func TestCacheEnabledConfigFileFalseOverridesEnvTrue(t *testing.T) {
+	t.Setenv("CACHE_ENABLED", "true")
+	cfg := loadOrFail(t, "cache_enabled: false\n")
+	if cfg.CacheEnabled {
+		t.Fatal("config file false should override environment true")
+	}
+}

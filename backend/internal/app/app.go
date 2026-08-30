@@ -57,7 +57,7 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("init storage: %w", err)
 	}
 
-	appCache, err := initCache(cfg)
+	contentCache, distributedCache, err := initCache(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init cache: %w", err)
 	}
@@ -65,14 +65,14 @@ func New(cfg *config.Config) (*App, error) {
 	// Distributed rate limiting only makes sense with a shared store; without
 	// valkey the endpoint groups keep their per-process in-memory budget.
 	var distributedRateLimit middleware.RateLimitStore
-	if cfg.ValkeyEnabled {
-		distributedRateLimit = middleware.NewFixedWindowRateLimitStore(appCache)
+	if distributedCache != nil {
+		distributedRateLimit = middleware.NewFixedWindowRateLimitStore(distributedCache)
 	}
 	// The sso domain keeps its sweeping in-process state store without
 	// valkey; a distributed store shares one OAuth state across instances.
 	var ssoStateStore sso.StateStore
-	if cfg.ValkeyEnabled {
-		ssoStateStore = appCache
+	if distributedCache != nil {
+		ssoStateStore = distributedCache
 	}
 
 	db, err := database.Open(cfg, cfg.DataDir)
@@ -134,7 +134,7 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
 			Files:     storage,
-			Cache:     appCache,
+			Cache:     contentCache,
 		},
 		Upload: upload.Deps{
 			DB:        db,
@@ -175,7 +175,7 @@ func New(cfg *config.Config) (*App, error) {
 		Home: home.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Cache:     appCache,
+			Cache:     contentCache,
 		},
 		Settings: settings.Deps{
 			DB:        db,
@@ -208,27 +208,40 @@ func (a *App) Run() error {
 	return srv.ListenAndServe()
 }
 
-// initCache returns the cache backend: an in-process memory cache by default,
-// or a Valkey (Redis-compatible) connection when valkey is enabled. Enabling
-// requires a reachable server: the connection is verified with a PING so
+// initCache resolves the two cache backends from the configuration matrix:
+// the content cache behind the public read paths (cache_enabled) and the
+// distributed state store behind rate limiting and SSO state (valkey_enabled).
+// Both share one Valkey connection when both want valkey. A nil result means
+// the consumer falls back to its per-process in-memory path — and a nil
+// content cache turns content caching off entirely. Enabling valkey requires
+// a reachable server: the connection is verified with a PING so
 // misconfiguration fails at startup instead of on first use.
-func initCache(cfg *config.Config) (cache.Cache, error) {
-	if !cfg.ValkeyEnabled {
-		slog.Info("using in-process cache")
-		return cache.NewMemory(), nil
+func initCache(cfg *config.Config) (contentCache, distributedCache cache.Cache, err error) {
+	if !cfg.CacheEnabled && !cfg.ValkeyEnabled {
+		slog.Info("content caching disabled, state kept in-process")
+		return nil, nil, nil
 	}
+	if !cfg.ValkeyEnabled {
+		slog.Info("using in-process content cache")
+		return cache.NewMemory(), nil, nil
+	}
+
 	if cfg.ValkeyURL == "" {
-		return nil, fmt.Errorf("valkey_enabled requires valkey_url to be set")
+		return nil, nil, fmt.Errorf("valkey_enabled requires valkey_url to be set")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	vc, err := cache.NewValkey(ctx, cfg.ValkeyURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	slog.Info("using valkey cache")
-	return vc, nil
+	if !cfg.CacheEnabled {
+		slog.Info("using valkey for distributed state")
+		return nil, vc, nil
+	}
+	slog.Info("using valkey content cache and distributed state")
+	return vc, vc, nil
 }
 
 // The cache backends satisfy the consumer-declared seams structurally, so the

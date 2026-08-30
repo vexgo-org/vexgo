@@ -19,9 +19,11 @@ end
 return n`
 
 // NewValkey opens a connection to the Valkey / Redis-compatible server at
-// url (e.g. "valkey://127.0.0.1:6379/0", "redis://:password@host:6379",
+// url (e.g. "valkey://127.0.0.1:6379", "redis://:password@host:6379",
 // "rediss://host:6379" for TLS) and verifies it with a PING before returning,
-// so misconfiguration fails at startup instead of on first use.
+// so misconfiguration fails at startup instead of on first use. A trailing
+// path ("/1") or a "db" query parameter selects a logical database; both
+// default to database 0.
 func NewValkey(ctx context.Context, url string) (*Valkey, error) {
 	opt, err := valkey.ParseURL(url)
 	if err != nil {
