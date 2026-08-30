@@ -33,7 +33,10 @@ type GeneralSettings struct {
 	UpdatedAt           time.Time `json:"updated_at"`                             // Update time
 }
 
-// Captcha stores sliding puzzle captcha information
+// Captcha stores sliding puzzle captcha information. Only the validation
+// state is persisted — the generated images are returned to the client
+// directly and never stored, so anonymous challenge requests cannot grow the
+// table.
 type Captcha struct {
 	ID        string    `json:"id" gorm:"primaryKey;size:255"` // Captcha ID
 	Token     string    `json:"token" gorm:"size:255"`         // Verification token
@@ -41,8 +44,6 @@ type Captcha struct {
 	Y         int       `json:"y"`                             // Puzzle correct position Y coordinate
 	Width     int       `json:"width"`                         // Puzzle width
 	Height    int       `json:"height"`                        // Puzzle height
-	BgImage   string    `json:"bg_image" gorm:"type:text"`     // Background image Base64
-	PuzzleImg string    `json:"puzzle_img" gorm:"type:text"`   // Puzzle image Base64
 	ExpiresAt time.Time `json:"expires_at"`                    // Expiration time
 	Used      bool      `json:"used" gorm:"default:false"`     // Whether already used
 	CreatedAt time.Time `json:"created_at"`                    // Creation time

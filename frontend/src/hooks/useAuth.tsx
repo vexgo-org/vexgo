@@ -16,14 +16,14 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
-    captchaData?: { id: string; token: string; x: number },
+    captchaData?: { id: string; token: string; x: number; y: number },
   ) => Promise<void>;
   loginWithToken: (token: string) => Promise<void>;
   register: (
     username: string,
     email: string,
     password: string,
-    captchaData?: { id: string; token: string; x: number },
+    captchaData?: { id: string; token: string; x: number; y: number },
   ) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (
     email: string,
     password: string,
-    captchaData?: { id: string; token: string; x: number },
+    captchaData?: { id: string; token: string; x: number; y: number },
   ) => {
     const requestData: {
       email: string;
@@ -71,11 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       captcha_id?: string;
       captcha_token?: string;
       captcha_x?: number;
+      captcha_y?: number;
     } = { email, password };
     if (captchaData) {
       requestData.captcha_id = captchaData.id;
       requestData.captcha_token = captchaData.token;
       requestData.captcha_x = captchaData.x;
+      requestData.captcha_y = captchaData.y;
     }
     const response = await authApi.login(requestData);
     const { user, token } = response.data;
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     username: string,
     email: string,
     password: string,
-    captchaData?: { id: string; token: string; x: number },
+    captchaData?: { id: string; token: string; x: number; y: number },
   ) => {
     const requestData: {
       username: string;
@@ -108,11 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       captcha_id?: string;
       captcha_token?: string;
       captcha_x?: number;
+      captcha_y?: number;
     } = { username, email, password };
     if (captchaData) {
       requestData.captcha_id = captchaData.id;
       requestData.captcha_token = captchaData.token;
       requestData.captcha_x = captchaData.x;
+      requestData.captcha_y = captchaData.y;
     }
     try {
       const response = await authApi.register(requestData);

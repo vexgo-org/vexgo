@@ -272,3 +272,44 @@
     color: hsl(var(--foreground)) !important;
     border-color: hsl(var(--border)) !important;
 }
+
+/* Slider captcha (go-captcha-react) theme mapping.
+ * The component reads every color from --go-captcha-theme-* variables, so
+ * scoping them to .slider-captcha lets the widget follow the shadcn theme
+ * instead of its built-in light defaults. */
+.slider-captcha {
+    --go-captcha-theme-text-color: hsl(var(--foreground));
+    --go-captcha-theme-bg-color: hsl(var(--card));
+    --go-captcha-theme-btn-color: hsl(var(--primary-foreground));
+    --go-captcha-theme-btn-bg-color: hsl(var(--primary));
+    --go-captcha-theme-btn-border-color: hsl(var(--primary));
+    --go-captcha-theme-btn-disabled-color: hsl(var(--primary) / 0.5);
+    --go-captcha-theme-active-color: hsl(var(--primary));
+    --go-captcha-theme-border-color: hsl(var(--border));
+    --go-captcha-theme-icon-color: hsl(var(--foreground));
+    --go-captcha-theme-drag-bar-color: hsl(var(--muted));
+    --go-captcha-theme-drag-bg-color: hsl(var(--primary));
+    --go-captcha-theme-drag-icon-color: hsl(var(--primary-foreground));
+    --go-captcha-theme-round-color: hsl(var(--muted));
+    --go-captcha-theme-loading-icon-color: hsl(var(--primary));
+    --go-captcha-theme-body-bg-color: hsl(var(--muted));
+    --go-captcha-theme-dot-color: hsl(var(--primary-foreground));
+    --go-captcha-theme-dot-bg-color: hsl(var(--primary));
+    --go-captcha-theme-dot-border-color: hsl(var(--background));
+    --go-captcha-theme-default-color: hsl(var(--primary));
+    --go-captcha-theme-default-bg-color: hsl(var(--accent));
+    --go-captcha-theme-default-border-color: hsl(var(--primary));
+    --go-captcha-theme-default-hover-color: hsl(var(--accent));
+    --go-captcha-theme-error-color: hsl(var(--destructive));
+    --go-captcha-theme-error-bg-color: hsl(var(--destructive) / 0.1);
+    --go-captcha-theme-error-border-color: hsl(var(--destructive) / 0.5);
+}
+
+.dark .slider-captcha {
+    --go-captcha-theme-warn-color: #fbbf24;
+    --go-captcha-theme-warn-bg-color: #451a03;
+    --go-captcha-theme-warn-border-color: #b45309;
+    --go-captcha-theme-success-color: #4ade80;
+    --go-captcha-theme-success-bg-color: #052e16;
+    --go-captcha-theme-success-border-color: #22c55e;
+}

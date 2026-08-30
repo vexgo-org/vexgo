@@ -40,6 +40,7 @@ export const enUS = {
     confirmPassword: "Confirm Password",
     forgotPassword: "Forgot Password?",
     resetPassword: "Reset Password",
+    reverify: "Verify Again",
     currentPassword: "Current Password",
     newPassword: "New Password",
     username: "Username",

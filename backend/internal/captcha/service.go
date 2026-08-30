@@ -3,23 +3,33 @@
 package captcha
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/png"
-	"math"
+	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/google/uuid"
+	"github.com/wenlng/go-captcha-assets/resources/imagesv2"
+	"github.com/wenlng/go-captcha-assets/resources/tiles"
+	"github.com/wenlng/go-captcha/v2/base/option"
+	"github.com/wenlng/go-captcha/v2/slide"
 	"gorm.io/gorm"
+)
+
+const (
+	// captchaImageWidth and captchaImageHeight are the pixel dimensions of
+	// the generated master image.
+	captchaImageWidth  = 320
+	captchaImageHeight = 160
+	// verifyPadding is the allowed deviation in pixels per axis when
+	// validating a submitted drop position.
+	verifyPadding = 5
+	// captchaTTL is how long a generated challenge stays valid.
+	captchaTTL = 5 * time.Minute
 )
 
 // Sentinel errors mapped to HTTP responses by the handler.
@@ -32,6 +42,9 @@ var (
 	ErrCaptchaExpired = errors.New("captcha has expired")
 	// ErrCaptchaMismatch means the submitted puzzle position is wrong.
 	ErrCaptchaMismatch = errors.New("captcha mismatch")
+	// ErrCaptchaFailed means the captcha could not be verified due to an
+	// internal error, as opposed to a wrong submission.
+	ErrCaptchaFailed = errors.New("captcha verification failed")
 	// ErrEncodeBgImage means the background image could not be encoded.
 	ErrEncodeBgImage = errors.New("encode background image")
 	// ErrEncodePuzzleImage means the puzzle image could not be encoded.
@@ -42,6 +55,9 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
+	// RateLimitPerMinute caps the requests per client IP per minute on the
+	// captcha endpoints; <= 0 disables the limit.
+	RateLimitPerMinute int
 }
 
 // Service contains the business logic of the captcha domain.
@@ -68,108 +84,155 @@ func (s *Service) IsCaptchaEnabled(ctx context.Context) (bool, error) {
 	return settings.CaptchaEnabled, nil
 }
 
-// Captcha is the result of generating a sliding puzzle captcha. The correct X
-// coordinate is intentionally not exposed to the client.
+// Captcha is the result of generating a sliding puzzle captcha. The correct
+// drop position is intentionally not exposed to the client.
 type Captcha struct {
-	ID        string
-	Token     string
-	X         int
-	Y         int
-	BgImage   string
-	PuzzleImg string
-	ExpiresAt time.Time
+	ID          string
+	Token       string
+	ThumbX      int
+	ThumbY      int
+	ThumbWidth  int
+	ThumbHeight int
+	Image       string
+	Thumb       string
+	ExpiresAt   time.Time
+}
+
+// VerifyArgs carries the inputs for one captcha verification.
+type VerifyArgs struct {
+	ID    string
+	Token string
+	X     int
+	Y     int
+}
+
+var (
+	builderOnce  sync.Once
+	slideBuilder slide.Builder
+	builderErr   error
+)
+
+// getBuilder lazily builds the slide captcha generator with the embedded
+// asset pack, so the background and tile images are decoded only once per
+// process.
+func getBuilder() (slide.Builder, error) {
+	builderOnce.Do(func() {
+		backgrounds, err := imagesv2.GetImages()
+		if err != nil {
+			builderErr = fmt.Errorf("load captcha backgrounds: %w", err)
+			return
+		}
+		assetTiles, err := tiles.GetTiles()
+		if err != nil {
+			builderErr = fmt.Errorf("load captcha tiles: %w", err)
+			return
+		}
+		graphImages := make([]*slide.GraphImage, 0, len(assetTiles))
+		for _, assetTile := range assetTiles {
+			graphImages = append(graphImages, &slide.GraphImage{
+				OverlayImage: assetTile.OverlayImage,
+				ShadowImage:  assetTile.ShadowImage,
+				MaskImage:    assetTile.MaskImage,
+			})
+		}
+		builder := slide.NewBuilder(
+			slide.WithImageSize(option.Size{
+				Width:  captchaImageWidth,
+				Height: captchaImageHeight,
+			}),
+		)
+		builder.SetResources(
+			slide.WithBackgrounds(backgrounds),
+			slide.WithGraphImages(graphImages),
+		)
+		slideBuilder = builder
+	})
+	return slideBuilder, builderErr
 }
 
 // GenerateCaptcha creates a sliding puzzle captcha, persists it, and returns
 // the client-facing information.
 func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
-	// Generate captcha ID and token
-	captchaID := uuid.New().String()
-	token := uuid.New().String()
-
-	// Set puzzle size
-	puzzleWidth := 60
-	puzzleHeight := 60
-	bgWidth := 320
-	bgHeight := 160
-
-	// Randomly generate puzzle position (ensure puzzle is fully inside image)
-	// Left margin:right margin = 3:2, puzzle biased to the right
-	totalWidth := bgWidth - puzzleWidth
-	targetLeft := totalWidth * 3 / 5 // Target left margin (60% of total width)
-	// Random fluctuation near target value (±20%)
-	randomRange := totalWidth / 5
-	minX := targetLeft - randomRange
-	maxX := targetLeft + randomRange
-	// Ensure minimum margin of at least 20 pixels
-	if minX < 20 {
-		minX = 20
+	builder, err := getBuilder()
+	if err != nil {
+		return nil, err
 	}
-	if maxX > bgWidth-puzzleWidth-20 {
-		maxX = bgWidth - puzzleWidth - 20
+
+	// security: go-captcha derives the answer position from a math/rand-based
+	// PRNG (time-seeded pool) rather than crypto/rand. This is acceptable
+	// here because the PRNG output is never observable — answers are not
+	// returned and cannot be recovered from the rendered image — and one-shot
+	// invalidation leaves a single-bit verification oracle per challenge, so
+	// the seed-space predictability cannot be exploited remotely. Revisit if
+	// the verify flow ever exposes more feedback.
+	capt, err := builder.Make().Generate()
+	if err != nil {
+		return nil, fmt.Errorf("generate slide captcha: %w", err)
 	}
-	x := minX + randInt(maxX-minX)
-	y := 20 + randInt(bgHeight-puzzleHeight-40) // Y position between 20-80
+	block := capt.GetData()
+	if block == nil {
+		return nil, slide.GenerateDataErr
+	}
 
-	// Create background image (blue gradient)
-	bgImage := createGradientBackground(bgWidth, bgHeight)
-
-	// Create puzzle shape
-	puzzleShape := createPuzzleShape(puzzleWidth, puzzleHeight)
-
-	// Extract puzzle part from background image
-	puzzleImage := extractPuzzleImage(bgImage, x, y, puzzleShape, puzzleWidth, puzzleHeight)
-
-	// Draw puzzle outline on background image
-	bgImageWithHole := drawPuzzleHole(bgImage, x, y, puzzleShape, puzzleWidth, puzzleHeight)
-
-	// Convert image to Base64
-	bgImageBase64, err := imageToBase64(bgImageWithHole)
+	masterImage, err := capt.GetMasterImage().ToBase64()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrEncodeBgImage, err)
 	}
-
-	puzzleImageBase64, err := imageToBase64(puzzleImage)
+	tileImage, err := capt.GetTileImage().ToBase64()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrEncodePuzzleImage, err)
 	}
 
-	// Save captcha information to database
+	// block.X/Y is the hole the client must drop the tile on — that is the
+	// answer. block.DX/DY is only the tile's initial display position and
+	// must never be used for validation. The images are returned to the
+	// client directly and are not persisted.
 	captcha := model.Captcha{
-		ID:        captchaID,
-		Token:     token,
-		X:         x,
-		Y:         y,
-		Width:     puzzleWidth,
-		Height:    puzzleHeight,
-		BgImage:   bgImageBase64,
-		PuzzleImg: puzzleImageBase64,
-		ExpiresAt: time.Now().Add(5 * time.Minute), // 5 minutes expiration
+		ID:        uuid.New().String(),
+		Token:     uuid.New().String(),
+		X:         block.X,
+		Y:         block.Y,
+		Width:     block.Width,
+		Height:    block.Height,
+		ExpiresAt: time.Now().Add(captchaTTL),
 		Used:      false,
 	}
-
 	if err := s.repo.CreateCaptcha(ctx, &captcha); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("persist captcha: %w", err)
+	}
+
+	// Opportunistic housekeeping: drop challenges that are no longer valid,
+	// bounding the table to roughly the challenges of the last TTL window.
+	if err := s.repo.DeleteExpiredCaptchas(ctx); err != nil {
+		slog.Warn("failed to clean up expired captchas", "err", err)
 	}
 
 	return &Captcha{
-		ID:        captchaID,
-		Token:     token,
-		X:         x,
-		Y:         y,
-		BgImage:   bgImageBase64,
-		PuzzleImg: puzzleImageBase64,
-		ExpiresAt: captcha.ExpiresAt,
+		ID:          captcha.ID,
+		Token:       captcha.Token,
+		ThumbX:      block.DX,
+		ThumbY:      block.DY,
+		ThumbWidth:  captcha.Width,
+		ThumbHeight: captcha.Height,
+		Image:       masterImage,
+		Thumb:       tileImage,
+		ExpiresAt:   captcha.ExpiresAt,
 	}, nil
 }
 
 // VerifyCaptcha verifies a sliding puzzle submission and marks the captcha as
 // used.
-func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x int) error {
+func (s *Service) VerifyCaptcha(ctx context.Context, args VerifyArgs) error {
 	// Query captcha
-	captcha, err := s.repo.FindCaptcha(ctx, id, token)
+	captcha, err := s.repo.FindCaptcha(ctx, args.ID, args.Token)
 	if err != nil {
-		return ErrCaptchaNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrCaptchaNotFound
+		}
+		// Unexpected lookup failure: report it as an internal error instead
+		// of masquerading as a missing challenge.
+		slog.Error("captcha lookup failed", "err", err)
+		return ErrCaptchaFailed
 	}
 
 	// Check if already used
@@ -182,173 +245,25 @@ func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x int) er
 		return ErrCaptchaExpired
 	}
 
-	// Verify position (allow certain tolerance)
-	tolerance := 10 // allow 10 pixel tolerance
-	if math.Abs(float64(x-captcha.X)) > float64(tolerance) {
+	// Verify the drop position on both axes within the tolerance padding.
+	// The challenge is one-shot: the first failed attempt invalidates it so
+	// the answer cannot be brute-forced within its lifetime.
+	if !slide.Validate(args.X, args.Y, captcha.X, captcha.Y, verifyPadding) {
+		if _, err := s.repo.MarkCaptchaUsed(ctx, args.ID, args.Token); err != nil {
+			return err
+		}
 		return ErrCaptchaMismatch
 	}
 
-	// Mark as used
-	captcha.Used = true
-	if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+	// Atomically claim the challenge; losing the race means a concurrent
+	// request consumed it first.
+	claimed, err := s.repo.MarkCaptchaUsed(ctx, args.ID, args.Token)
+	if err != nil {
 		return err
+	}
+	if !claimed {
+		return ErrCaptchaUsed
 	}
 
 	return nil
-}
-
-// createGradientBackground creates a simple gradient background
-func createGradientBackground(width, height int) *image.RGBA {
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-
-	for y := range height {
-		for x := range width {
-			// Create a simple blue gradient
-			r := uint8(100 + x*155/width)
-			g := uint8(150 + y*105/height)
-			b := uint8(200)
-			img.Set(x, y, color.RGBA{r, g, b, 255})
-		}
-	}
-
-	// Add some simple decorations
-	for i := range 5 {
-		x := i * width / 5
-		for y := range height {
-			img.Set(x, y, color.RGBA{255, 255, 255, 100})
-		}
-	}
-
-	return img
-}
-
-// createPuzzleShape creates puzzle shape - symmetric cross
-func createPuzzleShape(width, height int) [][]bool {
-	// Create a puzzle shape
-	shape := make([][]bool, height)
-
-	// Calculate center and arm length of cross
-	centerX := width / 2
-	centerY := height / 2
-	// Arm length takes half of the smaller width/height, ensure cross is symmetric in square area
-	armLength := min(width, height) / 3
-
-	// Calculate boundaries
-	left := centerX - armLength
-	right := centerX + armLength
-	top := centerY - armLength
-	bottom := centerY + armLength
-
-	// Arm thickness (half of center square)
-	armThickness := armLength / 2
-
-	for y := range height {
-		shape[y] = make([]bool, width)
-		for x := range width {
-			// Center square area
-			if x >= left && x <= right && y >= top && y <= bottom {
-				shape[y][x] = true
-				continue
-			}
-
-			// Vertical arm (up-down extension) - within center vertical range but outside center square
-			if x >= centerX-armThickness && x <= centerX+armThickness {
-				if y < top || y > bottom {
-					shape[y][x] = true
-					continue
-				}
-			}
-
-			// Horizontal arm (left-right extension) - within center horizontal range but outside center square
-			if y >= centerY-armThickness && y <= centerY+armThickness {
-				if x < left || x > right {
-					shape[y][x] = true
-					continue
-				}
-			}
-		}
-	}
-
-	return shape
-}
-
-// extractPuzzleImage extracts puzzle part from background image
-func extractPuzzleImage(bgImage *image.RGBA, x, y int, shape [][]bool, width, height int) *image.RGBA {
-	puzzleImg := image.NewRGBA(image.Rect(0, 0, width, height))
-
-	for py := range height {
-		for px := range width {
-			if py < len(shape) && px < len(shape[py]) && shape[py][px] {
-				bgX := x + px
-				bgY := y + py
-
-				// Check boundaries
-				if bgX >= 0 && bgX < bgImage.Bounds().Dx() && bgY >= 0 && bgY < bgImage.Bounds().Dy() {
-					puzzleImg.Set(px, py, bgImage.At(bgX, bgY))
-				}
-			} else {
-				// Transparent background
-				puzzleImg.Set(px, py, color.Transparent)
-			}
-		}
-	}
-
-	return puzzleImg
-}
-
-// drawPuzzleHole draws puzzle outline on background image
-func drawPuzzleHole(bgImage *image.RGBA, x, y int, shape [][]bool, width, height int) *image.RGBA {
-	// Create copy of background image
-	bgCopy := image.NewRGBA(bgImage.Bounds())
-	draw.Draw(bgCopy, bgCopy.Bounds(), bgImage, image.Point{}, draw.Src)
-
-	// Draw semi-transparent shadow at puzzle position
-	for py := range height {
-		for px := range width {
-			if py < len(shape) && px < len(shape[py]) && shape[py][px] {
-				bgX := x + px
-				bgY := y + py
-
-				// Check boundaries
-				if bgX >= 0 && bgX < bgCopy.Bounds().Dx() && bgY >= 0 && bgY < bgCopy.Bounds().Dy() {
-					// Get original pixel and darken it
-					original := bgCopy.At(bgX, bgY)
-					r, g, b, a := original.RGBA()
-					// Darken by 20%
-					r = uint32(float64(r) * 0.8)
-					g = uint32(float64(g) * 0.8)
-					b = uint32(float64(b) * 0.8)
-					bgCopy.Set(bgX, bgY, color.NRGBA{uint8(r / 256), uint8(g / 256), uint8(b / 256), uint8(a / 256)})
-				}
-			}
-		}
-	}
-
-	return bgCopy
-}
-
-// imageToBase64 converts image to Base64 string
-func imageToBase64(img *image.RGBA) (string, error) {
-	var buf bytes.Buffer
-	err := png.Encode(&buf, img)
-	if err != nil {
-		return "", err
-	}
-
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes()), nil
-}
-
-// randInt generates random integer
-func randInt(max int) int {
-	if max <= 0 {
-		return 0
-	}
-
-	b := make([]byte, 4)
-	_, err := rand.Read(b)
-	if err != nil {
-		return 0
-	}
-
-	return int(b[0]) % max
 }

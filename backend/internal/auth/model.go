@@ -7,6 +7,7 @@ type LoginRequest struct {
 	CaptchaID    string
 	CaptchaToken string
 	CaptchaX     int
+	CaptchaY     int
 }
 
 // RegisterRequest carries the registration inputs.
@@ -17,6 +18,7 @@ type RegisterRequest struct {
 	CaptchaID    string
 	CaptchaToken string
 	CaptchaX     int
+	CaptchaY     int
 	Protocol     string
 	Host         string
 }

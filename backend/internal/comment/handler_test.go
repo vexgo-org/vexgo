@@ -200,6 +200,40 @@ func TestModerationConfigTestEndpoint(t *testing.T) {
 	}
 }
 
+// TestModerationConfigTestEndpoint_HidesInternalErrors checks that a failing
+// test call surfaces only a generic message: the upstream response body and
+// endpoint details stay in the server log, not in the admin-facing response.
+func TestModerationConfigTestEndpoint_HidesInternalErrors(t *testing.T) {
+	r, db := newTestRouter(t)
+	moderator := seedHandlerUser(t, db, "moderator", model.RoleSuperAdmin)
+	adminToken := mintHandlerToken(t, moderator.ID, model.RoleSuperAdmin)
+
+	const upstreamBody = "upstream-secret: db password leaked"
+	fake := newFakeLLMServer(t, upstreamBody, http.StatusInternalServerError)
+	if err := db.Create(&model.CommentModerationConfig{
+		LLMReviewEnabled: true,
+		ApiKey:           "test-key",
+		ApiEndpoint:      fake.URL,
+		ModelName:        "test-model",
+	}).Error; err != nil {
+		t.Fatalf("seed config: %v", err)
+	}
+
+	w := doJSON(t, r, http.MethodPost, "/api/moderation/comments/config/test", adminToken, "")
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 from config test, got %d %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), upstreamBody) {
+		t.Errorf("response leaked the upstream response body: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), fake.URL) {
+		t.Errorf("response leaked the endpoint URL: %s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "Failed to test LLM moderation endpoint") {
+		t.Errorf("expected generic failure message, got %s", w.Body.String())
+	}
+}
+
 // TC-CMOD-026: moderation config endpoints and lists stay admin-only.
 func TestModerationRoutes_RoleGating(t *testing.T) {
 	r, db := newTestRouter(t)

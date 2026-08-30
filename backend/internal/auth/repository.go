@@ -26,7 +26,10 @@ type Repository interface {
 	ResetPassword(ctx context.Context, userID uint, hashedPassword string) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
-	SaveCaptcha(ctx context.Context, captcha *model.Captcha) error
+	// MarkCaptchaUsed atomically flips used=false to true for the given
+	// challenge; the result is ignored because an already-used captcha is
+	// accepted idempotently at submit time.
+	MarkCaptchaUsed(ctx context.Context, id, token string) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
 }
 
@@ -142,8 +145,10 @@ func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*mo
 	return &captcha, nil
 }
 
-func (r *gormRepository) SaveCaptcha(ctx context.Context, captcha *model.Captcha) error {
-	return r.db.WithContext(ctx).Save(captcha).Error
+func (r *gormRepository) MarkCaptchaUsed(ctx context.Context, id, token string) error {
+	return r.db.WithContext(ctx).Model(&model.Captcha{}).
+		Where("id = ? AND token = ? AND used = ?", id, token, false).
+		Update("used", true).Error
 }
 
 func (r *gormRepository) UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error {

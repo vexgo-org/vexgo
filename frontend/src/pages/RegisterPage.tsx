@@ -167,6 +167,7 @@ export function RegisterPage() {
     id: string;
     token: string;
     x: number;
+    y: number;
   } | null>(null);
   const [isCaptchaModalOpen, setIsCaptchaModalOpen] = useState(false);
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
@@ -195,27 +196,11 @@ export function RegisterPage() {
     id: string;
     token: string;
     x: number;
+    y: number;
   }) => {
+    // The captcha dialog already pre-verified this challenge on drop; keep
+    // the data so the register submit re-checks it server-side.
     setCaptchaData(data);
-
-    // Call the pre-verify endpoint to mark the captcha as used
-    try {
-      await fetch("/api/captcha/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: data.id,
-          token: data.token,
-          x: data.x,
-        }),
-      });
-    } catch (error) {
-      console.error("Pre-verification failed:", error);
-      // Keep the data even if pre-verification fails so the user can still try to register
-    }
-
     setIsCaptchaVerified(true);
     // Do not auto-register; wait for the user to click the register button
   };
@@ -444,16 +429,16 @@ export function RegisterPage() {
                     {t("registerPage.securityVerification")}
                   </Label>
                   {isCaptchaVerified && (
-                    <span className="text-xs text-green-600 flex items-center">
+                    <span className="text-xs text-green-600 dark:text-green-400 flex items-center">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       {t("registerPage.verifiedBadge")}
                     </span>
                   )}
                 </div>
-                <div className="border rounded-lg p-3 bg-gray-50">
+                <div className="border rounded-lg p-3 bg-muted/50">
                   {isCaptchaVerified ? (
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-green-600">
+                      <div className="flex items-center text-sm text-green-600 dark:text-green-400">
                         <CheckCircle className="h-4 w-4 mr-2" />
                         {t("registerPage.captchaCompleted")}
                       </div>
@@ -464,12 +449,12 @@ export function RegisterPage() {
                         onClick={resetCaptcha}
                         className="text-xs h-7"
                       >
-                        {t("auth.resetPassword")}
+                        {t("auth.reverify")}
                       </Button>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         {t("registerPage.completeSlider")}
                       </span>
                       <Button

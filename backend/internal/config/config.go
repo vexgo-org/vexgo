@@ -32,6 +32,10 @@ type Config struct {
 	DataDir  string `mapstructure:"data_dir"`  // Data directory for storing sqlite database and media files
 	LogLevel string `mapstructure:"log_level"` // Logging level: "debug", "info", "warn", "error"
 
+	// CaptchaRateLimitPerMinute caps the requests per client IP per minute on
+	// the unauthenticated captcha endpoints. 0 disables the limit.
+	CaptchaRateLimitPerMinute int `mapstructure:"captcha_rate_limit_per_minute"`
+
 	// BaseURL is the public origin of this instance (e.g., https://vexgo.example.com).
 	// Used to build absolute links: SSO/OAuth callbacks and emailed
 	// verification / password-reset / email-change links. Empty means the
@@ -112,6 +116,8 @@ var keyDefaults = map[string]any{
 	"data_dir":  DefaultDataDir,
 	"log_level": "info",
 	"base_url":  "",
+
+	"captcha_rate_limit_per_minute": 30,
 
 	"db_type":     "",
 	"db_host":     "",

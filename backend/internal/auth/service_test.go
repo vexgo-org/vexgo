@@ -197,22 +197,43 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	}
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
+	loginReq := func(captchaID, token string, x, y int) LoginRequest {
+		return LoginRequest{
+			Email:        "alice@example.com",
+			Password:     "password123",
+			CaptchaID:    captchaID,
+			CaptchaToken: token,
+			CaptchaX:     x,
+			CaptchaY:     y,
+		}
+	}
+
 	// missing captcha fields
-	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123"}); !errors.Is(err, ErrCaptchaRequired) {
+	if _, _, err := svc.Login(context.Background(), loginReq("", "", 0, 0)); !errors.Is(err, ErrCaptchaRequired) {
 		t.Errorf("expected ErrCaptchaRequiredLogin, got %v", err)
 	}
 
-	// wrong position
+	// missing captcha y coordinate
 	captcha := model.Captcha{ID: "c1", Token: "t1", X: 100, Y: 50, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
 	if err := db.Create(&captcha).Error; err != nil {
 		t.Fatalf("failed to seed captcha: %v", err)
 	}
-	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 10}); !errors.Is(err, ErrCaptchaMismatch) {
-		t.Errorf("expected ErrCaptchaMismatch, got %v", err)
+	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 0)); !errors.Is(err, ErrCaptchaRequired) {
+		t.Errorf("expected ErrCaptchaRequired for missing y, got %v", err)
+	}
+
+	// wrong x position
+	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 10, 50)); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong x, got %v", err)
+	}
+
+	// wrong y position
+	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 20)); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
 	}
 
 	// correct position passes
-	token, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123", CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100})
+	token, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 50))
 	if err != nil {
 		t.Fatalf("Login with captcha error: %v", err)
 	}
@@ -226,6 +247,86 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	}
 	if !stored.Used {
 		t.Errorf("expected captcha marked as used")
+	}
+
+	// The submit-time re-check is idempotent: an already-used captcha still
+	// passes here because the pre-verification on drop already marked it.
+	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 50)); err != nil {
+		t.Errorf("expected idempotent re-check to pass for used captcha, got %v", err)
+	}
+}
+
+// failingCaptchaLookupRepo forces FindCaptcha to fail with a non-not-found
+// error to exercise the internal-error path.
+type failingCaptchaLookupRepo struct {
+	Repository
+}
+
+func (f failingCaptchaLookupRepo) FindCaptcha(context.Context, string, string) (*model.Captcha, error) {
+	return nil, errors.New("database is unavailable")
+}
+
+// TestLogin_CaptchaLookupFailureFailsClosed checks that an unexpected captcha
+// lookup failure surfaces as ErrCaptchaFailed instead of masquerading as a
+// missing challenge.
+func TestLogin_CaptchaLookupFailureFailsClosed(t *testing.T) {
+	svc, _, db := newTestService(t)
+	if err := db.Create(&model.GeneralSettings{CaptchaEnabled: true}).Error; err != nil {
+		t.Fatalf("failed to enable captcha: %v", err)
+	}
+	svc.repo = failingCaptchaLookupRepo{Repository: svc.repo}
+
+	if _, _, err := svc.Login(context.Background(), LoginRequest{
+		Email: "alice@example.com", Password: "password123",
+		CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100, CaptchaY: 50,
+	}); !errors.Is(err, ErrCaptchaFailed) {
+		t.Errorf("expected ErrCaptchaFailed on captcha lookup failure, got %v", err)
+	}
+}
+
+func TestRegister_WithCaptcha(t *testing.T) {
+	svc, _, db := newTestService(t)
+	settings := model.GeneralSettings{CaptchaEnabled: true, RegistrationEnabled: true}
+	if err := db.Create(&settings).Error; err != nil {
+		t.Fatalf("failed to enable captcha: %v", err)
+	}
+
+	registerReq := func(captchaID, token string, x, y int) RegisterRequest {
+		return RegisterRequest{
+			Email:        "new@example.com",
+			Password:     "password123",
+			Username:     "newbie",
+			CaptchaID:    captchaID,
+			CaptchaToken: token,
+			CaptchaX:     x,
+			CaptchaY:     y,
+			Protocol:     "http",
+			Host:         "localhost",
+		}
+	}
+
+	// missing captcha fields
+	if _, err := svc.Register(context.Background(), registerReq("", "", 0, 0)); !errors.Is(err, ErrCaptchaRequired) {
+		t.Errorf("expected ErrCaptchaRequired, got %v", err)
+	}
+
+	captcha := model.Captcha{ID: "c2", Token: "t2", X: 80, Y: 40, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
+	if err := db.Create(&captcha).Error; err != nil {
+		t.Fatalf("failed to seed captcha: %v", err)
+	}
+
+	// wrong y position
+	if _, err := svc.Register(context.Background(), registerReq("c2", "t2", 80, 20)); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
+	}
+
+	// correct position passes
+	result, err := svc.Register(context.Background(), registerReq("c2", "t2", 80, 40))
+	if err != nil {
+		t.Fatalf("Register with captcha error: %v", err)
+	}
+	if result.User == nil {
+		t.Errorf("expected user")
 	}
 }
 

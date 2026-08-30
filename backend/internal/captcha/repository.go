@@ -4,6 +4,7 @@ package captcha
 
 import (
 	"context"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -14,7 +15,10 @@ import (
 type Repository interface {
 	CreateCaptcha(ctx context.Context, captcha *model.Captcha) error
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
-	SaveCaptcha(ctx context.Context, captcha *model.Captcha) error
+	// MarkCaptchaUsed atomically flips used=false to true for the given
+	// challenge and reports whether this call won the race.
+	MarkCaptchaUsed(ctx context.Context, id, token string) (bool, error)
+	DeleteExpiredCaptchas(ctx context.Context) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 }
 
@@ -40,8 +44,18 @@ func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*mo
 	return &captcha, nil
 }
 
-func (r *gormRepository) SaveCaptcha(ctx context.Context, captcha *model.Captcha) error {
-	return r.db.WithContext(ctx).Save(captcha).Error
+func (r *gormRepository) MarkCaptchaUsed(ctx context.Context, id, token string) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.Captcha{}).
+		Where("id = ? AND token = ? AND used = ?", id, token, false).
+		Update("used", true)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected == 1, nil
+}
+
+func (r *gormRepository) DeleteExpiredCaptchas(ctx context.Context) error {
+	return r.db.WithContext(ctx).Where("expires_at < ?", time.Now()).Delete(&model.Captcha{}).Error
 }
 
 func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {

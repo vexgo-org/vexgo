@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/url"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
+	"github.com/wenlng/go-captcha/v2/slide"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -144,6 +144,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 	if err := s.verifyCaptcha(ctx, &verifyCaptchaArgs{
 		Token:     req.CaptchaToken,
 		X:         req.CaptchaX,
+		Y:         req.CaptchaY,
 		Email:     req.Email,
 		ID:        req.CaptchaID,
 		Tolerance: 10,
@@ -232,6 +233,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	if err := s.verifyCaptcha(ctx, &verifyCaptchaArgs{
 		Token:     req.CaptchaToken,
 		X:         req.CaptchaX,
+		Y:         req.CaptchaY,
 		Email:     req.Email,
 		ID:        req.CaptchaID,
 		Tolerance: 5,
@@ -678,6 +680,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 type verifyCaptchaArgs struct {
 	Token     string
 	X         int
+	Y         int
 	Email     string
 	ID        string
 	Tolerance int
@@ -685,11 +688,13 @@ type verifyCaptchaArgs struct {
 
 // verifyCaptcha enforces the sliding-puzzle captcha when it is enabled: it
 // checks the required fields, looks the captcha up, verifies expiry and the
-// clicked position within tolerance, then marks the captcha as used.
+// dropped position on both axes within tolerance, then marks the captcha as
+// used.
 func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) error {
 	// Check if captcha verification is enabled
 	captchaEnabled, err := s.captchaEnabled(ctx)
 	if err != nil {
+		slog.Error("failed to check captcha settings", "err", err)
 		return ErrCaptchaCheckFailed
 	}
 
@@ -700,24 +705,36 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 
 	// Verify captcha
 	slog.Debug("captcha verification enabled, validating user captcha")
-	if arg.ID == "" || arg.Token == "" || arg.X == 0 {
+	if arg.ID == "" || arg.Token == "" || arg.X == 0 || arg.Y == 0 {
 		slog.Warn(
 			"captcha verification failed: missing required fields",
 			"email", arg.Email,
 			"captchaID", arg.ID,
 			"captchaX", arg.X,
+			"captchaY", arg.Y,
 		)
 		return ErrCaptchaRequired
 	}
 	// Query captcha
 	captcha, err := s.repo.FindCaptcha(ctx, arg.ID, arg.Token)
 	if err != nil {
-		slog.Warn(
-			"captcha verification failed: captcha not found or invalid token",
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn(
+				"captcha verification failed: captcha not found or invalid token",
+				"captchaID", arg.ID,
+				"email", arg.Email,
+			)
+			return ErrCaptchaNotFound
+		}
+		// Unexpected lookup failure: report it as an internal error instead
+		// of masquerading as a missing challenge.
+		slog.Error(
+			"captcha verification failed: captcha lookup error",
 			"captchaID", arg.ID,
 			"email", arg.Email,
+			"err", err,
 		)
-		return ErrCaptchaNotFound
+		return ErrCaptchaFailed
 	}
 
 	// Check if expired
@@ -731,16 +748,30 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		return ErrCaptchaExpired
 	}
 
-	// Verify position (allow certain tolerance)
-	if math.Abs(float64(arg.X-captcha.X)) > float64(arg.Tolerance) {
+	// Verify position (allow certain tolerance on both axes). The challenge
+	// is one-shot: a failed attempt invalidates the captcha so the answer
+	// cannot be brute-forced through this endpoint within its lifetime.
+	//
+	// security: the stored answer is deliberately kept out of the logs —
+	// aggregated or leaked logs must not allow reconstructing it.
+	if !slide.Validate(arg.X, arg.Y, captcha.X, captcha.Y, arg.Tolerance) {
 		slog.Warn(
 			"captcha verification failed: incorrect position",
 			"captchaID", arg.ID,
 			"userX", arg.X,
-			"correctX", captcha.X,
+			"userY", arg.Y,
 			"tolerance", arg.Tolerance,
 			"email", arg.Email,
 		)
+		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
+			slog.Error(
+				"failed to invalidate captcha after mismatch",
+				"captchaID", arg.ID,
+				"email", arg.Email,
+				"err", err,
+			)
+			return ErrCaptchaFailed
+		}
 		return ErrCaptchaMismatch
 	}
 
@@ -750,10 +781,11 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		"email", arg.Email,
 	)
 
-	// If captcha has not been used yet, mark it as used
+	// If captcha has not been used yet, mark it as used. The conditional
+	// update makes the claim atomic; an already-used captcha passes either
+	// way because the drop-time pre-verification marked it.
 	if !captcha.Used {
-		captcha.Used = true
-		if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
 			slog.Error(
 				"failed to mark captcha as used",
 				"captchaID", arg.ID,
