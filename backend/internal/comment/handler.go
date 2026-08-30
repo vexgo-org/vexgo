@@ -182,6 +182,9 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		// The wrapped error names the failing persistence step; log it here
+		// so the generic client response does not lose the root cause.
+		slog.Error("failed to update comment moderation configuration", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment moderation configuration"})
 		return
 	}
@@ -201,7 +204,11 @@ func (h *Handler) TestModerationConfig(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// The raw error can carry network details and the upstream endpoint's
+		// response body; log it server-side and keep the client response
+		// generic.
+		slog.Error("LLM moderation test failed", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to test LLM moderation endpoint"})
 		return
 	}
 
