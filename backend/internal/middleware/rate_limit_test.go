@@ -95,7 +95,8 @@ func TestRateLimiter_FailsClosedAtCap(t *testing.T) {
 		entries: make(map[string]*rateLimitEntry, rateMaxEntries),
 	}
 	for i := range rateMaxEntries {
-		rl.entries["10.1."+strconv.Itoa(i/256)+"."+strconv.Itoa(i%256)] = &rateLimitEntry{limiter: newRateLimiter(rl.limit, rl.burst), lastSeen: time.Now()}
+		ip := "10.1." + strconv.Itoa(i/256) + "." + strconv.Itoa(i%256)
+		rl.entries[ip] = &rateLimitEntry{limiter: newRateLimiter(rl.limit, rl.burst), lastSeen: time.Now()}
 	}
 
 	router := gin.New()
@@ -134,7 +135,8 @@ func TestRateLimiter_SweepsIdleEntries(t *testing.T) {
 	rl.entries["10.0.0.1"].limiter.Allow()
 	// Push the map over the sweep threshold.
 	for i := range rateSweepThreshold {
-		rl.entries["10.2."+strconv.Itoa(i/256)+"."+strconv.Itoa(i%256)] = &rateLimitEntry{limiter: newRateLimiter(rl.limit, rl.burst), lastSeen: time.Now()}
+		ip := "10.2." + strconv.Itoa(i/256) + "." + strconv.Itoa(i%256)
+		rl.entries[ip] = &rateLimitEntry{limiter: newRateLimiter(rl.limit, rl.burst), lastSeen: time.Now()}
 	}
 
 	router := gin.New()
