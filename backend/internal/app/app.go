@@ -145,6 +145,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:        db,
 			SSO:       &cfg.SSO,
 			JWTSecret: cfg.JWTSecret,
+			Mailer:    mailerSvc,
 			BaseURL:   cfg.BaseURL,
 		},
 		Home: home.Deps{

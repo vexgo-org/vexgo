@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/coreos/go-oidc"
@@ -50,15 +52,26 @@ var (
 
 // generateState creates a random one-time state for CSRF protection and
 // stores it keyed by provider, bound to the client IP and requested method.
-func generateState(provider, ip, method string) string {
+// Expired entries are swept opportunistically so abandoned flows cannot grow
+// the cache without bound.
+func generateState(provider, ip, method string) (string, error) {
 	b := make([]byte, stateLength)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate sso state: %w", err)
+	}
 	state := base64.URLEncoding.EncodeToString(b)[:stateLength]
 	key := provider + "_" + state
+
+	now := time.Now()
 	stateMu.Lock()
-	stateCache[key] = stateEntry{ip: ip, method: method, expires: time.Now().Add(stateExpire)}
+	for k, entry := range stateCache {
+		if now.After(entry.expires) {
+			delete(stateCache, k)
+		}
+	}
+	stateCache[key] = stateEntry{ip: ip, method: method, expires: now.Add(stateExpire)}
 	stateMu.Unlock()
-	return state
+	return state, nil
 }
 
 // verifyState consumes and validates a state previously issued by
@@ -83,6 +96,10 @@ type Deps struct {
 	DB        *gorm.DB
 	SSO       *config.SSOConfig
 	JWTSecret []byte
+	// Mailer is consulted when deciding whether a local account may be linked
+	// to an SSO identity by email: with SMTP disabled there is no verification
+	// flow, so unverified local accounts stay linkable (see linkableByEmail).
+	Mailer *mailer.Service
 
 	// BaseURL is the public origin of this instance (cfg.BaseURL). When set,
 	// OAuth callback URLs are built from it instead of the request host.
@@ -94,12 +111,32 @@ type Service struct {
 	repo      Repository
 	sso       *config.SSOConfig
 	jwtSecret []byte
+	mailer    *mailer.Service
 	baseURL   string
 }
 
 // NewService creates an sso service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret, baseURL: deps.BaseURL}
+	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret, mailer: deps.Mailer, baseURL: deps.BaseURL}
+}
+
+// linkableByEmail reports whether a local account may be linked to an SSO
+// identity whose email the provider verified. The local account must be
+// verified itself, unless SMTP is disabled and no verification flow exists.
+func (s *Service) linkableByEmail(ctx context.Context, u *model.User) (bool, error) {
+	if u.EmailVerified {
+		return true, nil
+	}
+	if s.mailer == nil {
+		return false, nil
+	}
+	enabled, err := s.mailer.Enabled(ctx)
+	if err != nil {
+		// The verification state of the account cannot be confirmed; stay
+		// strict rather than linking on a maybe.
+		return false, nil
+	}
+	return !enabled, nil
 }
 
 // Providers returns the list of enabled providers and whether local login is
@@ -127,7 +164,10 @@ func (s *Service) LoginRedirect(c *gin.Context, provider, method string) (authUR
 	}
 
 	redirectURI := s.callbackURI(c, provider)
-	state := generateState(provider, c.ClientIP(), method)
+	state, err := generateState(provider, c.ClientIP(), method)
+	if err != nil {
+		return "", http.StatusInternalServerError, "failed to start login flow"
+	}
 
 	switch provider {
 	case "github":
@@ -146,7 +186,8 @@ func (s *Service) LoginRedirect(c *gin.Context, provider, method string) (authUR
 		}
 		oidcCfg, err := s.oidcOAuth2Config(c.Request.Context(), redirectURI)
 		if err != nil {
-			return "", http.StatusInternalServerError, err.Error()
+			slog.Warn("oidc discovery failed", "err", err)
+			return "", http.StatusInternalServerError, "SSO provider is temporarily unavailable"
 		}
 		authURL = oidcCfg.AuthCodeURL(state)
 	default:
@@ -174,7 +215,10 @@ func (s *Service) Callback(c *gin.Context, provider, state, code string) (payloa
 	redirectURI := s.callbackURI(c, provider)
 	info, err := s.exchange(c, provider, code, redirectURI)
 	if err != nil {
-		return nil, err.Error()
+		// Details may contain provider response bodies and internal URLs;
+		// log them server-side and return a generic message to the client.
+		slog.Warn("sso exchange failed", "provider", provider, "err", err)
+		return nil, "login with the provider failed, please try again"
 	}
 
 	// get_sso_id: just return the provider-scoped ID so the frontend can bind it
@@ -187,7 +231,8 @@ func (s *Service) Callback(c *gin.Context, provider, state, code string) (payloa
 	// sso_get_token: find or create local user, then issue JWT
 	user, err := s.FindOrCreateUser(c.Request.Context(), provider, info)
 	if err != nil {
-		return nil, err.Error()
+		slog.Warn("sso account resolution failed", "provider", provider, "err", err)
+		return nil, "failed to resolve the account for this login"
 	}
 	token, err := auth.IssueJWT(user, s.jwtSecret)
 	if err != nil {
@@ -282,6 +327,11 @@ type ssoUserInfo struct {
 	username   string
 	email      string
 	avatar     string
+	// emailVerified reports whether the provider confirmed ownership of
+	// info.email. It is only true on explicit confirmation (GitHub /user/emails
+	// verified flag, Google/OIDC email_verified claim); providers that stay
+	// silent count as unverified so email-based account linking stays safe.
+	emailVerified bool
 }
 
 // exchange delegates the OAuth2 code exchange to the matching provider
@@ -328,9 +378,21 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 	info.email, _ = data["email"].(string)
 	info.avatar, _ = data["avatar_url"].(string)
 
-	// GitHub may omit email in /user when it is set to private
+	// GitHub may omit email in /user when it is set to private. The /user
+	// endpoint alone does not prove ownership, so confirmation comes from
+	// /user/emails: either the address we got is flagged verified there, or
+	// the account's verified primary email replaces it.
+	if emails := fetchGitHubEmails(tok.AccessToken); emails != nil {
+		if isVerifiedGitHubEmail(emails, info.email) {
+			info.emailVerified = true
+		} else if primary := verifiedGitHubPrimaryEmail(emails); primary != "" {
+			info.email = primary
+			info.emailVerified = true
+		}
+	}
 	if info.email == "" {
 		info.email = fetchGitHubPrimaryEmail(tok.AccessToken)
+		info.emailVerified = info.email != ""
 	}
 	if info.providerID == "" {
 		return nil, errors.New("cannot get user ID from GitHub")
@@ -360,6 +422,7 @@ func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*sso
 	info.username, _ = data["name"].(string)
 	info.email, _ = data["email"].(string)
 	info.avatar, _ = data["picture"].(string)
+	info.emailVerified, _ = data["email_verified"].(bool)
 
 	if info.providerID == "" {
 		return nil, errors.New("cannot get user ID from Google")
@@ -496,6 +559,9 @@ func (s *Service) claimsToUserInfo(claims map[string]any) *ssoUserInfo {
 	// email — respect OIDC_EMAIL_CLAIM
 	info.email, _ = claims[cfg.EmailClaim].(string)
 	info.avatar, _ = claims["picture"].(string)
+	if verified, ok := claims["email_verified"].(bool); ok {
+		info.emailVerified = verified
+	}
 	return info
 }
 
@@ -521,21 +587,41 @@ func (s *Service) FindOrCreateUser(ctx context.Context, provider string, info *s
 		return user, nil
 	}
 
-	// 2. Email match → link to existing account
+	// 2. Email match → link to existing account. Linking is only allowed when
+	// the provider confirmed the email (email_verified) AND the local account
+	// is verified itself — unless the instance has no verification flow at
+	// all (SMTP disabled), matching the fail-open stance of local login.
+	// Without these checks an attacker controlling an unverified SSO identity
+	// carrying a victim's email could log in as the victim.
 	var user *model.User
-	if info.email != "" {
-		if u, err := s.repo.FindUserByEmail(ctx, info.email); err == nil {
-			user = u
-			// Update last login time
-			user.LastLoginAt = time.Now()
-			if err := s.repo.SaveUser(ctx, user); err != nil {
+	emailTaken := false
+	if info.email != "" && info.emailVerified {
+		u, err := s.repo.FindUserByEmail(ctx, info.email)
+		switch {
+		case err == nil:
+			emailTaken = true
+			linkable, err := s.linkableByEmail(ctx, u)
+			if err != nil {
 				return nil, err
 			}
+			if linkable {
+				user = u
+				// Update last login time
+				user.LastLoginAt = time.Now()
+				if err := s.repo.SaveUser(ctx, user); err != nil {
+					return nil, err
+				}
+			}
+		case !errors.Is(err, gorm.ErrRecordNotFound):
+			return nil, err
 		}
 	}
 
 	// 3. Auto-register new user
 	if user == nil {
+		if emailTaken {
+			return nil, errors.New("an account with this email already exists; verify your email first or log in with a password")
+		}
 		username := s.generateUsername(ctx, info.username, info.email)
 		u := model.User{
 			Username:        username,
@@ -622,17 +708,37 @@ func apiGet(url, accessToken, scheme string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-// fetchGitHubPrimaryEmail returns the primary, verified email address from
-// GitHub's /user/emails endpoint, or an empty string when unavailable.
-func fetchGitHubPrimaryEmail(accessToken string) string {
+// fetchGitHubEmails returns the account's email entries from GitHub's
+// /user/emails endpoint, or nil when unavailable.
+func fetchGitHubEmails(accessToken string) []map[string]any {
 	body, err := apiGet("https://api.github.com/user/emails", accessToken, "token")
 	if err != nil {
-		return ""
+		return nil
 	}
 	var emails []map[string]any
 	if err := json.Unmarshal(body, &emails); err != nil {
-		return ""
+		return nil
 	}
+	return emails
+}
+
+// isVerifiedGitHubEmail reports whether the given address is flagged verified
+// in a /user/emails payload.
+func isVerifiedGitHubEmail(emails []map[string]any, email string) bool {
+	for _, e := range emails {
+		if addr, _ := e["email"].(string); addr != email {
+			continue
+		}
+		if verified, _ := e["verified"].(bool); verified {
+			return true
+		}
+	}
+	return false
+}
+
+// verifiedGitHubPrimaryEmail returns the primary, verified email address from
+// a /user/emails payload, or an empty string when unavailable.
+func verifiedGitHubPrimaryEmail(emails []map[string]any) string {
 	for _, e := range emails {
 		if primary, _ := e["primary"].(bool); !primary {
 			continue
@@ -645,6 +751,12 @@ func fetchGitHubPrimaryEmail(accessToken string) string {
 		}
 	}
 	return ""
+}
+
+// fetchGitHubPrimaryEmail returns the primary, verified email address from
+// GitHub's /user/emails endpoint, or an empty string when unavailable.
+func fetchGitHubPrimaryEmail(accessToken string) string {
+	return verifiedGitHubPrimaryEmail(fetchGitHubEmails(accessToken))
 }
 
 // isValidMethod reports whether the SSO flow method is supported.
