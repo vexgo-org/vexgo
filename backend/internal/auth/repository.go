@@ -75,7 +75,10 @@ func (r *gormRepository) FindUserByEmailExcluding(
 
 func (r *gormRepository) FindUserByToken(ctx context.Context, token string) (*model.User, error) {
 	var user model.User
-	if err := r.db.WithContext(ctx).Where("verification_token = ?", token).First(&user).Error; err != nil {
+	// Tokens are stored hashed (tokenStorageForm); the presented raw token is
+	// hashed the same way before the lookup, so the plaintext never exists in
+	// the database.
+	if err := r.db.WithContext(ctx).Where("verification_token = ?", tokenStorageForm(token)).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

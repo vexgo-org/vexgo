@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -831,15 +833,38 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 const secureTokenEntropy = 32
 
 // generateSecureToken returns prefix + 256 bits of crypto/rand entropy encoded
-// as unpadded base64url. The token is stored and looked up as-is (plaintext
-// column equality); the entropy — not the format — is what makes it
-// unguessable within its 5-minute window.
+// as unpadded base64url. The token is emailed in this raw form; only its
+// storage form (see tokenStorageForm) is persisted.
 func generateSecureToken(prefix string) (string, error) {
 	b := make([]byte, secureTokenEntropy)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
 	return prefix + base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// tokenStorageForm maps a raw emailed token to its at-rest representation:
+// the kind prefix followed by the SHA-256 of the rest. Only this form is
+// persisted, so a database leak does not expose live one-time tokens, and
+// lookups compare hashes instead of plaintext. The prefix is preserved so the
+// token-kind checks on stored values (e.g. the verification-resend cooldown)
+// keep working. Unknown tokens hash in full (empty prefix) and match nothing.
+func tokenStorageForm(rawToken string) string {
+	prefix := tokenKindPrefix(rawToken)
+	sum := sha256.Sum256([]byte(rawToken[len(prefix):]))
+	return prefix + hex.EncodeToString(sum[:])
+}
+
+// tokenKindPrefix returns the known account-token prefix of a raw token, or
+// "" for unrecognized input. Prefixes are matched longest-first because
+// TokenPrefixEmailChange contains an inner hyphen.
+func tokenKindPrefix(rawToken string) string {
+	for _, prefix := range []string{model.TokenPrefixEmailChange, model.TokenPrefixReset, model.TokenPrefixVerify} {
+		if strings.HasPrefix(rawToken, prefix) {
+			return prefix
+		}
+	}
+	return ""
 }
 
 // GeneratePasswordResetToken generates password reset token
@@ -853,7 +878,7 @@ func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database
-	if err := s.repo.UpdateUserToken(ctx, userID, token, expiresAt); err != nil {
+	if err := s.repo.UpdateUserToken(ctx, userID, tokenStorageForm(token), expiresAt); err != nil {
 		return "", fmt.Errorf("failed to save password reset token: %w", err)
 	}
 
@@ -871,7 +896,7 @@ func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, new
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database, also store pending new email
-	if err := s.repo.UpdateEmailChangeToken(ctx, userID, newEmail, token, expiresAt); err != nil {
+	if err := s.repo.UpdateEmailChangeToken(ctx, userID, newEmail, tokenStorageForm(token), expiresAt); err != nil {
 		return "", fmt.Errorf("failed to update email change token: %w", err)
 	}
 
@@ -888,7 +913,7 @@ func (s *Service) GenerateVerificationToken(ctx context.Context, userID uint) (s
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database
-	if err := s.repo.UpdateUserToken(ctx, userID, token, expiresAt); err != nil {
+	if err := s.repo.UpdateUserToken(ctx, userID, tokenStorageForm(token), expiresAt); err != nil {
 		return "", fmt.Errorf("failed to save verification token: %w", err)
 	}
 

@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
-	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -561,7 +561,7 @@ func TestResetPassword(t *testing.T) {
 		Email:             "alice@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "reset-token",
+		VerificationToken: tokenStorageForm("reset-token"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u).Error; err != nil {
@@ -581,7 +581,7 @@ func TestResetPassword(t *testing.T) {
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "reset-expired",
+		VerificationToken: tokenStorageForm("reset-expired"),
 		TokenExpiresAt:    &expiredAt,
 	}
 	if err := db.Create(&u2).Error; err != nil {
@@ -656,7 +656,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 		Email:             "alice@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "verify-abc",
+		VerificationToken: tokenStorageForm("verify-abc"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u1).Error; err != nil {
@@ -672,7 +672,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "email-change-abc",
+		VerificationToken: tokenStorageForm("email-change-abc"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u2).Error; err != nil {
@@ -685,7 +685,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 	// The rejected tokens are left untouched (not consumed).
 	for _, token := range []string{"verify-abc", "email-change-abc"} {
 		var stored model.User
-		if err := db.Where("verification_token = ?", token).First(&stored).Error; err != nil {
+		if err := db.Where("verification_token = ?", tokenStorageForm(token)).First(&stored).Error; err != nil {
 			t.Fatalf("token %q unexpectedly cleared: %v", token, err)
 		}
 	}
@@ -732,17 +732,16 @@ func captureEmails(t *testing.T) {
 }
 
 // extractToken pulls the token query parameter out of an emailed link.
-func extractToken(t *testing.T, link string) string {
+// emailedToken extracts the raw link token from a captured email's HTML body.
+// Raw tokens exist only in the email; the database holds their storage form
+// (see tokenStorageForm).
+func emailedToken(t *testing.T, email capturedEmail) string {
 	t.Helper()
-	u, err := url.Parse(link)
-	if err != nil {
-		t.Fatalf("failed to parse link %q: %v", link, err)
+	m := regexp.MustCompile(`token=([A-Za-z0-9_-]+)`).FindStringSubmatch(email.HTMLBody)
+	if m == nil {
+		t.Fatal("no token link in email body")
 	}
-	tok := u.Query().Get("token")
-	if tok == "" {
-		t.Fatalf("no token in link %q", link)
-	}
-	return tok
+	return m[1]
 }
 
 func TestRegister_SendsVerificationEmail(t *testing.T) {
@@ -775,17 +774,17 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 		t.Errorf("expected recipient username in email body")
 	}
 
+	tok := emailedToken(t, email)
+
 	var stored model.User
 	if err := db.First(&stored, result.User.ID).Error; err != nil {
 		t.Fatalf("reload user: %v", err)
 	}
-	wantLink := "https://example.com/verify-email?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected verification link %q in email body", wantLink)
+	if stored.VerificationToken != tokenStorageForm(tok) {
+		t.Errorf("expected only the token hash at rest, got %q", stored.VerificationToken)
 	}
 
 	// The emailed link actually verifies the address.
-	tok := extractToken(t, wantLink)
 	emailChange, _, err := svc.VerifyEmail(context.Background(), tok)
 	if err != nil {
 		t.Fatalf("VerifyEmail via link error: %v", err)
@@ -887,7 +886,7 @@ func TestResendVerification_NonVerifyTokensDoNotCoolDown(t *testing.T) {
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: model.TokenPrefixReset + "abc",
+		VerificationToken: tokenStorageForm(model.TokenPrefixReset + "abc"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u).Error; err != nil {
@@ -1035,20 +1034,20 @@ func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
 		t.Errorf("expected new email in email body")
 	}
 
+	tok := emailedToken(t, email)
+	if !strings.HasPrefix(tok, model.TokenPrefixEmailChange) {
+		t.Fatalf("expected email-change token, got %q", tok)
+	}
+
 	var stored model.User
 	if err := db.First(&stored, u.ID).Error; err != nil {
 		t.Fatalf("reload user: %v", err)
 	}
-	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixEmailChange) {
-		t.Fatalf("expected email-change token, got %q", stored.VerificationToken)
-	}
-	wantLink := "https://example.com/verify-email?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected change link %q in email body", wantLink)
+	if stored.VerificationToken != tokenStorageForm(tok) {
+		t.Errorf("expected only the token hash at rest, got %q", stored.VerificationToken)
 	}
 
 	// The emailed link actually confirms the email change.
-	tok := extractToken(t, wantLink)
 	emailChange, newEmail, err := svc.VerifyEmail(context.Background(), tok)
 	if err != nil {
 		t.Fatalf("VerifyEmail via link error: %v", err)
@@ -1082,20 +1081,20 @@ func TestRequestPasswordReset_SendsResetEmail(t *testing.T) {
 		t.Errorf("unexpected subject %q", email.Subject)
 	}
 
+	tok := emailedToken(t, email)
+	if !strings.HasPrefix(tok, model.TokenPrefixReset) {
+		t.Fatalf("expected reset token, got %q", tok)
+	}
+
 	var stored model.User
 	if err := db.First(&stored, u.ID).Error; err != nil {
 		t.Fatalf("reload user: %v", err)
 	}
-	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixReset) {
-		t.Fatalf("expected reset token, got %q", stored.VerificationToken)
-	}
-	wantLink := "https://example.com/reset-password?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected reset link %q in email body", wantLink)
+	if stored.VerificationToken != tokenStorageForm(tok) {
+		t.Errorf("expected only the token hash at rest, got %q", stored.VerificationToken)
 	}
 
 	// The emailed link actually resets the password.
-	tok := extractToken(t, wantLink)
 	if err := svc.ResetPassword(context.Background(), tok, "brandnew123"); err != nil {
 		t.Fatalf("ResetPassword error: %v", err)
 	}
@@ -1130,7 +1129,7 @@ func TestVerifyEmail_Success(t *testing.T) {
 	u := model.User{
 		Username:          "alice",
 		Email:             "alice@example.com",
-		VerificationToken: "verify-abc",
+		VerificationToken: tokenStorageForm("verify-abc"),
 		TokenExpiresAt:    &expiresAt,
 		EmailVerified:     false,
 	}
@@ -1167,7 +1166,7 @@ func TestVerifyEmail_EmailChangeReturnsNewEmail(t *testing.T) {
 	u := model.User{
 		Username:          "alice",
 		Email:             "old@example.com",
-		VerificationToken: "email-change-abc",
+		VerificationToken: tokenStorageForm("email-change-abc"),
 		TokenExpiresAt:    &expiresAt,
 		PendingEmail:      "new@example.com",
 		EmailVerified:     true,
@@ -1205,7 +1204,7 @@ func TestVerifyEmail_RejectsResetToken(t *testing.T) {
 	u := model.User{
 		Username:          "alice",
 		Email:             "alice@example.com",
-		VerificationToken: "reset-abc",
+		VerificationToken: tokenStorageForm("reset-abc"),
 		TokenExpiresAt:    &expiresAt,
 		EmailVerified:     false,
 	}
@@ -1243,5 +1242,48 @@ func TestVerificationStatus(t *testing.T) {
 
 	if _, _, err := svc.VerificationStatus(context.Background(), 99999); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("expected ErrUserNotFound, got %v", err)
+	}
+}
+
+// TestTokens_OnlyHashesAreStored ensures the emailed account tokens exist in
+// the database only in their hashed storage form: a database leak must not
+// expose live one-time tokens, and the raw value must still resolve through
+// the hashed lookup.
+func TestTokens_OnlyHashesAreStored(t *testing.T) {
+	svc, _, db := newTestService(t)
+	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+
+	raw, err := svc.GenerateVerificationToken(context.Background(), u.ID)
+	if err != nil {
+		t.Fatalf("GenerateVerificationToken error: %v", err)
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if stored.VerificationToken == raw {
+		t.Error("raw token must not be stored in plaintext")
+	}
+	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixVerify) {
+		t.Errorf("expected kind prefix preserved on stored hash, got %q", stored.VerificationToken)
+	}
+	hashPart := strings.TrimPrefix(stored.VerificationToken, model.TokenPrefixVerify)
+	if len(hashPart) != 64 { // hex-encoded SHA-256
+		t.Errorf("expected 64-char hex hash, got %d chars", len(hashPart))
+	}
+
+	// the raw token still resolves through the hashed lookup
+	user, err := svc.repo.FindUserByToken(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("FindUserByToken with raw token: %v", err)
+	}
+	if user.ID != u.ID {
+		t.Errorf("expected user %d, got %d", u.ID, user.ID)
+	}
+
+	// unknown tokens hash to something that matches nothing
+	if _, err := svc.repo.FindUserByToken(context.Background(), model.TokenPrefixVerify+"nope"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("expected ErrRecordNotFound for unknown token, got %v", err)
 	}
 }
