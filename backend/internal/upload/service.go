@@ -70,11 +70,18 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 		return ErrNotFound
 	}
 
+	// Look up the acting user's role. A lookup failure must not bypass the
+	// ownership check — failing closed here means a transient DB error can
+	// only block a delete, never widen it.
 	user, err := s.repo.FindUserByID(ctx, userID)
-	if err == nil {
-		if !model.IsAdmin(user.Role) && media.UserID != userID {
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrForbidden
 		}
+		return fmt.Errorf("failed to look up acting user: %w", err)
+	}
+	if !model.IsAdmin(user.Role) && media.UserID != userID {
+		return ErrForbidden
 	}
 
 	// Delete the underlying file; log but continue to delete the DB record
