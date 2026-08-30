@@ -358,30 +358,42 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		return
 	}
 
-	// Extract the zip file
+	// Extract the zip file. Entry names are untrusted input: os.Root confines
+	// every created file to the extraction directory at the OS level, so
+	// absolute paths, ".." segments or volume names in entries cannot escape
+	// tempDir. The Clean/IsAbs/".." pre-check below only fails fast with a
+	// client-facing 400; the Root is the actual guarantee.
+	zipRoot, err := os.OpenRoot(tempDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare extraction directory"})
+		return
+	}
+	defer func() { _ = zipRoot.Close() }()
+
 	for _, f := range zipReader.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
 
 		// Ensure the file path is safe
-		if strings.Contains(f.Name, "..") {
+		clean := filepath.Clean(f.Name)
+		if filepath.IsAbs(clean) || strings.Contains(clean, "..") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
 			return
 		}
 
-		// Create the directory structure
-		filePath := filepath.Join(tempDir, f.Name)
-		dir := filepath.Dir(filePath)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory structure"})
-			return
+		// Create the directory structure inside the extraction root
+		if dir := filepath.Dir(clean); dir != "." {
+			if err := zipRoot.MkdirAll(dir, 0o755); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
+				return
+			}
 		}
 
 		// Extract the file
-		dstFile, err := os.Create(filePath)
+		dstFile, err := zipRoot.Create(clean)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
 			return
 		}
 
