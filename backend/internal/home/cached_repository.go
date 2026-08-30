@@ -102,18 +102,28 @@ func (r *cachedRepository) CountTags(ctx context.Context) (int64, error) {
 	return r.counter(ctx, "tags", r.Repository.CountTags), nil
 }
 
+// getSettings loads and decodes the cached settings row, reporting whether
+// usable data was found. Decode failures are logged here and read as a miss;
+// the fall-through re-reads the database and overwrites the bad value.
+func (r *cachedRepository) getSettings(ctx context.Context, key string) (model.GeneralSettings, bool) {
+	value, ok, err := r.cache.Get(ctx, key)
+	if err != nil || !ok {
+		return model.GeneralSettings{}, false
+	}
+	var config model.GeneralSettings
+	if jsonErr := json.Unmarshal([]byte(value), &config); jsonErr != nil {
+		slog.Warn("home cache decode failed", "key", key, "err", jsonErr)
+		return model.GeneralSettings{}, false
+	}
+	return config, true
+}
+
 // GetGeneralSettings serves the general settings row through the cache; it
 // gates whether anonymous visitors may read content at all.
 func (r *cachedRepository) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {
-	key := "home:settings"
-	value, ok, err := r.cache.Get(ctx, key)
-	if err == nil && ok {
-		var config model.GeneralSettings
-		jsonErr := json.Unmarshal([]byte(value), &config)
-		if jsonErr == nil {
-			return config, nil
-		}
-		slog.Warn("home cache decode failed", "key", key, "err", jsonErr)
+	const key = "home:settings"
+	if config, ok := r.getSettings(ctx, key); ok {
+		return config, nil
 	}
 
 	config, err := r.Repository.GetGeneralSettings(ctx)

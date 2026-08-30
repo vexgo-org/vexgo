@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+const (
+	// memorySweepThreshold is the map size that triggers a sweep of expired
+	// entries on the next Set.
+	memorySweepThreshold = 4096
+	// memoryMaxEntries is the hard cap on stored keys. Overwrites of keys
+	// already present and counter increments still work at the cap.
+	memoryMaxEntries = 65536
+)
+
 // memoryEntry pairs a cached value with its optional expiration.
 type memoryEntry struct {
 	value   string
@@ -32,15 +41,6 @@ type Memory struct {
 	entries        map[string]memoryEntry
 	setsSinceSweep int
 }
-
-const (
-	// memorySweepThreshold is the map size that triggers a sweep of expired
-	// entries on the next Set.
-	memorySweepThreshold = 4096
-	// memoryMaxEntries is the hard cap on stored keys. Overwrites of keys
-	// already present and counter increments still work at the cap.
-	memoryMaxEntries = 65536
-)
 
 // NewMemory returns an empty in-process cache backend.
 func NewMemory() *Memory {
@@ -126,7 +126,7 @@ func (m *Memory) Incr(_ context.Context, key string, ttl time.Duration) (int64, 
 		ok = false
 	}
 
-	n := int64(0)
+	var n int64
 	if ok {
 		var err error
 		n, err = strconv.ParseInt(entry.value, 10, 64)

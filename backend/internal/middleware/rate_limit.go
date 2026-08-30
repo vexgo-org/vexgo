@@ -46,17 +46,19 @@ type CounterStore interface {
 	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
 }
 
-// NewFixedWindowRateLimitStore returns a distributed RateLimitStore backed by
-// atomic counters: each key's counter expires one window after its first
-// increment, so every window allows limit requests. Window borders allow up
-// to twice the budget across two adjacent windows, which is acceptable for
-// abuse protection.
-func NewFixedWindowRateLimitStore(counters CounterStore) RateLimitStore {
-	return &fixedWindowRateLimitStore{counters: counters}
-}
-
+// fixedWindowRateLimitStore is a distributed RateLimitStore backed by atomic
+// counters: each key's counter expires one window after its first increment,
+// so every window allows limit requests. Window borders allow up to twice
+// the budget across two adjacent windows, which is acceptable for abuse
+// protection.
 type fixedWindowRateLimitStore struct {
 	counters CounterStore
+}
+
+// NewFixedWindowRateLimitStore returns a distributed RateLimitStore backed
+// by atomic counters; see fixedWindowRateLimitStore.
+func NewFixedWindowRateLimitStore(counters CounterStore) RateLimitStore {
+	return &fixedWindowRateLimitStore{counters: counters}
 }
 
 // Allow increments the key's counter and allows the request while the window

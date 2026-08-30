@@ -19,10 +19,7 @@ package cache
 
 import (
 	"context"
-	"fmt"
 	"time"
-
-	"github.com/valkey-io/valkey-go"
 )
 
 // keyPrefix namespaces every key written by this application.
@@ -54,33 +51,4 @@ type Cache interface {
 	// Close releases the underlying resources. It must be safe to call on
 	// backends that hold none.
 	Close()
-}
-
-// NewValkey opens a connection to the Valkey / Redis-compatible server at
-// url (e.g. "valkey://127.0.0.1:6379/0", "redis://:password@host:6379",
-// "rediss://host:6379" for TLS) and verifies it with a PING before returning,
-// so misconfiguration fails at startup instead of on first use.
-func NewValkey(ctx context.Context, url string) (*Valkey, error) {
-	opt, err := valkey.ParseURL(url)
-	if err != nil {
-		return nil, fmt.Errorf("parse valkey URL: %w", err)
-	}
-	// Client-side caching (the DoCache API) is never used, so the CLIENT
-	// TRACKING opt-in handshake is disabled. This also keeps the client
-	// compatible with servers and proxies that lack RESP3 tracking.
-	opt.DisableCache = true
-	// Command retries (20 attempts with backoff by default) are disabled:
-	// callers run on the request path and own their failure semantics (rate
-	// limiting fails open, SSO state fails closed), which needs fast errors,
-	// not a hidden ~20s stall per command during an outage.
-	opt.DisableRetry = true
-	client, err := valkey.NewClient(opt)
-	if err != nil {
-		return nil, fmt.Errorf("connect valkey: %w", err)
-	}
-	if err := client.Do(ctx, client.B().Ping().Build()).Error(); err != nil {
-		client.Close()
-		return nil, fmt.Errorf("ping valkey: %w", err)
-	}
-	return &Valkey{client: client}, nil
 }

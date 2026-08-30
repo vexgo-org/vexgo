@@ -129,27 +129,28 @@ func sanitizeForCache(posts ...*model.Post) {
 // a freshly decoded copy. Not-found lookups are never cached.
 func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
 	key := fmt.Sprintf("post:g%s:slug:%s", r.generation(ctx), slug)
-	var post model.Post
-	if r.getJSON(ctx, key, &post) {
-		return &post, nil
+	var cached model.Post
+	if r.getJSON(ctx, key, &cached) {
+		return &cached, nil
 	}
 
-	post2, err := r.Repository.FindBySlug(ctx, slug)
+	post, err := r.Repository.FindBySlug(ctx, slug)
 	if err != nil {
-		return post2, err
+		return post, err
 	}
-	sanitizeForCache(post2)
-	r.setJSON(ctx, key, post2)
-	return post2, nil
+	sanitizeForCache(post)
+	r.setJSON(ctx, key, post)
+	return post, nil
 }
 
-// List serves guest-visible list pages through the cache; authenticated
-// queries and search queries always hit the database. Search is excluded
-// because its keys would be attacker-enumerable and unbounded in size, and
-// empty pages are not cached so keys only ever exist for real content —
-// together these bound the key space to what the posts table actually holds.
+// List serves guest-visible list pages through the cache; staff queries and
+// search queries always hit the database. Search is excluded because its
+// keys would be attacker-enumerable and unbounded in size, and empty pages
+// are not cached so keys only ever exist for real content — together these
+// bound the key space to what the posts table actually holds.
 func (r *cachedRepository) List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {
-	if (userRole != "" && userRole != model.RoleGuest) || userID != 0 || f.Search != "" {
+	isStaff := userRole != "" && userRole != model.RoleGuest
+	if isStaff || userID != 0 || f.Search != "" {
 		return r.Repository.List(ctx, userRole, userID, f)
 	}
 
@@ -160,7 +161,7 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	key := fmt.Sprintf("post:g%s:list:%d:%d:%s", r.generation(ctx), f.Page, f.Limit, listFilterKey(f.CategoryID, f.Status))
 	var page listPage
 	if r.getJSON(ctx, key, &page) {
-		// An absent slice must stay an empty JSON array, not null.
+		// A decoded null slice must stay an empty JSON array, not null.
 		if page.Posts == nil {
 			page.Posts = []model.Post{}
 		}
@@ -168,14 +169,8 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	}
 
 	posts, total, err := r.Repository.List(ctx, userRole, userID, f)
-	if err != nil {
+	if err != nil || len(posts) == 0 {
 		return posts, total, err
-	}
-	if len(posts) == 0 {
-		return posts, total, err
-	}
-	if posts == nil {
-		posts = []model.Post{}
 	}
 	for i := range posts {
 		sanitizeForCache(&posts[i])
@@ -184,10 +179,12 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	return posts, total, nil
 }
 
-// Popular serves the published-posts pool through the cache; scoring,
-// sorting and limiting happen in the service. Empty pools are not cached.
-func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
-	key := "post:g" + r.generation(ctx) + ":popular"
+// cachedPosts is the shared read-through body of the post-pool queries
+// (Popular, Latest): on a miss it fetches fresh, drops empty results so keys
+// only exist for content that exists, strips guest-invisible author data and
+// stores until contentTTL. A decoded null slice comes back as an empty
+// slice, never null.
+func (r *cachedRepository) cachedPosts(ctx context.Context, key string, fetch func(context.Context) ([]model.Post, error)) ([]model.Post, error) {
 	var posts []model.Post
 	if r.getJSON(ctx, key, &posts) {
 		if posts == nil {
@@ -196,15 +193,9 @@ func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
 		return posts, nil
 	}
 
-	posts, err := r.Repository.Popular(ctx)
-	if err != nil {
+	posts, err := fetch(ctx)
+	if err != nil || len(posts) == 0 {
 		return posts, err
-	}
-	if len(posts) == 0 {
-		return posts, err
-	}
-	if posts == nil {
-		posts = []model.Post{}
 	}
 	for i := range posts {
 		sanitizeForCache(&posts[i])
@@ -213,33 +204,18 @@ func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
 	return posts, nil
 }
 
+// Popular serves the published-posts pool through the cache; scoring,
+// sorting and limiting happen in the service. Empty pools are not cached.
+func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
+	return r.cachedPosts(ctx, fmt.Sprintf("post:g%s:popular", r.generation(ctx)), r.Repository.Popular)
+}
+
 // Latest serves the most recent published posts through the cache. Empty
 // results are not cached.
 func (r *cachedRepository) Latest(ctx context.Context, limit int) ([]model.Post, error) {
-	key := fmt.Sprintf("post:g%s:latest:%d", r.generation(ctx), limit)
-	var posts []model.Post
-	if r.getJSON(ctx, key, &posts) {
-		if posts == nil {
-			posts = []model.Post{}
-		}
-		return posts, nil
-	}
-
-	posts, err := r.Repository.Latest(ctx, limit)
-	if err != nil {
-		return posts, err
-	}
-	if len(posts) == 0 {
-		return posts, err
-	}
-	if posts == nil {
-		posts = []model.Post{}
-	}
-	for i := range posts {
-		sanitizeForCache(&posts[i])
-	}
-	r.setJSON(ctx, key, posts)
-	return posts, nil
+	return r.cachedPosts(ctx, fmt.Sprintf("post:g%s:latest:%d", r.generation(ctx), limit), func(ctx context.Context) ([]model.Post, error) {
+		return r.Repository.Latest(ctx, limit)
+	})
 }
 
 // Create writes through and invalidates the cached reads.
