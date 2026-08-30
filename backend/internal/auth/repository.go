@@ -25,6 +25,9 @@ type Repository interface {
 	UpdateUserEmailVerified(ctx context.Context, userID uint) error
 	ResetPassword(ctx context.Context, userID uint, hashedPassword string) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
+	// FindMediaByURL looks up the media_files row behind a stored URL so
+	// avatar cleanup can verify ownership before deleting the file.
+	FindMediaByURL(ctx context.Context, url string) (*model.MediaFile, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
 	// DeleteCaptcha removes a consumed or rejected challenge so the same
 	// (id, token, x, y) answer cannot be replayed against auth endpoints.
@@ -138,6 +141,14 @@ func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralS
 		return settings, err
 	}
 	return settings, nil
+}
+
+func (r *gormRepository) FindMediaByURL(ctx context.Context, url string) (*model.MediaFile, error) {
+	var media model.MediaFile
+	if err := r.db.WithContext(ctx).Where("url = ?", url).First(&media).Error; err != nil {
+		return nil, err
+	}
+	return &media, nil
 }
 
 func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error) {

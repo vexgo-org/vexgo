@@ -63,7 +63,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}, &model.MediaFile{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -480,25 +480,77 @@ func TestUpdateSettings(t *testing.T) {
 	}
 }
 
-func TestUpdateProfile_DeletesOldAvatar(t *testing.T) {
-	svc, files, db := newTestService(t)
-	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
-	u.Avatar = "/uploads/old-avatar.png"
-	if err := db.Save(&u).Error; err != nil {
-		t.Fatalf("failed to set avatar: %v", err)
+// seedMedia inserts a media_files row for the given owner and URL.
+func seedMedia(t *testing.T, db *gorm.DB, userID uint, url string) model.MediaFile {
+	t.Helper()
+	media := model.MediaFile{URL: url, UserID: userID, Type: "image/png"}
+	if err := db.Create(&media).Error; err != nil {
+		t.Fatalf("failed to seed media: %v", err)
 	}
+	return media
+}
 
-	newAvatar := "/uploads/new-avatar.png"
-	user, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar})
-	if err != nil {
-		t.Fatalf("UpdateProfile error: %v", err)
-	}
-	if user.Avatar != newAvatar {
-		t.Errorf("expected new avatar, got %s", user.Avatar)
-	}
-	if len(files.deleted) != 1 || files.deleted[0] != "/uploads/old-avatar.png" {
-		t.Errorf("expected old avatar deleted, got %v", files.deleted)
-	}
+func TestUpdateProfile_DeletesOldAvatar(t *testing.T) {
+	t.Run("owned media record is deleted", func(t *testing.T) {
+		svc, files, db := newTestService(t)
+		u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+		u.Avatar = "/uploads/old-avatar.png"
+		if err := db.Save(&u).Error; err != nil {
+			t.Fatalf("failed to set avatar: %v", err)
+		}
+		seedMedia(t, db, u.ID, "/uploads/old-avatar.png")
+
+		newAvatar := "/uploads/new-avatar.png"
+		user, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar})
+		if err != nil {
+			t.Fatalf("UpdateProfile error: %v", err)
+		}
+		if user.Avatar != newAvatar {
+			t.Errorf("expected new avatar, got %s", user.Avatar)
+		}
+		if len(files.deleted) != 1 || files.deleted[0] != "/uploads/old-avatar.png" {
+			t.Errorf("expected old avatar deleted, got %v", files.deleted)
+		}
+	})
+
+	// security: the stored avatar URL is client-controlled; pointing it at
+	// someone else's media (or an arbitrary S3 URL) must never trigger a
+	// delete of that object when the avatar changes again.
+	t.Run("media owned by another user is not deleted", func(t *testing.T) {
+		svc, files, db := newTestService(t)
+		u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+		other := seedUser(t, db, "bob@example.com", "password123", model.RoleGuest, true)
+		u.Avatar = "/uploads/victim.png"
+		if err := db.Save(&u).Error; err != nil {
+			t.Fatalf("failed to set avatar: %v", err)
+		}
+		seedMedia(t, db, other.ID, "/uploads/victim.png")
+
+		newAvatar := "/uploads/new-avatar.png"
+		if _, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar}); err != nil {
+			t.Fatalf("UpdateProfile error: %v", err)
+		}
+		if len(files.deleted) != 0 {
+			t.Errorf("expected no deletions, got %v", files.deleted)
+		}
+	})
+
+	t.Run("unknown URL is not deleted", func(t *testing.T) {
+		svc, files, db := newTestService(t)
+		u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+		u.Avatar = "https://bucket.s3.amazonaws.com/anything/secret.png"
+		if err := db.Save(&u).Error; err != nil {
+			t.Fatalf("failed to set avatar: %v", err)
+		}
+
+		newAvatar := "/uploads/new-avatar.png"
+		if _, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar}); err != nil {
+			t.Fatalf("UpdateProfile error: %v", err)
+		}
+		if len(files.deleted) != 0 {
+			t.Errorf("expected no deletions, got %v", files.deleted)
+		}
+	})
 }
 
 func TestResetPassword(t *testing.T) {

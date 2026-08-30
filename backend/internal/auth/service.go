@@ -455,17 +455,14 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		return nil, err
 	}
 
-	// If updating avatar, delete old avatar
+	// If updating avatar, delete the old avatar file — but only when it maps
+	// to a media record owned by this user. The stored URL is
+	// client-controlled (set by a previous profile update), and
+	// Storage.Delete resolves it back to a storage key (for S3, any key in
+	// the bucket), so deleting on faith would let a user wipe arbitrary
+	// objects by first pointing their avatar at them.
 	if req.Avatar != nil && *req.Avatar != user.Avatar && user.Avatar != "" {
-		// Delete old avatar file
-		if err := s.files.Delete(user.Avatar); err != nil {
-			// Log error but continue execution to avoid avatar update failure
-			slog.Warn(
-				"failed to delete old avatar",
-				"url", user.Avatar,
-				"err", err,
-			)
-		}
+		s.deleteOldAvatar(ctx, userID, user.Avatar)
 		user.Avatar = *req.Avatar
 	} else if req.Avatar != nil {
 		user.Avatar = *req.Avatar
@@ -484,6 +481,30 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		return nil, err
 	}
 	return user, nil
+}
+
+// deleteOldAvatar removes the file behind a replaced avatar when — and only
+// when — it is a media file owned by the acting user. Anything else
+// (external URLs, records that no longer exist, other users' files, DB
+// errors) is logged and skipped: the cleanup is best-effort and must never
+// widen into deleting unmanaged or third-party storage objects.
+func (s *Service) deleteOldAvatar(ctx context.Context, userID uint, url string) {
+	media, err := s.repo.FindMediaByURL(ctx, url)
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		slog.Warn("old avatar has no media record, skipping deletion", "userID", userID, "url", url)
+		return
+	case err != nil:
+		slog.Warn("failed to look up old avatar media record, skipping deletion", "userID", userID, "url", url, "err", err)
+		return
+	}
+	if media.UserID != userID {
+		slog.Warn("old avatar media record belongs to another user, skipping deletion", "userID", userID, "ownerID", media.UserID, "url", url)
+		return
+	}
+	if err := s.files.Delete(url); err != nil {
+		slog.Warn("failed to delete old avatar", "url", url, "err", err)
+	}
 }
 
 // ChangePassword verifies the old password and replaces it with the new one,
