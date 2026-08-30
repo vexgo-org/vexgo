@@ -40,6 +40,7 @@ export const zhCN = {
     confirmPassword: "确认密码",
     forgotPassword: "忘记密码",
     resetPassword: "重置密码",
+    reverify: "重新验证",
     currentPassword: "当前密码",
     newPassword: "新密码",
     username: "用户名",

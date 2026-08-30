@@ -429,16 +429,16 @@ export function RegisterPage() {
                     {t("registerPage.securityVerification")}
                   </Label>
                   {isCaptchaVerified && (
-                    <span className="text-xs text-green-600 flex items-center">
+                    <span className="text-xs text-green-600 dark:text-green-400 flex items-center">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       {t("registerPage.verifiedBadge")}
                     </span>
                   )}
                 </div>
-                <div className="border rounded-lg p-3 bg-gray-50">
+                <div className="border rounded-lg p-3 bg-muted/50">
                   {isCaptchaVerified ? (
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-green-600">
+                      <div className="flex items-center text-sm text-green-600 dark:text-green-400">
                         <CheckCircle className="h-4 w-4 mr-2" />
                         {t("registerPage.captchaCompleted")}
                       </div>
@@ -449,12 +449,12 @@ export function RegisterPage() {
                         onClick={resetCaptcha}
                         className="text-xs h-7"
                       >
-                        {t("auth.resetPassword")}
+                        {t("auth.reverify")}
                       </Button>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         {t("registerPage.completeSlider")}
                       </span>
                       <Button
