@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
-	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -20,6 +20,24 @@ import (
 )
 
 var testJWTSecret = []byte("test-secret-for-auth-tests")
+
+// seedCaptcha inserts a ready-to-use captcha challenge for login/register tests.
+func seedCaptcha(t *testing.T, db *gorm.DB, id, token string, x, y int) model.Captcha {
+	t.Helper()
+	captcha := model.Captcha{ID: id, Token: token, X: x, Y: y, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
+	if err := db.Create(&captcha).Error; err != nil {
+		t.Fatalf("failed to seed captcha: %v", err)
+	}
+	return captcha
+}
+
+// captchaGone reports whether the challenge has been consumed (deleted).
+func captchaGone(t *testing.T, db *gorm.DB, id string) bool {
+	t.Helper()
+	var count int64
+	db.Model(&model.Captcha{}).Where("id = ?", id).Count(&count)
+	return count == 0
+}
 
 // capturedEmails records emails captured by the mailer test seam.
 var capturedEmails []capturedEmail
@@ -45,7 +63,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}, &model.MediaFile{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -214,45 +232,47 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	}
 
 	// missing captcha y coordinate
-	captcha := model.Captcha{ID: "c1", Token: "t1", X: 100, Y: 50, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
-	if err := db.Create(&captcha).Error; err != nil {
-		t.Fatalf("failed to seed captcha: %v", err)
-	}
+	captcha := seedCaptcha(t, db, "c1", "t1", 100, 50)
+
 	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 0)); !errors.Is(err, ErrCaptchaRequired) {
 		t.Errorf("expected ErrCaptchaRequired for missing y, got %v", err)
 	}
 
-	// wrong x position
+	// wrong x position — the failed attempt consumes the challenge
 	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 10, 50)); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong x, got %v", err)
 	}
-
-	// wrong y position
-	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 20)); !errors.Is(err, ErrCaptchaMismatch) {
-		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
+	if !captchaGone(t, db, captcha.ID) {
+		t.Errorf("expected failed-attempt captcha to be invalidated")
 	}
 
-	// correct position passes
-	token, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 50))
+	// wrong y position (fresh challenge — the previous one was consumed)
+	c2 := seedCaptcha(t, db, "c1b", "t1b", 100, 50)
+	if _, _, err := svc.Login(context.Background(), loginReq("c1b", "t1b", 100, 20)); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
+	}
+	if !captchaGone(t, db, c2.ID) {
+		t.Errorf("expected failed-attempt captcha to be invalidated")
+	}
+
+	// correct position passes (fresh challenge)
+	seedCaptcha(t, db, "c1c", "t1c", 100, 50)
+	token, _, err := svc.Login(context.Background(), loginReq("c1c", "t1c", 100, 50))
 	if err != nil {
 		t.Fatalf("Login with captcha error: %v", err)
 	}
 	if token == "" {
 		t.Errorf("expected token")
 	}
-	// captcha marked used
-	var stored model.Captcha
-	if err := db.First(&stored, "id = ?", "c1").Error; err != nil {
-		t.Fatalf("failed to reload captcha: %v", err)
-	}
-	if !stored.Used {
-		t.Errorf("expected captcha marked as used")
+	// the challenge is consumed at the sensitive action, not merely marked used
+	if !captchaGone(t, db, "c1c") {
+		t.Errorf("expected consumed captcha to be deleted")
 	}
 
-	// The submit-time re-check is idempotent: an already-used captcha still
-	// passes here because the pre-verification on drop already marked it.
-	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 50)); err != nil {
-		t.Errorf("expected idempotent re-check to pass for used captcha, got %v", err)
+	// security: replaying the same (id, token, x, y) answer must fail — the
+	// consumed challenge no longer exists.
+	if _, _, err := svc.Login(context.Background(), loginReq("c1c", "t1c", 100, 50)); !errors.Is(err, ErrCaptchaNotFound) {
+		t.Errorf("expected ErrCaptchaNotFound for replayed captcha, got %v", err)
 	}
 }
 
@@ -320,8 +340,13 @@ func TestRegister_WithCaptcha(t *testing.T) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
 	}
 
-	// correct position passes
-	result, err := svc.Register(context.Background(), registerReq("c2", "t2", 80, 40))
+	// correct position passes (fresh challenge — the failed attempt consumed c2)
+	seedCaptcha(t, db, "c2b", "t2b", 80, 40)
+	result, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "new@example.com", Password: "password123", Username: "newbie",
+		CaptchaID: "c2b", CaptchaToken: "t2b", CaptchaX: 80, CaptchaY: 40,
+		Protocol: "http", Host: "localhost",
+	})
 	if err != nil {
 		t.Fatalf("Register with captcha error: %v", err)
 	}
@@ -455,25 +480,77 @@ func TestUpdateSettings(t *testing.T) {
 	}
 }
 
-func TestUpdateProfile_DeletesOldAvatar(t *testing.T) {
-	svc, files, db := newTestService(t)
-	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
-	u.Avatar = "/uploads/old-avatar.png"
-	if err := db.Save(&u).Error; err != nil {
-		t.Fatalf("failed to set avatar: %v", err)
+// seedMedia inserts a media_files row for the given owner and URL.
+func seedMedia(t *testing.T, db *gorm.DB, userID uint, url string) model.MediaFile {
+	t.Helper()
+	media := model.MediaFile{URL: url, UserID: userID, Type: "image/png"}
+	if err := db.Create(&media).Error; err != nil {
+		t.Fatalf("failed to seed media: %v", err)
 	}
+	return media
+}
 
-	newAvatar := "/uploads/new-avatar.png"
-	user, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar})
-	if err != nil {
-		t.Fatalf("UpdateProfile error: %v", err)
-	}
-	if user.Avatar != newAvatar {
-		t.Errorf("expected new avatar, got %s", user.Avatar)
-	}
-	if len(files.deleted) != 1 || files.deleted[0] != "/uploads/old-avatar.png" {
-		t.Errorf("expected old avatar deleted, got %v", files.deleted)
-	}
+func TestUpdateProfile_DeletesOldAvatar(t *testing.T) {
+	t.Run("owned media record is deleted", func(t *testing.T) {
+		svc, files, db := newTestService(t)
+		u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+		u.Avatar = "/uploads/old-avatar.png"
+		if err := db.Save(&u).Error; err != nil {
+			t.Fatalf("failed to set avatar: %v", err)
+		}
+		seedMedia(t, db, u.ID, "/uploads/old-avatar.png")
+
+		newAvatar := "/uploads/new-avatar.png"
+		user, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar})
+		if err != nil {
+			t.Fatalf("UpdateProfile error: %v", err)
+		}
+		if user.Avatar != newAvatar {
+			t.Errorf("expected new avatar, got %s", user.Avatar)
+		}
+		if len(files.deleted) != 1 || files.deleted[0] != "/uploads/old-avatar.png" {
+			t.Errorf("expected old avatar deleted, got %v", files.deleted)
+		}
+	})
+
+	// security: the stored avatar URL is client-controlled; pointing it at
+	// someone else's media (or an arbitrary S3 URL) must never trigger a
+	// delete of that object when the avatar changes again.
+	t.Run("media owned by another user is not deleted", func(t *testing.T) {
+		svc, files, db := newTestService(t)
+		u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+		other := seedUser(t, db, "bob@example.com", "password123", model.RoleGuest, true)
+		u.Avatar = "/uploads/victim.png"
+		if err := db.Save(&u).Error; err != nil {
+			t.Fatalf("failed to set avatar: %v", err)
+		}
+		seedMedia(t, db, other.ID, "/uploads/victim.png")
+
+		newAvatar := "/uploads/new-avatar.png"
+		if _, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar}); err != nil {
+			t.Fatalf("UpdateProfile error: %v", err)
+		}
+		if len(files.deleted) != 0 {
+			t.Errorf("expected no deletions, got %v", files.deleted)
+		}
+	})
+
+	t.Run("unknown URL is not deleted", func(t *testing.T) {
+		svc, files, db := newTestService(t)
+		u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+		u.Avatar = "https://bucket.s3.amazonaws.com/anything/secret.png"
+		if err := db.Save(&u).Error; err != nil {
+			t.Fatalf("failed to set avatar: %v", err)
+		}
+
+		newAvatar := "/uploads/new-avatar.png"
+		if _, err := svc.UpdateProfile(context.Background(), u.ID, UpdateProfileRequest{Avatar: &newAvatar}); err != nil {
+			t.Fatalf("UpdateProfile error: %v", err)
+		}
+		if len(files.deleted) != 0 {
+			t.Errorf("expected no deletions, got %v", files.deleted)
+		}
+	})
 }
 
 func TestResetPassword(t *testing.T) {
@@ -484,7 +561,7 @@ func TestResetPassword(t *testing.T) {
 		Email:             "alice@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "reset-token",
+		VerificationToken: tokenStorageForm("reset-token"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u).Error; err != nil {
@@ -496,6 +573,14 @@ func TestResetPassword(t *testing.T) {
 		t.Errorf("expected ErrInvalidResetToken, got %v", err)
 	}
 
+	// empty token must not resolve to an account whose token was cleared
+	if err := svc.ResetPassword(context.Background(), "", "newpass123"); !errors.Is(err, ErrInvalidResetToken) {
+		t.Errorf("expected ErrInvalidResetToken for empty token, got %v", err)
+	}
+	if _, err := svc.repo.FindUserByToken(context.Background(), ""); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("expected ErrRecordNotFound for empty token lookup, got %v", err)
+	}
+
 	// expired token (with the correct reset- prefix, so it reaches the
 	// expiry check instead of being rejected by the prefix check)
 	expiredAt := time.Now().Add(-1 * time.Minute)
@@ -504,7 +589,7 @@ func TestResetPassword(t *testing.T) {
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "reset-expired",
+		VerificationToken: tokenStorageForm("reset-expired"),
 		TokenExpiresAt:    &expiredAt,
 	}
 	if err := db.Create(&u2).Error; err != nil {
@@ -514,7 +599,7 @@ func TestResetPassword(t *testing.T) {
 		t.Errorf("expected ErrResetTokenExpired, got %v", err)
 	}
 
-	// success: token cleared
+	// success: token cleared and password version bumped (invalidates sessions)
 	if err := svc.ResetPassword(context.Background(), "reset-token", "newpass123"); err != nil {
 		t.Fatalf("ResetPassword error: %v", err)
 	}
@@ -524,6 +609,48 @@ func TestResetPassword(t *testing.T) {
 	}
 	if stored.VerificationToken != "" {
 		t.Errorf("expected token cleared")
+	}
+	if stored.PasswordVersion != u.PasswordVersion+1 {
+		t.Errorf("expected password version bumped from %d to %d, got %d",
+			u.PasswordVersion, u.PasswordVersion+1, stored.PasswordVersion)
+	}
+}
+
+// TestGenerateTokens_CryptoRandomAndPrefixed ensures the emailed account
+// tokens (reset / verification / email change) carry high entropy instead of
+// the former predictable "userID-nanotime" format, and keep their prefixes so
+// token kinds stay distinguishable.
+func TestGenerateTokens_CryptoRandomAndPrefixed(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	ctx := context.Background()
+
+	cases := []struct {
+		prefix string
+		gen    func(ctx context.Context, userID uint) (string, error)
+	}{
+		{model.TokenPrefixReset, svc.GeneratePasswordResetToken},
+		{model.TokenPrefixVerify, svc.GenerateVerificationToken},
+	}
+
+	for _, tc := range cases {
+		t1, err := tc.gen(ctx, 1)
+		if err != nil {
+			t.Fatalf("generate token error: %v", err)
+		}
+		t2, err := tc.gen(ctx, 1)
+		if err != nil {
+			t.Fatalf("generate token error: %v", err)
+		}
+
+		if !strings.HasPrefix(t1, tc.prefix) {
+			t.Errorf("expected prefix %q, got %q", tc.prefix, t1)
+		}
+		if t1 == t2 {
+			t.Errorf("expected two tokens for the same user to differ")
+		}
+		if len(t1) < len(tc.prefix)+43 { // 43 = base64url length of 32 bytes
+			t.Errorf("expected >= 256 bits of entropy, token too short: %q (%d chars)", t1, len(t1))
+		}
 	}
 }
 
@@ -537,7 +664,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 		Email:             "alice@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "verify-abc",
+		VerificationToken: tokenStorageForm("verify-abc"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u1).Error; err != nil {
@@ -553,7 +680,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: "email-change-abc",
+		VerificationToken: tokenStorageForm("email-change-abc"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u2).Error; err != nil {
@@ -566,7 +693,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 	// The rejected tokens are left untouched (not consumed).
 	for _, token := range []string{"verify-abc", "email-change-abc"} {
 		var stored model.User
-		if err := db.Where("verification_token = ?", token).First(&stored).Error; err != nil {
+		if err := db.Where("verification_token = ?", tokenStorageForm(token)).First(&stored).Error; err != nil {
 			t.Fatalf("token %q unexpectedly cleared: %v", token, err)
 		}
 	}
@@ -613,17 +740,16 @@ func captureEmails(t *testing.T) {
 }
 
 // extractToken pulls the token query parameter out of an emailed link.
-func extractToken(t *testing.T, link string) string {
+// emailedToken extracts the raw link token from a captured email's HTML body.
+// Raw tokens exist only in the email; the database holds their storage form
+// (see tokenStorageForm).
+func emailedToken(t *testing.T, email capturedEmail) string {
 	t.Helper()
-	u, err := url.Parse(link)
-	if err != nil {
-		t.Fatalf("failed to parse link %q: %v", link, err)
+	m := regexp.MustCompile(`token=([A-Za-z0-9_-]+)`).FindStringSubmatch(email.HTMLBody)
+	if m == nil {
+		t.Fatal("no token link in email body")
 	}
-	tok := u.Query().Get("token")
-	if tok == "" {
-		t.Fatalf("no token in link %q", link)
-	}
-	return tok
+	return m[1]
 }
 
 func TestRegister_SendsVerificationEmail(t *testing.T) {
@@ -656,17 +782,17 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 		t.Errorf("expected recipient username in email body")
 	}
 
+	tok := emailedToken(t, email)
+
 	var stored model.User
 	if err := db.First(&stored, result.User.ID).Error; err != nil {
 		t.Fatalf("reload user: %v", err)
 	}
-	wantLink := "https://example.com/verify-email?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected verification link %q in email body", wantLink)
+	if stored.VerificationToken != tokenStorageForm(tok) {
+		t.Errorf("expected only the token hash at rest, got %q", stored.VerificationToken)
 	}
 
 	// The emailed link actually verifies the address.
-	tok := extractToken(t, wantLink)
 	emailChange, _, err := svc.VerifyEmail(context.Background(), tok)
 	if err != nil {
 		t.Fatalf("VerifyEmail via link error: %v", err)
@@ -768,7 +894,7 @@ func TestResendVerification_NonVerifyTokensDoNotCoolDown(t *testing.T) {
 		Email:             "bob@example.com",
 		Password:          "hash",
 		Role:              model.RoleGuest,
-		VerificationToken: model.TokenPrefixReset + "abc",
+		VerificationToken: tokenStorageForm(model.TokenPrefixReset + "abc"),
 		TokenExpiresAt:    &expiresAt,
 	}
 	if err := db.Create(&u).Error; err != nil {
@@ -916,20 +1042,20 @@ func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
 		t.Errorf("expected new email in email body")
 	}
 
+	tok := emailedToken(t, email)
+	if !strings.HasPrefix(tok, model.TokenPrefixEmailChange) {
+		t.Fatalf("expected email-change token, got %q", tok)
+	}
+
 	var stored model.User
 	if err := db.First(&stored, u.ID).Error; err != nil {
 		t.Fatalf("reload user: %v", err)
 	}
-	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixEmailChange) {
-		t.Fatalf("expected email-change token, got %q", stored.VerificationToken)
-	}
-	wantLink := "https://example.com/verify-email?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected change link %q in email body", wantLink)
+	if stored.VerificationToken != tokenStorageForm(tok) {
+		t.Errorf("expected only the token hash at rest, got %q", stored.VerificationToken)
 	}
 
 	// The emailed link actually confirms the email change.
-	tok := extractToken(t, wantLink)
 	emailChange, newEmail, err := svc.VerifyEmail(context.Background(), tok)
 	if err != nil {
 		t.Fatalf("VerifyEmail via link error: %v", err)
@@ -963,20 +1089,20 @@ func TestRequestPasswordReset_SendsResetEmail(t *testing.T) {
 		t.Errorf("unexpected subject %q", email.Subject)
 	}
 
+	tok := emailedToken(t, email)
+	if !strings.HasPrefix(tok, model.TokenPrefixReset) {
+		t.Fatalf("expected reset token, got %q", tok)
+	}
+
 	var stored model.User
 	if err := db.First(&stored, u.ID).Error; err != nil {
 		t.Fatalf("reload user: %v", err)
 	}
-	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixReset) {
-		t.Fatalf("expected reset token, got %q", stored.VerificationToken)
-	}
-	wantLink := "https://example.com/reset-password?token=" + stored.VerificationToken
-	if !strings.Contains(email.TextBody, wantLink) || !strings.Contains(email.HTMLBody, wantLink) {
-		t.Errorf("expected reset link %q in email body", wantLink)
+	if stored.VerificationToken != tokenStorageForm(tok) {
+		t.Errorf("expected only the token hash at rest, got %q", stored.VerificationToken)
 	}
 
 	// The emailed link actually resets the password.
-	tok := extractToken(t, wantLink)
 	if err := svc.ResetPassword(context.Background(), tok, "brandnew123"); err != nil {
 		t.Fatalf("ResetPassword error: %v", err)
 	}
@@ -1011,7 +1137,7 @@ func TestVerifyEmail_Success(t *testing.T) {
 	u := model.User{
 		Username:          "alice",
 		Email:             "alice@example.com",
-		VerificationToken: "verify-abc",
+		VerificationToken: tokenStorageForm("verify-abc"),
 		TokenExpiresAt:    &expiresAt,
 		EmailVerified:     false,
 	}
@@ -1048,7 +1174,7 @@ func TestVerifyEmail_EmailChangeReturnsNewEmail(t *testing.T) {
 	u := model.User{
 		Username:          "alice",
 		Email:             "old@example.com",
-		VerificationToken: "email-change-abc",
+		VerificationToken: tokenStorageForm("email-change-abc"),
 		TokenExpiresAt:    &expiresAt,
 		PendingEmail:      "new@example.com",
 		EmailVerified:     true,
@@ -1086,7 +1212,7 @@ func TestVerifyEmail_RejectsResetToken(t *testing.T) {
 	u := model.User{
 		Username:          "alice",
 		Email:             "alice@example.com",
-		VerificationToken: "reset-abc",
+		VerificationToken: tokenStorageForm("reset-abc"),
 		TokenExpiresAt:    &expiresAt,
 		EmailVerified:     false,
 	}
@@ -1124,5 +1250,48 @@ func TestVerificationStatus(t *testing.T) {
 
 	if _, _, err := svc.VerificationStatus(context.Background(), 99999); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("expected ErrUserNotFound, got %v", err)
+	}
+}
+
+// TestTokens_OnlyHashesAreStored ensures the emailed account tokens exist in
+// the database only in their hashed storage form: a database leak must not
+// expose live one-time tokens, and the raw value must still resolve through
+// the hashed lookup.
+func TestTokens_OnlyHashesAreStored(t *testing.T) {
+	svc, _, db := newTestService(t)
+	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+
+	raw, err := svc.GenerateVerificationToken(context.Background(), u.ID)
+	if err != nil {
+		t.Fatalf("GenerateVerificationToken error: %v", err)
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if stored.VerificationToken == raw {
+		t.Error("raw token must not be stored in plaintext")
+	}
+	if !strings.HasPrefix(stored.VerificationToken, model.TokenPrefixVerify) {
+		t.Errorf("expected kind prefix preserved on stored hash, got %q", stored.VerificationToken)
+	}
+	hashPart := strings.TrimPrefix(stored.VerificationToken, model.TokenPrefixVerify)
+	if len(hashPart) != 64 { // hex-encoded SHA-256
+		t.Errorf("expected 64-char hex hash, got %d chars", len(hashPart))
+	}
+
+	// the raw token still resolves through the hashed lookup
+	user, err := svc.repo.FindUserByToken(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("FindUserByToken with raw token: %v", err)
+	}
+	if user.ID != u.ID {
+		t.Errorf("expected user %d, got %d", u.ID, user.ID)
+	}
+
+	// unknown tokens hash to something that matches nothing
+	if _, err := svc.repo.FindUserByToken(context.Background(), model.TokenPrefixVerify+"nope"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("expected ErrRecordNotFound for unknown token, got %v", err)
 	}
 }

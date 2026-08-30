@@ -3,6 +3,8 @@ package settings
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -502,5 +504,30 @@ func TestTestAI_UndecryptableKeyTreatedAsUnset(t *testing.T) {
 
 	if _, err := svc.TestAI(context.Background()); !errors.Is(err, ErrAIIncomplete) {
 		t.Errorf("expected ErrAIIncomplete for undecryptable key, got %v", err)
+	}
+}
+
+// TestThemePreview_RejectsEscapingPreviewPath ensures a malicious theme
+// metadata cannot make the public preview endpoint serve files outside the
+// theme directory (arbitrary file read).
+func TestThemePreview_RejectsEscapingPreviewPath(t *testing.T) {
+	svc, _ := newTestService(t)
+	dataDir := svc.themes.DataDir()
+
+	themeID := "evil"
+	themeDir := filepath.Join(dataDir, public.ThemesDir, themeID)
+	if err := os.MkdirAll(themeDir, 0o755); err != nil {
+		t.Fatalf("mkdir error: %v", err)
+	}
+	meta := `{"id": "evil", "preview": "../../secret.txt"}`
+	if err := os.WriteFile(filepath.Join(themeDir, public.ThemeMetaFile), []byte(meta), 0o600); err != nil {
+		t.Fatalf("write meta error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "secret.txt"), []byte("top secret"), 0o600); err != nil {
+		t.Fatalf("write secret error: %v", err)
+	}
+
+	if _, err := svc.ThemePreview(themeID); !errors.Is(err, ErrPreviewNotFound) {
+		t.Errorf("expected ErrPreviewNotFound for escaping preview path, got %v", err)
 	}
 }

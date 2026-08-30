@@ -31,8 +31,12 @@ func newTestService(t *testing.T) (*Service, *gorm.DB) {
 }
 
 func seedUser(t *testing.T, db *gorm.DB, username, email string) model.User {
+	return seedUserVerified(t, db, username, email, false)
+}
+
+func seedUserVerified(t *testing.T, db *gorm.DB, username, email string, verified bool) model.User {
 	t.Helper()
-	u := model.User{Username: username, Email: email, Role: model.RoleGuest}
+	u := model.User{Username: username, Email: email, Role: model.RoleGuest, EmailVerified: verified}
 	if err := db.Create(&u).Error; err != nil {
 		t.Fatalf("failed to seed user: %v", err)
 	}
@@ -79,12 +83,13 @@ func TestFindOrCreateUser_ExactBinding(t *testing.T) {
 
 func TestFindOrCreateUser_EmailMatch(t *testing.T) {
 	svc, db := newTestService(t)
-	u := seedUser(t, db, "bob", "bob@example.com")
+	u := seedUserVerified(t, db, "bob", "bob@example.com", true)
 
 	user, err := svc.FindOrCreateUser(context.Background(), "google", &ssoUserInfo{
-		providerID: "g-456",
-		username:   "Bobby",
-		email:      "bob@example.com",
+		providerID:    "g-456",
+		username:      "Bobby",
+		email:         "bob@example.com",
+		emailVerified: true,
 	})
 	if err != nil {
 		t.Fatalf("FindOrCreateUser error: %v", err)
@@ -101,6 +106,54 @@ func TestFindOrCreateUser_EmailMatch(t *testing.T) {
 	if binding.UserID != u.ID {
 		t.Errorf("expected binding to bob")
 	}
+}
+
+// TestFindOrCreateUser_EmailLinkRequiresVerifiedEmail ensures an SSO identity
+// carrying an unverified email cannot link to (and thereby take over) an
+// existing local account.
+func TestFindOrCreateUser_EmailLinkRequiresVerifiedEmail(t *testing.T) {
+	t.Run("provider email unverified", func(t *testing.T) {
+		svc, db := newTestService(t)
+		seedUserVerified(t, db, "bob", "bob@example.com", true)
+
+		_, err := svc.FindOrCreateUser(context.Background(), "google", &ssoUserInfo{
+			providerID:    "g-789",
+			username:      "Bobby",
+			email:         "bob@example.com",
+			emailVerified: false,
+		})
+		if err == nil {
+			t.Fatal("expected error for unverified provider email, got nil")
+		}
+
+		// no binding may have been created for the attacker identity
+		var bindings int64
+		db.Model(&model.SSOBinding{}).Where("provider_id = ?", "g-789").Count(&bindings)
+		if bindings != 0 {
+			t.Errorf("expected no binding, got %d", bindings)
+		}
+	})
+
+	t.Run("local account unverified", func(t *testing.T) {
+		svc, db := newTestService(t)
+		seedUserVerified(t, db, "bob", "bob@example.com", false)
+
+		_, err := svc.FindOrCreateUser(context.Background(), "google", &ssoUserInfo{
+			providerID:    "g-990",
+			username:      "Bobby",
+			email:         "bob@example.com",
+			emailVerified: true,
+		})
+		if err == nil {
+			t.Fatal("expected error for unverified local account, got nil")
+		}
+
+		var bindings int64
+		db.Model(&model.SSOBinding{}).Where("provider_id = ?", "g-990").Count(&bindings)
+		if bindings != 0 {
+			t.Errorf("expected no binding, got %d", bindings)
+		}
+	})
 }
 
 func TestFindOrCreateUser_AutoRegister(t *testing.T) {

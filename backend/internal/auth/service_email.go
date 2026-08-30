@@ -47,7 +47,9 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) (emailChange bo
 
 // ConfirmEmailChange confirms email change
 func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
-	slog.Debug("confirm email change processing started", "token", token)
+	// security: the token value must stay out of the logs — it is a live
+	// account-takeover credential until consumed.
+	slog.Debug("confirm email change processing started")
 
 	// Only email-change tokens may confirm an email change.
 	if !strings.HasPrefix(token, model.TokenPrefixEmailChange) {

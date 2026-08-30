@@ -168,8 +168,10 @@ func (r *Renderer) activeTheme() string {
 	return config.ActiveTheme
 }
 
-// isSafePath verifies that targetPath is within basePath
-func isSafePath(basePath, targetPath string) bool {
+// IsPathInside verifies that targetPath is within basePath. Exported because
+// other domains resolve untrusted paths against theme directories too (e.g.
+// settings theme previews) and must apply the same containment check.
+func IsPathInside(basePath, targetPath string) bool {
 	absBase, err := filepath.Abs(basePath)
 	if err != nil {
 		return false
@@ -216,7 +218,7 @@ func (r *Renderer) getFileContent(themeID, relativePath string) ([]byte, string,
 		}
 
 		themeBasePath := filepath.Join(r.dataDir, ThemesDir, themeID)
-		if !isSafePath(themeBasePath, cleanPath) {
+		if !IsPathInside(themeBasePath, cleanPath) {
 			return nil, "", false
 		}
 
@@ -293,9 +295,13 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 			return
 		}
 
-		// Server-side rendering: lookup by slug
+		// Server-side rendering: lookup by slug. Drafts, pending and rejected
+		// posts stay hidden — the SSR page must not expose them via a
+		// guessable slug when the API filters them out.
 		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
+		if err := r.db.Preload("Author").Preload("Tags").
+			Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
+			First(&post).Error; err != nil {
 			// Post not found, serve SPA so the frontend can render a 404 page.
 			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
 			return
@@ -323,9 +329,12 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 			return
 		}
 
-		// Server-side rendering: lookup by slug
+		// Server-side rendering: lookup by slug (published posts only, see the
+		// plural route above)
 		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
+		if err := r.db.Preload("Author").Preload("Tags").
+			Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
+			First(&post).Error; err != nil {
 			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
 			return
 		}

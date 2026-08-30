@@ -3,10 +3,41 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// redactedQueryParams are query parameters whose values are credentials and
+// must not end up in access logs.
+var redactedQueryParams = map[string]struct{}{
+	"token": {},
+}
+
+// sanitizeQuery strips credential-bearing query parameters (e.g. the emailed
+// verification / reset token in ?token=...) before the URL is logged.
+func sanitizeQuery(rawQuery string) string {
+	if rawQuery == "" {
+		return ""
+	}
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		// Unparseable query: drop it rather than risk logging a token.
+		return ""
+	}
+	redacted := false
+	for key := range values {
+		if _, sensitive := redactedQueryParams[key]; sensitive {
+			values[key] = []string{"[REDACTED]"}
+			redacted = true
+		}
+	}
+	if !redacted {
+		return rawQuery
+	}
+	return values.Encode()
+}
 
 // RequestLogger is a Gin middleware that logs HTTP requests and responses
 func RequestLogger() gin.HandlerFunc {
@@ -15,8 +46,7 @@ func RequestLogger() gin.HandlerFunc {
 
 		// Get request details
 		path := c.Request.URL.Path
-		raw := c.Request.URL.RawQuery
-		if raw != "" {
+		if raw := sanitizeQuery(c.Request.URL.RawQuery); raw != "" {
 			path += "?" + raw
 		}
 

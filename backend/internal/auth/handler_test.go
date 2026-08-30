@@ -288,10 +288,14 @@ func (errRepo) GetGeneralSettings(context.Context) (model.GeneralSettings, error
 	return model.GeneralSettings{}, nil
 }
 
+func (errRepo) FindMediaByURL(context.Context, string) (*model.MediaFile, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+
 func (errRepo) FindCaptcha(context.Context, string, string) (*model.Captcha, error) {
 	return nil, gorm.ErrRecordNotFound
 }
-func (errRepo) MarkCaptchaUsed(context.Context, string, string) error { return nil }
+func (errRepo) DeleteCaptcha(context.Context, string, string) error { return nil }
 func (errRepo) UpdateEmailChangeToken(context.Context, uint, string, string, time.Time) error {
 	return nil
 }

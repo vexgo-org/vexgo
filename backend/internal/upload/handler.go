@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -39,12 +40,34 @@ func getFileExtension(filename string) string {
 	return ext
 }
 
+// maxExtensionLength caps the client-supplied extension length so a hostile
+// filename cannot push the stored name past filesystem limits.
+const maxExtensionLength = 9
+
+// sanitizeExtension extracts the client-supplied extension and keeps it only
+// if it is 1-9 lowercase ASCII letters/digits. It is the only client-controlled
+// part of the stored filename, so anything else (separators, spaces, control
+// bytes, Windows ADS colons, overlong tails) means no extension at all.
+func sanitizeExtension(filename string) string {
+	ext := strings.TrimPrefix(getFileExtension(filename), ".")
+	if ext == "" || len(ext) > maxExtensionLength {
+		return ""
+	}
+	ext = strings.ToLower(ext)
+	for i := 0; i < len(ext); i++ {
+		c := ext[i]
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return ""
+		}
+	}
+	return "." + ext
+}
+
 // generateFilename generates a unique filename with extension
 func generateFilename(originalName string) string {
-	ext := getFileExtension(originalName)
 	uid := uuid.New().String()
-	if ext != "" {
-		return fmt.Sprintf("%s%s", uid, ext)
+	if ext := sanitizeExtension(originalName); ext != "" {
+		return uid + ext
 	}
 	return uid
 }

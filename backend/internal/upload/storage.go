@@ -3,6 +3,7 @@ package upload
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -139,17 +140,40 @@ func NewLocalStorage(dataDir string) *LocalStorage {
 	return &LocalStorage{dataDir: dataDir}
 }
 
+// mediaRoot opens an os.Root over the data directory. Every media file
+// operation goes through it so a hostile filename (absolute path, ".."
+// segment, volume name) can never resolve outside the media tree — the
+// containment is enforced at the OS level, not by string checks.
+func (s *LocalStorage) mediaRoot() (*os.Root, error) {
+	if err := os.MkdirAll(s.dataDir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+	root, err := os.OpenRoot(s.dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open data directory: %w", err)
+	}
+	return root, nil
+}
+
 // Upload writes the file to the local media directory.
 func (s *LocalStorage) Upload(reader io.Reader, filename, contentType string) (string, error) {
-	uploadDir := filepath.Join(s.dataDir, "media")
-	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-			return "", fmt.Errorf("failed to create upload directory: %w", err)
-		}
+	root, err := s.mediaRoot()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = root.Close() }()
+
+	// Reject path separators in the (server-generated) filename up front so
+	// the error message is accurate; os.Root would contain them anyway.
+	if strings.ContainsRune(filename, '/') || strings.ContainsRune(filename, '\\') {
+		return "", fmt.Errorf("invalid filename: %s", filename)
 	}
 
-	fullPath := filepath.Join(uploadDir, filename)
-	dst, err := os.Create(fullPath)
+	if err := root.MkdirAll("media", 0o755); err != nil {
+		return "", fmt.Errorf("failed to create upload directory: %w", err)
+	}
+
+	dst, err := root.Create("media/" + filename)
 	if err != nil {
 		return "", fmt.Errorf("failed to create file: %w", err)
 	}
@@ -165,16 +189,20 @@ func (s *LocalStorage) Upload(reader io.Reader, filename, contentType string) (s
 // Delete removes a local file identified by its /uploads/ URL. Missing files
 // are not an error.
 func (s *LocalStorage) Delete(url string) error {
+	root, err := s.mediaRoot()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+
 	filename := filepath.Base(url)
-	if filename == "" || filename == "/" {
+	if filename == "" || filename == "/" || filename == "." || filename == ".." ||
+		filename == string(filepath.Separator) {
 		return fmt.Errorf("invalid filename: %s", url)
 	}
 
-	path := filepath.Join(s.dataDir, "media", filename)
-	if _, err := os.Stat(path); err == nil {
-		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("failed to delete file: %w", err)
-		}
+	if err := root.Remove("media/" + filename); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to delete file: %w", err)
 	}
 	return nil
 }

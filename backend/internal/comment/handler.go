@@ -3,6 +3,7 @@ package comment
 import (
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -65,12 +66,25 @@ func (h *Handler) CreateComment(c *gin.Context) {
 	var postID uint
 	switch v := req.PostID.(type) {
 	case float64:
+		// JSON numbers decode as float64; reject out-of-range or negative
+		// values instead of letting the conversion wrap into garbage IDs.
+		if v < 1 || v > math.MaxUint32 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId"})
+			return
+		}
 		postID = uint(v)
 	case string:
-		if id64, err := strconv.ParseUint(v, 10, 64); err == nil {
-			postID = uint(id64)
+		id64, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId"})
+			return
 		}
+		postID = uint(id64)
 	case int:
+		if v < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId"})
+			return
+		}
 		postID = uint(v)
 	case uint:
 		postID = v

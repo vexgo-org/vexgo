@@ -2,6 +2,10 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -98,6 +102,10 @@ type Deps struct {
 	// BehindReverseProxy enables honoring X-Forwarded-Proto when BaseURL is
 	// not configured. Mirrors cfg.BehindReverseProxy / behind_reverse_proxy.
 	BehindReverseProxy bool
+	// RateLimitPerMinute caps unauthenticated auth requests (register, login,
+	// password reset, verification resend) per client IP per minute; 0 or less
+	// disables the limiter.
+	RateLimitPerMinute int
 }
 
 // FileRemover is an alias for model.FileRemover kept for backward compatibility.
@@ -449,17 +457,14 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		return nil, err
 	}
 
-	// If updating avatar, delete old avatar
+	// If updating avatar, delete the old avatar file — but only when it maps
+	// to a media record owned by this user. The stored URL is
+	// client-controlled (set by a previous profile update), and
+	// Storage.Delete resolves it back to a storage key (for S3, any key in
+	// the bucket), so deleting on faith would let a user wipe arbitrary
+	// objects by first pointing their avatar at them.
 	if req.Avatar != nil && *req.Avatar != user.Avatar && user.Avatar != "" {
-		// Delete old avatar file
-		if err := s.files.Delete(user.Avatar); err != nil {
-			// Log error but continue execution to avoid avatar update failure
-			slog.Warn(
-				"failed to delete old avatar",
-				"url", user.Avatar,
-				"err", err,
-			)
-		}
+		s.deleteOldAvatar(ctx, userID, user.Avatar)
 		user.Avatar = *req.Avatar
 	} else if req.Avatar != nil {
 		user.Avatar = *req.Avatar
@@ -478,6 +483,30 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		return nil, err
 	}
 	return user, nil
+}
+
+// deleteOldAvatar removes the file behind a replaced avatar when — and only
+// when — it is a media file owned by the acting user. Anything else
+// (external URLs, records that no longer exist, other users' files, DB
+// errors) is logged and skipped: the cleanup is best-effort and must never
+// widen into deleting unmanaged or third-party storage objects.
+func (s *Service) deleteOldAvatar(ctx context.Context, userID uint, url string) {
+	media, err := s.repo.FindMediaByURL(ctx, url)
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		slog.Warn("old avatar has no media record, skipping deletion", "userID", userID, "url", url)
+		return
+	case err != nil:
+		slog.Warn("failed to look up old avatar media record, skipping deletion", "userID", userID, "url", url, "err", err)
+		return
+	}
+	if media.UserID != userID {
+		slog.Warn("old avatar media record belongs to another user, skipping deletion", "userID", userID, "ownerID", media.UserID, "url", url)
+		return
+	}
+	if err := s.files.Delete(url); err != nil {
+		slog.Warn("failed to delete old avatar", "url", url, "err", err)
+	}
 }
 
 // ChangePassword verifies the old password and replaces it with the new one,
@@ -763,7 +792,7 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 			"tolerance", arg.Tolerance,
 			"email", arg.Email,
 		)
-		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
+		if err := s.repo.DeleteCaptcha(ctx, arg.ID, arg.Token); err != nil {
 			slog.Error(
 				"failed to invalidate captcha after mismatch",
 				"captchaID", arg.ID,
@@ -781,36 +810,75 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		"email", arg.Email,
 	)
 
-	// If captcha has not been used yet, mark it as used. The conditional
-	// update makes the claim atomic; an already-used captcha passes either
-	// way because the drop-time pre-verification marked it.
-	if !captcha.Used {
-		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
-			slog.Error(
-				"failed to mark captcha as used",
-				"captchaID", arg.ID,
-				"email", arg.Email,
-				"err", err,
-			)
-			return ErrCaptchaFailed
-		}
-		slog.Debug("captcha marked as used", "captchaID", arg.ID)
+	// Consume the challenge here, at the sensitive action it protects: the
+	// drop-time pre-verification (POST /api/captcha/verify) only marks it
+	// used, so without this deletion the same (id, token, x, y) answer could
+	// be replayed against login/register until the challenge expires.
+	if err := s.repo.DeleteCaptcha(ctx, arg.ID, arg.Token); err != nil {
+		slog.Error(
+			"failed to consume captcha after successful verification",
+			"captchaID", arg.ID,
+			"email", arg.Email,
+			"err", err,
+		)
+		return ErrCaptchaFailed
 	}
-	// If captcha already used, pre-verification successful, pass directly
 
 	return nil
 }
 
+// secureTokenEntropy is the number of random bytes in every emailed account
+// token (reset, verification, email change): 32 bytes give 256 bits, far above
+// the 128-bit floor for unguessable one-time tokens.
+const secureTokenEntropy = 32
+
+// generateSecureToken returns prefix + 256 bits of crypto/rand entropy encoded
+// as unpadded base64url. The token is emailed in this raw form; only its
+// storage form (see tokenStorageForm) is persisted.
+func generateSecureToken(prefix string) (string, error) {
+	b := make([]byte, secureTokenEntropy)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return prefix + base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// tokenStorageForm maps a raw emailed token to its at-rest representation:
+// the kind prefix followed by the SHA-256 of the rest. Only this form is
+// persisted, so a database leak does not expose live one-time tokens, and
+// lookups compare hashes instead of plaintext. The prefix is preserved so the
+// token-kind checks on stored values (e.g. the verification-resend cooldown)
+// keep working. Unknown tokens hash in full (empty prefix) and match nothing.
+func tokenStorageForm(rawToken string) string {
+	prefix := tokenKindPrefix(rawToken)
+	sum := sha256.Sum256([]byte(rawToken[len(prefix):]))
+	return prefix + hex.EncodeToString(sum[:])
+}
+
+// tokenKindPrefix returns the known account-token prefix of a raw token, or
+// "" for unrecognized input. Prefixes are matched longest-first because
+// TokenPrefixEmailChange contains an inner hyphen.
+func tokenKindPrefix(rawToken string) string {
+	for _, prefix := range []string{model.TokenPrefixEmailChange, model.TokenPrefixReset, model.TokenPrefixVerify} {
+		if strings.HasPrefix(rawToken, prefix) {
+			return prefix
+		}
+	}
+	return ""
+}
+
 // GeneratePasswordResetToken generates password reset token
 func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (string, error) {
-	// Generate random token
-	token := model.TokenPrefixReset + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+	token, err := generateSecureToken(model.TokenPrefixReset)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate password reset token: %w", err)
+	}
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database
-	if err := s.repo.UpdateUserToken(ctx, userID, token, expiresAt); err != nil {
+	if err := s.repo.UpdateUserToken(ctx, userID, tokenStorageForm(token), expiresAt); err != nil {
 		return "", fmt.Errorf("failed to save password reset token: %w", err)
 	}
 
@@ -819,14 +887,16 @@ func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (
 
 // GenerateEmailChangeToken generates email change verification token
 func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error) {
-	// Generate random token
-	token := model.TokenPrefixEmailChange + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+	token, err := generateSecureToken(model.TokenPrefixEmailChange)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate email change token: %w", err)
+	}
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database, also store pending new email
-	if err := s.repo.UpdateEmailChangeToken(ctx, userID, newEmail, token, expiresAt); err != nil {
+	if err := s.repo.UpdateEmailChangeToken(ctx, userID, newEmail, tokenStorageForm(token), expiresAt); err != nil {
 		return "", fmt.Errorf("failed to update email change token: %w", err)
 	}
 
@@ -834,14 +904,16 @@ func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, new
 }
 
 func (s *Service) GenerateVerificationToken(ctx context.Context, userID uint) (string, error) {
-	// Generate random token (should use more secure method in production)
-	token := model.TokenPrefixVerify + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+	token, err := generateSecureToken(model.TokenPrefixVerify)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate verification token: %w", err)
+	}
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Save to database
-	if err := s.repo.UpdateUserToken(ctx, userID, token, expiresAt); err != nil {
+	if err := s.repo.UpdateUserToken(ctx, userID, tokenStorageForm(token), expiresAt); err != nil {
 		return "", fmt.Errorf("failed to save verification token: %w", err)
 	}
 

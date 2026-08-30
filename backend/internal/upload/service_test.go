@@ -133,3 +133,42 @@ func TestDelete_PermissionsAndFileRemoval(t *testing.T) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
+
+// failingUserLookupRepo forces FindUserByID to fail with an unexpected error
+// to exercise the fail-closed authorization path in Delete.
+type failingUserLookupRepo struct {
+	Repository
+}
+
+func (f failingUserLookupRepo) FindUserByID(context.Context, uint) (*model.User, error) {
+	return nil, errors.New("database is unavailable")
+}
+
+// TestDelete_UserLookupFailureFailsClosed ensures a transient failure while
+// looking up the acting user can never bypass the ownership check: the delete
+// must fail, not proceed.
+func TestDelete_UserLookupFailureFailsClosed(t *testing.T) {
+	svc, _, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+
+	media, err := svc.Upload(context.Background(), owner.ID, "keep.jpg", 1, strings.NewReader("x"))
+	if err != nil {
+		t.Fatalf("Upload error: %v", err)
+	}
+
+	svc.repo = failingUserLookupRepo{Repository: svc.repo}
+
+	idStr := strconv.FormatUint(uint64(media.ID), 10)
+	if err := svc.Delete(context.Background(), idStr, owner.ID); err == nil || errors.Is(err, ErrForbidden) {
+		t.Errorf("expected a non-forbidden error (fail closed), got %v", err)
+	}
+
+	// the media record must still exist
+	var count int64
+	if err := db.Model(&model.MediaFile{}).Count(&count).Error; err != nil {
+		t.Fatalf("count error: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected media record preserved after failed delete, got %d", count)
+	}
+}

@@ -1,7 +1,10 @@
 package settings
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -222,5 +225,91 @@ func TestSMTPRoutes_TestSendWorksWithEncryptedPassword(t *testing.T) {
 	}
 	if capture.to != "to@example.com" {
 		t.Errorf("expected a captured test email to %q, got %q", "to@example.com", capture.to)
+	}
+}
+
+// buildThemeZip packs the given entries (name → content) into a zip archive.
+func buildThemeZip(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, content := range entries {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("zip create %q: %v", name, err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("zip write %q: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// doThemeUpload POSTs a zip to the admin theme upload endpoint.
+func doThemeUpload(t *testing.T, r *gin.Engine, token string, zipBytes []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, err := mw.CreateFormFile("theme", "theme.zip")
+	if err != nil {
+		t.Fatalf("multipart form file: %v", err)
+	}
+	if _, err := fw.Write(zipBytes); err != nil {
+		t.Fatalf("multipart write: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("multipart close: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/themes/upload", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// TestUploadTheme_RejectsZipSlipEntries ensures hostile zip entry names —
+// relative traversal, absolute paths and Windows-style traversal — are
+// rejected with 400 instead of being extracted.
+func TestUploadTheme_RejectsZipSlipEntries(t *testing.T) {
+	r, _, _ := newTestAdminRouter(t)
+	token := mintAdminToken(t)
+
+	for name, entry := range map[string]string{
+		"parent traversal":     "../evil.txt",
+		"nested traversal":     "assets/../../evil.txt",
+		"absolute path":        "/tmp/vexgo-evil.txt",
+		"windows traversal":    `..\..\evil.txt`,
+		"windows drive letter": `C:\vexgo-evil.txt`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			zipBytes := buildThemeZip(t, map[string]string{entry: "evil"})
+			w := doThemeUpload(t, r, token, zipBytes)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("expected 400 for entry %q, got %d: %s", entry, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestUploadTheme_AcceptsWellFormedZip exercises the happy path: a zip with a
+// valid vexgo-theme.json and nested assets installs successfully.
+func TestUploadTheme_AcceptsWellFormedZip(t *testing.T) {
+	r, _, _ := newTestAdminRouter(t)
+	token := mintAdminToken(t)
+
+	zipBytes := buildThemeZip(t, map[string]string{
+		"vexgo-theme.json":    `{"id": "testtheme", "name": "Test Theme"}`,
+		"assets/style.css":    "body {}",
+		"templates/home.html": "<html></html>",
+	})
+
+	w := doThemeUpload(t, r, token, zipBytes)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
@@ -16,6 +17,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// themeIDPattern is the allowlist for theme directory names coming from
+// uploaded theme metadata: letters, digits, underscore and dash only, so the
+// value can never traverse out of the themes directory.
+var themeIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Handler exposes the settings domain over HTTP.
 type Handler struct {
@@ -352,30 +358,42 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		return
 	}
 
-	// Extract the zip file
+	// Extract the zip file. Entry names are untrusted input: os.Root confines
+	// every created file to the extraction directory at the OS level, so
+	// absolute paths, ".." segments or volume names in entries cannot escape
+	// tempDir. The Clean/IsAbs/".." pre-check below only fails fast with a
+	// client-facing 400; the Root is the actual guarantee.
+	zipRoot, err := os.OpenRoot(tempDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare extraction directory"})
+		return
+	}
+	defer func() { _ = zipRoot.Close() }()
+
 	for _, f := range zipReader.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
 
 		// Ensure the file path is safe
-		if strings.Contains(f.Name, "..") {
+		clean := filepath.Clean(f.Name)
+		if filepath.IsAbs(clean) || strings.Contains(clean, "..") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
 			return
 		}
 
-		// Create the directory structure
-		filePath := filepath.Join(tempDir, f.Name)
-		dir := filepath.Dir(filePath)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory structure"})
-			return
+		// Create the directory structure inside the extraction root
+		if dir := filepath.Dir(clean); dir != "." {
+			if err := zipRoot.MkdirAll(dir, 0o755); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
+				return
+			}
 		}
 
 		// Extract the file
-		dstFile, err := os.Create(filePath)
+		dstFile, err := zipRoot.Create(clean)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
 			return
 		}
 
@@ -467,8 +485,11 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		}
 	}
 
-	// Ensure the theme ID is valid
-	if themeDir == "" || themeDir == public.DefaultTheme {
+	// Ensure the theme ID is valid. The ID may come from the uploaded
+	// vexgo-theme.json, so it is treated as untrusted input: anything but a
+	// plain directory name would make filepath.Join below escape the themes
+	// directory (arbitrary RemoveAll/MkdirAll/write).
+	if themeDir == "" || themeDir == public.DefaultTheme || !themeIDPattern.MatchString(themeDir) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
 		return
 	}

@@ -5,7 +5,9 @@ package app
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
@@ -81,6 +83,7 @@ func New(cfg *config.Config) (*App, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestLogger())
+	r.Use(middleware.SecurityHeaders())
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
 	slog.Info("base url set for server-side rendering", "baseURL", renderer.BaseURL())
@@ -136,11 +139,13 @@ func New(cfg *config.Config) (*App, error) {
 			Captcha:            captchaSvc,
 			BaseURL:            cfg.BaseURL,
 			BehindReverseProxy: cfg.BehindReverseProxy,
+			RateLimitPerMinute: cfg.AuthRateLimitPerMinute,
 		},
 		SSO: sso.Deps{
 			DB:        db,
 			SSO:       &cfg.SSO,
 			JWTSecret: cfg.JWTSecret,
+			Mailer:    mailerSvc,
 			BaseURL:   cfg.BaseURL,
 		},
 		Home: home.Deps{
@@ -161,10 +166,21 @@ func New(cfg *config.Config) (*App, error) {
 	return &App{cfg: cfg, db: db, engine: r}, nil
 }
 
-// Run starts the HTTP server.
+// Run starts the HTTP server. Explicit timeouts guard against slow-loris and
+// slow-body connection exhaustion, which the net/http defaults (no timeouts)
+// do not protect against.
 func (a *App) Run() error {
+	srv := &http.Server{
+		Addr:              a.cfg.GetListenAddr(),
+		Handler:           a.engine,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
 	slog.Info("starting server", "address", a.cfg.GetListenAddr())
-	return a.engine.Run(a.cfg.GetListenAddr())
+	return srv.ListenAndServe()
 }
 
 // initStorage returns the file storage backend: local disk by default, or an

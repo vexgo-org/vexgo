@@ -26,14 +26,7 @@ func NewHandler(deps Deps) *Handler {
 // GetUserList gets user list
 func (h *Handler) GetUserList(c *gin.Context) {
 	// Pagination parameters
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 10
-	}
+	page, limit := middleware.ParsePagination(c, 10)
 
 	search := c.DefaultQuery("search", "")
 
@@ -191,17 +184,9 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := middleware.ParsePagination(c, 10)
 	statusStr := c.DefaultQuery("status", string(model.CreatorApplicationStatusPending))
 	status := model.CreatorApplicationStatus(statusStr)
-
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 10
-	}
 
 	applications, total, err := h.svc.ListCreatorApplications(c.Request.Context(), ListCreatorApplicationsQuery{
 		ActorRole: actor.Role,

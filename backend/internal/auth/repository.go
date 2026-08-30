@@ -25,11 +25,13 @@ type Repository interface {
 	UpdateUserEmailVerified(ctx context.Context, userID uint) error
 	ResetPassword(ctx context.Context, userID uint, hashedPassword string) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
+	// FindMediaByURL looks up the media_files row behind a stored URL so
+	// avatar cleanup can verify ownership before deleting the file.
+	FindMediaByURL(ctx context.Context, url string) (*model.MediaFile, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
-	// MarkCaptchaUsed atomically flips used=false to true for the given
-	// challenge; the result is ignored because an already-used captcha is
-	// accepted idempotently at submit time.
-	MarkCaptchaUsed(ctx context.Context, id, token string) error
+	// DeleteCaptcha removes a consumed or rejected challenge so the same
+	// (id, token, x, y) answer cannot be replayed against auth endpoints.
+	DeleteCaptcha(ctx context.Context, id, token string) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
 }
 
@@ -72,8 +74,18 @@ func (r *gormRepository) FindUserByEmailExcluding(
 }
 
 func (r *gormRepository) FindUserByToken(ctx context.Context, token string) (*model.User, error) {
+	if token == "" {
+		// An empty lookup must never resolve: cleared tokens are stored as
+		// the empty sentinel, so a missing/empty parameter would otherwise
+		// match whichever account last cleared its token. (The hashing below
+		// already fails to match it; this guard is the explicit contract.)
+		return nil, gorm.ErrRecordNotFound
+	}
 	var user model.User
-	if err := r.db.WithContext(ctx).Where("verification_token = ?", token).First(&user).Error; err != nil {
+	// Tokens are stored hashed (tokenStorageForm); the presented raw token is
+	// hashed the same way before the lookup, so the plaintext never exists in
+	// the database.
+	if err := r.db.WithContext(ctx).Where("verification_token = ?", tokenStorageForm(token)).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -123,7 +135,11 @@ func (r *gormRepository) UpdateUserEmailVerified(ctx context.Context, userID uin
 func (r *gormRepository) ResetPassword(ctx context.Context, userID uint, hashedPassword string) error {
 	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
 		Updates(map[string]any{
-			"password":           hashedPassword,
+			"password": hashedPassword,
+			// Bumping the version invalidates every outstanding JWT issued
+			// before the reset (enforced by middleware.auth), so a stolen
+			// session cannot survive a password reset.
+			"password_version":   gorm.Expr("password_version + 1"),
 			"verification_token": "",
 			"token_expires_at":   time.Time{},
 		}).Error
@@ -137,6 +153,14 @@ func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralS
 	return settings, nil
 }
 
+func (r *gormRepository) FindMediaByURL(ctx context.Context, url string) (*model.MediaFile, error) {
+	var media model.MediaFile
+	if err := r.db.WithContext(ctx).Where("url = ?", url).First(&media).Error; err != nil {
+		return nil, err
+	}
+	return &media, nil
+}
+
 func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error) {
 	var captcha model.Captcha
 	if err := r.db.WithContext(ctx).Where("id = ? AND token = ?", id, token).First(&captcha).Error; err != nil {
@@ -145,10 +169,10 @@ func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*mo
 	return &captcha, nil
 }
 
-func (r *gormRepository) MarkCaptchaUsed(ctx context.Context, id, token string) error {
-	return r.db.WithContext(ctx).Model(&model.Captcha{}).
-		Where("id = ? AND token = ? AND used = ?", id, token, false).
-		Update("used", true).Error
+func (r *gormRepository) DeleteCaptcha(ctx context.Context, id, token string) error {
+	return r.db.WithContext(ctx).
+		Where("id = ? AND token = ?", id, token).
+		Delete(&model.Captcha{}).Error
 }
 
 func (r *gormRepository) UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error {
