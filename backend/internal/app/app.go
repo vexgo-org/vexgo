@@ -134,6 +134,7 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
 			Files:     storage,
+			Cache:     appCache,
 		},
 		Upload: upload.Deps{
 			DB:        db,
@@ -174,6 +175,7 @@ func New(cfg *config.Config) (*App, error) {
 		Home: home.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
+			Cache:     appCache,
 		},
 		Settings: settings.Deps{
 			DB:        db,
@@ -234,6 +236,8 @@ func initCache(cfg *config.Config) (cache.Cache, error) {
 var (
 	_ middleware.CounterStore = cache.Cache(nil)
 	_ sso.StateStore          = cache.Cache(nil)
+	_ post.ReadCache          = cache.Cache(nil)
+	_ home.ReadCache          = cache.Cache(nil)
 )
 
 // initStorage returns the file storage backend: local disk by default, or an

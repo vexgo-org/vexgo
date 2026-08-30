@@ -55,6 +55,24 @@ func TestValkeyCacheIncrAppliesTTLToNewCounterOnly(t *testing.T) {
 	}
 }
 
+func TestValkeyCacheIncrWithoutTTL(t *testing.T) {
+	c, mr := newTestValkey(t)
+	ctx := context.Background()
+
+	// A non-positive ttl must create a counter that never expires (the post
+	// cache generation counter relies on this).
+	if n, err := c.Incr(ctx, "gen", 0); err != nil || n != 1 {
+		t.Fatalf("Incr = %d, %v; want 1, nil", n, err)
+	}
+	if n, _ := c.Incr(ctx, "gen", 0); n != 2 {
+		t.Fatalf("second Incr = %d; want 2", n)
+	}
+	mr.FastForward(time.Hour)
+	if value, ok, _ := c.Get(ctx, "gen"); !ok || value != "2" {
+		t.Fatalf("Get(gen) after an hour = %q, %v; want 2, true", value, ok)
+	}
+}
+
 func TestValkeyCacheKeysAreNamespaced(t *testing.T) {
 	c, mr := newTestValkey(t)
 	if err := c.Set(context.Background(), "k", "v", 0); err != nil {

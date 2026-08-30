@@ -74,14 +74,19 @@ func (c *Valkey) GetDel(ctx context.Context, key string) (string, bool, error) {
 }
 
 // Incr atomically increments the counter stored at key, applying ttl only
-// when the call creates the counter (see incrScript).
+// when the call creates the counter (see incrScript). A non-positive ttl
+// increments a counter without expiration.
 func (c *Valkey) Incr(ctx context.Context, key string, ttl time.Duration) (int64, error) {
-	n, err := c.client.Do(ctx, c.client.B().Eval().
-		Script(incrScript).
-		Numkeys(1).
-		Key(keyPrefix+key).
-		Arg(strconv.FormatInt(ttl.Milliseconds(), 10)).
-		Build()).ToInt64()
+	cmd := c.client.B().Incr().Key(keyPrefix + key).Build()
+	if ttl > 0 {
+		cmd = c.client.B().Eval().
+			Script(incrScript).
+			Numkeys(1).
+			Key(keyPrefix + key).
+			Arg(strconv.FormatInt(ttl.Milliseconds(), 10)).
+			Build()
+	}
+	n, err := c.client.Do(ctx, cmd).ToInt64()
 	if err != nil {
 		return 0, fmt.Errorf("cache incr %q: %w", key, err)
 	}
