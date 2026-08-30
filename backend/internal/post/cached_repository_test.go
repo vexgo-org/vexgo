@@ -254,6 +254,47 @@ func TestCachedRepository_ListKeyHashesFilters(t *testing.T) {
 	}
 }
 
+// TestCachedRepository_CachedAuthorIsGuestFiltered checks that hidden profile
+// data never enters the cache: the backend may be a shared Valkey, so it must
+// only hold what an anonymous visitor could already see.
+func TestCachedRepository_CachedAuthorIsGuestFiltered(t *testing.T) {
+	ctx := context.Background()
+	r, repo, cache := newCachedFakeRepo()
+	repo.post.Author = model.User{
+		ID:                1,
+		Username:          "alice",
+		Email:             "alice@example.com",
+		Bio:               "secret bio",
+		HideEmail:         true,
+		HideBio:           true,
+		VerificationToken: "tok",
+	}
+
+	got, err := r.FindBySlug(ctx, "hello")
+	if err != nil {
+		t.Fatalf("FindBySlug: %v", err)
+	}
+	if got.Author.Email != "" || got.Author.Bio != "" {
+		t.Fatalf("returned author leaks hidden data: email=%q bio=%q", got.Author.Email, got.Author.Bio)
+	}
+	for key, value := range cache.values {
+		if strings.Contains(value, "alice@example.com") || strings.Contains(value, "secret bio") {
+			t.Fatalf("cached payload %q leaks hidden author data", key)
+		}
+		if strings.Contains(value, "tok") {
+			t.Fatalf("cached payload %q leaked the verification token", key)
+		}
+	}
+	// A cache hit decodes the already-filtered copy.
+	hit, err := r.FindBySlug(ctx, "hello")
+	if err != nil {
+		t.Fatalf("FindBySlug hit: %v", err)
+	}
+	if hit.Author.Email != "" || hit.Author.Username != "alice" {
+		t.Fatalf("cache hit lost or leaked author data: %+v", hit.Author)
+	}
+}
+
 func TestCachedRepository_PopularAndLatestCache(t *testing.T) {
 	ctx := context.Background()
 	r, repo, _ := newCachedFakeRepo()

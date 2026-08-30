@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -107,10 +108,26 @@ func listFilterKey(categoryID, status string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// sanitizeForCache applies guest-view privacy filtering to a post's author
+// before the row enters the cache. The cache backend may be a shared Valkey,
+// so it must only ever hold data an anonymous visitor could already see:
+// profile fields hidden from guests (email, birthday, bio, private profiles)
+// stay in the database. Cached read paths therefore serve the guest-filtered
+// author block to every viewer, including the author and admins, on hits and
+// misses alike. Account credentials and emailed-link tokens never serialize
+// in the first place (json:"-" on model.User).
+func sanitizeForCache(posts ...*model.Post) {
+	for _, post := range posts {
+		if post != nil {
+			auth.FilterUserByPrivacy(&post.Author, 0, "")
+		}
+	}
+}
+
 // FindBySlug serves the post by slug through the cache. The stored copy is
-// the pristine database row; per-request enrichment (privacy filtering, like
-// and comment counts) happens in the service on a freshly decoded copy.
-// Not-found lookups are never cached.
+// the pristine database row with guest-invisible author data stripped;
+// per-request enrichment (like and comment counts) happens in the service on
+// a freshly decoded copy. Not-found lookups are never cached.
 func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
 	key := fmt.Sprintf("post:g%s:slug:%s", r.generation(ctx), slug)
 	var post model.Post
@@ -122,6 +139,7 @@ func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.
 	if err != nil {
 		return post2, err
 	}
+	sanitizeForCache(post2)
 	r.setJSON(ctx, key, post2)
 	return post2, nil
 }
@@ -160,6 +178,9 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	if posts == nil {
 		posts = []model.Post{}
 	}
+	for i := range posts {
+		sanitizeForCache(&posts[i])
+	}
 	r.setJSON(ctx, key, listPage{Posts: posts, Total: total})
 	return posts, total, nil
 }
@@ -186,6 +207,9 @@ func (r *cachedRepository) Popular(ctx context.Context) ([]model.Post, error) {
 	if posts == nil {
 		posts = []model.Post{}
 	}
+	for i := range posts {
+		sanitizeForCache(&posts[i])
+	}
 	r.setJSON(ctx, key, posts)
 	return posts, nil
 }
@@ -211,6 +235,9 @@ func (r *cachedRepository) Latest(ctx context.Context, limit int) ([]model.Post,
 	}
 	if posts == nil {
 		posts = []model.Post{}
+	}
+	for i := range posts {
+		sanitizeForCache(&posts[i])
 	}
 	r.setJSON(ctx, key, posts)
 	return posts, nil
