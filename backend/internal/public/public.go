@@ -295,9 +295,13 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 			return
 		}
 
-		// Server-side rendering: lookup by slug
+		// Server-side rendering: lookup by slug. Drafts, pending and rejected
+		// posts stay hidden — the SSR page must not expose them via a
+		// guessable slug when the API filters them out.
 		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
+		if err := r.db.Preload("Author").Preload("Tags").
+			Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
+			First(&post).Error; err != nil {
 			// Post not found, serve SPA so the frontend can render a 404 page.
 			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
 			return
@@ -325,9 +329,12 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 			return
 		}
 
-		// Server-side rendering: lookup by slug
+		// Server-side rendering: lookup by slug (published posts only, see the
+		// plural route above)
 		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").Where("slug = ?", slug).First(&post).Error; err != nil {
+		if err := r.db.Preload("Author").Preload("Tags").
+			Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
+			First(&post).Error; err != nil {
 			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
 			return
 		}
