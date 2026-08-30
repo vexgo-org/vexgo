@@ -98,6 +98,14 @@ type Captcha struct {
 	ExpiresAt   time.Time
 }
 
+// VerifyArgs carries the inputs for one captcha verification.
+type VerifyArgs struct {
+	ID    string
+	Token string
+	X     int
+	Y     int
+}
+
 var (
 	builderOnce  sync.Once
 	slideBuilder slide.Builder
@@ -214,9 +222,9 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 
 // VerifyCaptcha verifies a sliding puzzle submission and marks the captcha as
 // used.
-func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x, y int) error {
+func (s *Service) VerifyCaptcha(ctx context.Context, args VerifyArgs) error {
 	// Query captcha
-	captcha, err := s.repo.FindCaptcha(ctx, id, token)
+	captcha, err := s.repo.FindCaptcha(ctx, args.ID, args.Token)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrCaptchaNotFound
@@ -240,8 +248,8 @@ func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x, y int)
 	// Verify the drop position on both axes within the tolerance padding.
 	// The challenge is one-shot: the first failed attempt invalidates it so
 	// the answer cannot be brute-forced within its lifetime.
-	if !slide.Validate(x, y, captcha.X, captcha.Y, verifyPadding) {
-		if _, err := s.repo.MarkCaptchaUsed(ctx, id, token); err != nil {
+	if !slide.Validate(args.X, args.Y, captcha.X, captcha.Y, verifyPadding) {
+		if _, err := s.repo.MarkCaptchaUsed(ctx, args.ID, args.Token); err != nil {
 			return err
 		}
 		return ErrCaptchaMismatch
@@ -249,7 +257,7 @@ func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x, y int)
 
 	// Atomically claim the challenge; losing the race means a concurrent
 	// request consumed it first.
-	claimed, err := s.repo.MarkCaptchaUsed(ctx, id, token)
+	claimed, err := s.repo.MarkCaptchaUsed(ctx, args.ID, args.Token)
 	if err != nil {
 		return err
 	}

@@ -66,7 +66,12 @@ func (h *Handler) VerifyCaptcha(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.VerifyCaptcha(c.Request.Context(), req.ID, req.Token, req.X, req.Y)
+	err := h.svc.VerifyCaptcha(c.Request.Context(), VerifyArgs{
+		ID:    req.ID,
+		Token: req.Token,
+		X:     req.X,
+		Y:     req.Y,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaNotFound):
