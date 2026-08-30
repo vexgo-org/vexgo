@@ -26,10 +26,9 @@ type Repository interface {
 	ResetPassword(ctx context.Context, userID uint, hashedPassword string) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
-	// MarkCaptchaUsed atomically flips used=false to true for the given
-	// challenge; the result is ignored because an already-used captcha is
-	// accepted idempotently at submit time.
-	MarkCaptchaUsed(ctx context.Context, id, token string) error
+	// DeleteCaptcha removes a consumed or rejected challenge so the same
+	// (id, token, x, y) answer cannot be replayed against auth endpoints.
+	DeleteCaptcha(ctx context.Context, id, token string) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
 }
 
@@ -123,7 +122,11 @@ func (r *gormRepository) UpdateUserEmailVerified(ctx context.Context, userID uin
 func (r *gormRepository) ResetPassword(ctx context.Context, userID uint, hashedPassword string) error {
 	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
 		Updates(map[string]any{
-			"password":           hashedPassword,
+			"password": hashedPassword,
+			// Bumping the version invalidates every outstanding JWT issued
+			// before the reset (enforced by middleware.auth), so a stolen
+			// session cannot survive a password reset.
+			"password_version":   gorm.Expr("password_version + 1"),
 			"verification_token": "",
 			"token_expires_at":   time.Time{},
 		}).Error
@@ -145,10 +148,10 @@ func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*mo
 	return &captcha, nil
 }
 
-func (r *gormRepository) MarkCaptchaUsed(ctx context.Context, id, token string) error {
-	return r.db.WithContext(ctx).Model(&model.Captcha{}).
-		Where("id = ? AND token = ? AND used = ?", id, token, false).
-		Update("used", true).Error
+func (r *gormRepository) DeleteCaptcha(ctx context.Context, id, token string) error {
+	return r.db.WithContext(ctx).
+		Where("id = ? AND token = ?", id, token).
+		Delete(&model.Captcha{}).Error
 }
 
 func (r *gormRepository) UpdateUserToken(ctx context.Context, userID uint, token string, expiresAt time.Time) error {

@@ -21,6 +21,24 @@ import (
 
 var testJWTSecret = []byte("test-secret-for-auth-tests")
 
+// seedCaptcha inserts a ready-to-use captcha challenge for login/register tests.
+func seedCaptcha(t *testing.T, db *gorm.DB, id, token string, x, y int) model.Captcha {
+	t.Helper()
+	captcha := model.Captcha{ID: id, Token: token, X: x, Y: y, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
+	if err := db.Create(&captcha).Error; err != nil {
+		t.Fatalf("failed to seed captcha: %v", err)
+	}
+	return captcha
+}
+
+// captchaGone reports whether the challenge has been consumed (deleted).
+func captchaGone(t *testing.T, db *gorm.DB, id string) bool {
+	t.Helper()
+	var count int64
+	db.Model(&model.Captcha{}).Where("id = ?", id).Count(&count)
+	return count == 0
+}
+
 // capturedEmails records emails captured by the mailer test seam.
 var capturedEmails []capturedEmail
 
@@ -214,45 +232,47 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	}
 
 	// missing captcha y coordinate
-	captcha := model.Captcha{ID: "c1", Token: "t1", X: 100, Y: 50, Width: 60, Height: 60, ExpiresAt: time.Now().Add(5 * time.Minute)}
-	if err := db.Create(&captcha).Error; err != nil {
-		t.Fatalf("failed to seed captcha: %v", err)
-	}
+	captcha := seedCaptcha(t, db, "c1", "t1", 100, 50)
+
 	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 0)); !errors.Is(err, ErrCaptchaRequired) {
 		t.Errorf("expected ErrCaptchaRequired for missing y, got %v", err)
 	}
 
-	// wrong x position
+	// wrong x position — the failed attempt consumes the challenge
 	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 10, 50)); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong x, got %v", err)
 	}
-
-	// wrong y position
-	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 20)); !errors.Is(err, ErrCaptchaMismatch) {
-		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
+	if !captchaGone(t, db, captcha.ID) {
+		t.Errorf("expected failed-attempt captcha to be invalidated")
 	}
 
-	// correct position passes
-	token, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 50))
+	// wrong y position (fresh challenge — the previous one was consumed)
+	c2 := seedCaptcha(t, db, "c1b", "t1b", 100, 50)
+	if _, _, err := svc.Login(context.Background(), loginReq("c1b", "t1b", 100, 20)); !errors.Is(err, ErrCaptchaMismatch) {
+		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
+	}
+	if !captchaGone(t, db, c2.ID) {
+		t.Errorf("expected failed-attempt captcha to be invalidated")
+	}
+
+	// correct position passes (fresh challenge)
+	seedCaptcha(t, db, "c1c", "t1c", 100, 50)
+	token, _, err := svc.Login(context.Background(), loginReq("c1c", "t1c", 100, 50))
 	if err != nil {
 		t.Fatalf("Login with captcha error: %v", err)
 	}
 	if token == "" {
 		t.Errorf("expected token")
 	}
-	// captcha marked used
-	var stored model.Captcha
-	if err := db.First(&stored, "id = ?", "c1").Error; err != nil {
-		t.Fatalf("failed to reload captcha: %v", err)
-	}
-	if !stored.Used {
-		t.Errorf("expected captcha marked as used")
+	// the challenge is consumed at the sensitive action, not merely marked used
+	if !captchaGone(t, db, "c1c") {
+		t.Errorf("expected consumed captcha to be deleted")
 	}
 
-	// The submit-time re-check is idempotent: an already-used captcha still
-	// passes here because the pre-verification on drop already marked it.
-	if _, _, err := svc.Login(context.Background(), loginReq("c1", "t1", 100, 50)); err != nil {
-		t.Errorf("expected idempotent re-check to pass for used captcha, got %v", err)
+	// security: replaying the same (id, token, x, y) answer must fail — the
+	// consumed challenge no longer exists.
+	if _, _, err := svc.Login(context.Background(), loginReq("c1c", "t1c", 100, 50)); !errors.Is(err, ErrCaptchaNotFound) {
+		t.Errorf("expected ErrCaptchaNotFound for replayed captcha, got %v", err)
 	}
 }
 
@@ -320,8 +340,13 @@ func TestRegister_WithCaptcha(t *testing.T) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
 	}
 
-	// correct position passes
-	result, err := svc.Register(context.Background(), registerReq("c2", "t2", 80, 40))
+	// correct position passes (fresh challenge — the failed attempt consumed c2)
+	seedCaptcha(t, db, "c2b", "t2b", 80, 40)
+	result, err := svc.Register(context.Background(), RegisterRequest{
+		Email: "new@example.com", Password: "password123", Username: "newbie",
+		CaptchaID: "c2b", CaptchaToken: "t2b", CaptchaX: 80, CaptchaY: 40,
+		Protocol: "http", Host: "localhost",
+	})
 	if err != nil {
 		t.Fatalf("Register with captcha error: %v", err)
 	}
@@ -514,7 +539,7 @@ func TestResetPassword(t *testing.T) {
 		t.Errorf("expected ErrResetTokenExpired, got %v", err)
 	}
 
-	// success: token cleared
+	// success: token cleared and password version bumped (invalidates sessions)
 	if err := svc.ResetPassword(context.Background(), "reset-token", "newpass123"); err != nil {
 		t.Fatalf("ResetPassword error: %v", err)
 	}
@@ -524,6 +549,48 @@ func TestResetPassword(t *testing.T) {
 	}
 	if stored.VerificationToken != "" {
 		t.Errorf("expected token cleared")
+	}
+	if stored.PasswordVersion != u.PasswordVersion+1 {
+		t.Errorf("expected password version bumped from %d to %d, got %d",
+			u.PasswordVersion, u.PasswordVersion+1, stored.PasswordVersion)
+	}
+}
+
+// TestGenerateTokens_CryptoRandomAndPrefixed ensures the emailed account
+// tokens (reset / verification / email change) carry high entropy instead of
+// the former predictable "userID-nanotime" format, and keep their prefixes so
+// token kinds stay distinguishable.
+func TestGenerateTokens_CryptoRandomAndPrefixed(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	ctx := context.Background()
+
+	cases := []struct {
+		prefix string
+		gen    func(ctx context.Context, userID uint) (string, error)
+	}{
+		{model.TokenPrefixReset, svc.GeneratePasswordResetToken},
+		{model.TokenPrefixVerify, svc.GenerateVerificationToken},
+	}
+
+	for _, tc := range cases {
+		t1, err := tc.gen(ctx, 1)
+		if err != nil {
+			t.Fatalf("generate token error: %v", err)
+		}
+		t2, err := tc.gen(ctx, 1)
+		if err != nil {
+			t.Fatalf("generate token error: %v", err)
+		}
+
+		if !strings.HasPrefix(t1, tc.prefix) {
+			t.Errorf("expected prefix %q, got %q", tc.prefix, t1)
+		}
+		if t1 == t2 {
+			t.Errorf("expected two tokens for the same user to differ")
+		}
+		if len(t1) < len(tc.prefix)+43 { // 43 = base64url length of 32 bytes
+			t.Errorf("expected >= 256 bits of entropy, token too short: %q (%d chars)", t1, len(t1))
+		}
 	}
 }
 

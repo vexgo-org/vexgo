@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -98,6 +100,10 @@ type Deps struct {
 	// BehindReverseProxy enables honoring X-Forwarded-Proto when BaseURL is
 	// not configured. Mirrors cfg.BehindReverseProxy / behind_reverse_proxy.
 	BehindReverseProxy bool
+	// RateLimitPerMinute caps unauthenticated auth requests (register, login,
+	// password reset, verification resend) per client IP per minute; 0 or less
+	// disables the limiter.
+	RateLimitPerMinute int
 }
 
 // FileRemover is an alias for model.FileRemover kept for backward compatibility.
@@ -763,7 +769,7 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 			"tolerance", arg.Tolerance,
 			"email", arg.Email,
 		)
-		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
+		if err := s.repo.DeleteCaptcha(ctx, arg.ID, arg.Token); err != nil {
 			slog.Error(
 				"failed to invalidate captcha after mismatch",
 				"captchaID", arg.ID,
@@ -781,30 +787,46 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		"email", arg.Email,
 	)
 
-	// If captcha has not been used yet, mark it as used. The conditional
-	// update makes the claim atomic; an already-used captcha passes either
-	// way because the drop-time pre-verification marked it.
-	if !captcha.Used {
-		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
-			slog.Error(
-				"failed to mark captcha as used",
-				"captchaID", arg.ID,
-				"email", arg.Email,
-				"err", err,
-			)
-			return ErrCaptchaFailed
-		}
-		slog.Debug("captcha marked as used", "captchaID", arg.ID)
+	// Consume the challenge here, at the sensitive action it protects: the
+	// drop-time pre-verification (POST /api/captcha/verify) only marks it
+	// used, so without this deletion the same (id, token, x, y) answer could
+	// be replayed against login/register until the challenge expires.
+	if err := s.repo.DeleteCaptcha(ctx, arg.ID, arg.Token); err != nil {
+		slog.Error(
+			"failed to consume captcha after successful verification",
+			"captchaID", arg.ID,
+			"email", arg.Email,
+			"err", err,
+		)
+		return ErrCaptchaFailed
 	}
-	// If captcha already used, pre-verification successful, pass directly
 
 	return nil
 }
 
+// secureTokenEntropy is the number of random bytes in every emailed account
+// token (reset, verification, email change): 32 bytes give 256 bits, far above
+// the 128-bit floor for unguessable one-time tokens.
+const secureTokenEntropy = 32
+
+// generateSecureToken returns prefix + 256 bits of crypto/rand entropy encoded
+// as unpadded base64url. The token is stored and looked up as-is (plaintext
+// column equality); the entropy — not the format — is what makes it
+// unguessable within its 5-minute window.
+func generateSecureToken(prefix string) (string, error) {
+	b := make([]byte, secureTokenEntropy)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return prefix + base64.RawURLEncoding.EncodeToString(b), nil
+}
+
 // GeneratePasswordResetToken generates password reset token
 func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (string, error) {
-	// Generate random token
-	token := model.TokenPrefixReset + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+	token, err := generateSecureToken(model.TokenPrefixReset)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate password reset token: %w", err)
+	}
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -819,8 +841,10 @@ func (s *Service) GeneratePasswordResetToken(ctx context.Context, userID uint) (
 
 // GenerateEmailChangeToken generates email change verification token
 func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, newEmail string) (string, error) {
-	// Generate random token
-	token := model.TokenPrefixEmailChange + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+	token, err := generateSecureToken(model.TokenPrefixEmailChange)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate email change token: %w", err)
+	}
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -834,8 +858,10 @@ func (s *Service) GenerateEmailChangeToken(ctx context.Context, userID uint, new
 }
 
 func (s *Service) GenerateVerificationToken(ctx context.Context, userID uint) (string, error) {
-	// Generate random token (should use more secure method in production)
-	token := model.TokenPrefixVerify + fmt.Sprintf("%d-%d", userID, time.Now().UnixNano())
+	token, err := generateSecureToken(model.TokenPrefixVerify)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate verification token: %w", err)
+	}
 
 	// Calculate expiration time (5 minutes from now)
 	expiresAt := time.Now().Add(5 * time.Minute)
