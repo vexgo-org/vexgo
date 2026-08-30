@@ -11,7 +11,7 @@ import (
 // behind the per-client-IP rate limit when one is configured.
 func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	routes := api
-	if limiter := middleware.NewRateLimiter(h.rateLimitPerMinute); limiter != nil {
+	if limiter := middleware.NewRateLimiter("captcha", h.rateLimitPerMinute, h.rateLimit); limiter != nil {
 		routes = api.Group("", limiter)
 	}
 	routes.GET("/captcha", h.GenerateCaptcha)

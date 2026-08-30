@@ -39,56 +39,117 @@ const (
 	stateExpire = 5 * time.Minute
 )
 
-type stateEntry struct {
-	ip      string
-	method  string
+// StateStore persists one-time OAuth state values until a deadline. It is
+// satisfied by the cache backends (internal/cache) without sso depending on
+// them; the in-process default below keeps single-instance deployments
+// working without configuration, while a distributed store lets multiple
+// instances share one state.
+type StateStore interface {
+	// Set stores value under key until the ttl elapses.
+	Set(ctx context.Context, key, value string, ttl time.Duration) error
+	// GetDel atomically retrieves and removes the value stored under key,
+	// enforcing one-time use.
+	GetDel(ctx context.Context, key string) (value string, ok bool, err error)
+}
+
+// stateValue binds a state to the client IP and the requested callback
+// method. Client IPs never contain the separator.
+type stateValue struct {
+	ip     string
+	method string
+}
+
+const stateValueSep = "|"
+
+func (v stateValue) encode() string {
+	return v.ip + stateValueSep + v.method
+}
+
+func decodeStateValue(raw string) (stateValue, bool) {
+	ip, method, found := strings.Cut(raw, stateValueSep)
+	if !found {
+		return stateValue{}, false
+	}
+	return stateValue{ip: ip, method: method}, true
+}
+
+// memoryStateStore keeps state values in the process. Expired entries are
+// swept on Set so abandoned flows cannot grow the map without bound.
+type memoryStateStore struct {
+	mu      sync.Mutex
+	entries map[string]memoryStateEntry
+}
+
+type memoryStateEntry struct {
+	value   string
 	expires time.Time
 }
 
-var (
-	stateMu    sync.Mutex
-	stateCache = make(map[string]stateEntry) // key: "provider_state"
-)
+func newMemoryStateStore() *memoryStateStore {
+	return &memoryStateStore{entries: make(map[string]memoryStateEntry)}
+}
+
+func (m *memoryStateStore) Set(_ context.Context, key, value string, ttl time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := time.Now()
+	for k, entry := range m.entries {
+		if now.After(entry.expires) {
+			delete(m.entries, k)
+		}
+	}
+	m.entries[key] = memoryStateEntry{value: value, expires: now.Add(ttl)}
+	return nil
+}
+
+// GetDel retrieves and removes the stored value in one step.
+func (m *memoryStateStore) GetDel(_ context.Context, key string) (string, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	entry, ok := m.entries[key]
+	delete(m.entries, key) // one-time use
+	if !ok || time.Now().After(entry.expires) {
+		return "", false, nil
+	}
+	return entry.value, true, nil
+}
 
 // generateState creates a random one-time state for CSRF protection and
 // stores it keyed by provider, bound to the client IP and requested method.
-// Expired entries are swept opportunistically so abandoned flows cannot grow
-// the cache without bound.
-func generateState(provider, ip, method string) (string, error) {
+func (s *Service) generateState(ctx context.Context, provider, ip, method string) (string, error) {
 	b := make([]byte, stateLength)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generate sso state: %w", err)
 	}
 	state := base64.URLEncoding.EncodeToString(b)[:stateLength]
-	key := provider + "_" + state
 
-	now := time.Now()
-	stateMu.Lock()
-	for k, entry := range stateCache {
-		if now.After(entry.expires) {
-			delete(stateCache, k)
-		}
+	value := stateValue{ip: ip, method: method}.encode()
+	if err := s.states.Set(ctx, provider+"_"+state, value, stateExpire); err != nil {
+		return "", fmt.Errorf("store sso state: %w", err)
 	}
-	stateCache[key] = stateEntry{ip: ip, method: method, expires: now.Add(stateExpire)}
-	stateMu.Unlock()
 	return state, nil
 }
 
 // verifyState consumes and validates a state previously issued by
-// generateState: it must exist, match the client IP and not be expired.
-// The stored method is returned on success.
-func verifyState(provider, ip, state string) (method string, ok bool) {
-	key := provider + "_" + state
-	stateMu.Lock()
-	entry, exists := stateCache[key]
-	if exists {
-		delete(stateCache, key) // one-time use
-	}
-	stateMu.Unlock()
-	if !exists || entry.ip != ip || time.Now().After(entry.expires) {
+// generateState: it must exist (one-time use), match the client IP and not be
+// expired. The stored method is returned on success. Store errors fail
+// closed, keeping CSRF protection intact during a backend outage.
+func (s *Service) verifyState(ctx context.Context, provider, ip, state string) (method string, ok bool) {
+	value, found, err := s.states.GetDel(ctx, provider+"_"+state)
+	if err != nil {
+		slog.Error("sso state store unavailable, rejecting callback", "err", err)
 		return "", false
 	}
-	return entry.method, true
+	if !found {
+		return "", false
+	}
+	v, ok := decodeStateValue(value)
+	if !ok || v.ip != ip {
+		return "", false
+	}
+	return v.method, true
 }
 
 // Deps holds the dependencies required by the sso domain.
@@ -104,6 +165,10 @@ type Deps struct {
 	// BaseURL is the public origin of this instance (cfg.BaseURL). When set,
 	// OAuth callback URLs are built from it instead of the request host.
 	BaseURL string
+
+	// StateStore persists one-time OAuth state values. nil keeps them
+	// in-process; a distributed store shares one state across instances.
+	StateStore StateStore
 }
 
 // Service contains the business logic of the sso domain.
@@ -113,11 +178,16 @@ type Service struct {
 	jwtSecret []byte
 	mailer    *mailer.Service
 	baseURL   string
+	states    StateStore
 }
 
 // NewService creates an sso service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret, mailer: deps.Mailer, baseURL: deps.BaseURL}
+	states := deps.StateStore
+	if states == nil {
+		states = newMemoryStateStore()
+	}
+	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret, mailer: deps.Mailer, baseURL: deps.BaseURL, states: states}
 }
 
 // linkableByEmail reports whether a local account may be linked to an SSO
@@ -164,7 +234,7 @@ func (s *Service) LoginRedirect(c *gin.Context, provider, method string) (authUR
 	}
 
 	redirectURI := s.callbackURI(c, provider)
-	state, err := generateState(provider, c.ClientIP(), method)
+	state, err := s.generateState(c.Request.Context(), provider, c.ClientIP(), method)
 	if err != nil {
 		return "", http.StatusInternalServerError, "failed to start login flow"
 	}
@@ -201,7 +271,7 @@ func (s *Service) LoginRedirect(c *gin.Context, provider, method string) (authUR
 // postMessage payload (either the provider-scoped sso_id for binding or the
 // issued JWT), or an error message when the exchange fails.
 func (s *Service) Callback(c *gin.Context, provider, state, code string) (payload map[string]string, message string) {
-	method, ok := verifyState(provider, c.ClientIP(), state)
+	method, ok := s.verifyState(c.Request.Context(), provider, c.ClientIP(), state)
 	if !ok {
 		return nil, "invalid or expired state parameter"
 	}

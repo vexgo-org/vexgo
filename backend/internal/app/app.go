@@ -3,6 +3,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/cache"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/config"
@@ -53,6 +55,24 @@ func New(cfg *config.Config) (*App, error) {
 	storage, err := initStorage(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init storage: %w", err)
+	}
+
+	appCache, err := initCache(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("init cache: %w", err)
+	}
+
+	// Distributed rate limiting only makes sense with a shared store; without
+	// valkey the endpoint groups keep their per-process in-memory budget.
+	var distributedRateLimit middleware.RateLimitStore
+	if cfg.ValkeyEnabled {
+		distributedRateLimit = middleware.NewFixedWindowRateLimitStore(appCache)
+	}
+	// The sso domain keeps its sweeping in-process state store without
+	// valkey; a distributed store shares one OAuth state across instances.
+	var ssoStateStore sso.StateStore
+	if cfg.ValkeyEnabled {
+		ssoStateStore = appCache
 	}
 
 	db, err := database.Open(cfg, cfg.DataDir)
@@ -130,6 +150,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:                 db,
 			JWTSecret:          cfg.JWTSecret,
 			RateLimitPerMinute: cfg.CaptchaRateLimitPerMinute,
+			RateLimit:          distributedRateLimit,
 		},
 		Auth: auth.Deps{
 			DB:                 db,
@@ -140,13 +161,15 @@ func New(cfg *config.Config) (*App, error) {
 			BaseURL:            cfg.BaseURL,
 			BehindReverseProxy: cfg.BehindReverseProxy,
 			RateLimitPerMinute: cfg.AuthRateLimitPerMinute,
+			RateLimit:          distributedRateLimit,
 		},
 		SSO: sso.Deps{
-			DB:        db,
-			SSO:       &cfg.SSO,
-			JWTSecret: cfg.JWTSecret,
-			Mailer:    mailerSvc,
-			BaseURL:   cfg.BaseURL,
+			DB:         db,
+			SSO:        &cfg.SSO,
+			JWTSecret:  cfg.JWTSecret,
+			Mailer:     mailerSvc,
+			BaseURL:    cfg.BaseURL,
+			StateStore: ssoStateStore,
 		},
 		Home: home.Deps{
 			DB:        db,
@@ -182,6 +205,36 @@ func (a *App) Run() error {
 	slog.Info("starting server", "address", a.cfg.GetListenAddr())
 	return srv.ListenAndServe()
 }
+
+// initCache returns the cache backend: an in-process memory cache by default,
+// or a Valkey (Redis-compatible) connection when valkey is enabled. Enabling
+// requires a reachable server: the connection is verified with a PING so
+// misconfiguration fails at startup instead of on first use.
+func initCache(cfg *config.Config) (cache.Cache, error) {
+	if !cfg.ValkeyEnabled {
+		slog.Info("using in-process cache")
+		return cache.NewMemory(), nil
+	}
+	if cfg.ValkeyURL == "" {
+		return nil, fmt.Errorf("valkey_enabled requires valkey_url to be set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	vc, err := cache.NewValkey(ctx, cfg.ValkeyURL)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("using valkey cache")
+	return vc, nil
+}
+
+// The cache backends satisfy the consumer-declared seams structurally, so the
+// consumers never import internal/cache.
+var (
+	_ middleware.CounterStore = cache.Cache(nil)
+	_ sso.StateStore          = cache.Cache(nil)
+)
 
 // initStorage returns the file storage backend: local disk by default, or an
 // S3-compatible storage when S3 is enabled in the config.

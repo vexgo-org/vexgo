@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/wenlng/go-captcha/v2/slide"
@@ -106,6 +107,9 @@ type Deps struct {
 	// password reset, verification resend) per client IP per minute; 0 or less
 	// disables the limiter.
 	RateLimitPerMinute int
+	// RateLimit stores the per-IP request budget. nil keeps it in-process; a
+	// distributed store shares one budget across instances.
+	RateLimit middleware.RateLimitStore
 }
 
 // FileRemover is an alias for model.FileRemover kept for backward compatibility.
