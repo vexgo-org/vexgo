@@ -23,6 +23,7 @@ import {
   Upload,
   Eye,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ThemeInfo {
   id: string;
@@ -159,268 +160,282 @@ export function ThemePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Palette className="w-8 h-8" />
-            {t("themePage.title")}
-          </h1>
-          <p className="text-gray-500 mt-2">{t("themePage.description")}</p>
-        </div>
-        <Button
-          onClick={handleUploadClick}
-          disabled={uploading}
-          className="flex items-center gap-2"
-        >
-          {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-          <Upload className="w-4 h-4" />
-          {t("themePage.uploadTheme")}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-      </div>
-
-      {message && (
-        <Alert
-          className={
-            message.type === "success"
-              ? "border-green-200 bg-green-50"
-              : "border-red-200 bg-red-50"
-          }
-        >
-          {message.type === "success" ? (
-            <Check className="w-4 h-4 text-green-600" />
-          ) : (
-            <AlertCircle className="w-4 h-4 text-red-600" />
-          )}
-          <AlertDescription
-            className={
-              message.type === "success" ? "text-green-800" : "text-red-800"
-            }
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Palette className="w-8 h-8" />
+              {t("themePage.title")}
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {t("themePage.description")}
+            </p>
+          </div>
+          <Button
+            onClick={handleUploadClick}
+            disabled={uploading}
+            className="flex items-center gap-2"
           >
-            {message.text}
-          </AlertDescription>
-        </Alert>
-      )}
+            {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+            <Upload className="w-4 h-4" />
+            {t("themePage.uploadTheme")}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {themes.length === 0 ? (
-          <Card className="col-span-full">
-            <CardContent className="pt-6">
-              <p className="text-center text-gray-500">
-                {t("themePage.noThemesFound")}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          themes.map((theme) => (
-            <Dialog key={theme.id}>
-              <DialogTrigger asChild>
-                <div
-                  className={`cursor-pointer transition-all hover:shadow-md ${activeTheme === theme.id ? "border-blue-500 border-2" : "border border-gray-200"} rounded-lg overflow-hidden bg-white`}
-                  onClick={() => setSelectedTheme(theme)}
-                >
-                  {theme.preview && (
-                    <div className="w-full h-48 overflow-hidden">
-                      <img
-                        src={`/api/theme/${theme.id}/preview`}
-                        alt={`${theme.name} preview`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                      <h3 className="font-semibold text-sm">{theme.name}</h3>
-                      {activeTheme === theme.id && (
-                        <Badge className="bg-blue-500 text-xs">
-                          {t("themePage.currentBadge")}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="space-y-1 text-xs text-gray-600 mb-4">
-                      <p>
-                        <span className="font-semibold">
-                          {t("themePage.author")}:
-                        </span>{" "}
-                        {theme.author}
-                      </p>
-                      <p>
-                        <span className="font-semibold">
-                          {t("themePage.version")}:
-                        </span>{" "}
-                        {theme.version}
-                      </p>
-                      {theme.description && (
-                        <p className="line-clamp-2">
-                          <span className="font-semibold">
-                            {t("themePage.themeDescription")}:
-                          </span>{" "}
-                          {theme.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="flex items-center gap-1 text-xs"
-                      >
-                        <Eye className="w-3 h-3" />
-                        {t("themePage.viewDetails")}
-                      </Button>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApplyTheme(theme.id);
-                        }}
-                        disabled={activeTheme === theme.id || applying !== null}
-                        variant={
-                          activeTheme === theme.id ? "secondary" : "default"
-                        }
-                        size="sm"
-                        className="text-xs"
-                      >
-                        {applying === theme.id && (
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        )}
-                        {activeTheme === theme.id
-                          ? t("themePage.applied")
-                          : t("themePage.applyTheme")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                {selectedTheme && (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center justify-between">
-                        {selectedTheme.name}
-                        {activeTheme === selectedTheme.id && (
-                          <Badge className="bg-blue-500">
-                            {t("themePage.currentBadge")}
-                          </Badge>
-                        )}
-                      </DialogTitle>
-                      <DialogDescription>
-                        <div className="space-y-2 text-sm">
-                          <p>
-                            <span className="font-semibold">
-                              {t("themePage.author")}:
-                            </span>{" "}
-                            {selectedTheme.author}
-                          </p>
-                          <p>
-                            <span className="font-semibold">
-                              {t("themePage.version")}:
-                            </span>{" "}
-                            {selectedTheme.version}
-                          </p>
-                          {selectedTheme.description && (
-                            <p>
-                              <span className="font-semibold">
-                                {t("themePage.themeDescription")}:
-                              </span>{" "}
-                              {selectedTheme.description}
-                            </p>
-                          )}
-                          {selectedTheme.url && (
-                            <p>
-                              <span className="font-semibold">
-                                {t("themePage.link")}:
-                              </span>
-                              <a
-                                href={selectedTheme.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 hover:underline break-all"
-                              >
-                                {selectedTheme.url}
-                              </a>
-                            </p>
-                          )}
-                        </div>
-                      </DialogDescription>
-                    </DialogHeader>
-                    {selectedTheme.preview && (
-                      <div className="mt-4">
+        {message && (
+          <Alert
+            className={cn(
+              message.type === "success"
+                ? "border-green-500/50 bg-green-500/10"
+                : "border-red-500/50 bg-red-500/10",
+            )}
+          >
+            {message.type === "success" ? (
+              <Check className="w-4 h-4 text-green-500" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-500" />
+            )}
+            <AlertDescription
+              className={cn(
+                message.type === "success" ? "text-green-500" : "text-red-500",
+              )}
+            >
+              {message.text}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {themes.length === 0 ? (
+            <Card className="col-span-full">
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">
+                  {t("themePage.noThemesFound")}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            themes.map((theme) => (
+              <Dialog key={theme.id}>
+                <DialogTrigger asChild>
+                  <div
+                    className={cn(
+                      "cursor-pointer transition-all hover:shadow-md rounded-lg overflow-hidden bg-card border",
+                      activeTheme === theme.id
+                        ? "border-primary border-2"
+                        : "border-border",
+                    )}
+                    onClick={() => setSelectedTheme(theme)}
+                  >
+                    {theme.preview && (
+                      <div className="w-full h-48 overflow-hidden">
                         <img
-                          src={`/api/theme/${selectedTheme.id}/preview`}
-                          alt={`${selectedTheme.name} preview`}
-                          className="w-full h-auto rounded-md shadow-sm"
+                          src={`/api/theme/${theme.id}/preview`}
+                          alt={`${theme.name} preview`}
+                          className="w-full h-full object-cover"
                         />
                       </div>
                     )}
-                    <div className="mt-6 flex justify-end">
-                      <Button
-                        onClick={() => handleApplyTheme(selectedTheme.id)}
-                        disabled={
-                          activeTheme === selectedTheme.id || applying !== null
-                        }
-                        variant={
-                          activeTheme === selectedTheme.id
-                            ? "secondary"
-                            : "default"
-                        }
-                      >
-                        {applying === selectedTheme.id && (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <div className="p-4">
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                        <h3 className="font-semibold text-sm">{theme.name}</h3>
+                        {activeTheme === theme.id && (
+                          <Badge className="bg-primary text-primary-foreground text-xs">
+                            {t("themePage.currentBadge")}
+                          </Badge>
                         )}
-                        {activeTheme === selectedTheme.id
-                          ? t("themePage.applied")
-                          : t("themePage.applyTheme")}
-                      </Button>
+                      </div>
+                      <div className="space-y-1 text-xs text-muted-foreground mb-4">
+                        <p>
+                          <span className="font-semibold">
+                            {t("themePage.author")}:
+                          </span>{" "}
+                          {theme.author}
+                        </p>
+                        <p>
+                          <span className="font-semibold">
+                            {t("themePage.version")}:
+                          </span>{" "}
+                          {theme.version}
+                        </p>
+                        {theme.description && (
+                          <p className="line-clamp-2">
+                            <span className="font-semibold">
+                              {t("themePage.themeDescription")}:
+                            </span>{" "}
+                            {theme.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="flex items-center gap-1 text-xs"
+                        >
+                          <Eye className="w-3 h-3" />
+                          {t("themePage.viewDetails")}
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApplyTheme(theme.id);
+                          }}
+                          disabled={
+                            activeTheme === theme.id || applying !== null
+                          }
+                          variant={
+                            activeTheme === theme.id ? "secondary" : "default"
+                          }
+                          size="sm"
+                          className="text-xs"
+                        >
+                          {applying === theme.id && (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          )}
+                          {activeTheme === theme.id
+                            ? t("themePage.applied")
+                            : t("themePage.applyTheme")}
+                        </Button>
+                      </div>
                     </div>
-                  </>
-                )}
-              </DialogContent>
-            </Dialog>
-          ))
-        )}
-      </div>
+                  </div>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  {selectedTheme && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center justify-between">
+                          {selectedTheme.name}
+                          {activeTheme === selectedTheme.id && (
+                            <Badge className="bg-primary text-primary-foreground">
+                              {t("themePage.currentBadge")}
+                            </Badge>
+                          )}
+                        </DialogTitle>
+                        <DialogDescription>
+                          <div className="space-y-2 text-sm">
+                            <p>
+                              <span className="font-semibold">
+                                {t("themePage.author")}:
+                              </span>{" "}
+                              {selectedTheme.author}
+                            </p>
+                            <p>
+                              <span className="font-semibold">
+                                {t("themePage.version")}:
+                              </span>{" "}
+                              {selectedTheme.version}
+                            </p>
+                            {selectedTheme.description && (
+                              <p>
+                                <span className="font-semibold">
+                                  {t("themePage.themeDescription")}:
+                                </span>{" "}
+                                {selectedTheme.description}
+                              </p>
+                            )}
+                            {selectedTheme.url && (
+                              <p>
+                                <span className="font-semibold">
+                                  {t("themePage.link")}:
+                                </span>
+                                <a
+                                  href={selectedTheme.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline break-all"
+                                >
+                                  {selectedTheme.url}
+                                </a>
+                              </p>
+                            )}
+                          </div>
+                        </DialogDescription>
+                      </DialogHeader>
+                      {selectedTheme.preview && (
+                        <div className="mt-4">
+                          <img
+                            src={`/api/theme/${selectedTheme.id}/preview`}
+                            alt={`${selectedTheme.name} preview`}
+                            className="w-full h-auto rounded-md shadow-sm"
+                          />
+                        </div>
+                      )}
+                      <div className="mt-6 flex justify-end">
+                        <Button
+                          onClick={() => handleApplyTheme(selectedTheme.id)}
+                          disabled={
+                            activeTheme === selectedTheme.id ||
+                            applying !== null
+                          }
+                          variant={
+                            activeTheme === selectedTheme.id
+                              ? "secondary"
+                              : "default"
+                          }
+                        >
+                          {applying === selectedTheme.id && (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          )}
+                          {activeTheme === selectedTheme.id
+                            ? t("themePage.applied")
+                            : t("themePage.applyTheme")}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
+            ))
+          )}
+        </div>
 
-      <Card className="bg-blue-50 border-blue-200">
-        <CardHeader>
-          <CardTitle className="text-blue-900">
-            {t("themePage.installationInstructions")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-blue-800 space-y-2">
-          <p>
-            <strong>{t("themePage.method1.title")}</strong>
-          </p>
-          <p>{t("themePage.method1.step1")}</p>
-          <p>{t("themePage.method1.step2")}</p>
-          <p>{t("themePage.method1.step3")}</p>
-          <p className="mt-4">
-            <strong>{t("themePage.method2.title")}</strong>
-          </p>
-          <p>
-            1. {t("themePage.instruction1")}{" "}
-            <code className="bg-white px-2 py-1 rounded">./data/theme/</code>{" "}
-            {t("themePage.instruction2")}
-          </p>
-          <p>
-            2. {t("themePage.instruction3")}{" "}
-            <code className="bg-white px-2 py-1 rounded">vexgo-theme.json</code>{" "}
-            {t("themePage.instruction4")}
-          </p>
-          <p>
-            3. {t("themePage.instruction5")}{" "}
-            <code className="bg-white px-2 py-1 rounded">dist/</code>{" "}
-            {t("themePage.instruction6")}
-          </p>
-          <p>4. {t("themePage.instruction7")}</p>
-        </CardContent>
-      </Card>
+        <Card className="bg-muted border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground">
+              {t("themePage.installationInstructions")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-foreground space-y-2">
+            <p>
+              <strong>{t("themePage.method1.title")}</strong>
+            </p>
+            <p>{t("themePage.method1.step1")}</p>
+            <p>{t("themePage.method1.step2")}</p>
+            <p>{t("themePage.method1.step3")}</p>
+            <p className="mt-4">
+              <strong>{t("themePage.method2.title")}</strong>
+            </p>
+            <p>
+              1. {t("themePage.instruction1")}{" "}
+              <code className="bg-muted px-2 py-1 rounded">./data/theme/</code>{" "}
+              {t("themePage.instruction2")}
+            </p>
+            <p>
+              2. {t("themePage.instruction3")}{" "}
+              <code className="bg-muted px-2 py-1 rounded">
+                vexgo-theme.json
+              </code>{" "}
+              {t("themePage.instruction4")}
+            </p>
+            <p>
+              3. {t("themePage.instruction5")}{" "}
+              <code className="bg-muted px-2 py-1 rounded">dist/</code>{" "}
+              {t("themePage.instruction6")}
+            </p>
+            <p>4. {t("themePage.instruction7")}</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
