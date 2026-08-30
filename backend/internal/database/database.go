@@ -156,7 +156,10 @@ func openPostgres(cfg *config.Config) (*gorm.DB, error) {
 
 // openSQLite connects to an SQLite database stored in dataDir.
 func openSQLite(dataDir string) (*gorm.DB, error) {
-	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+	// 0750: the directory holds blog.db (user credentials, sessions, private
+	// posts), so it must not be group/world traversable. MkdirAll is a no-op
+	// for an existing directory, so this only affects fresh deployments.
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)
 	}
 	dbPath := filepath.Join(dataDir, "blog.db")
