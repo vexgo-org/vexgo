@@ -694,6 +694,7 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// Check if captcha verification is enabled
 	captchaEnabled, err := s.captchaEnabled(ctx)
 	if err != nil {
+		slog.Error("failed to check captcha settings", "err", err)
 		return ErrCaptchaCheckFailed
 	}
 
@@ -717,12 +718,23 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// Query captcha
 	captcha, err := s.repo.FindCaptcha(ctx, arg.ID, arg.Token)
 	if err != nil {
-		slog.Warn(
-			"captcha verification failed: captcha not found or invalid token",
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Warn(
+				"captcha verification failed: captcha not found or invalid token",
+				"captchaID", arg.ID,
+				"email", arg.Email,
+			)
+			return ErrCaptchaNotFound
+		}
+		// Unexpected lookup failure: report it as an internal error instead
+		// of masquerading as a missing challenge.
+		slog.Error(
+			"captcha verification failed: captcha lookup error",
 			"captchaID", arg.ID,
 			"email", arg.Email,
+			"err", err,
 		)
-		return ErrCaptchaNotFound
+		return ErrCaptchaFailed
 	}
 
 	// Check if expired

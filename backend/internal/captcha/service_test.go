@@ -241,6 +241,28 @@ func TestGenerateCaptcha_CleansUpExpired(t *testing.T) {
 	}
 }
 
+// failingLookupRepo forces FindCaptcha to fail with a non-not-found error to
+// exercise the internal-error path.
+type failingLookupRepo struct {
+	Repository
+}
+
+func (f failingLookupRepo) FindCaptcha(context.Context, string, string) (*model.Captcha, error) {
+	return nil, errors.New("database is unavailable")
+}
+
+// TestVerifyCaptcha_DbFailureFailsClosed checks that an unexpected lookup
+// failure is reported as an internal error instead of masquerading as a
+// missing challenge.
+func TestVerifyCaptcha_DbFailureFailsClosed(t *testing.T) {
+	svc, _ := newTestService(t)
+	svc.repo = failingLookupRepo{Repository: svc.repo}
+
+	if err := svc.VerifyCaptcha(context.Background(), "id", "token", 10, 10); !errors.Is(err, ErrCaptchaFailed) {
+		t.Errorf("expected ErrCaptchaFailed on lookup failure, got %v", err)
+	}
+}
+
 func TestVerifyCaptcha_ToleranceBounded(t *testing.T) {
 	svc, db := newTestService(t)
 	captcha, err := svc.GenerateCaptcha(context.Background())

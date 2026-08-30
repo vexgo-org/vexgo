@@ -42,6 +42,9 @@ var (
 	ErrCaptchaExpired = errors.New("captcha has expired")
 	// ErrCaptchaMismatch means the submitted puzzle position is wrong.
 	ErrCaptchaMismatch = errors.New("captcha mismatch")
+	// ErrCaptchaFailed means the captcha could not be verified due to an
+	// internal error, as opposed to a wrong submission.
+	ErrCaptchaFailed = errors.New("captcha verification failed")
 	// ErrEncodeBgImage means the background image could not be encoded.
 	ErrEncodeBgImage = errors.New("encode background image")
 	// ErrEncodePuzzleImage means the puzzle image could not be encoded.
@@ -187,7 +190,7 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 		Used:      false,
 	}
 	if err := s.repo.CreateCaptcha(ctx, &captcha); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("persist captcha: %w", err)
 	}
 
 	// Opportunistic housekeeping: drop challenges that are no longer valid,
@@ -215,7 +218,13 @@ func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x, y int)
 	// Query captcha
 	captcha, err := s.repo.FindCaptcha(ctx, id, token)
 	if err != nil {
-		return ErrCaptchaNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrCaptchaNotFound
+		}
+		// Unexpected lookup failure: report it as an internal error instead
+		// of masquerading as a missing challenge.
+		slog.Error("captcha lookup failed", "err", err)
+		return ErrCaptchaFailed
 	}
 
 	// Check if already used

@@ -31,7 +31,7 @@ func (h *Handler) GenerateCaptcha(c *gin.Context) {
 		case errors.Is(err, ErrEncodePuzzleImage):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode puzzle image"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save captcha"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate captcha"})
 		}
 		return
 	}

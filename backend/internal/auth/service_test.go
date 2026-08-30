@@ -245,6 +245,34 @@ func TestLogin_WithCaptcha(t *testing.T) {
 	}
 }
 
+// failingCaptchaLookupRepo forces FindCaptcha to fail with a non-not-found
+// error to exercise the internal-error path.
+type failingCaptchaLookupRepo struct {
+	Repository
+}
+
+func (f failingCaptchaLookupRepo) FindCaptcha(context.Context, string, string) (*model.Captcha, error) {
+	return nil, errors.New("database is unavailable")
+}
+
+// TestLogin_CaptchaLookupFailureFailsClosed checks that an unexpected captcha
+// lookup failure surfaces as ErrCaptchaFailed instead of masquerading as a
+// missing challenge.
+func TestLogin_CaptchaLookupFailureFailsClosed(t *testing.T) {
+	svc, _, db := newTestService(t)
+	if err := db.Create(&model.GeneralSettings{CaptchaEnabled: true}).Error; err != nil {
+		t.Fatalf("failed to enable captcha: %v", err)
+	}
+	svc.repo = failingCaptchaLookupRepo{Repository: svc.repo}
+
+	if _, _, err := svc.Login(context.Background(), LoginRequest{
+		Email: "alice@example.com", Password: "password123",
+		CaptchaID: "c1", CaptchaToken: "t1", CaptchaX: 100, CaptchaY: 50,
+	}); !errors.Is(err, ErrCaptchaFailed) {
+		t.Errorf("expected ErrCaptchaFailed on captcha lookup failure, got %v", err)
+	}
+}
+
 func TestRegister_WithCaptcha(t *testing.T) {
 	svc, _, db := newTestService(t)
 	settings := model.GeneralSettings{CaptchaEnabled: true, RegistrationEnabled: true}
