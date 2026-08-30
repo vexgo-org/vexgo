@@ -315,11 +315,6 @@ export function ThemePage() {
                       <DialogHeader>
                         <DialogTitle className="flex items-center justify-between">
                           {selectedTheme.name}
-                          {activeTheme === selectedTheme.id && (
-                            <Badge className="bg-primary text-primary-foreground">
-                              {t("themePage.currentBadge")}
-                            </Badge>
-                          )}
                         </DialogTitle>
                         <DialogDescription>
                           <div className="space-y-2 text-sm">
