@@ -42,6 +42,7 @@
               go
               gofumpt
               golangci-lint
+              gotools
               just
               nodejs
               oxlint
