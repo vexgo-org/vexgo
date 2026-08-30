@@ -498,7 +498,9 @@ Generate a sliding puzzle captcha.
   display position and size inside the master image; the client must drag the
   tile to the matching hole and submit the drop coordinates
 - The correct drop position is never exposed to the client
-- A captcha can be verified only once and expires after 5 minutes
+- A captcha can be verified only once and expires after 5 minutes; any
+  failed verification attempt also invalidates it, and the client must
+  request a new one
 
 ---
 
@@ -526,7 +528,8 @@ Verify a captcha token and drop position.
 - `400`: `{"error": "Verification failed, please try again"}`
 
 Both `x` and `y` are verified against the stored answer with a ±5 pixel
-tolerance per axis.
+tolerance per axis. A failed verification attempt invalidates the captcha —
+request a new one and try again.
 
 ---
 

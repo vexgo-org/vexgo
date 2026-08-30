@@ -4,6 +4,7 @@ package captcha
 
 import (
 	"context"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -15,6 +16,7 @@ type Repository interface {
 	CreateCaptcha(ctx context.Context, captcha *model.Captcha) error
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
 	SaveCaptcha(ctx context.Context, captcha *model.Captcha) error
+	DeleteExpiredCaptchas(ctx context.Context) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
 }
 
@@ -42,6 +44,10 @@ func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*mo
 
 func (r *gormRepository) SaveCaptcha(ctx context.Context, captcha *model.Captcha) error {
 	return r.db.WithContext(ctx).Save(captcha).Error
+}
+
+func (r *gormRepository) DeleteExpiredCaptchas(ctx context.Context) error {
+	return r.db.WithContext(ctx).Where("expires_at < ?", time.Now()).Delete(&model.Captcha{}).Error
 }
 
 func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -163,7 +164,8 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 
 	// block.X/Y is the hole the client must drop the tile on — that is the
 	// answer. block.DX/DY is only the tile's initial display position and
-	// must never be used for validation.
+	// must never be used for validation. The images are returned to the
+	// client directly and are not persisted.
 	captcha := model.Captcha{
 		ID:        uuid.New().String(),
 		Token:     uuid.New().String(),
@@ -171,13 +173,17 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 		Y:         block.Y,
 		Width:     block.Width,
 		Height:    block.Height,
-		BgImage:   masterImage,
-		PuzzleImg: tileImage,
 		ExpiresAt: time.Now().Add(captchaTTL),
 		Used:      false,
 	}
 	if err := s.repo.CreateCaptcha(ctx, &captcha); err != nil {
 		return nil, err
+	}
+
+	// Opportunistic housekeeping: drop challenges that are no longer valid,
+	// bounding the table to roughly the challenges of the last TTL window.
+	if err := s.repo.DeleteExpiredCaptchas(ctx); err != nil {
+		slog.Warn("failed to clean up expired captchas", "err", err)
 	}
 
 	return &Captcha{
@@ -212,8 +218,14 @@ func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x, y int)
 		return ErrCaptchaExpired
 	}
 
-	// Verify the drop position on both axes within the tolerance padding
+	// Verify the drop position on both axes within the tolerance padding.
+	// The challenge is one-shot: the first failed attempt invalidates it so
+	// the answer cannot be brute-forced within its lifetime.
 	if !slide.Validate(x, y, captcha.X, captcha.Y, verifyPadding) {
+		captcha.Used = true
+		if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+			return err
+		}
 		return ErrCaptchaMismatch
 	}
 

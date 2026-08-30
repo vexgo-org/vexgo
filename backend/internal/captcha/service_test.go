@@ -165,8 +165,21 @@ func TestVerifyCaptcha(t *testing.T) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong x, got %v", err)
 	}
 
-	// wrong y position
-	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, stored2.X, stored2.Y+100); !errors.Is(err, ErrCaptchaMismatch) {
+	// the failed attempt invalidated the challenge: a correct retry is rejected
+	if err := svc.VerifyCaptcha(context.Background(), captcha2.ID, captcha2.Token, stored2.X, stored2.Y); !errors.Is(err, ErrCaptchaUsed) {
+		t.Errorf("expected ErrCaptchaUsed after failed attempt, got %v", err)
+	}
+
+	// wrong y position (fresh challenge)
+	captcha3, err := svc.GenerateCaptcha(context.Background())
+	if err != nil {
+		t.Fatalf("GenerateCaptcha error: %v", err)
+	}
+	var stored3 model.Captcha
+	if err := db.First(&stored3, "id = ?", captcha3.ID).Error; err != nil {
+		t.Fatalf("failed to load captcha: %v", err)
+	}
+	if err := svc.VerifyCaptcha(context.Background(), captcha3.ID, captcha3.Token, stored3.X, stored3.Y+100); !errors.Is(err, ErrCaptchaMismatch) {
 		t.Errorf("expected ErrCaptchaMismatch for wrong y, got %v", err)
 	}
 
@@ -191,6 +204,40 @@ func TestVerifyCaptcha(t *testing.T) {
 	}
 	if err := svc.VerifyCaptcha(context.Background(), "expired-id", "expired-token", 50, 20); !errors.Is(err, ErrCaptchaExpired) {
 		t.Errorf("expected ErrCaptchaExpired, got %v", err)
+	}
+}
+
+// TestGenerateCaptcha_CleansUpExpired checks the opportunistic housekeeping:
+// generating a challenge removes rows that are no longer valid, so the table
+// cannot grow unboundedly from anonymous challenge requests.
+func TestGenerateCaptcha_CleansUpExpired(t *testing.T) {
+	svc, db := newTestService(t)
+	rows := []model.Captcha{
+		{ID: "expired-1", Token: "t1", X: 50, Y: 20, ExpiresAt: time.Now().Add(-time.Minute)},
+		{ID: "valid-1", Token: "t2", X: 50, Y: 20, ExpiresAt: time.Now().Add(5 * time.Minute)},
+	}
+	for i := range rows {
+		if err := db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("failed to seed captcha row: %v", err)
+		}
+	}
+
+	if _, err := svc.GenerateCaptcha(context.Background()); err != nil {
+		t.Fatalf("GenerateCaptcha error: %v", err)
+	}
+
+	var count int64
+	if err := db.Model(&model.Captcha{}).Where("id = ?", "expired-1").Count(&count).Error; err != nil {
+		t.Fatalf("failed to query expired row: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected expired captcha row to be deleted")
+	}
+	if err := db.Model(&model.Captcha{}).Where("id = ?", "valid-1").Count(&count).Error; err != nil {
+		t.Fatalf("failed to query valid row: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected valid captcha row to be kept")
 	}
 }
 

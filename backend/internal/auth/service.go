@@ -736,7 +736,9 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		return ErrCaptchaExpired
 	}
 
-	// Verify position (allow certain tolerance on both axes)
+	// Verify position (allow certain tolerance on both axes). The challenge
+	// is one-shot: a failed attempt invalidates the captcha so the answer
+	// cannot be brute-forced through this endpoint within its lifetime.
 	if !slide.Validate(arg.X, arg.Y, captcha.X, captcha.Y, arg.Tolerance) {
 		slog.Warn(
 			"captcha verification failed: incorrect position",
@@ -748,6 +750,18 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 			"tolerance", arg.Tolerance,
 			"email", arg.Email,
 		)
+		if !captcha.Used {
+			captcha.Used = true
+			if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+				slog.Error(
+					"failed to invalidate captcha after mismatch",
+					"captchaID", arg.ID,
+					"email", arg.Email,
+					"err", err,
+				)
+				return ErrCaptchaFailed
+			}
+		}
 		return ErrCaptchaMismatch
 	}
 
