@@ -36,6 +36,12 @@ type Config struct {
 	// the unauthenticated captcha endpoints. 0 disables the limit.
 	CaptchaRateLimitPerMinute int `mapstructure:"captcha_rate_limit_per_minute"`
 
+	// AuthRateLimitPerMinute caps the requests per client IP per minute on the
+	// unauthenticated auth endpoints (register, login, password reset and
+	// verification resend) to slow down online brute-force and mail-bombing.
+	// 0 disables the limit.
+	AuthRateLimitPerMinute int `mapstructure:"auth_rate_limit_per_minute"`
+
 	// BaseURL is the public origin of this instance (e.g., https://vexgo.example.com).
 	// Used to build absolute links: SSO/OAuth callbacks and emailed
 	// verification / password-reset / email-change links. Empty means the
@@ -118,6 +124,7 @@ var keyDefaults = map[string]any{
 	"base_url":  "",
 
 	"captcha_rate_limit_per_minute": 30,
+	"auth_rate_limit_per_minute":    10,
 
 	"db_type":     "",
 	"db_host":     "",

@@ -28,6 +28,10 @@ type Handler struct {
 	// proxy. Gin's trusted-proxies check filters the client IP but does not
 	// sanitize raw header reads, so this gate lives at the read site.
 	honorForwardedProto bool
+
+	// rateLimitPerMinute caps unauthenticated credential endpoints per client
+	// IP; mirrored from deps.RateLimitPerMinute.
+	rateLimitPerMinute int
 }
 
 // NewHandler creates an auth HTTP handler with the given dependencies.
@@ -39,6 +43,7 @@ func NewHandler(deps Deps) *Handler {
 		linkScheme:          scheme,
 		linkHost:            host,
 		honorForwardedProto: deps.BehindReverseProxy,
+		rateLimitPerMinute:  deps.RateLimitPerMinute,
 	}
 }
 

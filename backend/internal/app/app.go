@@ -136,6 +136,7 @@ func New(cfg *config.Config) (*App, error) {
 			Captcha:            captchaSvc,
 			BaseURL:            cfg.BaseURL,
 			BehindReverseProxy: cfg.BehindReverseProxy,
+			RateLimitPerMinute: cfg.AuthRateLimitPerMinute,
 		},
 		SSO: sso.Deps{
 			DB:        db,
