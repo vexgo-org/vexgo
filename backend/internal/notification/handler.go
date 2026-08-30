@@ -25,8 +25,7 @@ func NewHandler(deps Deps) *Handler {
 func (h *Handler) GetNotifications(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := middleware.ParsePagination(c, 10)
 
 	notifications, total, err := h.svc.List(c.Request.Context(), ListQuery{
 		UserID:           uid,

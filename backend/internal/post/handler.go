@@ -26,14 +26,7 @@ func NewHandler(deps Deps) *Handler {
 
 // GetPosts returns the post list.
 func (h *Handler) GetPosts(c *gin.Context) {
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if err != nil || page < 1 {
-		page = 1
-	}
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	if err != nil || limit < 1 || limit > 100 {
-		limit = 10
-	}
+	page, limit := middleware.ParsePagination(c, 10)
 
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
@@ -248,8 +241,7 @@ func (h *Handler) DeletePost(c *gin.Context) {
 func (h *Handler) GetMyPosts(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := middleware.ParsePagination(c, 10)
 	status := c.DefaultQuery("status", "")
 
 	posts, total, err := h.svc.MyPosts(c.Request.Context(), MyPostsQuery{
@@ -281,8 +273,7 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 
 // GetDraftPosts returns draft posts.
 func (h *Handler) GetDraftPosts(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := middleware.ParsePagination(c, 10)
 
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
@@ -317,8 +308,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 // GetUserPosts returns the posts of a specific user.
 func (h *Handler) GetUserPosts(c *gin.Context) {
 	userIDStr := c.Param("id")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := middleware.ParsePagination(c, 10)
 
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
@@ -359,7 +349,7 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 func (h *Handler) GetPopularPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	_, limit := middleware.ParsePagination(c, 5)
 
 	posts, err := h.svc.Popular(c.Request.Context(), userRole, limit)
 	if err != nil {
@@ -378,7 +368,7 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 func (h *Handler) GetLatestPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	_, limit := middleware.ParsePagination(c, 5)
 
 	posts, err := h.svc.Latest(c.Request.Context(), userRole, limit)
 	if err != nil {
@@ -581,8 +571,7 @@ func (h *Handler) GetRejectedPosts(c *gin.Context) {
 
 // listModeration renders the moderation queue for a given post status.
 func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := middleware.ParsePagination(c, 10)
 	search := c.DefaultQuery("search", "")
 
 	posts, total, err := h.svc.ListModeration(c.Request.Context(), ListModerationQuery{
