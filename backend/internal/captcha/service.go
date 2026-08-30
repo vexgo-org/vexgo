@@ -52,6 +52,9 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
+	// RateLimitPerMinute caps the requests per client IP per minute on the
+	// captcha endpoints; <= 0 disables the limit.
+	RateLimitPerMinute int
 }
 
 // Service contains the business logic of the captcha domain.
@@ -144,6 +147,13 @@ func (s *Service) GenerateCaptcha(ctx context.Context) (*Captcha, error) {
 		return nil, err
 	}
 
+	// security: go-captcha derives the answer position from a math/rand-based
+	// PRNG (time-seeded pool) rather than crypto/rand. This is acceptable
+	// here because the PRNG output is never observable — answers are not
+	// returned and cannot be recovered from the rendered image — and one-shot
+	// invalidation leaves a single-bit verification oracle per challenge, so
+	// the seed-space predictability cannot be exploited remotely. Revisit if
+	// the verify flow ever exposes more feedback.
 	capt, err := builder.Make().Generate()
 	if err != nil {
 		return nil, fmt.Errorf("generate slide captcha: %w", err)
@@ -222,17 +232,20 @@ func (s *Service) VerifyCaptcha(ctx context.Context, id, token string, x, y int)
 	// The challenge is one-shot: the first failed attempt invalidates it so
 	// the answer cannot be brute-forced within its lifetime.
 	if !slide.Validate(x, y, captcha.X, captcha.Y, verifyPadding) {
-		captcha.Used = true
-		if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+		if _, err := s.repo.MarkCaptchaUsed(ctx, id, token); err != nil {
 			return err
 		}
 		return ErrCaptchaMismatch
 	}
 
-	// Mark as used
-	captcha.Used = true
-	if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+	// Atomically claim the challenge; losing the race means a concurrent
+	// request consumed it first.
+	claimed, err := s.repo.MarkCaptchaUsed(ctx, id, token)
+	if err != nil {
 		return err
+	}
+	if !claimed {
+		return ErrCaptchaUsed
 	}
 
 	return nil

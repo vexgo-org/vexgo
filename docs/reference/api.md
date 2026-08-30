@@ -501,6 +501,9 @@ Generate a sliding puzzle captcha.
 - A captcha can be verified only once and expires after 5 minutes; any
   failed verification attempt also invalidates it, and the client must
   request a new one
+- Both captcha endpoints are rate-limited per client IP (default 30
+  requests/minute, configurable via `captcha_rate_limit_per_minute`); an
+  excessive client receives `429`
 
 ---
 

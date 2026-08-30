@@ -739,28 +739,26 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 	// Verify position (allow certain tolerance on both axes). The challenge
 	// is one-shot: a failed attempt invalidates the captcha so the answer
 	// cannot be brute-forced through this endpoint within its lifetime.
+	//
+	// security: the stored answer is deliberately kept out of the logs —
+	// aggregated or leaked logs must not allow reconstructing it.
 	if !slide.Validate(arg.X, arg.Y, captcha.X, captcha.Y, arg.Tolerance) {
 		slog.Warn(
 			"captcha verification failed: incorrect position",
 			"captchaID", arg.ID,
 			"userX", arg.X,
 			"userY", arg.Y,
-			"correctX", captcha.X,
-			"correctY", captcha.Y,
 			"tolerance", arg.Tolerance,
 			"email", arg.Email,
 		)
-		if !captcha.Used {
-			captcha.Used = true
-			if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
-				slog.Error(
-					"failed to invalidate captcha after mismatch",
-					"captchaID", arg.ID,
-					"email", arg.Email,
-					"err", err,
-				)
-				return ErrCaptchaFailed
-			}
+		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
+			slog.Error(
+				"failed to invalidate captcha after mismatch",
+				"captchaID", arg.ID,
+				"email", arg.Email,
+				"err", err,
+			)
+			return ErrCaptchaFailed
 		}
 		return ErrCaptchaMismatch
 	}
@@ -771,10 +769,11 @@ func (s *Service) verifyCaptcha(ctx context.Context, arg *verifyCaptchaArgs) err
 		"email", arg.Email,
 	)
 
-	// If captcha has not been used yet, mark it as used
+	// If captcha has not been used yet, mark it as used. The conditional
+	// update makes the claim atomic; an already-used captcha passes either
+	// way because the drop-time pre-verification marked it.
 	if !captcha.Used {
-		captcha.Used = true
-		if err := s.repo.SaveCaptcha(ctx, captcha); err != nil {
+		if err := s.repo.MarkCaptchaUsed(ctx, arg.ID, arg.Token); err != nil {
 			slog.Error(
 				"failed to mark captcha as used",
 				"captchaID", arg.ID,

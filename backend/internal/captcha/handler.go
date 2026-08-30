@@ -10,12 +10,15 @@ import (
 
 // Handler exposes the captcha domain over HTTP.
 type Handler struct {
-	svc *Service
+	svc                *Service
+	rateLimitPerMinute int
 }
 
-// NewHandler creates a captcha HTTP handler with the given dependencies.
+// NewHandler creates a captcha HTTP handler with the given dependencies. A
+// positive deps.RateLimitPerMinute installs a per-client-IP rate limit on the
+// unauthenticated captcha endpoints.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps)}
+	return &Handler{svc: NewService(deps), rateLimitPerMinute: deps.RateLimitPerMinute}
 }
 
 // GenerateCaptcha generates sliding puzzle captcha

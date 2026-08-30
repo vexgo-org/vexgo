@@ -124,8 +124,9 @@ func New(cfg *config.Config) (*App, error) {
 			Files:     storage,
 		},
 		Captcha: captcha.Deps{
-			DB:        db,
-			JWTSecret: cfg.JWTSecret,
+			DB:                 db,
+			JWTSecret:          cfg.JWTSecret,
+			RateLimitPerMinute: cfg.CaptchaRateLimitPerMinute,
 		},
 		Auth: auth.Deps{
 			DB:                 db,

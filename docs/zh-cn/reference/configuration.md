@@ -118,18 +118,19 @@
 
 ### 服务器
 
-| YAML 键                   | 默认值    | 说明                                                                                         |
-| ------------------------- | --------- | -------------------------------------------------------------------------------------------- |
-| `addr`                    | `0.0.0.0` | 监听地址                                                                                     |
-| `port`                    | `3001`    | 监听端口                                                                                     |
-| `data_dir`                | `./data`  | 数据目录路径                                                                                 |
-| `jwt_secret`              | —         | JWT 签名密钥（**生产环境必填**）                                                             |
-| `settings_encryption_key` | —         | 加密静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）的口令。留空 = 明文存储并输出启动警告。 |
-| `log_level`               | `info`    | `debug`、`info`、`warn`、`error`                                                             |
-| `base_url`                | —         | 实例公网地址，如 `https://vexgo.example.com`                                                 |
-| `frontend_url`            | —         | 面向用户链接的前端地址                                                                       |
-| `behind_reverse_proxy`    | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                      |
-| `trusted_proxies`         | `[]`      | 可信代理 IP/CIDR 列表                                                                        |
+| YAML 键                         | 默认值    | 说明                                                                                         |
+| ------------------------------- | --------- | -------------------------------------------------------------------------------------------- |
+| `addr`                          | `0.0.0.0` | 监听地址                                                                                     |
+| `port`                          | `3001`    | 监听端口                                                                                     |
+| `data_dir`                      | `./data`  | 数据目录路径                                                                                 |
+| `jwt_secret`                    | —         | JWT 签名密钥（**生产环境必填**）                                                             |
+| `settings_encryption_key`       | —         | 加密静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）的口令。留空 = 明文存储并输出启动警告。 |
+| `log_level`                     | `info`    | `debug`、`info`、`warn`、`error`                                                             |
+| `base_url`                      | —         | 实例公网地址，如 `https://vexgo.example.com`                                                 |
+| `frontend_url`                  | —         | 面向用户链接的前端地址                                                                       |
+| `behind_reverse_proxy`          | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                      |
+| `trusted_proxies`               | `[]`      | 可信代理 IP/CIDR 列表                                                                        |
+| `captcha_rate_limit_per_minute` | `30`      | 无鉴权验证码接口的单 IP 每分钟请求上限；`0` 表示不限制                                       |
 
 ### 数据库
 
@@ -183,41 +184,42 @@
 
 ## 环境变量 ↔ 配置文件 ↔ 命令行对照
 
-| 设置                 | 环境变量                  | 配置文件键                | CLI 参数     |
-| -------------------- | ------------------------- | ------------------------- | ------------ |
-| 监听地址             | `ADDR`                    | `addr`                    | `--addr, -a` |
-| 监听端口             | `PORT`                    | `port`                    | `--port, -p` |
-| 数据目录             | `DATA_DIR`                | `data_dir`                | `--data, -d` |
-| JWT 密钥             | `JWT_SECRET`              | `jwt_secret`              | —            |
-| 静态敏感信息加密口令 | `SETTINGS_ENCRYPTION_KEY` | `settings_encryption_key` | —            |
-| 日志级别             | `LOG_LEVEL`               | `log_level`               | —            |
-| 公网地址             | `BASE_URL`                | `base_url`                | —            |
-| 前端地址             | `FRONTEND_URL`            | `frontend_url`            | —            |
-| 反向代理             | `BEHIND_REVERSE_PROXY`    | `behind_reverse_proxy`    | —            |
-| 可信代理             | `TRUSTED_PROXIES`         | `trusted_proxies`         | —            |
-| 数据库类型           | `DB_TYPE`                 | `db_type`                 | —            |
-| 数据库主机           | `DB_HOST`                 | `db_host`                 | —            |
-| 数据库端口           | `DB_PORT`                 | `db_port`                 | —            |
-| 数据库用户           | `DB_USER`                 | `db_user`                 | —            |
-| 数据库密码           | `DB_PASSWORD`             | `db_password`             | —            |
-| 数据库名             | `DB_NAME`                 | `db_name`                 | —            |
-| SSL 模式             | `DB_SSL_MODE`             | `db_ssl_mode`             | —            |
-| GitHub Client ID     | `GITHUB_CLIENT_ID`        | `github_client_id`        | —            |
-| GitHub Secret        | `GITHUB_CLIENT_SECRET`    | `github_client_secret`    | —            |
-| Google Client ID     | `GOOGLE_CLIENT_ID`        | `google_client_id`        | —            |
-| Google Secret        | `GOOGLE_CLIENT_SECRET`    | `google_client_secret`    | —            |
-| OIDC 启用            | `OIDC_ENABLED`            | `oidc_enabled`            | —            |
-| OIDC Issuer          | `OIDC_ISSUER_URL`         | `oidc_issuer_url`         | —            |
-| OIDC Client ID       | `OIDC_CLIENT_ID`          | `oidc_client_id`          | —            |
-| OIDC Secret          | `OIDC_CLIENT_SECRET`      | `oidc_client_secret`      | —            |
-| OIDC 自动跳转        | `OIDC_AUTO_REDIRECT`      | `oidc_auto_redirect`      | —            |
-| OIDC 邮箱验证        | `OIDC_VERIFY_EMAIL`       | `oidc_verify_email`       | —            |
-| S3 启用              | `S3_ENABLED`              | `s3_enabled`              | —            |
-| S3 端点              | `S3_ENDPOINT`             | `s3_endpoint`             | —            |
-| S3 区域              | `S3_REGION`               | `s3_region`               | —            |
-| S3 桶                | `S3_BUCKET`               | `s3_bucket`               | —            |
-| S3 Access Key        | `S3_ACCESS_KEY`           | `s3_access_key`           | —            |
-| S3 Secret Key        | `S3_SECRET_KEY`           | `s3_secret_key`           | —            |
+| 设置                 | 环境变量                        | 配置文件键                      | CLI 参数     |
+| -------------------- | ------------------------------- | ------------------------------- | ------------ |
+| 监听地址             | `ADDR`                          | `addr`                          | `--addr, -a` |
+| 监听端口             | `PORT`                          | `port`                          | `--port, -p` |
+| 数据目录             | `DATA_DIR`                      | `data_dir`                      | `--data, -d` |
+| JWT 密钥             | `JWT_SECRET`                    | `jwt_secret`                    | —            |
+| 静态敏感信息加密口令 | `SETTINGS_ENCRYPTION_KEY`       | `settings_encryption_key`       | —            |
+| 日志级别             | `LOG_LEVEL`                     | `log_level`                     | —            |
+| 公网地址             | `BASE_URL`                      | `base_url`                      | —            |
+| 前端地址             | `FRONTEND_URL`                  | `frontend_url`                  | —            |
+| 反向代理             | `BEHIND_REVERSE_PROXY`          | `behind_reverse_proxy`          | —            |
+| 可信代理             | `TRUSTED_PROXIES`               | `trusted_proxies`               | —            |
+| 验证码限流           | `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `captcha_rate_limit_per_minute` | —            |
+| 数据库类型           | `DB_TYPE`                       | `db_type`                       | —            |
+| 数据库主机           | `DB_HOST`                       | `db_host`                       | —            |
+| 数据库端口           | `DB_PORT`                       | `db_port`                       | —            |
+| 数据库用户           | `DB_USER`                       | `db_user`                       | —            |
+| 数据库密码           | `DB_PASSWORD`                   | `db_password`                   | —            |
+| 数据库名             | `DB_NAME`                       | `db_name`                       | —            |
+| SSL 模式             | `DB_SSL_MODE`                   | `db_ssl_mode`                   | —            |
+| GitHub Client ID     | `GITHUB_CLIENT_ID`              | `github_client_id`              | —            |
+| GitHub Secret        | `GITHUB_CLIENT_SECRET`          | `github_client_secret`          | —            |
+| Google Client ID     | `GOOGLE_CLIENT_ID`              | `google_client_id`              | —            |
+| Google Secret        | `GOOGLE_CLIENT_SECRET`          | `google_client_secret`          | —            |
+| OIDC 启用            | `OIDC_ENABLED`                  | `oidc_enabled`                  | —            |
+| OIDC Issuer          | `OIDC_ISSUER_URL`               | `oidc_issuer_url`               | —            |
+| OIDC Client ID       | `OIDC_CLIENT_ID`                | `oidc_client_id`                | —            |
+| OIDC Secret          | `OIDC_CLIENT_SECRET`            | `oidc_client_secret`            | —            |
+| OIDC 自动跳转        | `OIDC_AUTO_REDIRECT`            | `oidc_auto_redirect`            | —            |
+| OIDC 邮箱验证        | `OIDC_VERIFY_EMAIL`             | `oidc_verify_email`             | —            |
+| S3 启用              | `S3_ENABLED`                    | `s3_enabled`                    | —            |
+| S3 端点              | `S3_ENDPOINT`                   | `s3_endpoint`                   | —            |
+| S3 区域              | `S3_REGION`                     | `s3_region`                     | —            |
+| S3 桶                | `S3_BUCKET`                     | `s3_bucket`                     | —            |
+| S3 Access Key        | `S3_ACCESS_KEY`                 | `s3_access_key`                 | —            |
+| S3 Secret Key        | `S3_SECRET_KEY`                 | `s3_secret_key`                 | —            |
 
 只有 `addr`、`port` 和 `data` 提供命令行参数，其余设置均通过环境变量或配置文件键配置。
 
