@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,6 +92,25 @@ func TestMemoryCacheIncrAppliesTTLToNewCounterOnly(t *testing.T) {
 	// applied again.
 	if n, _ := c.Incr(ctx, "c", time.Minute); n != 1 {
 		t.Fatalf("Incr after expiry = %d; want 1", n)
+	}
+}
+
+// TestMemoryCacheIncrNamespacesCorruptedValueError checks that a corrupted
+// counter value surfaces an error carrying the key, matching the valkey
+// backend's wrapping.
+func TestMemoryCacheIncrNamespacesCorruptedValueError(t *testing.T) {
+	ctx := context.Background()
+	c := NewMemory()
+
+	if err := c.Set(ctx, "c", "not-a-number", 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	_, err := c.Incr(ctx, "c", time.Minute)
+	if err == nil {
+		t.Fatal("Incr on a non-numeric value = nil error; want failure")
+	}
+	if !strings.Contains(err.Error(), `cache incr "c"`) {
+		t.Fatalf("Incr error missing key context: %v", err)
 	}
 }
 

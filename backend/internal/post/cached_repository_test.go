@@ -92,8 +92,6 @@ func (c *fakeCache) Set(_ context.Context, key, value string, _ time.Duration) e
 	return nil
 }
 
-func (c *fakeCache) Delete(_ context.Context, key string) error { return nil }
-
 func (c *fakeCache) Incr(_ context.Context, key string, _ time.Duration) (int64, error) {
 	if c.err != nil {
 		return 0, c.err

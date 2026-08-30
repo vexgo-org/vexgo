@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -130,7 +131,7 @@ func (m *Memory) Incr(_ context.Context, key string, ttl time.Duration) (int64, 
 		var err error
 		n, err = strconv.ParseInt(entry.value, 10, 64)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("cache incr %q: %w", key, err)
 		}
 	}
 	n++

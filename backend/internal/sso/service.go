@@ -236,6 +236,9 @@ func (s *Service) LoginRedirect(c *gin.Context, provider, method string) (authUR
 	redirectURI := s.callbackURI(c, provider)
 	state, err := s.generateState(c.Request.Context(), provider, c.ClientIP(), method)
 	if err != nil {
+		// The error is translated to a generic user-facing message here, so
+		// log it: it is otherwise invisible (typically a state store outage).
+		slog.Warn("sso login redirect failed", "provider", provider, "err", err)
 		return "", http.StatusInternalServerError, "failed to start login flow"
 	}
 

@@ -64,7 +64,10 @@ func (r *cachedRepository) setInt(ctx context.Context, key string, n int64) {
 }
 
 // counter returns the cached counter for the given name, counting fresh
-// through the wrapped repository on a miss.
+// through the wrapped repository on a miss. Counter failures are logged here
+// and read as zero: the stats endpoint deliberately serves partial numbers
+// instead of failing (its only caller discards errors), so this log is the
+// single handling point of the failure.
 func (r *cachedRepository) counter(ctx context.Context, name string, count func(context.Context) (int64, error)) int64 {
 	key := "home:count:" + name
 	if n, ok := r.getInt(ctx, key); ok {
@@ -72,6 +75,7 @@ func (r *cachedRepository) counter(ctx context.Context, name string, count func(
 	}
 	n, err := count(ctx)
 	if err != nil {
+		slog.Warn("home counter failed", "key", key, "err", err)
 		return n
 	}
 	r.setInt(ctx, key, n)
@@ -105,10 +109,11 @@ func (r *cachedRepository) GetGeneralSettings(ctx context.Context) (model.Genera
 	value, ok, err := r.cache.Get(ctx, key)
 	if err == nil && ok {
 		var config model.GeneralSettings
-		if jsonErr := json.Unmarshal([]byte(value), &config); jsonErr == nil {
+		jsonErr := json.Unmarshal([]byte(value), &config)
+		if jsonErr == nil {
 			return config, nil
 		}
-		slog.Warn("home cache decode failed", "key", key, "err", err)
+		slog.Warn("home cache decode failed", "key", key, "err", jsonErr)
 	}
 
 	config, err := r.Repository.GetGeneralSettings(ctx)

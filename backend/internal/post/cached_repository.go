@@ -15,11 +15,10 @@ import (
 
 // ReadCache is the consumer-declared seam for the read cache. It is satisfied
 // structurally by the cache backends (internal/cache) without post depending
-// on them.
+// on them. Invalidation is generation-based (Incr), so no Delete is needed.
 type ReadCache interface {
 	Get(ctx context.Context, key string) (value string, ok bool, err error)
 	Set(ctx context.Context, key, value string, ttl time.Duration) error
-	Delete(ctx context.Context, key string) error
 	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
 }
 
