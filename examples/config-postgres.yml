@@ -65,7 +65,7 @@ db_ssl_mode: "disable" # Options: "disable", "require", "verify-ca", "verify-ful
 # configured valkey server is used. Disabled, every read goes to the
 # database directly. Rate limiting and SSO state are governed by
 # valkey_enabled regardless of this switch.
-cache_enabled: true
+cache_enabled: false
 
 # Enable Valkey (Redis-compatible) backed caching. When enabled, rate limiting
 # and SSO state (and public content caching) are stored in Valkey so multiple

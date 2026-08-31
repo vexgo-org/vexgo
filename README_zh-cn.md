@@ -206,7 +206,7 @@ db_type: "sqlite"
 # 公开读路径的内容缓存（文章列表、文章详情、热门、最新、首页统计）。
 # 开启时读取经由缓存提供：未启用 valkey 时使用进程内内存，
 # 启用 valkey 时使用配置的 valkey 服务器。关闭时所有读取直达数据库。
-cache_enabled: true
+cache_enabled: false
 
 # 为上述内容缓存以及共享状态（限流、OAuth 登录 state）启用
 # Valkey（兼容 Redis），使多实例可以部署在负载均衡之后。
