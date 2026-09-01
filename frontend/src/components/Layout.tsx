@@ -121,7 +121,7 @@ export function Layout({ children }: LayoutProps) {
 
   // Periodically refresh the unread count (every 30s)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isAuthenticated) {
       interval = setInterval(() => {
         fetchUnreadCount();
