@@ -37,6 +37,9 @@ import (
 const (
 	stateLength = 16
 	stateExpire = 5 * time.Minute
+	// stateSweepThreshold is the map size / write count that triggers a sweep
+	// of expired entries on the next Set.
+	stateSweepThreshold = 4096
 )
 
 // StateStore persists one-time OAuth state values until a deadline. It is
@@ -74,10 +77,13 @@ func decodeStateValue(raw string) (stateValue, bool) {
 }
 
 // memoryStateStore keeps state values in the process. Expired entries are
-// swept on Set so abandoned flows cannot grow the map without bound.
+// swept amortized (at most one O(n) scan per stateSweepThreshold writes once
+// the map has grown) so abandoned flows cannot grow the map without bound
+// while Set stays O(1) on average.
 type memoryStateStore struct {
-	mu      sync.Mutex
-	entries map[string]memoryStateEntry
+	mu             sync.Mutex
+	entries        map[string]memoryStateEntry
+	setsSinceSweep int
 }
 
 type memoryStateEntry struct {
@@ -93,14 +99,27 @@ func (m *memoryStateStore) Set(_ context.Context, key, value string, ttl time.Du
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.setsSinceSweep++
+	if len(m.entries) >= stateSweepThreshold && m.setsSinceSweep >= stateSweepThreshold {
+		// Amortized sweeping: at most one O(n) scan per stateSweepThreshold
+		// writes keeps Set O(1) on average while expired entries cannot pile
+		// up unboundedly.
+		m.sweepLocked()
+		m.setsSinceSweep = 0
+	}
+	m.entries[key] = memoryStateEntry{value: value, expires: time.Now().Add(ttl)}
+	return nil
+}
+
+// sweepLocked drops expired entries so abandoned flows cannot grow the map
+// without bound. Callers must hold m.mu.
+func (m *memoryStateStore) sweepLocked() {
 	now := time.Now()
 	for k, entry := range m.entries {
 		if now.After(entry.expires) {
 			delete(m.entries, k)
 		}
 	}
-	m.entries[key] = memoryStateEntry{value: value, expires: now.Add(ttl)}
-	return nil
 }
 
 // GetDel retrieves and removes the stored value in one step.

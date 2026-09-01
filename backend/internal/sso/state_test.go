@@ -3,6 +3,7 @@ package sso
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -110,5 +111,41 @@ func TestDefaultStateStoreIsInProcess(t *testing.T) {
 	svc := NewService(Deps{})
 	if _, ok := svc.states.(*memoryStateStore); !ok {
 		t.Fatalf("default states = %T; want *memoryStateStore", svc.states)
+	}
+}
+
+// TestMemoryStateStore_SweepsExpiredEntries checks that expired entries are
+// swept once the map passes the sweep threshold, so abandoned flows cannot
+// grow the map without bound.
+func TestMemoryStateStore_SweepsExpiredEntries(t *testing.T) {
+	ctx := context.Background()
+	store := newMemoryStateStore()
+
+	// One long-lived entry and one that is already expired.
+	if err := store.Set(ctx, "live", "v", time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := store.Set(ctx, "dead", "v", time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	time.Sleep(2 * time.Millisecond)
+
+	// Push the map over the sweep threshold.
+	for i := range stateSweepThreshold {
+		if err := store.Set(ctx, strconv.Itoa(i), "v", time.Minute); err != nil {
+			t.Fatalf("Set: %v", err)
+		}
+	}
+
+	store.mu.Lock()
+	_, deadExists := store.entries["dead"]
+	_, liveExists := store.entries["live"]
+	store.mu.Unlock()
+
+	if deadExists {
+		t.Fatal("expired entry survived the sweep")
+	}
+	if !liveExists {
+		t.Fatal("live entry was swept")
 	}
 }
