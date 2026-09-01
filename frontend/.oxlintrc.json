@@ -7,18 +7,14 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": [
-    "dist"
-  ],
+  "ignorePatterns": ["dist"],
   "options": {
     "typeAware": true,
     "typeCheck": true
   },
   "overrides": [
     {
-      "files": [
-        "**/*.{ts,tsx}"
-      ],
+      "files": ["**/*.{ts,tsx}"],
       "rules": {
         "constructor-super": "error",
         "for-direction": "error",
@@ -118,10 +114,7 @@
           }
         ]
       },
-      "plugins": [
-        "typescript",
-        "react"
-      ],
+      "plugins": ["typescript", "react"],
       "env": {
         "browser": true,
         "es2020": true
