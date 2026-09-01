@@ -145,7 +145,7 @@ valkey_enabled: true # required for multi-instance deployments
 valkey_url: "valkey://valkey.internal:6379"
 ```
 
-Every instance must point at the same Valkey server. VexGo verifies the connection with a PING at startup and refuses to start when the server is unreachable (fail-fast), so a broken URL surfaces immediately instead of at request time.
+Every instance must point at the same Valkey server. Unlike `cache_enabled`, which needs no external server and falls back to the in-process memory cache, enabling `valkey_enabled` makes Valkey a hard dependency: VexGo verifies the connection with a PING at startup and refuses to start when the server is unreachable (fail-fast), so a broken URL surfaces immediately instead of at request time.
 
 Operational notes:
 

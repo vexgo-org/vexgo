@@ -145,7 +145,7 @@ valkey_enabled: true # 多实例部署必填
 valkey_url: "valkey://valkey.internal:6379"
 ```
 
-所有实例必须指向同一个 Valkey 服务器。VexGo 启动时以 PING 验证连接，服务器不可达时拒绝启动（fail-fast），让错误的 URL 立刻暴露而不是等到请求时才失败。
+所有实例必须指向同一个 Valkey 服务器。与 `cache_enabled` 不同——它无需外部服务器，会回退到进程内内存缓存——启用 `valkey_enabled` 使 Valkey 成为硬依赖：VexGo 启动时以 PING 验证连接，服务器不可达时拒绝启动（fail-fast），让错误的 URL 立刻暴露而不是等到请求时才失败。
 
 运维要点：
 
