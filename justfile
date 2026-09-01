@@ -3,13 +3,13 @@ set shell := ["bash", "-O", "globstar", "-c"]
 format:
     # Run formatter.
     gofumpt -w -extra .
-    prettier --write "**/*.{js,jsx,ts,tsx,html,md}"
+    prettier --write "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json"
 
 lint:
     # Run linter.
     golangci-lint run
     output=$(deadcode -test ./...); test -z "$output" || { echo "$output"; exit 1;}
-    prettier --check "**/*.{js,jsx,ts,tsx,html,md}"
+    prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json"
     diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
     oxlint --deny-warnings -c frontend/.oxlintrc.json frontend/
     output=$(gopls check -severity=hint ./**/*.go); test -z "$output" || { echo "$output"; exit 1;}

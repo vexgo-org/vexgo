@@ -83,7 +83,7 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [loading, isAuthenticated, allowGuestView, navigate, location.pathname]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.SubmitEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       if (isAuthenticated) {
@@ -121,7 +121,7 @@ export function Layout({ children }: LayoutProps) {
 
   // Periodically refresh the unread count (every 30s)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isAuthenticated) {
       interval = setInterval(() => {
         fetchUnreadCount();

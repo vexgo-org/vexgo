@@ -37,7 +37,7 @@ export function ResetPasswordPage() {
     }
   }, [token]);
 
-  const handleRequestReset = async (e: React.FormEvent) => {
+  const handleRequestReset = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
 
@@ -62,7 +62,7 @@ export function ResetPasswordPage() {
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
 
