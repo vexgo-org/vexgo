@@ -66,7 +66,7 @@ export function ProfilePage() {
     null,
   );
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -89,7 +89,7 @@ export function ProfilePage() {
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -123,7 +123,7 @@ export function ProfilePage() {
     }
   };
 
-  const handleUpdateEmail = async (e: React.FormEvent) => {
+  const handleUpdateEmail = async (e: React.MouseEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");

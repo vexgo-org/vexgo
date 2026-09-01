@@ -83,7 +83,7 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [loading, isAuthenticated, allowGuestView, navigate, location.pathname]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.SubmitEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       if (isAuthenticated) {
