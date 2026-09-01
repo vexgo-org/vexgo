@@ -31,7 +31,7 @@ import (
 //	benchstat db.txt memory.txt miniredis.txt valkey.txt
 //
 // The valkey variant needs a reachable server; VEXGO_BENCH_VALKEY_URL
-// overrides its URL (default valkey://127.0.0.1:16379/0). The miniredis
+// overrides its URL (default valkey://127.0.0.1:6379/0). The miniredis
 // variant talks RESP over loopback TCP to an in-process server: it exercises
 // the full client and wire stack but not a production server's compute, so
 // treat its absolute numbers as optimistic. The db variant uses in-process
@@ -46,8 +46,9 @@ const benchBackendEnv = "VEXGO_BENCH_CACHE"
 const benchValkeyURLEnv = "VEXGO_BENCH_VALKEY_URL"
 
 // benchDefaultValkeyURL is the real Valkey server the "valkey" wiring
-// connects to when benchValkeyURLEnv is unset.
-const benchDefaultValkeyURL = "valkey://127.0.0.1:16379"
+// connects to when benchValkeyURLEnv is unset. It matches the production
+// default port (6379) used across the config examples.
+const benchDefaultValkeyURL = "valkey://127.0.0.1:6379"
 
 const (
 	benchPostCount     = 100
