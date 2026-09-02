@@ -196,8 +196,7 @@ export function LoginPage() {
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
 
   const locationState = location.state as
-    | { from?: { pathname: string }; registrationMessage?: string }
-    | undefined;
+    { from?: { pathname: string }; registrationMessage?: string } | undefined;
   const from = locationState?.from?.pathname || "/";
 
   useEffect(() => {
