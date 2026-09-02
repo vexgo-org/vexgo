@@ -2,6 +2,8 @@
 package middleware
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -25,82 +27,144 @@ const (
 	rateMaxEntries = 65536
 )
 
+// RateLimitStore is the consumer-declared seam for per-key request budgeting.
+// NewRateLimiter keeps the budget in-process when no store is given; a
+// distributed store lets multiple instances share one budget.
+type RateLimitStore interface {
+	// Allow consumes one request for key against a budget of limit requests
+	// per window. A spent budget is (false, nil); an error reports a backend
+	// failure, which callers may treat differently from a denial.
+	Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, error)
+}
+
+// CounterStore is the consumer-declared seam for the atomic counters the
+// fixed-window store builds on. It is satisfied structurally by the cache
+// backends (internal/cache) without middleware depending on them.
+type CounterStore interface {
+	// Incr atomically increments the counter stored at key, applying ttl as
+	// its expiration when the call creates the counter.
+	Incr(ctx context.Context, key string, ttl time.Duration) (int64, error)
+}
+
+// fixedWindowRateLimitStore is a distributed RateLimitStore backed by atomic
+// counters: each key's counter expires one window after its first increment,
+// so every window allows limit requests. Window borders allow up to twice
+// the budget across two adjacent windows, which is acceptable for abuse
+// protection.
+type fixedWindowRateLimitStore struct {
+	counters CounterStore
+}
+
+// NewFixedWindowRateLimitStore returns a distributed RateLimitStore backed
+// by atomic counters; see fixedWindowRateLimitStore.
+func NewFixedWindowRateLimitStore(counters CounterStore) RateLimitStore {
+	return &fixedWindowRateLimitStore{counters: counters}
+}
+
+// Allow increments the key's counter and allows the request while the window
+// budget is not spent.
+func (s *fixedWindowRateLimitStore) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
+	if limit <= 0 {
+		// Defensive: a non-positive budget denies instead of dividing by it.
+		return false, nil
+	}
+	n, err := s.counters.Incr(ctx, "rl:"+key, window)
+	if err != nil {
+		return false, err
+	}
+	return n <= int64(limit), nil
+}
+
 // rateLimitEntry pairs a client's token bucket with its last-seen time.
 type rateLimitEntry struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
 }
 
-// ipRateLimiter enforces a per-client-IP request budget. Client IPs come from
-// c.ClientIP(), which honors gin's trusted-proxy configuration, so the key is
-// only as trustworthy as that setup.
-type ipRateLimiter struct {
+// memoryRateLimitStore keeps per-key token buckets in the process.
+type memoryRateLimitStore struct {
 	mu      sync.Mutex
-	limit   rate.Limit
-	burst   int
 	entries map[string]*rateLimitEntry
+}
+
+func newMemoryRateLimitStore() *memoryRateLimitStore {
+	return &memoryRateLimitStore{entries: make(map[string]*rateLimitEntry)}
+}
+
+// Allow consumes one request from the key's token bucket. Buckets start full
+// (burst = limit) and refill to limit per window, matching the fixed-window
+// budget. Sweep and the entry cap keep the map bounded.
+func (s *memoryRateLimitStore) Allow(_ context.Context, key string, limit int, window time.Duration) (bool, error) {
+	if limit <= 0 {
+		// Defensive: a non-positive budget denies instead of dividing by it.
+		return false, nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Sweep idle entries first so a client whose entry was just evicted gets
+	// a fresh budget instead of being judged on the stale limiter.
+	if len(s.entries) >= rateSweepThreshold {
+		s.sweepLocked()
+	}
+	entry, ok := s.entries[key]
+	if !ok {
+		if len(s.entries) >= rateMaxEntries {
+			// Fail closed: refuse to track more clients than the cap.
+			return false, nil
+		}
+		entry = &rateLimitEntry{limiter: rate.NewLimiter(rate.Every(window/time.Duration(limit)), limit)}
+		s.entries[key] = entry
+	}
+	allowed := entry.limiter.Allow()
+	entry.lastSeen = time.Now()
+	return allowed, nil
+}
+
+// sweepLocked drops entries idle beyond rateEntryIdleTTL. Callers must hold
+// s.mu.
+func (s *memoryRateLimitStore) sweepLocked() {
+	cutoff := time.Now().Add(-rateEntryIdleTTL)
+	for key, entry := range s.entries {
+		if entry.lastSeen.Before(cutoff) {
+			delete(s.entries, key)
+		}
+	}
 }
 
 // NewRateLimiter returns a gin middleware that allows each client IP
 // requestsPerMinute requests per minute (bursting up to requestsPerMinute).
 // It is meant for expensive unauthenticated endpoints such as captcha
 // generation. requestsPerMinute <= 0 disables the limiter (nil returned).
-func NewRateLimiter(requestsPerMinute int) gin.HandlerFunc {
+// scope namespaces the budget key, so endpoint groups sharing one store do
+// not share a budget. A nil store keeps the budget in-process.
+func NewRateLimiter(scope string, requestsPerMinute int, store RateLimitStore) gin.HandlerFunc {
 	if requestsPerMinute <= 0 {
 		return nil
 	}
-
-	rl := &ipRateLimiter{
-		limit:   rate.Every(time.Minute / time.Duration(requestsPerMinute)),
-		burst:   requestsPerMinute,
-		entries: make(map[string]*rateLimitEntry),
+	if store == nil {
+		store = newMemoryRateLimitStore()
 	}
-	return rl.handle
-}
 
-func (rl *ipRateLimiter) handle(c *gin.Context) {
-	ip := c.ClientIP()
+	return func(c *gin.Context) {
+		allowed, err := store.Allow(c.Request.Context(), scope+":"+c.ClientIP(), requestsPerMinute, time.Minute)
+		if err != nil {
+			// Fail open: availability wins over abuse protection, which is a
+			// soft target. The error is logged so an ailing store is visible
+			// in production.
+			slog.Error("rate limit store unavailable, allowing request", "scope", scope, "err", err)
+			c.Next()
+			return
+		}
 
-	rl.mu.Lock()
-	// Sweep idle entries first so a client whose entry was just evicted gets
-	// a fresh budget instead of being judged on the stale limiter.
-	if len(rl.entries) >= rateSweepThreshold {
-		rl.sweepLocked()
-	}
-	entry, ok := rl.entries[ip]
-	if !ok {
-		if len(rl.entries) >= rateMaxEntries {
-			// Fail closed: refuse to track more clients than the cap.
-			rl.mu.Unlock()
+		if !allowed {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "Too many requests, please try again later",
 			})
 			return
 		}
-		entry = &rateLimitEntry{limiter: rate.NewLimiter(rl.limit, rl.burst)}
-		rl.entries[ip] = entry
-	}
-	allowed := entry.limiter.Allow()
-	entry.lastSeen = time.Now()
-	rl.mu.Unlock()
 
-	if !allowed {
-		c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-			"error": "Too many requests, please try again later",
-		})
-		return
-	}
-
-	c.Next()
-}
-
-// sweepLocked drops entries idle beyond rateEntryIdleTTL. Callers must hold
-// rl.mu.
-func (rl *ipRateLimiter) sweepLocked() {
-	cutoff := time.Now().Add(-rateEntryIdleTTL)
-	for ip, entry := range rl.entries {
-		if entry.lastSeen.Before(cutoff) {
-			delete(rl.entries, ip)
-		}
+		c.Next()
 	}
 }

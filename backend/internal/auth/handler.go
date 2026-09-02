@@ -32,6 +32,9 @@ type Handler struct {
 	// rateLimitPerMinute caps unauthenticated credential endpoints per client
 	// IP; mirrored from deps.RateLimitPerMinute.
 	rateLimitPerMinute int
+
+	// rateLimit stores the per-IP request budget; nil keeps it in-process.
+	rateLimit middleware.RateLimitStore
 }
 
 // NewHandler creates an auth HTTP handler with the given dependencies.
@@ -44,6 +47,7 @@ func NewHandler(deps Deps) *Handler {
 		linkHost:            host,
 		honorForwardedProto: deps.BehindReverseProxy,
 		rateLimitPerMinute:  deps.RateLimitPerMinute,
+		rateLimit:           deps.RateLimit,
 	}
 }
 

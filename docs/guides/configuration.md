@@ -130,6 +130,14 @@ Every setting can also be provided as an environment variable. This is the natur
 
 > When `S3_ENABLED=true`, uploaded media is stored in the configured bucket instead of the local `data` directory.
 
+### Content Cache & Valkey
+
+| Variable         | Default | Description                                                                                                                                                          |
+| ---------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_ENABLED`  | `false` | Serve public read paths (post lists, post by slug, popular, latest, home stats) through the content cache. `false` = every read goes to the database.                |
+| `VALKEY_ENABLED` | `false` | Store cacheable state in Valkey (Redis-compatible): the content cache (when `CACHE_ENABLED=true`) plus rate limiting and OAuth login state, shared across instances. |
+| `VALKEY_URL`     | —       | Valkey connection URL, e.g. `valkey://127.0.0.1:6379` (required when `VALKEY_ENABLED=true`; `redis://` and `rediss://` for TLS are also accepted)                    |
+
 ---
 
 ## Setting Up a Database
@@ -286,6 +294,34 @@ docker run -d --name vexgo \
 ```
 
 > **MinIO/Wasabi:** set `S3_FORCE_PATH=true` — most S3-compatible services require path-style URLs.
+
+## Content Cache & Valkey
+
+VexGo caches its public read paths (post lists, single posts, popular/latest, home stats) behind a read-through cache, and can move rate-limiting and OAuth login state out of the process. Two switches control this independently:
+
+- **`cache_enabled`** (default `false`) — the content cache. `false` sends every public read straight to the database.
+- **`valkey_enabled`** (default `false`) — store cacheable state in a Valkey (Redis-compatible) server: the content cache (when `cache_enabled` is on) **and** the shared state (rate limiting, OAuth login state) that multiple instances must agree on.
+
+```yaml
+cache_enabled: true
+valkey_enabled: true
+valkey_url: "valkey://127.0.0.1:6379"
+```
+
+Behavior matrix:
+
+| `cache_enabled` | `valkey_enabled` | Content cache backend       | Rate limiting / OAuth state        |
+| --------------- | ---------------- | --------------------------- | ---------------------------------- |
+| `false`         | —                | off (direct database reads) | per-process / valkey (see below)   |
+| `true`          | `false`          | in-process memory           | per-process (single instance only) |
+| `true`          | `true`           | Valkey                      | Valkey, shared across instances    |
+
+Notes:
+
+- With `valkey_enabled: true` the server must be reachable at startup — VexGo fails fast on a bad URL or unreachable server instead of failing at request time.
+- Multi-instance deployments require `valkey_enabled: true`; without it, rate-limit budgets and OAuth state are per-process.
+- Keep the Valkey server private (loopback / trusted network, password, TLS via `rediss://`), and configure a `maxmemory` limit with `allkeys-lru` eviction — rate-limit keys rotate per client IP and cannot be bounded application-side.
+- Colocating Valkey with the app (same host or low-RTT network) matters for cheap reads: the cache roundtrip must be cheaper than the database query it replaces.
 
 ## Secrets at Rest Encryption
 

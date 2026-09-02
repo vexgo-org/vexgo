@@ -11,6 +11,9 @@ import (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
+	// Cache backs the read-through decorator for the aggregate stats. nil
+	// disables content caching.
+	Cache ReadCache
 }
 
 // Service contains the business logic of the home domain.
@@ -20,7 +23,11 @@ type Service struct {
 
 // NewService creates a home service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB)}
+	repo := NewRepository(deps.DB)
+	if deps.Cache != nil {
+		repo = NewCachedRepository(repo, deps.Cache)
+	}
+	return &Service{repo: repo}
 }
 
 // Stats holds the aggregate site counters returned by /api/stats.

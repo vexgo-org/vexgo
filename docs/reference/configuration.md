@@ -112,6 +112,14 @@ Run `./vexgo --help` for the authoritative list.
 | `S3_CUSTOM_DOMAIN`                | —       | Custom domain for public file URLs, e.g. `cdn.example.com` (e.g. a CDN in front of the bucket) |
 | `S3_DISABLE_BUCKET_IN_CUSTOM_URL` | `false` | Don't include the bucket name in custom-domain URLs (default: bucket is included)              |
 
+### Content Cache & Valkey
+
+| Variable         | Default | Description                                                                                                                                                                                                                   |
+| ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_ENABLED`  | `false` | Serve public read paths (post lists, post by slug, popular, latest, home stats) through the content cache. `false` = every read goes to the database.                                                                         |
+| `VALKEY_ENABLED` | `false` | Store cacheable state in Valkey (Redis-compatible): the content cache (when `CACHE_ENABLED=true`) plus rate limiting and OAuth login state, shared across instances.                                                          |
+| `VALKEY_URL`     | —       | Valkey connection URL, e.g. `valkey://127.0.0.1:6379` (required when `VALKEY_ENABLED=true`). A trailing path ("/1") or a `db` query parameter selects a logical database; `redis://` and `rediss://` (TLS) are also accepted. |
+
 ## Config File Keys
 
 The config file uses the same settings with lowercase YAML keys. The canonical example lives at `examples/config.yml` in the repository and is loaded with `-c examples/config.yml`.
@@ -182,6 +190,14 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 | `s3_custom_domain`                | —       | Custom domain for public URLs       |
 | `s3_disable_bucket_in_custom_url` | `false` | Omit bucket from custom-domain URLs |
 
+### Cache & Valkey
+
+| YAML key         | Default | Description                                                                                                                              |
+| ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `cache_enabled`  | `false` | Content cache for public read paths; `false` = direct database reads                                                                     |
+| `valkey_enabled` | `false` | Use Valkey for the content cache (when `cache_enabled: true`) and for shared state (rate limiting, OAuth login state)                    |
+| `valkey_url`     | —       | Valkey connection URL; required when `valkey_enabled: true`. A trailing path ("/1") or a `db` query parameter selects a logical database |
+
 ## Environment ↔ Config File ↔ Flag Cross-Reference
 
 | Setting                 | Environment variable            | Config file key                 | CLI flag     |
@@ -220,6 +236,9 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 | S3 bucket               | `S3_BUCKET`                     | `s3_bucket`                     | —            |
 | S3 access key           | `S3_ACCESS_KEY`                 | `s3_access_key`                 | —            |
 | S3 secret key           | `S3_SECRET_KEY`                 | `s3_secret_key`                 | —            |
+| Content cache           | `CACHE_ENABLED`                 | `cache_enabled`                 | —            |
+| Valkey enabled          | `VALKEY_ENABLED`                | `valkey_enabled`                | —            |
+| Valkey URL              | `VALKEY_URL`                    | `valkey_url`                    | —            |
 
 Only `addr`, `port`, and `data` have command-line flags. Every other setting is configured through an environment variable or a config-file key.
 

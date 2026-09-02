@@ -88,7 +88,22 @@ type Config struct {
 	SettingsEncryptionKey string `mapstructure:"settings_encryption_key"`
 
 	// Global options
-	AllowLocalLogin bool `mapstructure:"allow_local_login"` // Allow password-based login (default: true)
+	AllowLocalLogin bool `mapstructure:"allow_local_login"` // Allow password-based login ((default: false))
+
+	// Valkey configuration. When enabled, per-process in-memory state (rate
+	// limiting, SSO state) and public content caching move to a Valkey /
+	// Redis-compatible server so multiple instances share one state. Disabled
+	// (the default) everything stays in memory.
+	ValkeyEnabled bool   `mapstructure:"valkey_enabled"` // Enable Valkey-backed caching (default: false)
+	ValkeyURL     string `mapstructure:"valkey_url"`     // Valkey connection URL, e.g. valkey://127.0.0.1:6379 (redis:// and rediss:// accepted)
+
+	// CacheEnabled turns the content cache for the public read paths (post
+	// lists, post by slug, popular, latest, home stats) on or off. Enabled
+	// (the default) reads are served through a cache: in-process memory
+	// unless valkey is enabled, in which case the configured valkey server is
+	// used. Disabled, every read goes to the database directly. Rate limiting
+	// and SSO state are governed by valkey_enabled regardless of this switch.
+	CacheEnabled bool `mapstructure:"cache_enabled"` // Enable the content cache for public read paths ((default: false))
 
 	// Trusted proxies configuration
 	TrustedProxies     []string `mapstructure:"trusted_proxies"`      // List of trusted proxy IPs/CIDRs (empty = trust none)
@@ -158,6 +173,11 @@ var keyDefaults = map[string]any{
 	"settings_encryption_key": "",
 
 	"allow_local_login": true,
+
+	"cache_enabled": false,
+
+	"valkey_enabled": false,
+	"valkey_url":     "",
 
 	"trusted_proxies":      []string{},
 	"behind_reverse_proxy": false,

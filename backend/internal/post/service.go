@@ -47,6 +47,9 @@ type Deps struct {
 	JWTSecret []byte
 	Notifier  Notifier
 	Files     FileRemover
+	// Cache backs the read-through decorator for the public read paths. nil
+	// disables content caching.
+	Cache ReadCache
 }
 
 // Notifier is the seam for creating notifications; implemented by the notification domain.
@@ -65,7 +68,11 @@ type Service struct {
 
 // NewService creates a post service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), notifier: deps.Notifier, files: deps.Files}
+	repo := NewRepository(deps.DB)
+	if deps.Cache != nil {
+		repo = NewCachedRepository(repo, deps.Cache)
+	}
+	return &Service{repo: repo, notifier: deps.Notifier, files: deps.Files}
 }
 
 // allowGuestView reports whether anonymous viewers may see posts.

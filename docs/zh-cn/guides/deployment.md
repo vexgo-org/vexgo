@@ -13,6 +13,7 @@
 - [ ] 将 `BASE_URL` 设置为公网地址（SSO 回调必需）
 - [ ] 设置 `behind_reverse_proxy: true` 并配置 `trusted_proxies`（或设置 `BEHIND_REVERSE_PROXY=true` / `TRUSTED_PROXIES=...`）
 - [ ] 生产环境使用真实数据库（PostgreSQL）而非默认 SQLite
+- [ ] 在负载均衡后运行多个实例？设置 `VALKEY_ENABLED=true`（及 `VALKEY_URL`），使限流与 OAuth state 多实例共享——参见[多实例扩展](#多实例扩展)
 - [ ] 定期备份数据目录和数据库
 
 ---
@@ -131,6 +132,27 @@ sudo firewall-cmd --reload
 ```
 
 > **提示：** 如果 VexGo 与反向代理在同一台机器上，只需开放 80/443 端口——代理通过 localhost 与 VexGo 通信。
+
+---
+
+## 多实例扩展
+
+VexGo 是单一二进制。默认情况下内容缓存、限流预算与 OAuth 登录 state 都位于**进程内部**——单实例没有问题，但负载均衡后的两个及以上实例必须通过 Valkey（兼容 Redis）服务器共享这些状态：
+
+```yaml
+cache_enabled: true # 内容缓存；false = 公开读取始终直达数据库
+valkey_enabled: true # 多实例部署必填
+valkey_url: "valkey://valkey.internal:6379"
+```
+
+所有实例必须指向同一个 Valkey 服务器。与 `cache_enabled` 不同——它无需外部服务器，会回退到进程内内存缓存——启用 `valkey_enabled` 使 Valkey 成为硬依赖：VexGo 启动时以 PING 验证连接，服务器不可达时拒绝启动（fail-fast），让错误的 URL 立刻暴露而不是等到请求时才失败。
+
+运维要点：
+
+- **保持服务器私有**：回环或可信网络、URL 中带密码、必要时用 `rediss://` 走 TLS。其中的数据被视为可信并直接提供给用户。
+- **配置淘汰策略**：设置 `maxmemory` 上限并配合 `allkeys-lru`——限流键按客户端 IP 轮换，应用层无法设界。
+- **部署位置很重要**：将 Valkey 与应用同宿主（同一台机器、unix socket 或 host 网络），或保持低 RTT 网络路径。对廉价读取（单篇文章）而言，缓存往返必须比它替代的数据库查询更便宜，否则缓存得不偿失。
+- `valkey_enabled: false` 时内容缓存仍使用进程内内存后端——完整行为矩阵见[配置指南](/zh-cn/guides/configuration#内容缓存与-valkey)。
 
 ---
 

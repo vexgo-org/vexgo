@@ -61,6 +61,7 @@ just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main
 - Imports use the full module path: `github.com/vexgo-org/vexgo/backend/internal/<package>`.
 - Package dependency rules (acyclic graph):
   - `config/`, `model/`, and `secrets/` are leaf packages — import no other backend module.
+  - `cache/` is a leaf package providing the cache backends: an in-process memory implementation and a Valkey (Redis-compatible) implementation. It defines one `Cache` interface; consumers never import it — they declare their own narrow seams (e.g. `middleware.CounterStore`, `sso.StateStore`, which `cache.Cache` satisfies structurally) and the composition root (`internal/app`) injects the concrete backend based on `cache_enabled` (content cache on public read paths) and `valkey_enabled`/`valkey_url` (distributed state store behind rate limiting and SSO).
   - `model` holds GORM models plus cross-domain seams (`Notifier`, `FileRemover` in `model/interfaces.go`); it must not import application logic.
   - `config` is a pure setup module.
   - `secrets` provides AES-256-GCM encryption at rest for DB-stored secrets (SMTP password, AI/comment-moderation API keys). Consuming domains declare their own narrow `SecretCipher` interface; the composition root builds `secrets.Cipher` from `settings_encryption_key` (nil when unset → plaintext fallback) and `database.MigrateSecretsAtRest` encrypts plaintext values in place at startup.

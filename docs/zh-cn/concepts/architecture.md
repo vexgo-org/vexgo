@@ -21,6 +21,7 @@ backend/
   internal/
     app/                     # 组合根：组装所有依赖
     auth/                    # 注册、登录、JWT、个人资料、密码重置
+    cache/                   # 缓存后端：进程内内存 + Valkey（valkey-io/valkey-go）
     cli/                     # cobra 命令行：参数、帮助、版本、.env 加载
     comment/                 # 评论和 AI 内容审核
     config/                  # 基于 viper 的分层配置解析，JWT、S3、SSO 初始化
@@ -98,6 +99,18 @@ type Mailer interface {
 ```
 
 这些接口允许 `post`、`comment` 和 `user` 等领域触发通知和文件清理——`auth`/`verification` 则用于发送邮件——而无需导入具体实现，从而保持依赖图无环。
+
+### 缓存后端（`internal/cache/`）
+
+`internal/cache` 是一个**叶子包**（不 import 任何其他 backend 内部包），提供一个 `Cache` 接口——`Get`/`Set`/`Delete`/`GetDel`/`Incr`——以及两个实现：进程内内存后端与基于 `valkey-io/valkey-go` 的 Valkey（兼容 Redis）后端。所有键以 `vexgo:` 前缀命名空间隔离，使服务器可以与无关应用共享。
+
+遵循消费方声明接缝的惯例，没有任何领域包 import `cache`。取而代之：
+
+- `middleware` 声明 `CounterStore`——分布式固定窗口限流器背后的原子自增
+- `sso` 声明 `StateStore`——通过 `Set`/`GetDel` 实现的一次性 OAuth state
+- `post` 与 `home` 声明 `ReadCache`——公开读路径的读穿透装饰器
+
+`cache.Cache` 在结构上满足以上全部接口，组合根注入具体后端（memory，或启动时拨号并 PING 的 valkey 连接）。运行期存储错误在限流器中**fail-open**（可用性优先于防滥用），在 SSO state 检查中**fail-closed**（CSRF 防护保持完整）。
 
 ### 组合根（`internal/app/`）
 

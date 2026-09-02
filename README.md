@@ -201,6 +201,24 @@ db_type: "sqlite"
 # db_name: "vexgo"
 # db_ssl_mode: "disable"  # Options: "disable", "require", "verify-ca", "verify-full"
 
+# ==================== Content Cache & Valkey ====================
+
+# Content cache for public read paths (post lists, post by slug, popular,
+# latest, home stats). Enabled (default) reads are served through a cache:
+# in-process memory unless valkey is enabled, in which case the configured
+# valkey server is used. Disabled, every read goes to the database directly.
+cache_enabled: false
+
+# Enable Valkey (Redis-compatible) for the content cache above and for
+# shared state (rate limiting, OAuth login state) so multiple instances can
+# run behind a load balancer. Disabled (default) everything stays in memory.
+valkey_enabled: false
+
+# Valkey connection URL (required when valkey_enabled is true).
+# A trailing path ("/1") or a "db" query parameter selects a logical
+# database; both default to database 0.
+# valkey_url: "valkey://127.0.0.1:6379"
+
 # ==================== SSO Configuration ====================
 
 # -------------------- GitHub OAuth --------------------
@@ -442,6 +460,16 @@ sudo docker run -d --name vexgo \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
   ghcr.io/vexgo-org/vexgo:latest
 ```
+
+#### Content Cache & Valkey
+
+| Variable         | Default | Description                                                                                                                                                          |
+| ---------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_ENABLED`  | `false` | Serve public read paths (post lists, post by slug, popular, latest, home stats) through the content cache. `false` = every read goes to the database.                |
+| `VALKEY_ENABLED` | `false` | Store cacheable state in Valkey (Redis-compatible): the content cache (when `CACHE_ENABLED=true`) plus rate limiting and OAuth login state, shared across instances. |
+| `VALKEY_URL`     | —       | Valkey connection URL, e.g. `valkey://127.0.0.1:6379` (required when `VALKEY_ENABLED=true`; `redis://` and `rediss://` for TLS are also accepted)                    |
+
+> **Notes:** with `VALKEY_ENABLED=false` the content cache runs on in-process memory and rate limiting/OAuth state are per-process — single-instance only. Running multiple instances behind a load balancer requires `VALKEY_ENABLED=true`. With `VALKEY_ENABLED=true` the server must be reachable at startup (fail-fast) and should be kept private, with a `maxmemory` limit and `allkeys-lru` eviction configured.
 
 ## Database
 

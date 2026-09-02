@@ -15,7 +15,7 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 		// Unauthenticated credential endpoints carry a per-IP rate limit so
 		// online brute-force and mail-bombing cannot run unchecked even when
 		// captcha is disabled.
-		limited := middleware.NewRateLimiter(h.rateLimitPerMinute)
+		limited := middleware.NewRateLimiter("auth", h.rateLimitPerMinute, h.rateLimit)
 
 		if limited != nil {
 			auth.POST("/register", limited, h.Register)

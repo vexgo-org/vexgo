@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/google/uuid"
@@ -58,6 +59,9 @@ type Deps struct {
 	// RateLimitPerMinute caps the requests per client IP per minute on the
 	// captcha endpoints; <= 0 disables the limit.
 	RateLimitPerMinute int
+	// RateLimit stores the per-IP request budget. nil keeps it in-process; a
+	// distributed store shares one budget across instances.
+	RateLimit middleware.RateLimitStore
 }
 
 // Service contains the business logic of the captcha domain.

@@ -13,6 +13,7 @@ Before exposing VexGo to the internet:
 - [ ] Set `BASE_URL` to your public URL (required for SSO callbacks)
 - [ ] Set `behind_reverse_proxy: true` and configure `trusted_proxies` (or set `BEHIND_REVERSE_PROXY=true` / `TRUSTED_PROXIES=...`)
 - [ ] Use a real database (PostgreSQL) instead of the default SQLite for production workloads
+- [ ] Running more than one instance behind a load balancer? Set `VALKEY_ENABLED=true` (plus `VALKEY_URL`) so rate-limiting and OAuth state are shared — see [Scaling to Multiple Instances](#scaling-to-multiple-instances)
 - [ ] Back up the data directory and database on a schedule
 
 ---
@@ -131,6 +132,27 @@ sudo firewall-cmd --reload
 ```
 
 > **Tip:** if VexGo is behind a reverse proxy on the same machine, only ports 80/443 need to be open — the proxy talks to VexGo on localhost.
+
+---
+
+## Scaling to Multiple Instances
+
+VexGo is a single binary. By default the content cache, rate-limiting budgets and OAuth login state live **in the process** — which is correct for one instance, but two or more instances behind a load balancer must share that state through a Valkey (Redis-compatible) server:
+
+```yaml
+cache_enabled: true # content cache; false = public reads always hit the database
+valkey_enabled: true # required for multi-instance deployments
+valkey_url: "valkey://valkey.internal:6379"
+```
+
+Every instance must point at the same Valkey server. Unlike `cache_enabled`, which needs no external server and falls back to the in-process memory cache, enabling `valkey_enabled` makes Valkey a hard dependency: VexGo verifies the connection with a PING at startup and refuses to start when the server is unreachable (fail-fast), so a broken URL surfaces immediately instead of at request time.
+
+Operational notes:
+
+- **Keep the server private**: loopback or a trusted network, a password in the URL, TLS via `rediss://` where appropriate. Everything in it is treated as trusted and served to users.
+- **Configure eviction**: set a `maxmemory` limit with `allkeys-lru` — rate-limit keys rotate per client IP and cannot be bounded application-side.
+- **Placement matters**: colocate Valkey with the app (same host, unix socket or host networking) or keep the network path low-RTT. For cheap reads (a single post), the cache roundtrip must be cheaper than the database query it replaces, or the cache is a net loss.
+- The content cache stays on the in-process memory backend when `valkey_enabled: false` — see the [Configuration Guide](/guides/configuration#content-cache--valkey) for the full behavior matrix.
 
 ---
 
