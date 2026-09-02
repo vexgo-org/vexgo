@@ -356,12 +356,16 @@ func TestList_RoleVisibility(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
+	// The public List returns every published post regardless of the
+	// caller's role (see repository.List: status = published only). The
+	// contributor's own pending post is therefore not visible here; the
+	// contributor's own pending post is visible in MyPosts.
 	_, total, err = svc.List(ctx, ListQuery{UserRole: contributor.Role, UserID: contributor.ID, Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatalf("List error: %v", err)
 	}
-	if total != 3 {
-		t.Errorf("expected 3 visible posts, got %d", total)
+	if total != 2 {
+		t.Errorf("expected 2 published posts visible to contributor, got %d", total)
 	}
 }
 
