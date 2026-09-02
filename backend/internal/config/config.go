@@ -261,8 +261,7 @@ func Load(v *viper.Viper, configFile string) (*Config, error) {
 // a clean "no such file or directory" / "permission denied" without
 // duplicating the filename, which the surrounding error text already carries.
 func cleanPathError(err error) error {
-	var pathErr *fs.PathError
-	if errors.As(err, &pathErr) {
+	if pathErr, ok := errors.AsType[*fs.PathError](err); ok {
 		return pathErr.Err
 	}
 	return err
