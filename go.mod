@@ -1,6 +1,6 @@
 module github.com/vexgo-org/vexgo
 
-go 1.25.0
+go 1.26.7
 
 require (
 	github.com/coreos/go-oidc v2.5.0+incompatible
@@ -26,13 +26,14 @@ require (
 )
 
 require (
+	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/valkey-io/valkey-go v1.0.77
 	github.com/wenlng/go-captcha-assets v1.0.7
 	github.com/wenlng/go-captcha/v2 v2.0.5
 	golang.org/x/time v0.15.0
 )
 
 require (
-	github.com/alicebob/miniredis/v2 v2.38.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -42,7 +43,6 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/valkey-io/valkey-go v1.0.77 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	golang.org/x/image v0.45.0 // indirect
 )

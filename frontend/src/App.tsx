@@ -33,10 +33,7 @@ function App() {
   // Apply theme on app startup
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as
-      | "light"
-      | "dark"
-      | "system"
-      | null;
+      "light" | "dark" | "system" | null;
     const theme = savedTheme || "light";
 
     document.documentElement.classList.remove("light", "dark");

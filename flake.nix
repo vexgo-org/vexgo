@@ -39,9 +39,10 @@
         { pkgs }: {
           default = pkgs.mkShell {
             packages = with pkgs; [
-              go
+              go_1_26
               gofumpt
               golangci-lint
+              gopls
               gotools
               just
               nodejs

@@ -24,7 +24,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/setup@v1
         with:
-          version: 10
+          version: 11
 
       - name: Build frontend
         run: |
@@ -41,7 +41,7 @@ jobs:
 
       - name: Install formatters
         run: |
-          npm install prettier@3.6.2
+          npm install prettier@3.9.6
           go install mvdan.cc/gofumpt@latest
 
       - name: Check Go formatting
@@ -61,7 +61,7 @@ jobs:
 
       - name: Check Prettier formatting
         run: |
-          npx prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json"
+          npx prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json" "./*.{json,yml,yaml}"
 
       - name: Run oxlint
         run: |
