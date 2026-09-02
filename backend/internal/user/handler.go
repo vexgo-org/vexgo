@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -41,13 +42,13 @@ func (h *Handler) GetUserList(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"users": users,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.UsersResponse{
+		Users: users,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -67,9 +68,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Role string `json:"role" binding:"required"`
-	}
+	var req api.UpdateUserRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -99,9 +98,9 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User role updated successfully",
-		"user":    user,
+	c.JSON(http.StatusOK, api.UserRoleUpdateResponse{
+		Message: "User role updated successfully",
+		User:    *user,
 	})
 }
 
@@ -137,7 +136,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "User deleted successfully"})
 }
 
 // ApplyForCreator handles creator application submission
@@ -148,9 +147,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Reason string `json:"reason"`
-	}
+	var req api.ApplyForCreatorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -170,9 +167,9 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "Application submitted successfully",
-		"applicationId": applicationID,
+	c.JSON(http.StatusOK, api.CreatorApplicationApplyResponse{
+		Message:       "Application submitted successfully",
+		ApplicationID: applicationID,
 	})
 }
 
@@ -208,29 +205,28 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 		totalPages = 1
 	}
 
-	// Format response
-	var response []map[string]any
+	response := make([]api.CreatorApplicationView, 0, len(applications))
 	for _, app := range applications {
-		response = append(response, map[string]any{
-			"id":          app.ID,
-			"userId":      app.UserID,
-			"username":    app.User.Username,
-			"email":       app.User.Email,
-			"currentRole": app.User.Role,
-			"status":      app.Status,
-			"reason":      app.Reason,
-			"createdAt":   app.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			"updatedAt":   app.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		response = append(response, api.CreatorApplicationView{
+			ID:          app.ID,
+			UserID:      app.UserID,
+			Username:    app.User.Username,
+			Email:       app.User.Email,
+			CurrentRole: app.User.Role,
+			Status:      app.Status,
+			Reason:      app.Reason,
+			CreatedAt:   app.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:   app.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"applications": response,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.CreatorApplicationsResponse{
+		Applications: response,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -250,10 +246,7 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Action string `json:"action" binding:"required"`
-		Reason string `json:"reason"`
-	}
+	var req api.ReviewCreatorApplicationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -282,7 +275,5 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Application reviewed successfully",
-	})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Application reviewed successfully"})
 }

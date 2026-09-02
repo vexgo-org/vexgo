@@ -117,7 +117,7 @@ export function AdminPage() {
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string) => {
+  const handleDeleteCategory = async (categoryId: string | number) => {
     try {
       await categoriesApi.deleteCategory(categoryId);
       setActionError("");
@@ -128,7 +128,7 @@ export function AdminPage() {
     }
   };
 
-  const handleDeleteTag = async (tagId: string) => {
+  const handleDeleteTag = async (tagId: string | number) => {
     try {
       await tagsApi.deleteTag(tagId);
       setActionError("");
@@ -139,7 +139,7 @@ export function AdminPage() {
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = async (postId: string | number) => {
     try {
       await postsApi.deletePost(postId);
       // Stay on the post management page and refresh the data
@@ -150,7 +150,7 @@ export function AdminPage() {
     }
   };
 
-  const handleEditPost = (postId: string) => {
+  const handleEditPost = (postId: string | number) => {
     navigate(`/edit-post/${postId}`);
   };
 

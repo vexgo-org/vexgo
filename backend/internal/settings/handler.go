@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 
@@ -47,16 +48,7 @@ func (h *Handler) GetSMTPConfig(c *gin.Context) {
 
 // UpdateSMTPConfig updates SMTP configuration
 func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
-	var req struct {
-		Enabled   bool   `json:"enabled"`
-		Host      string `json:"host"`
-		Port      int    `json:"port"`
-		Username  string `json:"username"`
-		Password  string `json:"password"` // if empty, don't update password
-		FromEmail string `json:"fromEmail"`
-		FromName  string `json:"fromName"`
-		TestEmail string `json:"testEmail"` // test email recipient
-	}
+	var req api.UpdateSMTPConfigRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -79,7 +71,10 @@ func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, config)
+	c.JSON(http.StatusOK, api.SMTPConfigUpdateResponse{
+		Message:    "SMTP configuration updated successfully",
+		SMTPConfig: config,
+	})
 }
 
 // TestSMTP tests SMTP configuration
@@ -110,9 +105,9 @@ func (h *Handler) TestSMTP(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Test email has been sent to your inbox",
-		"to":      recipientEmail,
+	c.JSON(http.StatusOK, api.SMTPTestResponse{
+		Message: "Test email has been sent to your inbox",
+		To:      recipientEmail,
 	})
 }
 
@@ -128,15 +123,7 @@ func (h *Handler) GetGeneralSettings(c *gin.Context) {
 
 // UpdateGeneralSettings updates general settings
 func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
-	var req struct {
-		CaptchaEnabled      bool   `json:"captchaEnabled"`
-		RegistrationEnabled bool   `json:"registrationEnabled"`
-		AllowGuestViewPosts bool   `json:"allowGuestViewPosts"`
-		SiteName            string `json:"siteName"`
-		SiteDescription     string `json:"siteDescription"`
-		SiteIcon            string `json:"siteIcon"`
-		ItemsPerPage        int    `json:"itemsPerPage"`
-	}
+	var req api.UpdateGeneralSettingsRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -158,9 +145,9 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":         "General settings updated successfully",
-		"generalSettings": config,
+	c.JSON(http.StatusOK, api.GeneralSettingsUpdateResponse{
+		Message:         "General settings updated successfully",
+		GeneralSettings: config,
 	})
 }
 
@@ -176,13 +163,7 @@ func (h *Handler) GetAIConfig(c *gin.Context) {
 
 // UpdateAIConfig updates AI configuration
 func (h *Handler) UpdateAIConfig(c *gin.Context) {
-	var req struct {
-		Enabled     bool   `json:"enabled"`
-		Provider    string `json:"provider"`
-		ApiEndpoint string `json:"apiEndpoint"`
-		ApiKey      string `json:"apiKey"` // if empty, don't update API key
-		ModelName   string `json:"modelName"`
-	}
+	var req api.UpdateAIConfigRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -202,9 +183,9 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":  "AI config updated successfully",
-		"aiConfig": config,
+	c.JSON(http.StatusOK, api.AIConfigUpdateResponse{
+		Message:  "AI config updated successfully",
+		AIConfig: config,
 	})
 }
 
@@ -259,9 +240,18 @@ func (h *Handler) GetAIModels(c *gin.Context) {
 // GetThemes returns all available themes
 func (h *Handler) GetThemes(c *gin.Context) {
 	themes := h.svc.GetThemes()
-	c.JSON(http.StatusOK, gin.H{
-		"themes": themes,
-	})
+	out := make([]api.Theme, 0, len(themes))
+	for _, theme := range themes {
+		out = append(out, api.Theme{
+			ID:          theme.ID,
+			Name:        theme.Name,
+			Author:      theme.Author,
+			Version:     theme.Version,
+			Description: theme.Description,
+			URL:         theme.URL,
+		})
+	}
+	c.JSON(http.StatusOK, api.ThemesResponse{Themes: out})
 }
 
 // GetThemePreview returns the preview image for a theme
@@ -294,14 +284,12 @@ func (h *Handler) GetThemeConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get theme config"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"activeTheme": activeTheme})
+	c.JSON(http.StatusOK, api.ActiveThemeResponse{ActiveTheme: activeTheme})
 }
 
 // UpdateThemeConfig sets the globally active theme in the database
 func (h *Handler) UpdateThemeConfig(c *gin.Context) {
-	var req struct {
-		ActiveTheme string `json:"activeTheme" binding:"required"`
-	}
+	var req api.UpdateThemeConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -318,9 +306,9 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":     "Theme updated successfully",
-		"activeTheme": activeTheme,
+	c.JSON(http.StatusOK, api.ThemeUpdateResponse{
+		Message:     "Theme updated successfully",
+		ActiveTheme: activeTheme,
 	})
 }
 

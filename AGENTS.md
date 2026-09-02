@@ -39,6 +39,7 @@ just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main
 
 ## Testing Instructions
 
+- **Generated API types**: the frontend types under `frontend/src/types/generated/` are produced by [tygo](https://github.com/gzuidhof/tygo) from the Go source (`tygo.yaml` at the repo root). After changing Go types in `backend/internal/model` or `backend/internal/api` (or the new response envelopes in handlers), regenerate with `just api-types` and commit the output; never hand-edit the generated files.
 - Backend tests use Go testing package.
 - Add tests for new behavior, bugs, and permission boundaries.
 - Services should be tested through Repository interfaces with fakes.

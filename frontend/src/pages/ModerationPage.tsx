@@ -39,7 +39,7 @@ export function ModerationPage() {
   const [rejectedPosts, setRejectedPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
-  const [rejectingPostId, setRejectingPostId] = useState<string | null>(null);
+  const [rejectingPostId, setRejectingPostId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -112,7 +112,7 @@ export function ModerationPage() {
     setSearchTerm("");
   };
 
-  const handleApprovePost = async (postId: string) => {
+  const handleApprovePost = async (postId: string | number) => {
     try {
       await approvePost(postId);
       toast.success(t("moderation.approveSuccess"));
@@ -123,7 +123,7 @@ export function ModerationPage() {
     }
   };
 
-  const handleRejectPost = async (postId: string) => {
+  const handleRejectPost = async (postId: number) => {
     setRejectingPostId(postId);
     setShowRejectDialog(true);
     setRejectionReason("");
@@ -151,7 +151,7 @@ export function ModerationPage() {
     setRejectionReason("");
   };
 
-  const handleResubmitPost = async (postId: string) => {
+  const handleResubmitPost = async (postId: string | number) => {
     try {
       await resubmitPost(postId);
       toast.success(t("moderation.resubmitSuccess"));
@@ -166,7 +166,7 @@ export function ModerationPage() {
     navigate(`/post/${postSlug}`);
   };
 
-  const handleEditPost = (postId: string) => {
+  const handleEditPost = (postId: string | number) => {
     navigate(`/edit-post/${postId}`);
   };
 

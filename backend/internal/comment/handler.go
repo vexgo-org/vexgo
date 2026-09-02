@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -38,17 +39,13 @@ func (h *Handler) GetComments(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"comments": comments})
+	c.JSON(http.StatusOK, api.CommentsResponse{Comments: comments})
 }
 
 // CreateComment creates a comment (requires login)
 func (h *Handler) CreateComment(c *gin.Context) {
 	// Support postId as number or string from frontend
-	var req struct {
-		PostID   any    `json:"postId" binding:"required"`
-		Content  string `json:"content" binding:"required"`
-		ParentID *uint  `json:"parentId"`
-	}
+	var req api.CreateCommentRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -112,11 +109,11 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":            "Comment created successfully",
-		"comment":            comment,
-		"commentsCount":      count,
-		"requiresModeration": comment.Status == model.CommentStatusPending,
+	c.JSON(http.StatusCreated, api.CommentCreateResponse{
+		Message:            "Comment created successfully",
+		Comment:            *comment,
+		CommentsCount:      count,
+		RequiresModeration: comment.Status == model.CommentStatusPending,
 	})
 }
 
@@ -146,7 +143,10 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted", "commentsCount": count})
+	c.JSON(http.StatusOK, api.CommentDeleteResponse{
+		Message:       "Comment deleted",
+		CommentsCount: count,
+	})
 }
 
 // GetCommentModerationConfig gets comment moderation configuration
@@ -162,17 +162,7 @@ func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
 
 // UpdateCommentModerationConfig updates comment moderation configuration
 func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
-	var req struct {
-		ManualReviewEnabled  bool   `json:"manualReviewEnabled"`
-		KeywordFilterEnabled bool   `json:"keywordFilterEnabled"`
-		LLMReviewEnabled     bool   `json:"llmReviewEnabled"`
-		ModelProvider        string `json:"modelProvider"`
-		ApiKey               string `json:"apiKey"` // if empty, don't update
-		ApiEndpoint          string `json:"apiEndpoint"`
-		ModelName            string `json:"modelName"`
-		ModerationPrompt     string `json:"moderationPrompt"`
-		BlockKeywords        string `json:"blockKeywords"`
-	}
+	var req api.UpdateCommentModerationConfigRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -203,9 +193,9 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Comment moderation configuration updated successfully",
-		"config":  config,
+	c.JSON(http.StatusOK, api.CommentModerationUpdateResponse{
+		Message: "Comment moderation configuration updated successfully",
+		Config:  config,
 	})
 }
 
@@ -226,9 +216,9 @@ func (h *Handler) TestModerationConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":  result.Message,
-		"response": result.Response,
+	c.JSON(http.StatusOK, api.LLMTestResponse{
+		Message:  result.Message,
+		Response: result.Response,
 	})
 }
 
@@ -278,13 +268,13 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"comments": comments,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       pageNum,
-			"limit":      limitNum,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.CommentsResponse{
+		Comments: comments,
+		Pagination: &api.Pagination{
+			Total:      total,
+			Page:       pageNum,
+			Limit:      limitNum,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -311,8 +301,8 @@ func (h *Handler) setStatus(c *gin.Context, status model.CommentStatus, successM
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": successMsg,
-		"comment": comment,
+	c.JSON(http.StatusOK, api.CommentMutationResponse{
+		Message: successMsg,
+		Comment: *comment,
 	})
 }

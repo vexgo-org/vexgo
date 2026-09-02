@@ -1,0 +1,53 @@
+# Tygo generates TypeScript types from Go source.
+#
+# The `model` package holds the GORM/JSON models and the `api` package holds
+# the HTTP response envelopes. Run `just api-types` (or `tygo generate`) from
+# the repository root after changing either package, and commit the resulting
+# files under frontend/src/types/generated/.
+type_mappings:
+  time.Time: "string /* RFC3339 */"
+  time.Duration: "number /* int, ns */"
+
+packages:
+  - path: "github.com/vexgo-org/vexgo/backend/internal/model"
+    output_path: "frontend/src/types/generated/model.ts"
+    # Server-internal seams (interfaces for dependency injection, GORM-only
+    # SSO bindings) have no counterpart in the frontend API surface.
+    exclude_files:
+      - "interfaces.go"
+      - "sso_binding.go"
+    enum_style: "union"
+
+  - path: "github.com/vexgo-org/vexgo/backend/internal/api"
+    output_path: "frontend/src/types/generated/api.ts"
+    # Cross-package references: map model types to their generated names and
+    # import them from the sibling model output.
+    type_mappings:
+      model.User: "User"
+      model.Post: "Post"
+      model.Tag: "Tag"
+      model.Category: "Category"
+      model.Comment: "Comment"
+      model.MediaFile: "MediaFile"
+      model.SMTPConfig: "SMTPConfig"
+      model.GeneralSettings: "GeneralSettings"
+      model.AIConfig: "AIConfig"
+      model.CommentModerationConfig: "CommentModerationConfig"
+      model.Notification: "Notification"
+      model.CreatorApplicationStatus: "CreatorApplicationStatus"
+    enum_style: "union"
+    frontmatter: |
+      import type {
+        User,
+        Post,
+        Tag,
+        Category,
+        Comment,
+        MediaFile,
+        SMTPConfig,
+        GeneralSettings,
+        AIConfig,
+        CommentModerationConfig,
+        Notification,
+        CreatorApplicationStatus,
+      } from "./model";

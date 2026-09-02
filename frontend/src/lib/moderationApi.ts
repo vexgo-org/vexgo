@@ -1,5 +1,9 @@
 import api from "./api";
-import type { Post, PostsResponse } from "@/types";
+import type {
+  PostsResponse,
+  PostMutationResponse,
+  RejectPostRequest,
+} from "@/types";
 
 // Get the list of pending posts
 export const getPendingPosts = (params?: {
@@ -23,15 +27,15 @@ export const getRejectedPosts = (params?: {
 }) => api.get<PostsResponse>("/moderation/rejected", { params });
 
 // Approve a post
-export const approvePost = (id: string) =>
-  api.put<{ message: string; post: Post }>(`/moderation/approve/${id}`);
+export const approvePost = (id: string | number) =>
+  api.put<PostMutationResponse>(`/moderation/approve/${id}`);
 
 // Reject a post
-export const rejectPost = (id: string, rejectionReason?: string) =>
-  api.put<{ message: string; post: Post }>(`/moderation/reject/${id}`, {
-    rejectionReason,
-  });
+export const rejectPost = (id: string | number, rejectionReason?: string) =>
+  api.put<PostMutationResponse>(`/moderation/reject/${id}`, {
+    rejectionReason: rejectionReason ?? "",
+  } satisfies RejectPostRequest);
 
 // Resubmit a post for review
-export const resubmitPost = (id: string) =>
-  api.put<{ message: string; post: Post }>(`/moderation/resubmit/${id}`);
+export const resubmitPost = (id: string | number) =>
+  api.put<PostMutationResponse>(`/moderation/resubmit/${id}`);

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
@@ -98,9 +99,9 @@ func (h *Handler) UploadFile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "File uploaded successfully",
-		"file":    media,
+	c.JSON(http.StatusOK, api.UploadResponse{
+		Message: "File uploaded successfully",
+		File:    &media,
 	})
 }
 
@@ -133,9 +134,9 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 		uploadedFiles = append(uploadedFiles, media)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "File upload completed",
-		"files":   uploadedFiles,
+	c.JSON(http.StatusOK, api.UploadResponse{
+		Message: "File upload completed",
+		Files:   uploadedFiles,
 	})
 }
 
@@ -149,7 +150,7 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"files": files})
+	c.JSON(http.StatusOK, api.FilesResponse{Files: files})
 }
 
 // DeleteFile deletes a file (must be uploader or admin).
@@ -171,5 +172,5 @@ func (h *Handler) DeleteFile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "File deleted"})
 }

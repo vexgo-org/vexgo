@@ -35,7 +35,7 @@ import {
   Eye,
   XCircle,
 } from "lucide-react";
-import { normalizeTagsArray } from "@/lib/utils";
+
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { getLocale } from "@/lib/i18n";
 
@@ -49,13 +49,9 @@ export function PostDetailPage() {
     window as Window & { __INITIAL_DATA__?: { post?: Post } }
   ).__INITIAL_DATA__;
 
-  // Normalize tags in the initial data
-  const processedInitialData = initialData?.post
-    ? {
-        ...initialData.post,
-        tags: normalizeTagsArray(initialData.post.tags),
-      }
-    : null;
+  // Keep the post as the backend sent it, so the client and the SSR payload
+  // share the same shape.
+  const processedInitialData = initialData?.post ?? null;
 
   // Initialize state with the processed initialData so client and server rendering match
   const [post, setPost] = useState<Post | null>(processedInitialData || null);
@@ -76,9 +72,7 @@ export function PostDetailPage() {
       console.log("Loading post by slug:", slug);
       const response = await postsApi.getPost(slug!);
       console.log("Post loaded successfully:", response.data);
-      const p = response.data.post;
-      p.tags = normalizeTagsArray(p.tags);
-      setPost(p);
+      setPost(response.data.post);
       setLikesCount(response.data.post.likesCount || 0);
     } catch (error: unknown) {
       console.error("Failed to load post:", error);
@@ -229,7 +223,7 @@ export function PostDetailPage() {
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
+  const handleDeleteComment = async (commentId: string | number) => {
     if (!post?.id) return;
     try {
       const response = await commentsApi.deleteComment(commentId);
@@ -350,12 +344,10 @@ export function PostDetailPage() {
 
         {/* Category and tags */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          {post.categoryInfo && (
-            <Badge variant="secondary">{post.categoryInfo.name}</Badge>
-          )}
+          {post.category && <Badge variant="secondary">{post.category}</Badge>}
           {post.tags?.map((tag) => (
-            <Badge key={tag} variant="outline">
-              {tag}
+            <Badge key={tag.id} variant="outline">
+              {tag.name}
             </Badge>
           ))}
         </div>

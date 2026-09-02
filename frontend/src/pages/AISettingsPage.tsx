@@ -37,14 +37,14 @@ export function AISettingsPage() {
   const [testing, setTesting] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [config, setConfig] = useState<AIConfig>({
-    id: "",
+    id: 0,
     enabled: false,
     provider: "openai",
     apiEndpoint: "",
     apiKey: "",
     modelName: "gpt-3.5-turbo",
-    createdAt: "",
-    updatedAt: "",
+    created_at: "",
+    updated_at: "",
   });
   const [models, setModels] = useState<AIModel[]>([]);
 

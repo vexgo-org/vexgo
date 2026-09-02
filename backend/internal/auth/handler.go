@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -93,14 +94,7 @@ func (h *Handler) emailLinkOrigin(c *gin.Context) (protocol, host string) {
 func (h *Handler) Login(c *gin.Context) {
 	slog.Debug("user login attempt started")
 
-	var req struct {
-		Email        string `json:"email" binding:"required"`
-		Password     string `json:"password" binding:"required"`
-		CaptchaID    string `json:"captcha_id"`
-		CaptchaToken string `json:"captcha_token"`
-		CaptchaX     int    `json:"captcha_x"`
-		CaptchaY     int    `json:"captcha_y"`
-	}
+	var req api.LoginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("failed to bind login request JSON", "err", err)
@@ -146,17 +140,9 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"role":     user.Role,
-			"avatar":   user.Avatar,
-			"bio":      user.Bio,
-			"birthday": user.Birthday,
-		},
+	c.JSON(http.StatusOK, api.LoginResponse{
+		Token: token,
+		User:  *user,
 	})
 }
 
@@ -164,15 +150,7 @@ func (h *Handler) Login(c *gin.Context) {
 func (h *Handler) Register(c *gin.Context) {
 	slog.Debug("user registration attempt started")
 
-	var req struct {
-		Email        string `json:"email" binding:"required,email"`
-		Password     string `json:"password" binding:"required"`
-		Username     string `json:"username" binding:"required"`
-		CaptchaID    string `json:"captcha_id"`
-		CaptchaToken string `json:"captcha_token"`
-		CaptchaX     int    `json:"captcha_x"`
-		CaptchaY     int    `json:"captcha_y"`
-	}
+	var req api.RegisterRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Error("failed to bind registration request JSON", "err", err)
@@ -228,20 +206,20 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 
 	if result.RequiresVerification {
-		c.JSON(http.StatusCreated, gin.H{
-			"message":               "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
-			"user":                  result.User,
-			"email_verified":        false,
-			"requires_verification": true,
+		c.JSON(http.StatusCreated, api.RegisterResponse{
+			Message:              "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
+			User:                 *result.User,
+			EmailVerified:        false,
+			RequiresVerification: true,
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":               "Registration successful",
-		"user":                  result.User,
-		"email_verified":        result.User.EmailVerified,
-		"requires_verification": false,
+	c.JSON(http.StatusCreated, api.RegisterResponse{
+		Message:              "Registration successful",
+		User:                 *result.User,
+		EmailVerified:        result.User.EmailVerified,
+		RequiresVerification: false,
 	})
 }
 
@@ -262,17 +240,12 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, api.UserResponse{User: *user})
 }
 
 // UpdateProfile updates the current user's profile
 func (h *Handler) UpdateProfile(c *gin.Context) {
-	var req struct {
-		Username *string `json:"username"`
-		Avatar   *string `json:"avatar"`
-		Birthday *string `json:"birthday"`
-		Bio      *string `json:"bio"`
-	}
+	var req api.UpdateProfileRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -297,15 +270,12 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, api.UserResponse{User: *user})
 }
 
 // ChangePassword changes the current user's password
 func (h *Handler) ChangePassword(c *gin.Context) {
-	var req struct {
-		OldPassword string `json:"oldPassword" binding:"required"`
-		NewPassword string `json:"newPassword" binding:"required,min=6"`
-	}
+	var req api.ChangePasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -330,17 +300,12 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Password changed successfully"})
 }
 
 // UpdateSettings updates the current user's privacy settings
 func (h *Handler) UpdateSettings(c *gin.Context) {
-	var req struct {
-		ProfileVisibility *string `json:"profile_visibility"`
-		HideEmail         *bool   `json:"hide_email"`
-		HideBirthday      *bool   `json:"hide_birthday"`
-		HideBio           *bool   `json:"hide_bio"`
-	}
+	var req api.UpdateSettingsRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -369,17 +334,15 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Settings updated successfully",
-		"user":    user,
+	c.JSON(http.StatusOK, api.UserResponse{
+		Message: "Settings updated successfully",
+		User:    *user,
 	})
 }
 
 // UpdateEmail changes the current user's email
 func (h *Handler) UpdateEmail(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
+	var req api.UpdateEmailRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -429,9 +392,7 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 
 // RequestPasswordReset requests a password reset email
 func (h *Handler) RequestPasswordReset(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
+	var req api.RequestPasswordResetRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -453,7 +414,7 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "If the email exists, reset link has been sent"})
 }
 
 // ResendVerification sends another verification email for an unverified
@@ -462,9 +423,7 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 // or body difference would let callers probe whether an address exists and is
 // unverified. Failures are logged inside the service layer.
 func (h *Handler) ResendVerification(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
+	var req api.ResendVerificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -477,17 +436,14 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 		Email: req.Email, Protocol: protocol, Host: host,
 	})
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "If the account exists and is not verified, a verification email has been sent.",
+	c.JSON(http.StatusOK, api.MessageResponse{
+		Message: "If the account exists and is not verified, a verification email has been sent.",
 	})
 }
 
 // ResetPassword resets the password with an emailed token
 func (h *Handler) ResetPassword(c *gin.Context) {
-	var req struct {
-		Token    string `json:"token" binding:"required"`
-		Password string `json:"password" binding:"required,min=6"`
-	}
+	var req api.ResetPasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -512,7 +468,7 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Password reset successfully"})
 }
 
 func (h *Handler) VerifyEmail(c *gin.Context) {
@@ -546,23 +502,16 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 	}
 
 	if emailChange {
-		if newEmail != "" {
-			c.JSON(http.StatusOK, gin.H{
-				"message":         "Email change successful! Your new email is now active.",
-				"require_relogin": true,
-				"new_email":       newEmail,
-			})
-		} else {
-			c.JSON(http.StatusOK, gin.H{
-				"message":         "Email change successful! Your new email is now active.",
-				"require_relogin": true,
-			})
-		}
+		c.JSON(http.StatusOK, api.VerifyEmailResponse{
+			Message:        "Email change successful! Your new email is now active.",
+			RequireRelogin: true,
+			NewEmail:       newEmail,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Email verification successful! You can now log in.",
+	c.JSON(http.StatusOK, api.VerifyEmailResponse{
+		Message: "Email verification successful! You can now log in.",
 	})
 }
 
@@ -584,8 +533,8 @@ func (h *Handler) GetVerificationStatus(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"email_verified": emailVerified,
-		"email":          email,
+	c.JSON(http.StatusOK, api.VerificationStatusResponse{
+		EmailVerified: emailVerified,
+		Email:         email,
 	})
 }

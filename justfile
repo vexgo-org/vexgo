@@ -18,6 +18,11 @@ test:
     # Run tests.
     go test -v ./...
 
+api-types:
+    # Regenerate TypeScript API types from the Go source using tygo
+    # (requires the tygo CLI; config lives in tygo.yaml at the repo root).
+    tygo generate
+
 run:
     # Run VexGo.
     just ensure-dist

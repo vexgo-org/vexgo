@@ -28,7 +28,6 @@ import {
   SearchX,
   Eye,
 } from "lucide-react";
-import { normalizeTagsArray } from "@/lib/utils";
 
 export function HomePage() {
   const { t } = useTranslation();
@@ -64,14 +63,14 @@ export function HomePage() {
         const postId = String(d.postId);
         setPosts((prev) =>
           prev.map((p) =>
-            p.id === postId
+            String(p.id) === postId
               ? { ...p, isLiked: d.isLiked, likesCount: d.likesCount }
               : p,
           ),
         );
         setPopularPosts((prev) =>
           prev.map((p) =>
-            p.id === postId
+            String(p.id) === postId
               ? { ...p, isLiked: d.isLiked, likesCount: d.likesCount }
               : p,
           ),
@@ -88,7 +87,9 @@ export function HomePage() {
         const postId = String(d.postId);
         setPosts((prev) =>
           prev.map((p) =>
-            p.id === postId ? { ...p, commentsCount: d.commentsCount } : p,
+            String(p.id) === postId
+              ? { ...p, commentsCount: d.commentsCount }
+              : p,
           ),
         );
       } catch {
@@ -106,25 +107,9 @@ export function HomePage() {
     };
   }, []);
 
-  // Normalize posts returned by the backend: id/authorId as strings, timestamps as ISO strings
-  const normalizePost = (raw: Partial<Post>): Post => {
-    if (!raw) return raw as Post;
-    return {
-      ...raw,
-      id: String(raw.id),
-      authorId:
-        raw.authorId !== undefined && raw.authorId !== null
-          ? String(raw.authorId)
-          : raw.authorId,
-      createdAt: raw.createdAt
-        ? new Date(raw.createdAt).toISOString()
-        : raw.createdAt,
-      updatedAt: raw.updatedAt
-        ? new Date(raw.updatedAt).toISOString()
-        : raw.updatedAt,
-      tags: normalizeTagsArray(raw.tags),
-    } as Post;
-  };
+  // Posts come from the backend already in their final API shape; keep them
+  // as-is so the types stay faithful to the wire format.
+  const normalizePost = (raw: Post): Post => raw;
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -151,13 +136,11 @@ export function HomePage() {
         const bulk = (respBulk.data.posts || []).map((p) => normalizePost(p));
         const q = searchQuery.trim().toLowerCase();
         const tagMatches = bulk.filter((p) =>
-          (p.tags || []).some((t: string) =>
-            String(t).toLowerCase().includes(q),
-          ),
+          (p.tags || []).some((t) => t.name.toLowerCase().includes(q)),
         );
         const combinedMap = new Map<string, Post>();
-        titleMatches.forEach((p) => combinedMap.set(p.id, p));
-        tagMatches.forEach((p) => combinedMap.set(p.id, p));
+        titleMatches.forEach((p) => combinedMap.set(String(p.id), p));
+        tagMatches.forEach((p) => combinedMap.set(String(p.id), p));
         const combined = Array.from(combinedMap.values());
         setPosts(combined);
         // Use the title search pagination info as the page pagination reference
@@ -210,9 +193,9 @@ export function HomePage() {
       // Count how many times each tag appears
       const tagCounts: Record<string, number> = {};
       allPosts.forEach((post) => {
-        post.tags?.forEach((tag: string) => {
-          if (tag) {
-            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        post.tags?.forEach((tag) => {
+          if (tag.name) {
+            tagCounts[tag.name] = (tagCounts[tag.name] || 0) + 1;
           }
         });
       });
@@ -271,15 +254,19 @@ export function HomePage() {
     });
   };
 
-  const handleToggleLike = async (postId: string) => {
+  const handleToggleLike = async (postId: string | number) => {
     try {
       const response = await likesApi.toggleLike(postId);
       const { isLiked, likesCount } = response.data;
       setPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, isLiked, likesCount } : p)),
+        prev.map((p) =>
+          String(p.id) === String(postId) ? { ...p, isLiked, likesCount } : p,
+        ),
       );
       setPopularPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, isLiked, likesCount } : p)),
+        prev.map((p) =>
+          String(p.id) === String(postId) ? { ...p, isLiked, likesCount } : p,
+        ),
       );
     } catch (error) {
       console.error("Failed to toggle like:", error);
@@ -376,18 +363,16 @@ export function HomePage() {
                     <CardContent className="p-6">
                       {/* Category and tags */}
                       <div className="flex flex-wrap items-center gap-2 mb-3">
-                        {post.categoryInfo && (
-                          <Badge variant="secondary">
-                            {post.categoryInfo.name}
-                          </Badge>
+                        {post.category && (
+                          <Badge variant="secondary">{post.category}</Badge>
                         )}
                         {post.tags?.slice(0, 3).map((tag) => (
                           <Badge
-                            key={tag}
+                            key={tag.id}
                             variant="outline"
                             className="text-xs"
                           >
-                            {tag}
+                            {tag.name}
                           </Badge>
                         ))}
                       </div>

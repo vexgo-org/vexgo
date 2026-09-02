@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -53,13 +54,13 @@ func (h *Handler) GetPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.PostsResponse{
+		Posts: posts,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -81,7 +82,7 @@ func (h *Handler) GetPostByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"post": post})
+	c.JSON(http.StatusOK, api.PostResponse{Post: *post})
 }
 
 // GetPost returns a single post by slug.
@@ -104,7 +105,7 @@ func (h *Handler) GetPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"post": post})
+	c.JSON(http.StatusOK, api.PostResponse{Post: *post})
 }
 
 // CreatePost creates a post.
@@ -120,16 +121,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
 
-	var req struct {
-		Slug       string   `json:"slug" binding:"required"`
-		Title      string   `json:"title" binding:"required"`
-		Content    string   `json:"content" binding:"required"`
-		Category   any      `json:"category" binding:"required"`
-		Tags       []string `json:"tags"`
-		Excerpt    string   `json:"excerpt"`
-		CoverImage string   `json:"coverImage"`
-		Status     string   `json:"status"`
-	}
+	var req api.CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -163,7 +155,10 @@ func (h *Handler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Post created successfully", "post": post})
+	c.JSON(http.StatusCreated, api.PostMutationResponse{
+		Message: "Post created successfully",
+		Post:    *post,
+	})
 }
 
 // UpdatePost updates a post (author or admin only).
@@ -171,16 +166,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	id := c.Param("id")
 	userID := middleware.CurrentUserID(c)
 
-	var req struct {
-		Slug       string   `json:"slug"`
-		Title      string   `json:"title"`
-		Content    string   `json:"content"`
-		Category   any      `json:"category"`
-		Tags       []string `json:"tags"`
-		Excerpt    string   `json:"excerpt"`
-		CoverImage string   `json:"coverImage"`
-		Status     string   `json:"status"`
-	}
+	var req api.UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -213,7 +199,10 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "post": post})
+	c.JSON(http.StatusOK, api.PostMutationResponse{
+		Message: "Post updated successfully",
+		Post:    *post,
+	})
 }
 
 // DeletePost deletes a post (author or admin only).
@@ -234,7 +223,7 @@ func (h *Handler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Post deleted successfully"})
 }
 
 // GetMyPosts returns the current user's own posts.
@@ -260,13 +249,13 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.PostsResponse{
+		Posts: posts,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -294,13 +283,13 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.PostsResponse{
+		Posts: posts,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -334,13 +323,13 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.PostsResponse{
+		Posts: posts,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -361,7 +350,7 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"posts": posts})
+	c.JSON(http.StatusOK, api.PostListResponse{Posts: posts})
 }
 
 // GetLatestPosts returns the latest posts.
@@ -376,7 +365,7 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"posts": posts})
+	c.JSON(http.StatusOK, api.PostListResponse{Posts: posts})
 }
 
 // GetCategories returns the category list.
@@ -390,15 +379,12 @@ func (h *Handler) GetCategories(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"categories": categories})
+	c.JSON(http.StatusOK, api.CategoryListResponse{Categories: categories})
 }
 
 // CreateCategory creates a category.
 func (h *Handler) CreateCategory(c *gin.Context) {
-	var req struct {
-		Name        string `json:"name" binding:"required,max=100"`
-		Description string `json:"description" binding:"max=500"`
-	}
+	var req api.CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -421,9 +407,9 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":  "Category created successfully",
-		"category": category,
+	c.JSON(http.StatusCreated, api.CategoryCreateResponse{
+		Message:  "Category created successfully",
+		Category: *category,
 	})
 }
 
@@ -438,7 +424,7 @@ func (h *Handler) GetTags(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"tags": tags})
+	c.JSON(http.StatusOK, api.TagListResponse{Tags: tags})
 }
 
 // DeleteCategory deletes an empty category (contributor and above; 403 for
@@ -467,7 +453,7 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Category deleted successfully"})
 }
 
 // DeleteTag deletes an empty tag (contributor and above; 403 for insufficient
@@ -496,7 +482,7 @@ func (h *Handler) DeleteTag(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Tag deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Tag deleted successfully"})
 }
 
 // parseIDParam parses a numeric route :id, reporting whether it is valid.
@@ -523,9 +509,7 @@ func inUseMessage(kind string, count int64) string {
 
 // CreateTag creates a tag.
 func (h *Handler) CreateTag(c *gin.Context) {
-	var req struct {
-		Name string `json:"name" binding:"required,max=100"`
-	}
+	var req api.CreateTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
@@ -548,9 +532,9 @@ func (h *Handler) CreateTag(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Tag created successfully",
-		"tag":     tag,
+	c.JSON(http.StatusCreated, api.TagCreateResponse{
+		Message: "Tag created successfully",
+		Tag:     *tag,
 	})
 }
 
@@ -590,13 +574,13 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, api.PostsResponse{
+		Posts: posts,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
@@ -613,14 +597,12 @@ func (h *Handler) ApprovePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post approved", "post": post})
+	c.JSON(http.StatusOK, api.PostMutationResponse{Message: "Post approved", Post: *post})
 }
 
 // RejectPost rejects a post.
 func (h *Handler) RejectPost(c *gin.Context) {
-	var req struct {
-		RejectionReason string `json:"rejectionReason"`
-	}
+	var req api.RejectPostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request parameters"})
 		return
@@ -636,7 +618,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post has been rejected", "post": post})
+	c.JSON(http.StatusOK, api.PostMutationResponse{Message: "Post has been rejected", Post: *post})
 }
 
 // ResubmitPost resubmits a rejected post for moderation.
@@ -654,7 +636,7 @@ func (h *Handler) ResubmitPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post resubmitted for moderation", "post": post})
+	c.JSON(http.StatusOK, api.PostMutationResponse{Message: "Post resubmitted for moderation", Post: *post})
 }
 
 // ToggleLike likes or unlikes a post.
@@ -672,10 +654,20 @@ func (h *Handler) ToggleLike(c *gin.Context) {
 	}
 
 	if isLiked {
-		c.JSON(http.StatusOK, gin.H{"message": "Liked successfully", "postId": postID, "isLiked": true, "likesCount": count})
+		c.JSON(http.StatusOK, api.LikeResponse{
+			Message:    "Liked successfully",
+			PostID:     postID,
+			IsLiked:    true,
+			LikesCount: count,
+		})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Like removed", "postId": postID, "isLiked": false, "likesCount": count})
+	c.JSON(http.StatusOK, api.LikeResponse{
+		Message:    "Like removed",
+		PostID:     postID,
+		IsLiked:    false,
+		LikesCount: count,
+	})
 }
 
 // GetLikeStatus returns the like status of a post (public, optional login).
@@ -688,9 +680,9 @@ func (h *Handler) GetLikeStatus(c *gin.Context) {
 
 	isLiked, count := h.svc.LikeStatus(c.Request.Context(), postID, userID)
 
-	c.JSON(http.StatusOK, gin.H{
-		"postId":     postID,
-		"likesCount": count,
-		"isLiked":    isLiked,
+	c.JSON(http.StatusOK, api.LikeResponse{
+		PostID:     postID,
+		LikesCount: count,
+		IsLiked:    isLiked,
 	})
 }

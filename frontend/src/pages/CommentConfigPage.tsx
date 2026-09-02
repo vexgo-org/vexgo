@@ -31,7 +31,7 @@ export function CommentConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<CommentModerationConfig>({
-    id: "",
+    id: 0,
     manualReviewEnabled: false,
     keywordFilterEnabled: false,
     llmReviewEnabled: false,

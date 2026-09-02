@@ -24,7 +24,7 @@ export function SMTPSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [config, setConfig] = useState<SMTPConfig>({
-    id: "",
+    id: 0,
     enabled: false,
     host: "",
     port: 587,
@@ -33,8 +33,8 @@ export function SMTPSettingsPage() {
     fromEmail: "",
     fromName: t("common.siteName") || "VexGo",
     testEmail: "",
-    createdAt: "",
-    updatedAt: "",
+    created_at: "",
+    updated_at: "",
   });
 
   const loadConfig = useCallback(async () => {

@@ -40,7 +40,6 @@ import {
   XCircle,
   AlertCircle,
 } from "lucide-react";
-import { normalizeTagsArray } from "@/lib/utils";
 
 export function MyPostsPage() {
   const { t } = useTranslation();
@@ -70,12 +69,7 @@ export function MyPostsPage() {
         page: currentPage,
         limit: 10,
       });
-      setPosts(
-        response.data.posts.map((p) => ({
-          ...p,
-          tags: normalizeTagsArray(p.tags),
-        })),
-      );
+      setPosts(response.data.posts);
       setPagination(response.data.pagination);
     } catch (error) {
       console.error("Failed to load posts:", error);
@@ -88,7 +82,7 @@ export function MyPostsPage() {
     loadPosts();
   }, [currentPage, loadPosts]);
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = async (postId: string | number) => {
     try {
       await postsApi.deletePost(postId);
       loadPosts();
@@ -257,11 +251,11 @@ export function MyPostsPage() {
                         <div className="flex flex-wrap gap-1">
                           {post.tags.slice(0, 3).map((tag) => (
                             <Badge
-                              key={tag}
+                              key={tag.id}
                               variant="outline"
                               className="text-xs"
                             >
-                              {tag}
+                              {tag.name}
                             </Badge>
                           ))}
                         </div>

@@ -5,7 +5,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import type { User } from "@/types";
+import type { User, LoginRequest, RegisterRequest } from "@/types";
 import { authApi } from "@/lib/api";
 import { t } from "@/lib/i18n";
 
@@ -65,14 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     captchaData?: { id: string; token: string; x: number; y: number },
   ) => {
-    const requestData: {
-      email: string;
-      password: string;
-      captcha_id?: string;
-      captcha_token?: string;
-      captcha_x?: number;
-      captcha_y?: number;
-    } = { email, password };
+    const requestData: LoginRequest = { email, password };
     if (captchaData) {
       requestData.captcha_id = captchaData.id;
       requestData.captcha_token = captchaData.token;
@@ -103,15 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     captchaData?: { id: string; token: string; x: number; y: number },
   ) => {
-    const requestData: {
-      username: string;
-      email: string;
-      password: string;
-      captcha_id?: string;
-      captcha_token?: string;
-      captcha_x?: number;
-      captcha_y?: number;
-    } = { username, email, password };
+    const requestData: RegisterRequest = { username, email, password };
     if (captchaData) {
       requestData.captcha_id = captchaData.id;
       requestData.captcha_token = captchaData.token;
@@ -120,8 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const response = await authApi.register(requestData);
-      const { user, token, requires_verification, email_verified } =
-        response.data;
+      const { user, requires_verification, email_verified } = response.data;
 
       if (requires_verification && !email_verified) {
         const error = new Error(
@@ -137,13 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
 
-      if (token) {
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(user));
-        setUser(user);
-      } else {
-        setUser(user);
-      }
+      setUser(user);
     } catch (error: unknown) {
       // Registration pending email verification is signaled with a dedicated
       // flag; let it pass through untouched so callers can react to it.

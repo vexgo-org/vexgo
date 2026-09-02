@@ -70,7 +70,7 @@ export function CommentModerationPage() {
     loadData();
   }, [activeTab, loadData]);
 
-  const handleApproveComment = async (commentId: string) => {
+  const handleApproveComment = async (commentId: string | number) => {
     try {
       await api.put(`/moderation/comments/approve/${commentId}`);
       toast.success(t("moderation.approveSuccess"));
@@ -81,7 +81,7 @@ export function CommentModerationPage() {
     }
   };
 
-  const handleRejectComment = async (commentId: string) => {
+  const handleRejectComment = async (commentId: string | number) => {
     try {
       await api.put(`/moderation/comments/reject/${commentId}`);
       toast.success(t("moderation.rejectSuccess"));
