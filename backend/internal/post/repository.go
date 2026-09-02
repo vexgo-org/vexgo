@@ -215,23 +215,6 @@ func (r *gormRepository) listPage(query *gorm.DB, page, limit int) ([]model.Post
 	return posts, total, nil
 }
 
-// applyListVisibility narrows the query to posts visible to the given role.
-func applyListVisibility(query *gorm.DB, userRole string, userID uint) *gorm.DB {
-	switch userRole {
-	case "", model.RoleGuest:
-		return query.Where("status = ?", model.PostStatusPublished)
-	case model.RoleContributor:
-		return query.Where(
-			query.Session(&gorm.Session{}).Where("status = ?", model.PostStatusPublished).
-				Or("author_id = ? AND status != ?", userID, model.PostStatusRejected),
-		)
-	case model.RoleAuthor, model.RoleAdmin, model.RoleSuperAdmin:
-		return query.Where("status != ?", model.PostStatusRejected)
-	default:
-		return query.Where("status = ?", model.PostStatusPublished)
-	}
-}
-
 // applyUserPostsVisibility narrows a user's posts to those visible to the
 // acting role; contributors see all of their own posts.
 func applyUserPostsVisibility(query *gorm.DB, userRole string, authorID, currentUserID uint) *gorm.DB {
@@ -249,7 +232,7 @@ func applyUserPostsVisibility(query *gorm.DB, userRole string, authorID, current
 }
 
 func (r *gormRepository) List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {
-	query := applyListVisibility(r.baseQuery(ctx), userRole, userID)
+	query := r.baseQuery(ctx).Where("status = ?", model.PostStatusPublished)
 
 	// Category filter (by id or name)
 	if f.CategoryID != "" {
