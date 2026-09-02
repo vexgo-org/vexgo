@@ -61,7 +61,7 @@ jobs:
 
       - name: Check Prettier formatting
         run: |
-          npx prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json"
+          npx prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json" "./*.{json,yml,yaml}"
 
       - name: Run oxlint
         run: |

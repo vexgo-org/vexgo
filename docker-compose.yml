@@ -10,10 +10,10 @@ services:
       - ADDR=0.0.0.0
       - PORT=3001
       - DATA_DIR=/app/data
-      
+
       # JWT secret (must be set in production!)
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      
+
       # Database configuration (SQLite is used by default)
       # To use an external database, uncomment and configure the following variables:
       # - DB_TYPE=mysql
@@ -22,7 +22,7 @@ services:
       # - DB_USER=vexgo_user
       # - DB_PASSWORD=${DB_PASSWORD:-your-password}
       # - DB_NAME=vexgo_db
-      
+
       # Or use PostgreSQL:
       # - DB_TYPE=postgres
       # - DB_HOST=postgres
@@ -31,7 +31,7 @@ services:
       # - DB_PASSWORD=${DB_PASSWORD:-your-password}
       # - DB_NAME=vexgo_db
       # - DB_SSL_MODE=disable
-      
+
       # Or use a configuration file (takes precedence over environment variables):
       # - CONFIG_FILE=/app/examples/config-mysql.yml
       # - CONFIG_FILE=/app/examples/config-postgres.yml
