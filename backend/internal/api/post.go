@@ -64,7 +64,7 @@ type CreatePostRequest struct {
 	Slug       string   `json:"slug" binding:"required"`
 	Title      string   `json:"title" binding:"required"`
 	Content    string   `json:"content" binding:"required"`
-	Category   any      `json:"category" binding:"required"`
+	Category   any      `json:"category" binding:"required" tstype:"number | string"`
 	Tags       []string `json:"tags,omitempty"`
 	Excerpt    string   `json:"excerpt,omitempty"`
 	CoverImage string   `json:"coverImage,omitempty"`
@@ -77,7 +77,7 @@ type UpdatePostRequest struct {
 	Slug       string   `json:"slug,omitempty"`
 	Title      string   `json:"title,omitempty"`
 	Content    string   `json:"content,omitempty"`
-	Category   any      `json:"category,omitempty"`
+	Category   any      `json:"category,omitempty" tstype:"number | string"`
 	Tags       []string `json:"tags,omitempty"`
 	Excerpt    string   `json:"excerpt,omitempty"`
 	CoverImage string   `json:"coverImage,omitempty"`

@@ -202,7 +202,7 @@ export interface LLMTestResponse {
  * either a numeric post ID or its string form.
  */
 export interface CreateCommentRequest {
-  postId: any;
+  postId: number | string;
   content: string;
   parentId?: number /* uint */;
 }
@@ -361,7 +361,7 @@ export interface CreatePostRequest {
   slug: string;
   title: string;
   content: string;
-  category: any;
+  category: number | string;
   tags?: string[];
   excerpt?: string;
   coverImage?: string;
@@ -375,7 +375,7 @@ export interface UpdatePostRequest {
   slug?: string;
   title?: string;
   content?: string;
-  category?: any;
+  category?: number | string;
   tags?: string[];
   excerpt?: string;
   coverImage?: string;

@@ -47,7 +47,7 @@ type LLMTestResponse struct {
 // CreateCommentRequest is the body of POST /api/comments. PostID accepts
 // either a numeric post ID or its string form.
 type CreateCommentRequest struct {
-	PostID   any    `json:"postId" binding:"required"`
+	PostID   any    `json:"postId" binding:"required" tstype:"number | string"`
 	Content  string `json:"content" binding:"required"`
 	ParentID *uint  `json:"parentId,omitempty"`
 }
