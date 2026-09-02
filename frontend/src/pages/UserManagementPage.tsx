@@ -118,11 +118,7 @@ export function UserManagementPage() {
             ? {
                 ...user,
                 role: newRole as
-                  | "super_admin"
-                  | "admin"
-                  | "author"
-                  | "contributor"
-                  | "guest",
+                  "super_admin" | "admin" | "author" | "contributor" | "guest",
               }
             : user,
         ),
