@@ -42,6 +42,7 @@
               go_1_26
               gofumpt
               golangci-lint
+              gopls
               gotools
               just
               nodejs
