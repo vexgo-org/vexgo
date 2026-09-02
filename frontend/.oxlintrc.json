@@ -109,6 +109,7 @@
               "useFormField",
               "useSidebar",
               "useAuth",
+              "useNotifications",
               "useTranslation"
             ]
           }

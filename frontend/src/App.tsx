@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { NotificationProvider } from "@/hooks/useNotifications";
 import { I18nProvider } from "@/lib/I18nContext";
 import { Layout } from "@/components/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -58,153 +59,155 @@ function App() {
     <AuthProvider>
       <I18nProvider>
         <Router>
-          <Layout>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/post/:slug" element={<PostDetailPage />} />
-              <Route path="/user/:id" element={<UserPostsPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <NotificationProvider>
+            <Layout>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/post/:slug" element={<PostDetailPage />} />
+                <Route path="/user/:id" element={<UserPostsPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
 
-              {/* Routes requiring login */}
-              <Route
-                path="/write"
-                element={
-                  <ProtectedRoute>
-                    <WritePostPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/edit-post/:id"
-                element={
-                  <ProtectedRoute>
-                    <WritePostPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/my-posts"
-                element={
-                  <ProtectedRoute>
-                    <MyPostsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/notifications"
-                element={
-                  <ProtectedRoute>
-                    <NotificationCenterPage />
-                  </ProtectedRoute>
-                }
-              />
+                {/* Routes requiring login */}
+                <Route
+                  path="/write"
+                  element={
+                    <ProtectedRoute>
+                      <WritePostPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/edit-post/:id"
+                  element={
+                    <ProtectedRoute>
+                      <WritePostPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/my-posts"
+                  element={
+                    <ProtectedRoute>
+                      <MyPostsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <ProtectedRoute>
+                      <NotificationCenterPage />
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <SettingsPage />
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <SettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* Routes requiring admin access */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/moderation"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <ModerationPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/users"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <UserManagementPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/smtp"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <SMTPSettingsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/general-settings"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <GeneralSettingsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/comment-moderation"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <CommentModerationPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/comment-config"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <CommentConfigPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/ai-settings"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AISettingsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/theme"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <ThemePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/creator-applications"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <CreatorApplicationReviewPage />
-                  </ProtectedRoute>
-                }
-              />
-              {/* Catch-all 404 */}
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Layout>
+                {/* Routes requiring admin access */}
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/moderation"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <ModerationPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <UserManagementPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/smtp"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <SMTPSettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/general-settings"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <GeneralSettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/comment-moderation"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <CommentModerationPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/comment-config"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <CommentConfigPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/ai-settings"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AISettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/theme"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <ThemePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/creator-applications"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <CreatorApplicationReviewPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Catch-all 404 */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Layout>
+          </NotificationProvider>
         </Router>
         <Toaster />
       </I18nProvider>
