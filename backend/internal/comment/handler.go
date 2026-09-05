@@ -43,7 +43,7 @@ type createCommentInput struct {
 }
 
 type createCommentOutput struct {
-	Status int                           `status:"201" required:"" doc:"HTTP status; always 201 for a successful create"`
+	Status int `status:"201" required:"" doc:"HTTP status; always 201 for a successful create"`
 	Body   api.CreateCommentResponse
 }
 
@@ -115,83 +115,83 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 	}, h.DeleteComment)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "list-pending-comments",
-		Method:        http.MethodGet,
-		Path:          "/moderation/comments/pending",
-		Summary:       "List pending comments (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "list-pending-comments",
+		Method:      http.MethodGet,
+		Path:        "/moderation/comments/pending",
+		Summary:     "List pending comments (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.GetPendingComments)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "list-approved-comments",
-		Method:        http.MethodGet,
-		Path:          "/moderation/comments/approved",
-		Summary:       "List approved comments (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "list-approved-comments",
+		Method:      http.MethodGet,
+		Path:        "/moderation/comments/approved",
+		Summary:     "List approved comments (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.GetApprovedComments)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "list-rejected-comments",
-		Method:        http.MethodGet,
-		Path:          "/moderation/comments/rejected",
-		Summary:       "List rejected comments (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "list-rejected-comments",
+		Method:      http.MethodGet,
+		Path:        "/moderation/comments/rejected",
+		Summary:     "List rejected comments (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.GetRejectedComments)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "approve-comment",
-		Method:        http.MethodPut,
-		Path:          "/moderation/comments/approve/{id}",
-		Summary:       "Approve a comment (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "approve-comment",
+		Method:      http.MethodPut,
+		Path:        "/moderation/comments/approve/{id}",
+		Summary:     "Approve a comment (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.ApproveComment)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "reject-comment",
-		Method:        http.MethodPut,
-		Path:          "/moderation/comments/reject/{id}",
-		Summary:       "Reject a comment (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "reject-comment",
+		Method:      http.MethodPut,
+		Path:        "/moderation/comments/reject/{id}",
+		Summary:     "Reject a comment (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.RejectComment)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "get-comment-moderation-config",
-		Method:        http.MethodGet,
-		Path:          "/moderation/comments/config",
-		Summary:       "Get comment moderation configuration (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "get-comment-moderation-config",
+		Method:      http.MethodGet,
+		Path:        "/moderation/comments/config",
+		Summary:     "Get comment moderation configuration (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.GetCommentModerationConfig)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "update-comment-moderation-config",
-		Method:        http.MethodPut,
-		Path:          "/moderation/comments/config",
-		Summary:       "Update comment moderation configuration (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "update-comment-moderation-config",
+		Method:      http.MethodPut,
+		Path:        "/moderation/comments/config",
+		Summary:     "Update comment moderation configuration (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.UpdateCommentModerationConfig)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "test-comment-moderation",
-		Method:        http.MethodPost,
-		Path:          "/moderation/comments/config/test",
-		Summary:       "Test the stored LLM moderation configuration (admin)",
-		Tags:          []string{"comment-moderation"},
-		Security:      []map[string][]string{{"BearerAuth": {}}},
-		Middlewares:   huma.Middlewares{adminOnly},
+		OperationID: "test-comment-moderation",
+		Method:      http.MethodPost,
+		Path:        "/moderation/comments/config/test",
+		Summary:     "Test the stored LLM moderation configuration (admin)",
+		Tags:        []string{"comment-moderation"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
 	}, h.TestModerationConfig)
 }
 
@@ -230,9 +230,9 @@ func (h *Handler) CreateComment(ctx context.Context, in *createCommentInput) (*c
 	return &createCommentOutput{
 		Status: http.StatusCreated,
 		Body: api.CreateCommentResponse{
-			Message:           "Comment created successfully",
-			Comment:           comment,
-			CommentsCount:     count,
+			Message:            "Comment created successfully",
+			Comment:            comment,
+			CommentsCount:      count,
 			RequiresModeration: comment.Status == model.CommentStatusPending,
 		},
 	}, nil

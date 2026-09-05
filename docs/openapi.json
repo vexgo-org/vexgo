@@ -1,6 +1,130 @@
 {
   "components": {
     "schemas": {
+      "AIConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/AIConfig.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "apiEndpoint": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "modelName": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "enabled",
+          "provider",
+          "apiEndpoint",
+          "apiKey",
+          "modelName",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "AIConfigUpdateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/AIConfigUpdateResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "aiConfig": {
+            "$ref": "#/components/schemas/AIConfig",
+            "description": "The updated configuration"
+          }
+        },
+        "required": [
+          "aiConfig"
+        ],
+        "type": "object"
+      },
+      "AIModelsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/AIModelsResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "models": {
+            "description": "List of models as returned by the upstream provider"
+          }
+        },
+        "required": [
+          "message",
+          "models"
+        ],
+        "type": "object"
+      },
+      "AITestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/AITestResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "response": {
+            "description": "Raw upstream response or summary"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "ApplyForCreatorRequest": {
         "additionalProperties": false,
         "properties": {
@@ -807,6 +931,94 @@
         },
         "type": "object"
       },
+      "GeneralSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/GeneralSettings.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allowGuestViewPosts": {
+            "type": "boolean"
+          },
+          "captchaEnabled": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "itemsPerPage": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "registrationEnabled": {
+            "type": "boolean"
+          },
+          "siteDescription": {
+            "type": "string"
+          },
+          "siteIcon": {
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "captchaEnabled",
+          "registrationEnabled",
+          "allowGuestViewPosts",
+          "siteName",
+          "siteDescription",
+          "siteIcon",
+          "itemsPerPage",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "GeneralSettingsUpdateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/GeneralSettingsUpdateResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "generalSettings": {
+            "$ref": "#/components/schemas/GeneralSettings",
+            "description": "The updated general settings"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "generalSettings"
+        ],
+        "type": "object"
+      },
       "LikeStatusResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1368,6 +1580,119 @@
         },
         "type": "object"
       },
+      "SMTPConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/SMTPConfig.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "fromEmail": {
+            "type": "string"
+          },
+          "fromName": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "password": {
+            "type": "string"
+          },
+          "port": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "testEmail": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "enabled",
+          "host",
+          "port",
+          "username",
+          "password",
+          "fromEmail",
+          "fromName",
+          "testEmail",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "SMTPConfigUpdateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/SMTPConfigUpdateResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/SMTPConfig"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "type": "object"
+      },
+      "SMTPTestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/SMTPTestResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "to": {
+            "description": "Recipient of the test email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "to"
+        ],
+        "type": "object"
+      },
       "Stats": {
         "additionalProperties": false,
         "properties": {
@@ -1505,6 +1830,87 @@
         ],
         "type": "object"
       },
+      "ThemeConfigResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/ThemeConfigResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "activeTheme": {
+            "type": "string"
+          },
+          "message": {
+            "description": "Set on PUT responses",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activeTheme"
+        ],
+        "type": "object"
+      },
+      "ThemePreviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/ThemePreviewResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "data": {
+            "contentEncoding": "base64",
+            "description": "Inline preview bytes",
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "url": {
+            "description": "Path to the preview file on disk",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "mimeType"
+        ],
+        "type": "object"
+      },
+      "ThemesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/ThemesResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "themes": {
+            "items": {},
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "themes"
+        ],
+        "type": "object"
+      },
       "UnreadCountResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1526,6 +1932,41 @@
         "required": [
           "unreadCount"
         ],
+        "type": "object"
+      },
+      "UpdateAIConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UpdateAIConfigRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "apiEndpoint": {
+            "description": "Custom AI endpoint URL",
+            "type": "string"
+          },
+          "apiKey": {
+            "description": "AI API key (encrypted at rest); empty keeps the stored value",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Toggle AI features",
+            "type": "boolean"
+          },
+          "modelName": {
+            "description": "Model name (e.g. gpt-3.5-turbo)",
+            "type": "string"
+          },
+          "provider": {
+            "description": "openai|azure|... — selects the LLM client",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "UpdateCommentModerationConfigRequest": {
@@ -1606,6 +2047,43 @@
         ],
         "type": "object"
       },
+      "UpdateGeneralSettingsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UpdateGeneralSettingsRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allowGuestViewPosts": {
+            "type": "boolean"
+          },
+          "captchaEnabled": {
+            "type": "boolean"
+          },
+          "itemsPerPage": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "registrationEnabled": {
+            "type": "boolean"
+          },
+          "siteDescription": {
+            "type": "string"
+          },
+          "siteIcon": {
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdatePostRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1646,6 +2124,73 @@
             ]
           },
           "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateSMTPConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UpdateSMTPConfigRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Toggle the SMTP transport",
+            "type": "boolean"
+          },
+          "fromEmail": {
+            "description": "From address",
+            "type": "string"
+          },
+          "fromName": {
+            "description": "Display name",
+            "type": "string"
+          },
+          "host": {
+            "description": "SMTP server hostname",
+            "type": "string"
+          },
+          "password": {
+            "description": "SMTP password (encrypted at rest)",
+            "type": "string"
+          },
+          "port": {
+            "description": "SMTP server port (1-65535)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "testEmail": {
+            "description": "Override recipient for the test endpoint",
+            "type": "string"
+          },
+          "username": {
+            "description": "SMTP username",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateThemeConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UpdateThemeConfigRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "activeTheme": {
+            "description": "Theme ID to activate",
             "type": "string"
           }
         },
@@ -1746,6 +2291,32 @@
         },
         "required": [
           "message"
+        ],
+        "type": "object"
+      },
+      "UploadThemeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UploadThemeResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "themeId": {
+            "description": "ID of the installed theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "themeId"
         ],
         "type": "object"
       },
@@ -2207,6 +2778,424 @@
         "summary": "Delete a comment (author or admin)",
         "tags": [
           "comments"
+        ]
+      }
+    },
+    "/config/ai": {
+      "get": {
+        "operationId": "get-ai-config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIConfig"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get AI configuration (admin)",
+        "tags": [
+          "config"
+        ]
+      },
+      "put": {
+        "operationId": "update-ai-config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAIConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIConfigUpdateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update AI configuration (admin)",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/config/ai/models": {
+      "get": {
+        "operationId": "list-ai-models",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIModelsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List AI models for the configured provider (admin)",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/config/ai/test": {
+      "post": {
+        "operationId": "test-ai",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AITestResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Test the AI endpoint (admin)",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/config/general": {
+      "get": {
+        "operationId": "get-general-settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneralSettings"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get general site settings",
+        "tags": [
+          "config"
+        ]
+      },
+      "put": {
+        "operationId": "update-general-settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGeneralSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneralSettingsUpdateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update general site settings (admin)",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/config/smtp": {
+      "get": {
+        "operationId": "get-smtp-config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SMTPConfig"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get SMTP configuration (admin)",
+        "tags": [
+          "config"
+        ]
+      },
+      "put": {
+        "operationId": "update-smtp-config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSMTPConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SMTPConfigUpdateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update SMTP configuration (admin)",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/config/smtp/test": {
+      "post": {
+        "operationId": "test-smtp",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SMTPTestResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Send a test SMTP email (admin)",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/config/theme": {
+      "get": {
+        "operationId": "get-theme-config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeConfigResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the active theme",
+        "tags": [
+          "config"
+        ]
+      },
+      "put": {
+        "operationId": "update-theme-config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThemeConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeConfigResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Set the active theme (admin)",
+        "tags": [
+          "config"
         ]
       }
     },
@@ -3990,6 +4979,116 @@
         "summary": "Delete a tag (contributor+)",
         "tags": [
           "taxonomy"
+        ]
+      }
+    },
+    "/theme/{id}/preview": {
+      "get": {
+        "operationId": "theme-preview",
+        "parameters": [
+          {
+            "description": "Theme ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Theme ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemePreviewResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Render a theme preview",
+        "tags": [
+          "themes"
+        ]
+      }
+    },
+    "/themes": {
+      "get": {
+        "operationId": "list-themes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemesResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List installed themes",
+        "tags": [
+          "themes"
+        ]
+      }
+    },
+    "/themes/upload": {
+      "post": {
+        "operationId": "upload-theme",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadThemeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Upload a theme zip (admin)",
+        "tags": [
+          "themes"
         ]
       }
     },
