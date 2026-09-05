@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { configApi, notificationsApi } from "@/lib/api";
+import { useNotifications } from "@/hooks/useNotifications";
+import { configApi } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const { t } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,49 +100,6 @@ export function Layout({ children }: LayoutProps) {
     logout();
     navigate("/");
   };
-
-  // Unread notification count
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Fetch the unread notification count
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await notificationsApi.getUnreadCount();
-      setUnreadCount(response.data.unreadCount);
-    } catch (error) {
-      console.error("Failed to fetch the unread notification count:", error);
-    }
-  };
-
-  useEffect(() => {
-    // Only fetch the unread count when logged in
-    if (isAuthenticated) {
-      fetchUnreadCount();
-    }
-  }, [isAuthenticated]);
-
-  // Periodically refresh the unread count (every 30s)
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isAuthenticated) {
-      interval = setInterval(() => {
-        fetchUnreadCount();
-      }, 30000); // check every 30 seconds
-    }
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isAuthenticated]);
-
-  // Refresh the unread count on route changes, e.g. when entering or leaving the notifications page
-  useEffect(() => {
-    if (isAuthenticated) {
-      // Check the unread count whenever the route changes
-      fetchUnreadCount();
-    }
-  }, [isAuthenticated, location.pathname]);
 
   const navItems = [
     { path: "/", label: t("layout.home"), icon: Home },

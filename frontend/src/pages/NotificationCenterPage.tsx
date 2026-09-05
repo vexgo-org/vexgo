@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,6 +48,7 @@ type Notification = {
 export function NotificationCenterPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { decrementUnreadCount, clearUnreadCount } = useNotifications();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
 
@@ -119,6 +121,9 @@ export function NotificationCenterPage() {
 
   // Mark a notification as read
   const markAsRead = async (id: string) => {
+    const wasUnread = notifications.some(
+      (notification) => notification.id === id && !notification.isRead,
+    );
     try {
       await notificationsApi.markAsRead(id);
       // Update the local state
@@ -129,6 +134,9 @@ export function NotificationCenterPage() {
             : notification,
         ),
       );
+      if (wasUnread) {
+        decrementUnreadCount();
+      }
     } catch (error) {
       console.error(t("errors.networkError"), error);
     }
@@ -142,6 +150,7 @@ export function NotificationCenterPage() {
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true })),
       );
+      clearUnreadCount();
     } catch (error) {
       console.error(t("errors.networkError"), error);
     }
@@ -149,12 +158,18 @@ export function NotificationCenterPage() {
 
   // Delete a notification
   const deleteNotification = async (id: string) => {
+    const wasUnread = notifications.some(
+      (notification) => notification.id === id && !notification.isRead,
+    );
     try {
       await notificationsApi.deleteNotification(id);
       // Update the local state
       setNotifications((prev) =>
         prev.filter((notification) => notification.id !== id),
       );
+      if (wasUnread) {
+        decrementUnreadCount();
+      }
     } catch (error) {
       console.error(t("errors.networkError"), error);
     }
