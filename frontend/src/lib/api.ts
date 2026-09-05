@@ -1,22 +1,60 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type {
-  User,
-  Post,
-  Category,
-  Tag,
-  Comment,
-  MediaFile,
-  AuthResponse,
-  PostsResponse,
-  CommentsResponse,
-  LikeResponse,
-  UploadResponse,
-  StatsResponse,
   SMTPConfig,
   GeneralSettings,
   CommentModerationConfig,
   AIConfig,
   AIModel,
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+  UpdateProfileRequest,
+  UserResponse,
+  ChangePasswordRequest,
+  MessageResponse,
+  UpdateSettingsRequest,
+  UpdateEmailRequest,
+  VerificationStatusResponse,
+  VerifyEmailResponse,
+  RequestPasswordResetRequest,
+  ResendVerificationRequest,
+  ResetPasswordRequest,
+  PostsResponse,
+  PostResponse,
+  CreatePostRequest,
+  UpdatePostRequest,
+  PostMutationResponse,
+  PostListResponse,
+  LikeResponse,
+  CategoryListResponse,
+  CreateCategoryRequest,
+  CategoryCreateResponse,
+  TagListResponse,
+  CreateTagRequest,
+  TagCreateResponse,
+  CommentsResponse,
+  CreateCommentRequest,
+  CommentCreateResponse,
+  CommentDeleteResponse,
+  CommentModerationUpdateResponse,
+  UpdateCommentModerationConfigRequest,
+  LLMTestResponse,
+  UploadResponse,
+  FilesResponse,
+  StatsResponse,
+  ThemesResponse,
+  UpdateSMTPConfigRequest,
+  SMTPConfigUpdateResponse,
+  SMTPTestResponse,
+  UpdateGeneralSettingsRequest,
+  GeneralSettingsUpdateResponse,
+  UpdateAIConfigRequest,
+  AIConfigUpdateResponse,
+  UpdateThemeConfigRequest,
+  ThemeUpdateResponse,
+  NotificationsResponse,
+  UnreadCountResponse,
 } from "@/types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -67,51 +105,38 @@ api.interceptors.response.use(
 
 // Auth-related APIs
 export const authApi = {
-  register: (data: { username: string; email: string; password: string }) =>
-    api.post<AuthResponse>("/auth/register", data),
+  register: (data: RegisterRequest) =>
+    api.post<RegisterResponse>("/auth/register", data),
 
-  login: (data: { email: string; password: string }) =>
-    api.post<AuthResponse>("/auth/login", data),
+  login: (data: LoginRequest) => api.post<LoginResponse>("/auth/login", data),
 
-  getMe: () => api.get<{ user: User }>("/auth/me"),
+  getMe: () => api.get<UserResponse>("/auth/me"),
 
-  updateProfile: (data: {
-    username?: string;
-    avatar?: string;
-    birthday?: string;
-    bio?: string;
-  }) => api.put("/auth/profile", data),
+  updateProfile: (data: UpdateProfileRequest) =>
+    api.put<UserResponse>("/auth/profile", data),
 
-  changePassword: (data: { oldPassword: string; newPassword: string }) =>
-    api.put("/auth/password", data),
+  changePassword: (data: ChangePasswordRequest) =>
+    api.put<MessageResponse>("/auth/password", data),
 
-  updateEmail: (data: { email: string }) => api.put("/auth/email", data),
+  updateEmail: (data: UpdateEmailRequest) => api.put("/auth/email", data),
 
-  updateSettings: (data: {
-    profile_visibility?: string;
-    hide_email?: boolean;
-    hide_birthday?: boolean;
-    hide_bio?: boolean;
-  }) => api.put("/auth/settings", data),
+  updateSettings: (data: UpdateSettingsRequest) =>
+    api.put<UserResponse>("/auth/settings", data),
 
   getVerificationStatus: () =>
-    api.get<{ email_verified: boolean; email: string }>(
-      "/auth/verification-status",
-    ),
+    api.get<VerificationStatusResponse>("/auth/verification-status"),
 
   verifyEmail: (token: string) =>
-    api.get<{ message: string; require_relogin?: boolean; new_email?: string }>(
-      `/verify-email?token=${token}`,
-    ),
+    api.get<VerifyEmailResponse>(`/verify-email?token=${token}`),
 
-  requestPasswordReset: (data: { email: string }) =>
-    api.post<{ message: string }>("/auth/request-password-reset", data),
+  requestPasswordReset: (data: RequestPasswordResetRequest) =>
+    api.post<MessageResponse>("/auth/request-password-reset", data),
 
-  resendVerification: (data: { email: string }) =>
-    api.post<{ message: string }>("/auth/resend-verification", data),
+  resendVerification: (data: ResendVerificationRequest) =>
+    api.post<MessageResponse>("/auth/resend-verification", data),
 
-  resetPassword: (data: { token: string; password: string }) =>
-    api.post<{ message: string }>("/auth/reset-password", data),
+  resetPassword: (data: ResetPasswordRequest) =>
+    api.post<MessageResponse>("/auth/reset-password", data),
 };
 
 // Post-related APIs
@@ -125,24 +150,19 @@ export const postsApi = {
     status?: string;
   }) => api.get<PostsResponse>("/posts", { params }),
 
-  getPost: (slug: string) => api.get<{ post: Post }>(`/posts/${slug}`),
+  getPost: (slug: string) => api.get<PostResponse>(`/posts/${slug}`),
 
-  getPostById: (id: string) => api.get<{ post: Post }>(`/posts/by-id/${id}`),
+  getPostById: (id: string | number) =>
+    api.get<PostResponse>(`/posts/by-id/${id}`),
 
-  createPost: (data: {
-    title: string;
-    content: string;
-    category: string;
-    tags?: string[];
-    excerpt?: string;
-    coverImage?: string;
-    status?: "published" | "draft" | "pending";
-  }) => api.post<{ message: string; post: Post }>("/posts", data),
+  createPost: (data: CreatePostRequest) =>
+    api.post<PostMutationResponse>("/posts", data),
 
-  updatePost: (id: string, data: Partial<Post>) =>
-    api.put<{ message: string; post: Post }>(`/posts/${id}`, data),
+  updatePost: (id: string | number, data: UpdatePostRequest) =>
+    api.put<PostMutationResponse>(`/posts/${id}`, data),
 
-  deletePost: (id: string) => api.delete<{ message: string }>(`/posts/${id}`),
+  deletePost: (id: string | number) =>
+    api.delete<MessageResponse>(`/posts/${id}`),
 
   getMyPosts: (params?: { page?: number; limit?: number; status?: string }) =>
     api.get<PostsResponse>("/posts/user/my-posts", { params }),
@@ -150,55 +170,53 @@ export const postsApi = {
   getDraftPosts: (params?: { page?: number; limit?: number }) =>
     api.get<PostsResponse>("/posts/drafts", { params }),
 
-  getUserPosts: (userId: string, params?: { page?: number; limit?: number }) =>
-    api.get<PostsResponse>(`/posts/user/${userId}`, { params }),
+  getUserPosts: (
+    userId: string | number,
+    params?: { page?: number; limit?: number },
+  ) => api.get<PostsResponse>(`/posts/user/${userId}`, { params }),
 };
 
 // Category-related APIs
 export const categoriesApi = {
-  getCategories: () => api.get<{ categories: Category[] }>("/categories"),
+  getCategories: () => api.get<CategoryListResponse>("/categories"),
 
-  createCategory: (data: { name: string; description?: string }) =>
-    api.post<{ message: string; category: Category }>("/categories", data),
+  createCategory: (data: CreateCategoryRequest) =>
+    api.post<CategoryCreateResponse>("/categories", data),
 
-  deleteCategory: (id: string) =>
-    api.delete<{ message: string }>(`/categories/${id}`),
+  deleteCategory: (id: string | number) =>
+    api.delete<MessageResponse>(`/categories/${id}`),
 };
 
 // Tag-related APIs
 export const tagsApi = {
-  getTags: () => api.get<{ tags: Tag[] }>("/tags"),
+  getTags: () => api.get<TagListResponse>("/tags"),
 
-  deleteTag: (id: string) => api.delete<{ message: string }>(`/tags/${id}`),
+  createTag: (data: CreateTagRequest) =>
+    api.post<TagCreateResponse>("/tags", data),
+
+  deleteTag: (id: string | number) =>
+    api.delete<MessageResponse>(`/tags/${id}`),
 };
 
 // Comment-related APIs
 export const commentsApi = {
-  getComments: (postId: string) =>
+  getComments: (postId: string | number) =>
     api.get<CommentsResponse>(`/comments/post/${postId}`),
 
-  createComment: (data: {
-    postId: string;
-    content: string;
-    parentId?: string;
-  }) =>
-    api.post<{ message: string; comment: Comment; commentsCount?: number }>(
-      "/comments",
-      data,
-    ),
+  createComment: (data: CreateCommentRequest) =>
+    api.post<CommentCreateResponse>("/comments", data),
 
-  deleteComment: (id: string) =>
-    api.delete<{ message: string; commentsCount?: number }>(`/comments/${id}`),
+  deleteComment: (id: string | number) =>
+    api.delete<CommentDeleteResponse>(`/comments/${id}`),
 };
 
 // Like-related APIs
 export const likesApi = {
-  toggleLike: (postId: string) => api.post<LikeResponse>(`/likes/${postId}`),
+  toggleLike: (postId: string | number) =>
+    api.post<LikeResponse>(`/likes/${postId}`),
 
-  getLikeStatus: (postId: string) =>
-    api.get<{ postId: string; likesCount: number; isLiked: boolean }>(
-      `/likes/${postId}`,
-    ),
+  getLikeStatus: (postId: string | number) =>
+    api.get<LikeResponse>(`/likes/${postId}`),
 };
 
 // Upload-related APIs
@@ -241,9 +259,10 @@ export const uploadApi = {
     });
   },
 
-  getMyFiles: () => api.get<{ files: MediaFile[] }>("/upload/my-files"),
+  getMyFiles: () => api.get<FilesResponse>("/upload/my-files"),
 
-  deleteFile: (id: string) => api.delete<{ message: string }>(`/upload/${id}`),
+  deleteFile: (id: string | number) =>
+    api.delete<MessageResponse>(`/upload/${id}`),
 };
 
 // Stats-related APIs
@@ -251,71 +270,59 @@ export const statsApi = {
   getStats: () => api.get<StatsResponse>("/stats"),
 
   getPopularPosts: (limit?: number) =>
-    api.get<{ posts: Post[] }>("/stats/popular-posts", { params: { limit } }),
+    api.get<PostListResponse>("/stats/popular-posts", { params: { limit } }),
 
   getLatestPosts: (limit?: number) =>
-    api.get<{ posts: Post[] }>("/stats/latest-posts", { params: { limit } }),
+    api.get<PostListResponse>("/stats/latest-posts", { params: { limit } }),
 };
 
 // SMTP config-related APIs
 export const configApi = {
   getSMTPConfig: () => api.get<SMTPConfig>("/config/smtp"),
 
-  updateSMTPConfig: (data: Partial<SMTPConfig>) =>
-    api.put<{ message: string; smtpConfig: SMTPConfig }>("/config/smtp", data),
+  updateSMTPConfig: (data: UpdateSMTPConfigRequest) =>
+    api.put<SMTPConfigUpdateResponse>("/config/smtp", data),
 
-  testSMTP: () =>
-    api.post<{ message: string; to: string }>("/config/smtp/test"),
+  testSMTP: () => api.post<SMTPTestResponse>("/config/smtp/test"),
 
   // General settings-related APIs
   getGeneralSettings: () => api.get<GeneralSettings>("/config/general"),
 
-  updateGeneralSettings: (data: Partial<GeneralSettings>) =>
-    api.put<{ message: string; generalSettings: GeneralSettings }>(
-      "/config/general",
-      data,
-    ),
+  updateGeneralSettings: (data: UpdateGeneralSettingsRequest) =>
+    api.put<GeneralSettingsUpdateResponse>("/config/general", data),
 
   // Comment moderation config-related APIs
   getCommentModerationConfig: () =>
     api.get<CommentModerationConfig>("/moderation/comments/config"),
 
-  updateCommentModerationConfig: (data: Partial<CommentModerationConfig>) =>
-    api.put<{ message: string; config: CommentModerationConfig }>(
+  updateCommentModerationConfig: (data: UpdateCommentModerationConfigRequest) =>
+    api.put<CommentModerationUpdateResponse>(
       "/moderation/comments/config",
       data,
     ),
 
   testCommentModeration: () =>
-    api.post<{ message: string; response: string }>(
-      "/moderation/comments/config/test",
-    ),
+    api.post<LLMTestResponse>("/moderation/comments/config/test"),
 
   // AI config-related APIs
   getAIConfig: () => api.get<AIConfig>("/config/ai"),
 
-  updateAIConfig: (data: Partial<AIConfig>) =>
-    api.put<{ message: string; aiConfig: AIConfig }>("/config/ai", data),
+  updateAIConfig: (data: UpdateAIConfigRequest) =>
+    api.put<AIConfigUpdateResponse>("/config/ai", data),
 
-  testAI: () =>
-    api.post<{ message: string; response: string }>("/config/ai/test"),
+  testAI: () => api.post<LLMTestResponse>("/config/ai/test"),
 
   // AI model-related APIs
   getAIModels: () =>
     api.get<{ message: string; models: AIModel[] }>("/config/ai/models"),
 
   // Theme-related APIs
-  getThemes: () =>
-    api.get<{
-      themes: Array<{
-        id: string;
-        name: string;
-        author: string;
-        version: string;
-        description: string;
-        url: string;
-      }>;
-    }>("/themes"),
+  getThemes: () => api.get<ThemesResponse>("/themes"),
+
+  updateThemeConfig: (activeTheme: string) =>
+    api.put<ThemeUpdateResponse>("/config/theme", {
+      activeTheme,
+    } satisfies UpdateThemeConfigRequest),
 };
 
 // Notification-related APIs
@@ -325,24 +332,18 @@ export const notificationsApi = {
     limit?: number;
     type?: string;
     is_read?: string;
-  }) =>
-    api.get<{ notifications: unknown[]; pagination: unknown }>(
-      "/notifications",
-      {
-        params,
-      },
-    ),
+  }) => api.get<NotificationsResponse>("/notifications", { params }),
 
   getUnreadCount: () =>
-    api.get<{ unreadCount: number }>("/notifications/unread-count"),
+    api.get<UnreadCountResponse>("/notifications/unread-count"),
 
-  markAsRead: (id: string) =>
-    api.put<{ message: string }>(`/notifications/${id}/read`),
+  markAsRead: (id: string | number) =>
+    api.put<MessageResponse>(`/notifications/${id}/read`),
 
-  markAllAsRead: () => api.put<{ message: string }>("/notifications/read-all"),
+  markAllAsRead: () => api.put<MessageResponse>("/notifications/read-all"),
 
-  deleteNotification: (id: string) =>
-    api.delete<{ message: string }>(`/notifications/${id}`),
+  deleteNotification: (id: string | number) =>
+    api.delete<MessageResponse>(`/notifications/${id}`),
 };
 
 export default api;

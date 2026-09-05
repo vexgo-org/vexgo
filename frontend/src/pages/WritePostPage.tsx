@@ -117,15 +117,12 @@ export function WritePostPage() {
         throw Error("no default category");
       }
 
-      // Ensure category ids are strings so they match the Select options (the backend may return numeric ids)
-      const normalized = (response.data.categories || []).map((c) => ({
-        ...c,
-        id: String(c.id),
-      }));
-      setCategories(normalized);
+      setCategories(response.data.categories);
 
       if (!isEditMode) {
-        const def = normalized.find((c) => c.name.toLowerCase() === "default");
+        const def = response.data.categories.find(
+          (c) => c.name.toLowerCase() === "default",
+        );
         if (def) {
           setCategory(def.name);
         }
@@ -354,9 +351,8 @@ export function WritePostPage() {
     try {
       const res = await categoriesApi.createCategory({ name, description: "" });
       const created = res.data.category;
-      const normalized = { ...created, id: String(created.id) };
-      setCategories((prev) => [...prev, normalized]);
-      setCategory(normalized.name);
+      setCategories((prev) => [...prev, created]);
+      setCategory(created.name);
       setNewCategoryName("");
     } catch (err) {
       if (isAxiosError<{ error?: string; code?: string }>(err)) {

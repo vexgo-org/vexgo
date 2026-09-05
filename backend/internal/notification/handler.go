@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -39,13 +40,13 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"notifications": notifications,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": (total + int64(limit) - 1) / int64(limit),
+	c.JSON(http.StatusOK, api.NotificationsResponse{
+		Notifications: notifications,
+		Pagination: api.Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: int((total + int64(limit) - 1) / int64(limit)),
 		},
 	})
 }
@@ -71,7 +72,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Notification marked as read"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Notification marked as read"})
 }
 
 // MarkAllAsRead marks all notifications as read
@@ -83,7 +84,7 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "All notifications marked as read"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "All notifications marked as read"})
 }
 
 // DeleteNotification deletes a notification
@@ -107,7 +108,7 @@ func (h *Handler) DeleteNotification(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Notification deleted"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Notification deleted"})
 }
 
 // GetUnreadCount retrieves the number of unread notifications
@@ -120,5 +121,5 @@ func (h *Handler) GetUnreadCount(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"unreadCount": count})
+	c.JSON(http.StatusOK, api.UnreadCountResponse{UnreadCount: count})
 }

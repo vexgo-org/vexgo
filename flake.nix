@@ -49,6 +49,7 @@
               oxlint
               pnpm
               prettier
+              tygo
             ];
           };
         }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -56,12 +57,7 @@ func (h *Handler) GenerateCaptcha(c *gin.Context) {
 
 // VerifyCaptcha verifies sliding puzzle and marks as used (pre-verification)
 func (h *Handler) VerifyCaptcha(c *gin.Context) {
-	var req struct {
-		ID    string `json:"id" binding:"required"`
-		Token string `json:"token" binding:"required"`
-		X     int    `json:"x" binding:"required"`
-		Y     int    `json:"y" binding:"required"`
-	}
+	var req api.VerifyCaptchaRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)

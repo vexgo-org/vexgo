@@ -3,6 +3,7 @@ package home
 import (
 	"net/http"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -25,13 +26,13 @@ func (h *Handler) GetStats(c *gin.Context) {
 
 	stats := h.svc.Stats(c.Request.Context(), u.Role)
 
-	c.JSON(http.StatusOK, gin.H{
-		"stats": gin.H{
-			"posts":      stats.Posts,
-			"users":      stats.Users,
-			"comments":   stats.Comments,
-			"categories": stats.Categories,
-			"tags":       stats.Tags,
+	c.JSON(http.StatusOK, api.StatsResponse{
+		Stats: api.Stats{
+			Posts:      stats.Posts,
+			Users:      stats.Users,
+			Comments:   stats.Comments,
+			Categories: stats.Categories,
+			Tags:       stats.Tags,
 		},
 	})
 }

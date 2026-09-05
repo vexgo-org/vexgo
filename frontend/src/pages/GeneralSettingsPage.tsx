@@ -23,7 +23,7 @@ export function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<GeneralSettings>({
-    id: "",
+    id: 0,
     captchaEnabled: false,
     registrationEnabled: true,
     allowGuestViewPosts: true,
@@ -31,8 +31,8 @@ export function GeneralSettingsPage() {
     siteDescription: "",
     siteIcon: "",
     itemsPerPage: 20,
-    createdAt: "",
-    updatedAt: "",
+    created_at: "",
+    updated_at: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 

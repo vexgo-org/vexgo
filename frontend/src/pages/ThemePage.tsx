@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import api from "@/lib/api";
+import api, { configApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,7 +87,7 @@ export function ThemePage() {
     setApplying(themeId);
     setMessage(null);
     try {
-      await api.put("/config/theme", { activeTheme: themeId });
+      await configApi.updateThemeConfig(themeId);
       setActiveTheme(themeId);
       const themeName = themes.find((t) => t.id === themeId)?.name || themeId;
       setMessage({

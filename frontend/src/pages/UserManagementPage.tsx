@@ -106,7 +106,7 @@ export function UserManagementPage() {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const handleRoleChange = async (userId: string | number, newRole: string) => {
     try {
       const response = await updateUserRole(userId, newRole);
       toast.success(response.data.message);
@@ -114,7 +114,7 @@ export function UserManagementPage() {
       // Update the local user list
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
-          user.id === userId
+          String(user.id) === String(userId)
             ? {
                 ...user,
                 role: newRole as
@@ -129,13 +129,15 @@ export function UserManagementPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (userId: string | number) => {
     try {
       const response = await deleteUser(userId);
       toast.success(response.data.message);
 
       // Remove the deleted user from the local list
-      setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+      setUsers((prevUsers) =>
+        prevUsers.filter((user) => String(user.id) !== String(userId)),
+      );
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast.error(t("userManagement.deleteUserFailed"));
