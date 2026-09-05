@@ -1,288 +1,339 @@
+// Package user exposes user administration and creator application
+// endpoints. The handler is built around huma; the service layer
+// (service.go, repository.go) is unchanged.
 package user
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 // Handler exposes the user domain over HTTP.
 type Handler struct {
 	svc *Service
-	mw  *middleware.Auth
 }
 
 // NewHandler creates a user HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
+	return &Handler{svc: NewService(deps)}
 }
 
-// GetUserList gets user list
-func (h *Handler) GetUserList(c *gin.Context) {
-	// Pagination parameters
-	page, limit := middleware.ParsePagination(c, 10)
+// ---------- input / output types ----------
 
-	search := c.DefaultQuery("search", "")
+type getUserListInput struct {
+	Page   int    `query:"page" default:"1" doc:"1-based page index"`
+	Limit  int    `query:"limit" default:"10" doc:"page size; capped at 100"`
+	Search string `query:"search" default:"" doc:"Substring filter on username/email"`
+}
 
-	users, total, err := h.svc.ListUsers(c.Request.Context(), search, page, limit)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query users"})
-		return
+type getUserListOutput struct {
+	Body api.UsersResponse
+}
+
+type userIDPath struct {
+	ID string `path:"id" doc:"Numeric user ID"`
+}
+
+type updateUserRoleInput struct {
+	Body struct {
+		Role string `json:"role" required:"" doc:"Target role (e.g. admin, author, contributor)"`
 	}
+	userIDPath
+}
 
+type userRoleUpdateOutput struct {
+	Body api.UserRoleUpdateResponse
+}
+
+type messageOutput struct {
+	Body api.MessageResponse
+}
+
+type applyForCreatorInput struct {
+	Body api.ApplyForCreatorRequest
+}
+
+type applyForCreatorOutput struct {
+	Body api.CreatorApplicationApplyResponse
+}
+
+type getCreatorApplicationsInput struct {
+	Page   int    `query:"page" default:"1"`
+	Limit  int    `query:"limit" default:"10"`
+	Status string `query:"status" default:"pending" doc:"Filter by status (pending|approved|rejected)"`
+}
+
+type getCreatorApplicationsOutput struct {
+	Body api.CreatorApplicationsResponse
+}
+
+type reviewCreatorApplicationInput struct {
+	Body api.ReviewCreatorApplicationRequest
+	userIDPath
+}
+
+// RegisterRoutes registers the user domain operations on the given
+// huma.API. Admin-only endpoints are protected by
+// auth.Permission(admin, super_admin).
+func (h *Handler) RegisterRoutes(api huma.API) {
+	adminOnly := auth.Permission(model.RoleAdmin, model.RoleSuperAdmin)
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "list-users",
+		Method:        http.MethodGet,
+		Path:          "/users",
+		Summary:       "List users (admin only)",
+		Tags:          []string{"users"},
+		Security:      []map[string][]string{{"BearerAuth": {}}},
+		Middlewares:   huma.Middlewares{adminOnly},
+	}, h.GetUserList)
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "update-user-role",
+		Method:        http.MethodPut,
+		Path:          "/users/{id}/role",
+		Summary:       "Update a user's role (admin only)",
+		Tags:          []string{"users"},
+		Security:      []map[string][]string{{"BearerAuth": {}}},
+		Middlewares:   huma.Middlewares{adminOnly},
+	}, h.UpdateUserRole)
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "delete-user",
+		Method:        http.MethodDelete,
+		Path:          "/users/{id}",
+		Summary:       "Delete a user (admin only)",
+		Tags:          []string{"users"},
+		Security:      []map[string][]string{{"BearerAuth": {}}},
+		Middlewares:   huma.Middlewares{adminOnly},
+	}, h.DeleteUser)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "apply-for-creator",
+		Method:      http.MethodPost,
+		Path:        "/users/apply-creator",
+		Summary:     "Apply to become a creator",
+		Tags:        []string{"users"},
+		Security:    []map[string][]string{{"BearerAuth": {}}},
+	}, h.ApplyForCreator)
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "list-creator-applications",
+		Method:        http.MethodGet,
+		Path:          "/users/creator-applications",
+		Summary:       "List creator applications (admin only)",
+		Tags:          []string{"users"},
+		Security:      []map[string][]string{{"BearerAuth": {}}},
+		Middlewares:   huma.Middlewares{adminOnly},
+	}, h.GetCreatorApplications)
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "review-creator-application",
+		Method:        http.MethodPut,
+		Path:          "/users/creator-applications/{id}/review",
+		Summary:       "Approve or reject a creator application (admin only)",
+		Tags:          []string{"users"},
+		Security:      []map[string][]string{{"BearerAuth": {}}},
+		Middlewares:   huma.Middlewares{adminOnly},
+	}, h.ReviewCreatorApplication)
+}
+
+// ---------- handlers ----------
+
+func (h *Handler) GetUserList(ctx context.Context, in *getUserListInput) (*getUserListOutput, error) {
+	page, limit := middleware.ParsePaginationValues(
+		strconv.Itoa(in.Page), strconv.Itoa(in.Limit), middleware.DefaultPaginationLimit,
+	)
+	users, total, err := h.svc.ListUsers(ctx, in.Search, page, limit)
+	if err != nil {
+		return nil, huma.NewError(500, "Failed to query users")
+	}
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 	if totalPages == 0 {
 		totalPages = 1
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"users": users,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	return &getUserListOutput{
+		Body: api.UsersResponse{
+			Users: users,
+			Pagination: api.Pagination{
+				Total:      total,
+				Page:       page,
+				Limit:      limit,
+				TotalPages: totalPages,
+			},
 		},
-	})
+	}, nil
 }
 
-// UpdateUserRole updates user role
-func (h *Handler) UpdateUserRole(c *gin.Context) {
-	actor, ok := middleware.CurrentUser(c)
+func (h *Handler) UpdateUserRole(ctx context.Context, in *updateUserRoleInput) (*userRoleUpdateOutput, error) {
+	actor, ok := auth.UserFromContext(ctx)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
-		return
+		return nil, huma.NewError(401, "No user information provided")
 	}
-
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	id, err := strconv.ParseUint(in.ID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
+		return nil, huma.NewError(400, "Invalid user ID")
 	}
+	user, err := h.svc.UpdateRole(ctx, actor, uint(id), in.Body.Role)
+	if err != nil {
+		return nil, mapUserError(err)
+	}
+	return &userRoleUpdateOutput{
+		Body: api.UserRoleUpdateResponse{
+			Message: "User role updated successfully",
+			User:    *user,
+		},
+	}, nil
+}
 
-	var req struct {
-		Role string `json:"role" binding:"required"`
+func (h *Handler) DeleteUser(ctx context.Context, in *userIDPath) (*messageOutput, error) {
+	actor, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return nil, huma.NewError(401, "No user information provided")
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
+	id, err := strconv.ParseUint(in.ID, 10, 32)
+	if err != nil {
+		return nil, huma.NewError(400, "Invalid user ID")
 	}
+	if err := h.svc.DeleteUser(ctx, actor, uint(id)); err != nil {
+		return nil, mapUserError(err)
+	}
+	return &messageOutput{
+		Body: api.MessageResponse{Message: "User deleted successfully"},
+	}, nil
+}
 
-	user, err := h.svc.UpdateRole(c.Request.Context(), actor, uint(id), req.Role)
+func (h *Handler) ApplyForCreator(ctx context.Context, in *applyForCreatorInput) (*applyForCreatorOutput, error) {
+	actor, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return nil, huma.NewError(401, "No user information provided")
+	}
+	slog.Info("creator application submission", "actor", actor.ID)
+	id, err := h.svc.ApplyForCreator(ctx, actor, in.Body.Reason)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
-		case errors.Is(err, ErrCannotModifySelf):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrModifySuperAdmin):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrInvalidRole):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrSuperAdminRestricted):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrAdminRoleRestricted):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrNoPermission):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrRoleNotEligible), errors.Is(err, ErrAlreadyPending):
+			return nil, huma.NewError(400, err.Error())
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user role"})
+			return nil, huma.NewError(500, "Failed to create application")
 		}
-		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User role updated successfully",
-		"user":    user,
-	})
+	return &applyForCreatorOutput{
+		Body: api.CreatorApplicationApplyResponse{
+			Message:       "Application submitted successfully",
+			ApplicationID: id,
+		},
+	}, nil
 }
 
-// DeleteUser deletes user and all their posts and comments
-func (h *Handler) DeleteUser(c *gin.Context) {
-	actor, ok := middleware.CurrentUser(c)
+func (h *Handler) GetCreatorApplications(ctx context.Context, in *getCreatorApplicationsInput) (*getCreatorApplicationsOutput, error) {
+	actor, ok := auth.UserFromContext(ctx)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
-		return
+		return nil, huma.NewError(401, "No user information provided")
 	}
-
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	err = h.svc.DeleteUser(c.Request.Context(), actor, uint(id))
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
-		case errors.Is(err, ErrCannotDeleteSelf):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrAdminDeleteRestricted):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrNoPermissionToDelete):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
-}
-
-// ApplyForCreator handles creator application submission
-func (h *Handler) ApplyForCreator(c *gin.Context) {
-	actor, ok := middleware.CurrentUser(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
-		return
-	}
-
-	var req struct {
-		Reason string `json:"reason"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
-	applicationID, err := h.svc.ApplyForCreator(c.Request.Context(), actor, req.Reason)
-	if err != nil {
-		switch {
-		case errors.Is(err, ErrRoleNotEligible):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrAlreadyPending):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create application"})
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "Application submitted successfully",
-		"applicationId": applicationID,
-	})
-}
-
-// GetCreatorApplications gets creator applications for admin review
-func (h *Handler) GetCreatorApplications(c *gin.Context) {
-	actor, ok := middleware.CurrentUser(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
-		return
-	}
-
-	page, limit := middleware.ParsePagination(c, 10)
-	statusStr := c.DefaultQuery("status", string(model.CreatorApplicationStatusPending))
-	status := model.CreatorApplicationStatus(statusStr)
-
-	applications, total, err := h.svc.ListCreatorApplications(c.Request.Context(), ListCreatorApplicationsQuery{
+	page, limit := middleware.ParsePaginationValues(
+		strconv.Itoa(in.Page), strconv.Itoa(in.Limit), middleware.DefaultPaginationLimit,
+	)
+	applications, total, err := h.svc.ListCreatorApplications(ctx, ListCreatorApplicationsQuery{
 		ActorRole: actor.Role,
-		Status:    status,
+		Status:    model.CreatorApplicationStatus(in.Status),
 		Page:      page,
 		Limit:     limit,
 	})
 	if err != nil {
 		if errors.Is(err, ErrNoPermissionAccessApps) {
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-			return
+			return nil, huma.NewError(403, err.Error())
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query creator applications"})
-		return
+		return nil, huma.NewError(500, "Failed to query creator applications")
 	}
-
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 	if totalPages == 0 {
 		totalPages = 1
 	}
-
-	// Format response
-	var response []map[string]any
+	out := make([]api.CreatorApplicationView, 0, len(applications))
 	for _, app := range applications {
-		response = append(response, map[string]any{
-			"id":          app.ID,
-			"userId":      app.UserID,
-			"username":    app.User.Username,
-			"email":       app.User.Email,
-			"currentRole": app.User.Role,
-			"status":      app.Status,
-			"reason":      app.Reason,
-			"createdAt":   app.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			"updatedAt":   app.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		out = append(out, api.CreatorApplicationView{
+			ID:          app.ID,
+			UserID:      app.UserID,
+			Username:    app.User.Username,
+			Email:       app.User.Email,
+			CurrentRole: app.User.Role,
+			Status:      app.Status,
+			Reason:      app.Reason,
+			CreatedAt:   app.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:   app.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"applications": response,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	return &getCreatorApplicationsOutput{
+		Body: api.CreatorApplicationsResponse{
+			Applications: out,
+			Pagination: api.Pagination{
+				Total:      total,
+				Page:       page,
+				Limit:      limit,
+				TotalPages: totalPages,
+			},
 		},
-	})
+	}, nil
 }
 
-// ReviewCreatorApplication handles creator application review
-func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
-	actor, ok := middleware.CurrentUser(c)
+func (h *Handler) ReviewCreatorApplication(ctx context.Context, in *reviewCreatorApplicationInput) (*messageOutput, error) {
+	actor, ok := auth.UserFromContext(ctx)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No user information provided"})
-		return
+		return nil, huma.NewError(401, "No user information provided")
 	}
-
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	id, err := strconv.ParseUint(in.ID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid application ID"})
-		return
+		return nil, huma.NewError(400, "Invalid application ID")
 	}
-
-	var req struct {
-		Action string `json:"action" binding:"required"`
-		Reason string `json:"reason"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
-	err = h.svc.ReviewCreatorApplication(c.Request.Context(), ReviewCreatorApplicationRequest{
+	if err := h.svc.ReviewCreatorApplication(ctx, ReviewCreatorApplicationRequest{
 		Actor:  actor,
 		AppID:  uint(id),
-		Action: req.Action,
-		Reason: req.Reason,
-	})
-	if err != nil {
+		Action: in.Body.Action,
+		Reason: in.Body.Reason,
+	}); err != nil {
 		switch {
 		case errors.Is(err, ErrNoPermissionReviewApps):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return nil, huma.NewError(403, err.Error())
 		case errors.Is(err, ErrApplicationNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Application does not exist"})
-		case errors.Is(err, ErrApplicationProcessed):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrInvalidAction):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return nil, huma.NewError(404, "Application does not exist")
+		case errors.Is(err, ErrApplicationProcessed), errors.Is(err, ErrInvalidAction):
+			return nil, huma.NewError(400, err.Error())
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update application"})
+			return nil, huma.NewError(500, "Failed to update application")
 		}
-		return
 	}
+	return &messageOutput{
+		Body: api.MessageResponse{Message: "Application reviewed successfully"},
+	}, nil
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Application reviewed successfully",
-	})
+func mapUserError(err error) error {
+	switch {
+	case errors.Is(err, ErrUserNotFound):
+		return huma.NewError(404, "User does not exist")
+	case errors.Is(err, ErrCannotModifySelf),
+		errors.Is(err, ErrInvalidRole),
+		errors.Is(err, ErrCannotDeleteSelf):
+		return huma.NewError(400, err.Error())
+	case errors.Is(err, ErrModifySuperAdmin),
+		errors.Is(err, ErrSuperAdminRestricted),
+		errors.Is(err, ErrAdminRoleRestricted),
+		errors.Is(err, ErrNoPermission),
+		errors.Is(err, ErrAdminDeleteRestricted),
+		errors.Is(err, ErrNoPermissionToDelete):
+		return huma.NewError(403, err.Error())
+	default:
+		return huma.NewError(500, "Failed to process user request")
+	}
 }
