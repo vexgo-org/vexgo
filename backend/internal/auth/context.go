@@ -1,6 +1,7 @@
 // Package auth provides the auth-domain middleware (JWT
 // verification) and the huma-side helpers (UserFromContext,
-// ContextMiddleware, Permission) used by every huma handler.
+// ContextMiddleware, Permission, GinContextMiddleware) used by
+// every huma handler.
 package auth
 
 import (
@@ -9,15 +10,20 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
+	"github.com/gin-gonic/gin"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
-// ctxKey is the request-scope key for the authenticated user.
+// ctxKey is the request-scope key for the authenticated user and
+// the recovered gin context.
 type ctxKey struct{}
 
-var userKey = ctxKey{}
+var (
+	userKey       = ctxKey{}
+	ginContextKey = ctxKey{}
+)
 
 // UserFromContext returns the authenticated user, or a zero-value
 // User with ok=false when the request is anonymous.
@@ -46,6 +52,18 @@ func UserRoleFromContext(ctx context.Context) string {
 	return u.Role
 }
 
+// GinContextFromContext recovers the *gin.Context stashed by
+// GinContextMiddleware. Use it from handlers that still need gin
+// idioms (multipart uploads, c.PostForm, c.ClientIP). Returns
+// nil when the middleware has not run.
+func GinContextFromContext(ctx context.Context) *gin.Context {
+	v, ok := ctx.Value(ginContextKey).(*gin.Context)
+	if !ok {
+		return nil
+	}
+	return v
+}
+
 // ContextMiddleware copies the user from the underlying gin context
 // (set by middleware.JWTAuth and friends) into the request's
 // context.Context so huma handlers can read it via
@@ -63,11 +81,25 @@ func ContextMiddleware(ctx huma.Context, next func(huma.Context)) {
 	next(ctx)
 }
 
+// GinContextMiddleware stashes the *gin.Context in the request
+// context so handlers can recover it via GinContextFromContext.
+// Use only for handlers that depend on gin idioms (e.g. multipart
+// file uploads). Most handlers should not need it.
+func GinContextMiddleware(ctx huma.Context, next func(huma.Context)) {
+	if g := humagin.Unwrap(ctx); g != nil {
+		newCtx := context.WithValue(ctx.Context(), ginContextKey, g)
+		next(huma.WithContext(ctx, newCtx))
+		return
+	}
+	next(ctx)
+}
+
 // Permission is the huma-side role check. It must be chained after
 // ContextMiddleware and after JWTAuth has populated the gin
-// context. It mirrors the gin `middleware.Auth.Permission` for
-// huma-registered routes: super admin is implicitly allowed; the
-// first matching role is enough.
+// context. It is a small replacement for the gin
+// `middleware.Auth.Permission` for huma-registered routes: the
+// gin version still exists for any gin-registered routes (sso,
+// upload).
 func Permission(requiredRoles ...string) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		role := UserRoleFromContext(ctx.Context())
@@ -94,3 +126,4 @@ func hasRole(role string, required []string) bool {
 	}
 	return false
 }
+

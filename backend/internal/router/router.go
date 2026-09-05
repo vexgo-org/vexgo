@@ -63,6 +63,7 @@ func RegisterHumaRoutes(r *gin.Engine, api huma.API) {
 	home.NewHandler(home.Deps{}).RegisterRoutes(api)
 	notification.NewHandler(notification.Deps{}).RegisterRoutes(api)
 	user.NewHandler(user.Deps{}).RegisterRoutes(api)
+	upload.NewHandler(upload.Deps{}).RegisterRoutes(api)
 }
 
 // RegisterAPIRoutes wires every domain. The huma-typed domains
@@ -80,20 +81,20 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) huma.API {
 	api := humaapi.New(r, humaapi.DefaultConfig("VexGo API", "0.1.0"))
 	api.UseMiddleware(auth.ContextMiddleware)
 
-	// MIGRATED: captcha, home, notification, user
+	// MIGRATED: captcha, home, notification, user, upload
 	captcha.NewHandler(deps.Captcha).RegisterRoutes(api)
 	home.NewHandler(deps.Home).RegisterRoutes(api)
 	notification.NewHandler(deps.Notification).RegisterRoutes(api)
 	user.NewHandler(deps.User).RegisterRoutes(api)
+	upload.NewHandler(deps.Upload).RegisterRoutes(api)
 
 	// GIN-ONLY (not yet migrated): auth, comment, post, settings,
-	// upload, sso, verify-email
+	// sso, verify-email
 	g := r.Group("/api", jwtAuth.OptionalJWTAuth())
 	auth.NewHandler(deps.Auth).RegisterRoutes(g)
 	comment.NewHandler(deps.Comment).RegisterRoutes(g)
 	post.NewHandler(deps.Post).RegisterRoutes(g)
 	settings.NewHandler(deps.Settings).RegisterRoutes(g)
-	upload.NewHandler(deps.Upload).RegisterRoutes(g)
 	sso.NewHandler(deps.SSO).RegisterRoutes(g)
 
 	return api
