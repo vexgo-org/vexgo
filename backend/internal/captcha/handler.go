@@ -1,96 +1,119 @@
+// Package captcha implements sliding-puzzle captcha generation and
+// verification. HTTP handlers are registered with huma and live
+// alongside the service layer in this package.
+//
+// The service layer (service.go) is unchanged from the previous
+// gin-based implementation; only the HTTP boundary moves to huma.
+// The handler functions take (context.Context, *Input) and return
+// (*Output, error); the service is still driven by the request
+// context.
 package captcha
 
 import (
+	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/gin-gonic/gin"
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 )
 
-// Handler exposes the captcha domain over HTTP.
-type Handler struct {
-	svc                *Service
-	rateLimitPerMinute int
-	rateLimit          middleware.RateLimitStore
+// generateInput is empty: GET /api/captcha takes no body, query, or
+// path parameters.
+type generateInput struct{}
+
+// generateOutput wraps the captcha response. huma renders the Body
+// field as the JSON response body.
+type generateOutput struct {
+	Body api.CaptchaGenerateResponse
 }
 
-// NewHandler creates a captcha HTTP handler with the given dependencies. A
-// positive deps.RateLimitPerMinute installs a per-client-IP rate limit on the
-// unauthenticated captcha endpoints.
-func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), rateLimitPerMinute: deps.RateLimitPerMinute, rateLimit: deps.RateLimit}
+// verifyInput is the POST /api/captcha/verify body. huma binds the
+// JSON body to the Body field.
+type verifyInput struct {
+	Body api.CaptchaVerifyRequest
 }
 
-// GenerateCaptcha generates sliding puzzle captcha
-func (h *Handler) GenerateCaptcha(c *gin.Context) {
-	captcha, err := h.svc.GenerateCaptcha(c.Request.Context())
+// verifyOutput wraps the verification result.
+type verifyOutput struct {
+	Body api.CaptchaVerifyResponse
+}
+
+// RegisterRoutes registers the captcha domain operations on the
+// given huma.API. The rate-limit middleware is still a gin middleware
+// — humagin runs gin middleware before dispatching to the huma
+// handler, so attaching it to the gin group at the caller is the
+// only change needed.
+func (h *Handler) RegisterRoutes(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "generate-captcha",
+		Method:      http.MethodGet,
+		Path:        "/captcha",
+		Summary:     "Generate a sliding puzzle captcha",
+		Tags:        []string{"captcha"},
+	}, h.generate)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "verify-captcha",
+		Method:      http.MethodPost,
+		Path:        "/captcha/verify",
+		Summary:     "Verify a captcha solution",
+		Tags:        []string{"captcha"},
+	}, h.verify)
+}
+
+// generate is the huma handler for GET /api/captcha.
+func (h *Handler) generate(ctx context.Context, _ *generateInput) (*generateOutput, error) {
+	c, err := h.svc.GenerateCaptcha(ctx)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrEncodeBgImage):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode background image"})
+			return nil, huma.NewError(500, "Failed to encode background image")
 		case errors.Is(err, ErrEncodePuzzleImage):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to encode puzzle image"})
+			return nil, huma.NewError(500, "Failed to encode puzzle image")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate captcha"})
+			return nil, huma.NewError(500, "Failed to generate captcha")
 		}
-		return
 	}
-
-	// Return captcha information (without correct answer); the shape maps
-	// directly onto the go-captcha-react Slide component's data prop.
-	c.JSON(http.StatusOK, gin.H{
-		"id":          captcha.ID,
-		"token":       captcha.Token,
-		"thumbX":      captcha.ThumbX,
-		"thumbY":      captcha.ThumbY,
-		"thumbWidth":  captcha.ThumbWidth,
-		"thumbHeight": captcha.ThumbHeight,
-		"image":       captcha.Image,
-		"thumb":       captcha.Thumb,
-		"expires_at":  captcha.ExpiresAt,
-	})
+	return &generateOutput{
+		Body: api.CaptchaGenerateResponse{
+			ID:          c.ID,
+			Token:       c.Token,
+			ThumbX:      c.ThumbX,
+			ThumbY:      c.ThumbY,
+			ThumbWidth:  c.ThumbWidth,
+			ThumbHeight: c.ThumbHeight,
+			Image:       c.Image,
+			Thumb:       c.Thumb,
+			ExpiresAt:   c.ExpiresAt,
+		},
+	}, nil
 }
 
-// VerifyCaptcha verifies sliding puzzle and marks as used (pre-verification)
-func (h *Handler) VerifyCaptcha(c *gin.Context) {
-	var req struct {
-		ID    string `json:"id" binding:"required"`
-		Token string `json:"token" binding:"required"`
-		X     int    `json:"x" binding:"required"`
-		Y     int    `json:"y" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
-	err := h.svc.VerifyCaptcha(c.Request.Context(), VerifyArgs{
-		ID:    req.ID,
-		Token: req.Token,
-		X:     req.X,
-		Y:     req.Y,
+// verify is the huma handler for POST /api/captcha/verify.
+func (h *Handler) verify(ctx context.Context, in *verifyInput) (*verifyOutput, error) {
+	err := h.svc.VerifyCaptcha(ctx, VerifyArgs{
+		ID:    in.Body.ID,
+		Token: in.Body.Token,
+		X:     in.Body.X,
+		Y:     in.Body.Y,
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Captcha does not exist or has expired"})
+			return nil, huma.NewError(404, "Captcha does not exist or has expired")
 		case errors.Is(err, ErrCaptchaUsed):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Captcha already used"})
+			return nil, huma.NewError(400, "Captcha already used")
 		case errors.Is(err, ErrCaptchaExpired):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Captcha has expired"})
+			return nil, huma.NewError(400, "Captcha has expired")
 		case errors.Is(err, ErrCaptchaMismatch):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Verification failed, please try again"})
+			return nil, huma.NewError(400, "Verification failed, please try again")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Captcha verification failed"})
+			return nil, huma.NewError(500, "Captcha verification failed")
 		}
-		return
 	}
-
-	// Return verification success
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Verification successful"})
+	return &verifyOutput{
+		Body: api.CaptchaVerifyResponse{Success: true, Message: "Verification successful"},
+	}, nil
 }
