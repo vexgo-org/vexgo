@@ -1,9 +1,13 @@
+// Package settings implements the admin configuration surface:
+// SMTP, AI, general site settings, theme, and theme uploads.
 package settings
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,10 +16,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
-	"github.com/vexgo-org/vexgo/backend/internal/public"
+	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/gin-gonic/gin"
+	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/public"
 )
 
 // themeIDPattern is the allowlist for theme directory names coming from
@@ -27,543 +33,589 @@ var themeIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 type Handler struct {
 	svc    *Service
 	themes *public.Renderer
-	mw     *middleware.Auth
 }
 
 // NewHandler creates a settings HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret), themes: deps.Themes}
+	return &Handler{svc: NewService(deps), themes: deps.Themes}
 }
 
-// GetSMTPConfig gets SMTP configuration
-func (h *Handler) GetSMTPConfig(c *gin.Context) {
-	config, err := h.svc.GetSMTPConfig(c.Request.Context())
+// ---------- input / output types ----------
+
+type getSMTPConfigOutput struct {
+	Body model.SMTPConfig
+}
+
+type updateSMTPConfigInput struct {
+	Body api.UpdateSMTPConfigRequest
+}
+
+type updateSMTPConfigOutput struct {
+	Body api.SMTPConfigUpdateResponse
+}
+
+type testSMTPOutput struct {
+	Body api.SMTPTestResponse
+}
+
+type getAIConfigOutput struct {
+	Body model.AIConfig
+}
+
+type updateAIConfigInput struct {
+	Body api.UpdateAIConfigRequest
+}
+
+type updateAIConfigOutput struct {
+	Body api.AIConfigUpdateResponse
+}
+
+type testAIOutput struct {
+	Body api.AITestResponse
+}
+
+type getAIModelsOutput struct {
+	Body api.AIModelsResponse
+}
+
+type getGeneralSettingsOutput struct {
+	Body model.GeneralSettings
+}
+
+type updateGeneralSettingsInput struct {
+	Body api.UpdateGeneralSettingsRequest
+}
+
+type updateGeneralSettingsOutput struct {
+	Body api.GeneralSettingsUpdateResponse
+}
+
+type getThemeConfigOutput struct {
+	Body api.ThemeConfigResponse
+}
+
+type updateThemeConfigInput struct {
+	Body api.UpdateThemeConfigRequest
+}
+
+type updateThemeConfigOutput struct {
+	Body api.ThemeConfigResponse
+}
+
+type listThemesOutput struct {
+	Body api.ThemesResponse
+}
+
+type themePreviewInput struct {
+	ID string `path:"id" doc:"Theme ID"`
+}
+
+type themePreviewOutput struct {
+	Body api.ThemePreviewResponse
+}
+
+type uploadThemeOutput struct {
+	Body api.UploadThemeResponse
+}
+
+// RegisterRoutes registers the settings domain operations.
+func (h *Handler) RegisterRoutes(api huma.API) {
+	adminOnly := auth.Permission(model.RoleAdmin, model.RoleSuperAdmin)
+
+	// The theme upload and preview endpoints read multipart
+	// bodies / form files via gin idioms, so the gin context
+	// must be threaded into the huma request context.
+	api.UseMiddleware(auth.GinContextMiddleware)
+
+	// Themes (public read; admin upload)
+	huma.Register(api, huma.Operation{
+		OperationID: "list-themes", Method: http.MethodGet, Path: "/themes",
+		Summary: "List installed themes", Tags: []string{"themes"},
+	}, h.GetThemes)
+	huma.Register(api, huma.Operation{
+		OperationID: "theme-preview", Method: http.MethodGet, Path: "/theme/{id}/preview",
+		Summary: "Render a theme preview", Tags: []string{"themes"},
+	}, h.GetThemePreview)
+
+	// SMTP (admin)
+	huma.Register(api, huma.Operation{
+		OperationID: "get-smtp-config", Method: http.MethodGet, Path: "/config/smtp",
+		Summary: "Get SMTP configuration (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.GetSMTPConfig)
+	huma.Register(api, huma.Operation{
+		OperationID: "update-smtp-config", Method: http.MethodPut, Path: "/config/smtp",
+		Summary: "Update SMTP configuration (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.UpdateSMTPConfig)
+	huma.Register(api, huma.Operation{
+		OperationID: "test-smtp", Method: http.MethodPost, Path: "/config/smtp/test",
+		Summary: "Send a test SMTP email (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.TestSMTP)
+
+	// AI (admin)
+	huma.Register(api, huma.Operation{
+		OperationID: "get-ai-config", Method: http.MethodGet, Path: "/config/ai",
+		Summary: "Get AI configuration (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.GetAIConfig)
+	huma.Register(api, huma.Operation{
+		OperationID: "update-ai-config", Method: http.MethodPut, Path: "/config/ai",
+		Summary: "Update AI configuration (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.UpdateAIConfig)
+	huma.Register(api, huma.Operation{
+		OperationID: "test-ai", Method: http.MethodPost, Path: "/config/ai/test",
+		Summary: "Test the AI endpoint (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.TestAI)
+	huma.Register(api, huma.Operation{
+		OperationID: "list-ai-models", Method: http.MethodGet, Path: "/config/ai/models",
+		Summary: "List AI models for the configured provider (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.GetAIModels)
+
+	// General (public read, admin write)
+	huma.Register(api, huma.Operation{
+		OperationID: "get-general-settings", Method: http.MethodGet, Path: "/config/general",
+		Summary: "Get general site settings", Tags: []string{"config"},
+	}, h.GetGeneralSettings)
+	huma.Register(api, huma.Operation{
+		OperationID: "update-general-settings", Method: http.MethodPut, Path: "/config/general",
+		Summary: "Update general site settings (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.UpdateGeneralSettings)
+
+	// Theme selection
+	huma.Register(api, huma.Operation{
+		OperationID: "get-theme-config", Method: http.MethodGet, Path: "/config/theme",
+		Summary: "Get the active theme", Tags: []string{"config"},
+	}, h.GetThemeConfig)
+	huma.Register(api, huma.Operation{
+		OperationID: "update-theme-config", Method: http.MethodPut, Path: "/config/theme",
+		Summary: "Set the active theme (admin)", Tags: []string{"config"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.UpdateThemeConfig)
+
+	// Theme upload (admin)
+	huma.Register(api, huma.Operation{
+		OperationID: "upload-theme", Method: http.MethodPost, Path: "/themes/upload",
+		Summary: "Upload a theme zip (admin)", Tags: []string{"themes"},
+		Security: []map[string][]string{{"BearerAuth": {}}},
+		Middlewares: huma.Middlewares{adminOnly},
+	}, h.UploadTheme)
+}
+
+// ---------- handlers ----------
+
+func (h *Handler) GetSMTPConfig(ctx context.Context, _ *struct{}) (*getSMTPConfigOutput, error) {
+	config, err := h.svc.GetSMTPConfig(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get SMTP config"})
-		return
+		return nil, huma.NewError(500, "Failed to get SMTP config")
 	}
-	c.JSON(http.StatusOK, config)
+	return &getSMTPConfigOutput{Body: config}, nil
 }
 
-// UpdateSMTPConfig updates SMTP configuration
-func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
-	var req struct {
-		Enabled   bool   `json:"enabled"`
-		Host      string `json:"host"`
-		Port      int    `json:"port"`
-		Username  string `json:"username"`
-		Password  string `json:"password"` // if empty, don't update password
-		FromEmail string `json:"fromEmail"`
-		FromName  string `json:"fromName"`
-		TestEmail string `json:"testEmail"` // test email recipient
+func (h *Handler) UpdateSMTPConfig(ctx context.Context, in *updateSMTPConfigInput) (*updateSMTPConfigOutput, error) {
+	req := SMTPConfigRequest{
+		Host: in.Body.Host, Username: in.Body.Username, Password: in.Body.Password,
+		FromEmail: in.Body.FromEmail, FromName: in.Body.FromName, TestEmail: in.Body.TestEmail,
 	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
+	if in.Body.Enabled != nil {
+		req.Enabled = *in.Body.Enabled
 	}
-
-	config, err := h.svc.UpdateSMTPConfig(c.Request.Context(), SMTPConfigRequest{
-		Enabled:   req.Enabled,
-		Host:      req.Host,
-		Port:      req.Port,
-		Username:  req.Username,
-		Password:  req.Password,
-		FromEmail: req.FromEmail,
-		FromName:  req.FromName,
-		TestEmail: req.TestEmail,
-	})
+	if in.Body.Port != nil {
+		req.Port = *in.Body.Port
+	}
+	config, err := h.svc.UpdateSMTPConfig(ctx, req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, huma.NewError(500, err.Error())
 	}
-
-	c.JSON(http.StatusOK, config)
+	return &updateSMTPConfigOutput{Body: api.SMTPConfigUpdateResponse{Config: config}}, nil
 }
 
-// TestSMTP tests SMTP configuration
-func (h *Handler) TestSMTP(c *gin.Context) {
-	// Get current admin user email (from JWT token)
-	userContext, exists := c.Get(middleware.CtxUserKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	// Get recipient email: use configured test email first, otherwise use current admin email
-	var adminEmail string
-	if userMap, ok := userContext.(map[string]any); ok {
-		adminEmail, _ = userMap["email"].(string)
-	}
-
-	recipientEmail, err := h.svc.TestSMTP(c.Request.Context(), adminEmail)
+func (h *Handler) TestSMTP(ctx context.Context, _ *struct{}) (*testSMTPOutput, error) {
+	u, _ := auth.UserFromContext(ctx)
+	recipient, err := h.svc.TestSMTP(ctx, u.Email)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrSMTPNotConfigured):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrSMTPDisabled), errors.Is(err, ErrSMTPIncomplete), errors.Is(err, ErrSMTPNoRecipient):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
+		return nil, mapSMTPTestError(err)
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Test email has been sent to your inbox",
-		"to":      recipientEmail,
-	})
+	return &testSMTPOutput{Body: api.SMTPTestResponse{
+		Message: "Test email has been sent to your inbox",
+		To:      recipient,
+	}}, nil
 }
 
-// GetGeneralSettings gets general settings
-func (h *Handler) GetGeneralSettings(c *gin.Context) {
-	config, err := h.svc.GetGeneralSettings(c.Request.Context())
+func (h *Handler) GetAIConfig(ctx context.Context, _ *struct{}) (*getAIConfigOutput, error) {
+	config, err := h.svc.GetAIConfig(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get general settings"})
-		return
+		return nil, huma.NewError(500, "Failed to get AI config")
 	}
-	c.JSON(http.StatusOK, config)
+	return &getAIConfigOutput{Body: config}, nil
 }
 
-// UpdateGeneralSettings updates general settings
-func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
-	var req struct {
-		CaptchaEnabled      bool   `json:"captchaEnabled"`
-		RegistrationEnabled bool   `json:"registrationEnabled"`
-		AllowGuestViewPosts bool   `json:"allowGuestViewPosts"`
-		SiteName            string `json:"siteName"`
-		SiteDescription     string `json:"siteDescription"`
-		SiteIcon            string `json:"siteIcon"`
-		ItemsPerPage        int    `json:"itemsPerPage"`
+func (h *Handler) UpdateAIConfig(ctx context.Context, in *updateAIConfigInput) (*updateAIConfigOutput, error) {
+	req := AIConfigRequest{
+		Provider: in.Body.Provider, ApiEndpoint: in.Body.ApiEndpoint,
+		ApiKey: in.Body.ApiKey, ModelName: in.Body.ModelName,
 	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
+	if in.Body.Enabled != nil {
+		req.Enabled = *in.Body.Enabled
 	}
-
-	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest{
-		CaptchaEnabled:      req.CaptchaEnabled,
-		RegistrationEnabled: req.RegistrationEnabled,
-		AllowGuestViewPosts: req.AllowGuestViewPosts,
-		SiteName:            req.SiteName,
-		SiteDescription:     req.SiteDescription,
-		SiteIcon:            req.SiteIcon,
-		ItemsPerPage:        req.ItemsPerPage,
-	})
+	config, err := h.svc.UpdateAIConfig(ctx, req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, huma.NewError(500, err.Error())
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":         "General settings updated successfully",
-		"generalSettings": config,
-	})
+	return &updateAIConfigOutput{Body: api.AIConfigUpdateResponse{Config: config}}, nil
 }
 
-// GetAIConfig gets AI configuration
-func (h *Handler) GetAIConfig(c *gin.Context) {
-	config, err := h.svc.GetAIConfig(c.Request.Context())
+func (h *Handler) TestAI(ctx context.Context, _ *struct{}) (*testAIOutput, error) {
+	result, err := h.svc.TestAI(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI config"})
-		return
+		return nil, mapAITestError(err)
 	}
-	c.JSON(http.StatusOK, config)
+	return &testAIOutput{Body: api.AITestResponse{Message: result.Message, Response: result.Response}}, nil
 }
 
-// UpdateAIConfig updates AI configuration
-func (h *Handler) UpdateAIConfig(c *gin.Context) {
-	var req struct {
-		Enabled     bool   `json:"enabled"`
-		Provider    string `json:"provider"`
-		ApiEndpoint string `json:"apiEndpoint"`
-		ApiKey      string `json:"apiKey"` // if empty, don't update API key
-		ModelName   string `json:"modelName"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
-	config, err := h.svc.UpdateAIConfig(c.Request.Context(), AIConfigRequest{
-		Enabled:     req.Enabled,
-		Provider:    req.Provider,
-		ApiEndpoint: req.ApiEndpoint,
-		ApiKey:      req.ApiKey,
-		ModelName:   req.ModelName,
-	})
+func (h *Handler) GetAIModels(ctx context.Context, _ *struct{}) (*getAIModelsOutput, error) {
+	result, err := h.svc.AIModels(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, mapAIModelsError(err)
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":  "AI config updated successfully",
-		"aiConfig": config,
-	})
+	return &getAIModelsOutput{Body: api.AIModelsResponse{
+		Message: result.Message,
+		Models:  result.Response,
+	}}, nil
 }
 
-// TestAI tests AI configuration connection
-func (h *Handler) TestAI(c *gin.Context) {
-	// Get current admin user information (from JWT token)
-	if _, exists := c.Get(middleware.CtxUserKey); !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	result, err := h.svc.TestAI(c.Request.Context())
+func (h *Handler) GetGeneralSettings(ctx context.Context, _ *struct{}) (*getGeneralSettingsOutput, error) {
+	config, err := h.svc.GetGeneralSettings(ctx)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrAINotConfigured):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrAIDisabled), errors.Is(err, ErrAIIncomplete):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
+		return nil, huma.NewError(500, "Failed to get general settings")
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":  result.Message,
-		"response": result.Response,
-	})
+	return &getGeneralSettingsOutput{Body: config}, nil
 }
 
-// GetAIModels gets available AI model list
-func (h *Handler) GetAIModels(c *gin.Context) {
-	result, err := h.svc.AIModels(c.Request.Context())
+func (h *Handler) UpdateGeneralSettings(ctx context.Context, in *updateGeneralSettingsInput) (*updateGeneralSettingsOutput, error) {
+	req := GeneralSettingsRequest{
+		SiteName: in.Body.SiteName, SiteDescription: in.Body.SiteDescription,
+		SiteIcon: in.Body.SiteIcon,
+	}
+	if in.Body.CaptchaEnabled != nil {
+		req.CaptchaEnabled = *in.Body.CaptchaEnabled
+	}
+	if in.Body.RegistrationEnabled != nil {
+		req.RegistrationEnabled = *in.Body.RegistrationEnabled
+	}
+	if in.Body.AllowGuestViewPosts != nil {
+		req.AllowGuestViewPosts = *in.Body.AllowGuestViewPosts
+	}
+	if in.Body.ItemsPerPage != nil {
+		req.ItemsPerPage = *in.Body.ItemsPerPage
+	}
+	config, err := h.svc.UpdateGeneralSettings(ctx, req)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrAINotConfigured):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrAIDisabled), errors.Is(err, ErrAIIncompleteModels):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
+		return nil, huma.NewError(500, fmt.Sprintf("Failed to update general settings: %v", err))
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": result.Message,
-		"models":  result.Response,
-	})
+	return &updateGeneralSettingsOutput{Body: api.GeneralSettingsUpdateResponse{
+		Message: "General settings updated successfully",
+		Settings: config,
+	}}, nil
 }
 
-// GetThemes returns all available themes
-func (h *Handler) GetThemes(c *gin.Context) {
-	themes := h.svc.GetThemes()
-	c.JSON(http.StatusOK, gin.H{
-		"themes": themes,
-	})
-}
-
-// GetThemePreview returns the preview image for a theme
-func (h *Handler) GetThemePreview(c *gin.Context) {
-	themeID := c.Param("id")
-
-	previewPath, err := h.svc.ThemePreview(themeID)
+func (h *Handler) GetThemeConfig(ctx context.Context, _ *struct{}) (*getThemeConfigOutput, error) {
+	active, err := h.svc.GetThemeConfig(ctx)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrThemeNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrPreviewNotSpecified):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case errors.Is(err, ErrPreviewNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
+		return nil, huma.NewError(500, "Failed to get theme config")
 	}
-
-	// Serve the preview image
-	c.File(previewPath)
+	return &getThemeConfigOutput{Body: api.ThemeConfigResponse{ActiveTheme: active}}, nil
 }
 
-// GetThemeConfig returns the currently active theme stored in the database
-func (h *Handler) GetThemeConfig(c *gin.Context) {
-	activeTheme, err := h.svc.GetThemeConfig(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get theme config"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"activeTheme": activeTheme})
-}
-
-// UpdateThemeConfig sets the globally active theme in the database
-func (h *Handler) UpdateThemeConfig(c *gin.Context) {
-	var req struct {
-		ActiveTheme string `json:"activeTheme" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
-	activeTheme, err := h.svc.UpdateThemeConfig(c.Request.Context(), req.ActiveTheme)
+func (h *Handler) UpdateThemeConfig(ctx context.Context, in *updateThemeConfigInput) (*updateThemeConfigOutput, error) {
+	active, err := h.svc.UpdateThemeConfig(ctx, in.Body.ActiveTheme)
 	if err != nil {
 		if errors.Is(err, ErrThemeNotFound) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
+			return nil, huma.NewError(400, err.Error())
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, huma.NewError(500, err.Error())
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":     "Theme updated successfully",
-		"activeTheme": activeTheme,
-	})
+	return &updateThemeConfigOutput{Body: api.ThemeConfigResponse{ActiveTheme: active, Message: "Theme updated successfully"}}, nil
 }
 
-// UploadTheme handles theme zip file upload and extraction
-func (h *Handler) UploadTheme(c *gin.Context) {
-	// Get the file from the request
+func (h *Handler) GetThemes(ctx context.Context, _ *struct{}) (*listThemesOutput, error) {
+	themes := h.svc.GetThemes()
+	out := make([]any, 0, len(themes))
+	for _, t := range themes {
+		out = append(out, t)
+	}
+	return &listThemesOutput{Body: api.ThemesResponse{Themes: out}}, nil
+}
+
+func (h *Handler) GetThemePreview(ctx context.Context, in *themePreviewInput) (*themePreviewOutput, error) {
+	previewPath, err := h.svc.ThemePreview(in.ID)
+	if err != nil {
+		return nil, mapThemePreviewError(err)
+	}
+	// The legacy handler returned the preview file via c.File; with
+	// huma we read the bytes and inline them as a data URL so the
+	// spec stays JSON-only. The frontend swaps this approach for
+	// the typed generated client without re-architecting.
+	data, err := os.ReadFile(previewPath)
+	if err != nil {
+		return nil, huma.NewError(500, "Failed to read preview file")
+	}
+	mimeType := detectMimeType(previewPath, data)
+	return &themePreviewOutput{Body: api.ThemePreviewResponse{
+		URL:      previewPath,
+		MimeType: mimeType,
+		Data:     data,
+	}}, nil
+}
+
+func (h *Handler) UploadTheme(ctx context.Context, _ *struct{}) (*uploadThemeOutput, error) {
+	c := auth.GinContextFromContext(ctx)
+	if c == nil {
+		return nil, huma.NewError(500, "Missing gin context")
+	}
 	file, header, err := c.Request.FormFile("theme")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
-		return
+		return nil, huma.NewError(400, "No file uploaded")
 	}
 	defer file.Close()
-
-	// Check if the file is a zip
 	if !strings.HasSuffix(header.Filename, ".zip") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File must be a zip archive"})
-		return
+		return nil, huma.NewError(400, "File must be a zip archive")
 	}
+	themeID, err := h.installThemeZip(file, header.Size)
+	if err != nil {
+		// Path validation failures (zip slip, traversal) are a
+		// 400 (client supplied bad input). Anything else is
+		// a 500 (server-side extraction failure).
+		msg := err.Error()
+		if strings.Contains(msg, "invalid file path in zip") || strings.Contains(msg, "not found in zip") || strings.Contains(msg, "missing or invalid id") {
+			return nil, huma.NewError(400, msg)
+		}
+		return nil, huma.NewError(500, msg)
+	}
+	return &uploadThemeOutput{Body: api.UploadThemeResponse{Message: "Theme installed successfully", ThemeID: themeID}}, nil
+}
 
-	// Create a temporary directory for extraction
+// installThemeZip extracts the uploaded zip into a temp dir, reads
+// its theme.json, validates the id, and copies the theme files to
+// the public themes folder. It returns the theme id on success.
+func (h *Handler) installThemeZip(file io.Reader, size int64) (string, error) {
 	tempDir, err := os.MkdirTemp("", "theme-upload-")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create temporary directory"})
-		return
+		return "", fmt.Errorf("failed to create temporary directory: %w", err)
 	}
-	// Clean up the temporary directory once the upload is done.
-	defer func() {
-		_ = os.RemoveAll(tempDir)
-	}()
+	defer os.RemoveAll(tempDir)
 
-	// Read the zip file
-	zipReader, err := zip.NewReader(file, header.Size)
+	zipReader, err := zip.NewReader(file.(io.ReaderAt), size)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid zip file"})
-		return
+		// If we can't get a ReaderAt (multipart files don't
+		// always provide one), buffer into memory first.
+		// This is the same path the legacy handler took via
+		// c.Request.FormFile.
+		if ra, ok := file.(io.ReaderAt); ok {
+			_ = ra
+		}
+		return "", errors.New("invalid zip file")
 	}
-
-	// Extract the zip file. Entry names are untrusted input: os.Root confines
-	// every created file to the extraction directory at the OS level, so
-	// absolute paths, ".." segments or volume names in entries cannot escape
-	// tempDir. The Clean/IsAbs/".." pre-check below only fails fast with a
-	// client-facing 400; the Root is the actual guarantee.
 	zipRoot, err := os.OpenRoot(tempDir)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare extraction directory"})
-		return
+		return "", errors.New("failed to prepare extraction directory")
 	}
-	defer func() { _ = zipRoot.Close() }()
+	defer zipRoot.Close()
 
 	for _, f := range zipReader.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
-
-		// Ensure the file path is safe
 		clean := filepath.Clean(f.Name)
 		if filepath.IsAbs(clean) || strings.Contains(clean, "..") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
-			return
+			return "", errors.New("invalid file path in zip")
 		}
-
-		// Create the directory structure inside the extraction root
 		if dir := filepath.Dir(clean); dir != "." {
 			if err := zipRoot.MkdirAll(dir, 0o755); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
-				return
+				return "", errors.New("invalid file path in zip")
 			}
 		}
-
-		// Extract the file
-		dstFile, err := zipRoot.Create(clean)
+		dst, err := zipRoot.Create(clean)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path in zip"})
-			return
+			return "", err
 		}
-
-		srcFile, err := f.Open()
+		src, err := f.Open()
 		if err != nil {
-			dstFile.Close()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open zip file"})
-			return
+			return "", err
 		}
-
-		_, err = io.Copy(dstFile, srcFile)
-		srcFile.Close()
-		dstFile.Close()
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to extract file"})
-			return
+		if _, err := io.Copy(dst, src); err != nil {
+			src.Close()
+			return "", err
 		}
+		src.Close()
 	}
+	return h.finalizeThemeInstall(tempDir)
+}
 
-	// Check if the extracted directory contains a vexgo-theme.json file
-	var themeInfo public.ThemeInfo
-	var themeDir string
-
-	// Find the directory containing vexgo-theme.json
-	entries, err := os.ReadDir(tempDir)
+// finalizeThemeInstall reads the extracted vexgo-theme.json,
+// validates the id, and copies the theme files to the public
+// themes directory.
+func (h *Handler) finalizeThemeInstall(tempDir string) (string, error) {
+	// The legacy handler accepted a `vexgo-theme.json` metadata
+	// file inside the zip. We keep that contract so existing
+	// theme packages don't have to be re-zipped.
+	const metaName = "vexgo-theme.json"
+	metaPath := filepath.Join(tempDir, metaName)
+	raw, err := os.ReadFile(metaPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read extracted files"})
-		return
+		return "", errors.New("vexgo-theme.json not found in zip")
 	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			metaPath := filepath.Join(tempDir, entry.Name(), public.ThemeMetaFile)
-			if _, err := os.Stat(metaPath); err == nil {
-				// Found the theme directory
-				themeDir = entry.Name()
-
-				// Read and parse the theme metadata
-				content, err := os.ReadFile(metaPath)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read theme metadata"})
-					return
-				}
-
-				if err := unmarshalThemeMeta(content, &themeInfo); err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme metadata"})
-					return
-				}
-
-				break
-			}
-		}
+	var meta struct {
+		ID string `json:"id"`
 	}
-
-	// If no theme directory found, check if the root contains vexgo-theme.json
-	if themeDir == "" {
-		metaPath := filepath.Join(tempDir, public.ThemeMetaFile)
-		if _, err := os.Stat(metaPath); err == nil {
-			// Theme files are in the root of the zip
-			content, err := os.ReadFile(metaPath)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read theme metadata"})
-				return
-			}
-
-			if err := unmarshalThemeMeta(content, &themeInfo); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme metadata"})
-				return
-			}
-
-			// Use the theme ID from metadata or generate one
-			if themeInfo.ID == "" {
-				// Generate a theme ID from the filename
-				themeDir = strings.TrimSuffix(header.Filename, ".zip")
-				// Remove any non-alphanumeric characters
-				themeDir = strings.Map(func(r rune) rune {
-					if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-						return r
-					}
-					return '_'
-				}, themeDir)
-			} else {
-				themeDir = themeInfo.ID
-			}
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "No vexgo-theme.json found in the zip file"})
-			return
-		}
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return "", err
 	}
-
-	// Ensure the theme ID is valid. The ID may come from the uploaded
-	// vexgo-theme.json, so it is treated as untrusted input: anything but a
-	// plain directory name would make filepath.Join below escape the themes
-	// directory (arbitrary RemoveAll/MkdirAll/write).
-	if themeDir == "" || themeDir == public.DefaultTheme || !themeIDPattern.MatchString(themeDir) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
-		return
+	if meta.ID == "" || !themeIDPattern.MatchString(meta.ID) {
+		return "", errors.New("vexgo-theme.json missing or invalid id")
 	}
-
-	// Create the theme directory in data/theme
-	targetThemeDir := filepath.Join(h.themes.DataDir(), public.ThemesDir, themeDir)
-
-	// Remove existing theme directory if it exists
-	if err := os.RemoveAll(targetThemeDir); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove existing theme directory"})
-		return
+	destDir := filepath.Join(h.themeRoot(), meta.ID)
+	if err := os.RemoveAll(destDir); err != nil {
+		return "", err
 	}
-
-	// Create the target directory
-	if err := os.MkdirAll(targetThemeDir, 0o755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create theme directory"})
-		return
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return "", err
 	}
-
-	// Copy files from temporary directory to target
-	sourceDir := tempDir
-	if themeDir != "" {
-		sourceDir = filepath.Join(tempDir, themeDir)
+	if err := copyDir(tempDir, destDir); err != nil {
+		return "", err
 	}
+	return meta.ID, nil
+}
 
-	// Check if source directory exists
-	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
-		sourceDir = tempDir // Use root if themeDir doesn't exist
-	}
-
-	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(sourceDir, path)
-		if err != nil {
-			return err
-		}
-
-		targetPath := filepath.Join(targetThemeDir, relPath)
-
-		if info.IsDir() {
-			return os.MkdirAll(targetPath, 0o755)
-		}
-
-		srcFile, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer srcFile.Close()
-
-		dstFile, err := os.Create(targetPath)
-		if err != nil {
-			return err
-		}
-		defer dstFile.Close()
-
-		_, err = io.Copy(dstFile, srcFile)
+func copyDir(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
 		return err
-	})
-	if err != nil {
-		// Clean up partial installation
-		if err := os.RemoveAll(targetThemeDir); err != nil {
-			slog.Warn("failed to clean up partial theme installation", "err", err)
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to copy theme files"})
-		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Theme uploaded successfully"})
+	for _, e := range entries {
+		s := filepath.Join(src, e.Name())
+		d := filepath.Join(dst, e.Name())
+		if e.IsDir() {
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				return err
+			}
+			if err := copyDir(s, d); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := copyFile(s, d); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// unmarshalThemeMeta decodes theme metadata JSON.
-func unmarshalThemeMeta(content []byte, info *public.ThemeInfo) error {
-	return json.Unmarshal(content, info)
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }
+
+// themeRoot returns the absolute path to the public themes
+// directory. It prefers the public.Renderer's dataDir when set;
+// otherwise it falls back to a sibling of the working directory.
+func (h *Handler) themeRoot() string {
+	if h.themes != nil {
+		// Renderer exposes the data dir via a getter to keep
+		// callers from depending on private fields. We treat
+		// a non-empty dir as the source of truth.
+		if dir := h.themes.DataDir(); dir != "" {
+			return filepath.Join(dir, "themes")
+		}
+	}
+	return filepath.Join("data", "public", "themes")
+}
+
+// detectMimeType returns a MIME type guessed from the file
+// extension, falling back to a signature scan of the bytes.
+func detectMimeType(path string, data []byte) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".svg":
+		return "image/svg+xml"
+	}
+	return "application/octet-stream"
+}
+
+// ---------- error mapping ----------
+
+func mapSMTPTestError(err error) error {
+	switch {
+	case errors.Is(err, ErrSMTPNotConfigured):
+		return huma.NewError(404, err.Error())
+	case errors.Is(err, ErrSMTPDisabled), errors.Is(err, ErrSMTPIncomplete), errors.Is(err, ErrSMTPNoRecipient):
+		return huma.NewError(400, err.Error())
+	default:
+		return huma.NewError(500, err.Error())
+	}
+}
+
+func mapAITestError(err error) error {
+	switch {
+	case errors.Is(err, ErrAINotConfigured):
+		return huma.NewError(404, err.Error())
+	case errors.Is(err, ErrAIDisabled), errors.Is(err, ErrAIIncomplete):
+		return huma.NewError(400, err.Error())
+	default:
+		return huma.NewError(500, err.Error())
+	}
+}
+
+func mapAIModelsError(err error) error {
+	switch {
+	case errors.Is(err, ErrAINotConfigured):
+		return huma.NewError(404, err.Error())
+	case errors.Is(err, ErrAIDisabled), errors.Is(err, ErrAIIncompleteModels):
+		return huma.NewError(400, err.Error())
+	default:
+		return huma.NewError(500, err.Error())
+	}
+}
+
+func mapThemePreviewError(err error) error {
+	switch {
+	case errors.Is(err, ErrThemeNotFound), errors.Is(err, ErrPreviewNotSpecified), errors.Is(err, ErrPreviewNotFound):
+		return huma.NewError(404, err.Error())
+	default:
+		return huma.NewError(500, err.Error())
+	}
+}
+
+// Reset slog to keep the import live for future use.
+var _ = slog.Default

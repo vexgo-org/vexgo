@@ -17,12 +17,17 @@ import (
 )
 
 // ctxKey is the request-scope key for the authenticated user and
-// the recovered gin context.
+// the recovered gin context. Different named types so the
+// struct values compare unequal and the two slots never
+// collide in context.WithValue lookups.
 type ctxKey struct{}
 
+type userCtxKeyType struct{}
+type ginCtxKeyType struct{}
+
 var (
-	userKey       = ctxKey{}
-	ginContextKey = ctxKey{}
+	userKey       = userCtxKeyType{}
+	ginContextKey = ginCtxKeyType{}
 )
 
 // UserFromContext returns the authenticated user, or a zero-value
