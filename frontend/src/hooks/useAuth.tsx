@@ -5,7 +5,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import type { User } from "@/types";
+import type { User } from "@/api/generated/model";
 import { authApi } from "@/lib/api";
 import { t } from "@/lib/i18n";
 

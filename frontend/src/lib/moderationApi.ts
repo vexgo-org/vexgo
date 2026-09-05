@@ -1,37 +1,57 @@
-import api from "./api";
+// Moderation-domain API surface. Mirrors the legacy
+// moderationApi.ts but delegates to the orval-generated
+// `vexgoApi`. The functions keep their original signatures
+// so the moderation page (and any future admin queue) can
+// keep using `getPendingPosts`, `approvePost`, etc.
+
+import { vexgoApi } from "@/api";
 import type { Post, PostsResponse } from "@/types";
 
-// Get the list of pending posts
 export const getPendingPosts = (params?: {
   page?: number;
   limit?: number;
   search?: string;
-}) => api.get<PostsResponse>("/moderation/pending", { params });
+}) =>
+  vexgoApi.listPendingPosts({
+    page: params?.page,
+    limit: params?.limit,
+    search: params?.search,
+  } as never) as unknown as Promise<{ data: PostsResponse }>;
 
-// Get the list of approved posts
 export const getApprovedPosts = (params?: {
   page?: number;
   limit?: number;
   search?: string;
-}) => api.get<PostsResponse>("/moderation/approved", { params });
+}) =>
+  vexgoApi.listApprovedPosts({
+    page: params?.page,
+    limit: params?.limit,
+    search: params?.search,
+  } as never) as unknown as Promise<{ data: PostsResponse }>;
 
-// Get the list of rejected posts
 export const getRejectedPosts = (params?: {
   page?: number;
   limit?: number;
   search?: string;
-}) => api.get<PostsResponse>("/moderation/rejected", { params });
+}) =>
+  vexgoApi.listRejectedPosts({
+    page: params?.page,
+    limit: params?.limit,
+    search: params?.search,
+  } as never) as unknown as Promise<{ data: PostsResponse }>;
 
-// Approve a post
-export const approvePost = (id: string) =>
-  api.put<{ message: string; post: Post }>(`/moderation/approve/${id}`);
+export const approvePost = (id: number | string) =>
+  vexgoApi.approvePost({ id: Number(id) } as never) as unknown as Promise<{
+    data: { message: string; post: Post };
+  }>;
 
-// Reject a post
-export const rejectPost = (id: string, rejectionReason?: string) =>
-  api.put<{ message: string; post: Post }>(`/moderation/reject/${id}`, {
-    rejectionReason,
-  });
+export const rejectPost = (id: number | string, rejectionReason?: string) =>
+  vexgoApi.rejectPost(
+    { id: Number(id) } as never,
+    { rejectionReason } as never,
+  ) as unknown as Promise<{ data: { message: string; post: Post } }>;
 
-// Resubmit a post for review
-export const resubmitPost = (id: string) =>
-  api.put<{ message: string; post: Post }>(`/moderation/resubmit/${id}`);
+export const resubmitPost = (id: number | string) =>
+  vexgoApi.resubmitPost({ id: Number(id) } as never) as unknown as Promise<{
+    data: { message: string; post: Post };
+  }>;

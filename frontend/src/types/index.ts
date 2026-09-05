@@ -1,6 +1,10 @@
 // User types
+// The id field matches the backend's model.User.ID (uint).
+// Orval/huma types use number; this is kept in sync so the
+// legacy @/types still type-checks against the typed
+// @/api/generated surface.
 export interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
   role: "super_admin" | "admin" | "author" | "contributor" | "guest";
@@ -46,18 +50,22 @@ export interface GeneralSettings {
 }
 
 // Post types
+// The id and authorId fields are uint in the backend model; the
+// orval/huma generated client surfaces them as number. Keeping
+// the legacy type in sync prevents string<->number comparison
+// errors at call sites.
 export interface Post {
-  id: string;
+  id: number;
   slug: string;
   title: string;
   content: string;
   excerpt: string;
-  category: string;
+  category: number | string;
   categoryInfo?: Category;
   tags: string[];
   coverImage: string | null;
   status: "published" | "draft" | "pending" | "rejected";
-  authorId: string;
+  authorId: number;
   author?: User;
   createdAt: string;
   updatedAt: string;
@@ -86,13 +94,18 @@ export interface Tag {
 }
 
 // Comment types
+// userId is uint in the backend model; the orval/huma types
+// surface it as number. The legacy type used string — keeping
+// it as number avoids string<->number comparison errors at
+// call sites (e.g. PostDetailPage line 593).
 export interface Comment {
-  id: string;
-  postId: string;
-  userId: string;
+  id: number;
+  postId: number;
+  userId: number;
   author?: User;
   content: string;
-  parentId: string | null;
+  parentId: number | null;
+  status: "pending" | "published" | "rejected";
   moderationReason?: string;
   createdAt: string;
   updatedAt: string;

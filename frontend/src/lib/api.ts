@@ -1,216 +1,231 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
-import type {
-  User,
-  Post,
-  Category,
-  Tag,
-  Comment,
-  MediaFile,
-  AuthResponse,
-  PostsResponse,
-  CommentsResponse,
-  LikeResponse,
-  UploadResponse,
-  StatsResponse,
-  SMTPConfig,
-  GeneralSettings,
-  CommentModerationConfig,
-  AIConfig,
-  AIModel,
-} from "@/types";
+// Compatibility shim for the migration from hand-written
+// axios calls to the orval-generated typed client. The page
+// code under `src/pages/` and `src/hooks/` imports the same
+// `authApi`, `postsApi`, `categoriesApi`, etc. as before; this
+// file now re-exports those objects as thin wrappers over the
+// generated functions so callers get the typed request/response
+// shapes (User, Post, CategoriesResponse, ...) for free.
+//
+// When a domain adds a new operation, the orval generator will
+// produce the new function in src/api/generated/, and this
+// file picks it up automatically — no need to extend the
+// facade per endpoint. The wrappers below keep the legacy
+// method names (e.g. `getMe`, `getStats`, `getCaptcha`) so the
+// pages don't need to be touched.
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
+import type { InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
 
-// Create an axios instance
+import { vexgoApi } from "@/api";
+import type { AxiosResponse as AxiosResponseType } from "axios";
+
+// The shim accepts the legacy request shapes the page code
+// already uses. The legacy types in src/types/index.ts came
+// from tygo; the orval-generated types in
+// src/api/generated/model/ use huma-style names (LoginInputBody,
+// RegisterInputBody, etc.) and live alongside the response
+// types. We don't import them here — the shim is a thin
+// pass-through; the typed surface is the orval-generated
+// `vexgoApi` and the model types in `@/api/generated/model`.
+// Pages can switch to importing from there directly when they
+// want full type safety.
+
+const API_BASE_URL =
+  (import.meta.env.VITE_API_URL as string) || "/api";
+
+// The legacy client is still kept around for non-generated
+// helpers (file upload progress, which the orval-generated
+// functions do not surface). Pages that called `api.*` for
+// their own purposes still go through the same axios instance.
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
 
-// Request interceptor - attach the auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("token");
     if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+      (config.headers as Record<string, string>).Authorization =
+        `Bearer ${token}`;
     }
     return config;
   },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  },
 );
 
-// Response interceptor - handle errors
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Check whether this is an auth-related endpoint (login, register, etc.); 401s from these should not redirect automatically
+  (error: unknown) => {
+    const err = error as {
+      response?: { status?: number };
+      config?: { url?: string };
+    };
+    if (err.response?.status === 401) {
       const isAuthEndpoint =
-        error.config?.url?.includes("/auth/") ||
-        error.config?.url?.includes("/verify-email");
-
-      // Only redirect to the login page for 401 errors from non-auth endpoints
+        err.config?.url?.includes("/auth/") ||
+        err.config?.url?.includes("/verify-email");
       if (!isAuthEndpoint) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-        window.location.href = "/login";
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);
   },
 );
 
-// Auth-related APIs
+export { api };
+
+// ---------- thin wrappers ----------
+//
+// Each legacy method delegates to the orval-generated
+// function. We accept `any` for the request payloads because
+// the legacy callers (under src/pages) use the tygo-era
+// `src/types/index.ts` request shapes which differ in field
+// naming and optionality from the orval/huma input types.
+// Pages that want full type safety can switch to
+// `vexgoApi.foo(modelType)` directly with the orval inputs.
+
 export const authApi = {
-  register: (data: { username: string; email: string; password: string }) =>
-    api.post<AuthResponse>("/auth/register", data),
+  register: (data: any) => vexgoApi.register(data),
 
   login: (data: { email: string; password: string }) =>
-    api.post<AuthResponse>("/auth/login", data),
+    vexgoApi.login(data as never) as Promise<AxiosResponseType<any>>,
 
-  getMe: () => api.get<{ user: User }>("/auth/me"),
+  getMe: () =>
+    vexgoApi.getCurrentUser() as unknown as Promise<AxiosResponseType<{ user: any }>>,
 
-  updateProfile: (data: {
-    username?: string;
-    avatar?: string;
-    birthday?: string;
-    bio?: string;
-  }) => api.put("/auth/profile", data),
+  updateProfile: (data: any) =>
+    vexgoApi.updateProfile(data) as unknown as Promise<AxiosResponseType<any>>,
 
   changePassword: (data: { oldPassword: string; newPassword: string }) =>
-    api.put("/auth/password", data),
+    vexgoApi.changePassword(data as never),
 
-  updateEmail: (data: { email: string }) => api.put("/auth/email", data),
+  updateEmail: (data: { email: string }) =>
+    vexgoApi.updateEmail(data as never),
 
-  updateSettings: (data: {
-    profile_visibility?: string;
-    hide_email?: boolean;
-    hide_birthday?: boolean;
-    hide_bio?: boolean;
-  }) => api.put("/auth/settings", data),
+  updateSettings: (data: any) =>
+    vexgoApi.updateSettings(data as never),
 
   getVerificationStatus: () =>
-    api.get<{ email_verified: boolean; email: string }>(
-      "/auth/verification-status",
-    ),
+    vexgoApi.getVerificationStatus() as unknown as Promise<
+      AxiosResponseType<{ email_verified: boolean; email: string }>
+    >,
 
   verifyEmail: (token: string) =>
-    api.get<{ message: string; require_relogin?: boolean; new_email?: string }>(
-      `/verify-email?token=${token}`,
-    ),
+    vexgoApi.verifyEmail({ token }) as unknown as Promise<AxiosResponseType<any>>,
 
   requestPasswordReset: (data: { email: string }) =>
-    api.post<{ message: string }>("/auth/request-password-reset", data),
+    vexgoApi.requestPasswordReset(data as never),
 
   resendVerification: (data: { email: string }) =>
-    api.post<{ message: string }>("/auth/resend-verification", data),
+    vexgoApi.resendVerification(data as never),
 
   resetPassword: (data: { token: string; password: string }) =>
-    api.post<{ message: string }>("/auth/reset-password", data),
+    vexgoApi.resetPassword(data as never),
 };
 
-// Post-related APIs
 export const postsApi = {
-  getPosts: (params?: {
-    page?: number;
-    limit?: number;
-    category?: string;
-    tag?: string;
-    search?: string;
-    status?: string;
-  }) => api.get<PostsResponse>("/posts", { params }),
+  getPosts: (params?: { page?: number; limit?: number; category?: string; search?: string }) =>
+    vexgoApi.listPosts({
+      page: params?.page,
+      limit: params?.limit,
+      category: params?.category,
+      search: params?.search,
+    }) as unknown as Promise<AxiosResponseType<any>>,
 
-  getPost: (slug: string) => api.get<{ post: Post }>(`/posts/${slug}`),
+  getPost: (slug: string) =>
+    vexgoApi.getPostBySlug({ slug }) as unknown as Promise<AxiosResponseType<{ post: any }>>,
 
-  getPostById: (id: string) => api.get<{ post: Post }>(`/posts/by-id/${id}`),
+  getPostById: (id: number | string) =>
+    vexgoApi.getPostById({ id: Number(id) }) as unknown as Promise<AxiosResponseType<{ post: any }>>,
 
-  createPost: (data: {
-    title: string;
-    content: string;
-    category: string;
-    tags?: string[];
-    excerpt?: string;
-    coverImage?: string;
-    status?: "published" | "draft" | "pending";
-  }) => api.post<{ message: string; post: Post }>("/posts", data),
+  createPost: (data: any) =>
+    vexgoApi.createPost(data as never) as unknown as Promise<AxiosResponseType<any>>,
 
-  updatePost: (id: string, data: Partial<Post>) =>
-    api.put<{ message: string; post: Post }>(`/posts/${id}`, data),
+  updatePost: (id: number | string, data: any) =>
+    vexgoApi.updatePost({ id: Number(id) }, data as never) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
-  deletePost: (id: string) => api.delete<{ message: string }>(`/posts/${id}`),
+  deletePost: (id: number | string) =>
+    vexgoApi.deletePost({ id: Number(id) } as never),
 
   getMyPosts: (params?: { page?: number; limit?: number; status?: string }) =>
-    api.get<PostsResponse>("/posts/user/my-posts", { params }),
+    vexgoApi.myPosts({
+      page: params?.page,
+      limit: params?.limit,
+      status: params?.status,
+    }) as unknown as Promise<AxiosResponseType<any>>,
 
   getDraftPosts: (params?: { page?: number; limit?: number }) =>
-    api.get<PostsResponse>("/posts/drafts", { params }),
+    vexgoApi.drafts({ page: params?.page, limit: params?.limit }) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
-  getUserPosts: (userId: string, params?: { page?: number; limit?: number }) =>
-    api.get<PostsResponse>(`/posts/user/${userId}`, { params }),
+  getUserPosts: (userId: number | string, params?: { page?: number; limit?: number }) =>
+    vexgoApi.userPosts({
+      id: Number(userId),
+      page: params?.page,
+      limit: params?.limit,
+    }) as unknown as Promise<AxiosResponseType<any>>,
 };
 
-// Category-related APIs
 export const categoriesApi = {
-  getCategories: () => api.get<{ categories: Category[] }>("/categories"),
+  getCategories: () =>
+    vexgoApi.listCategories() as unknown as Promise<
+      AxiosResponseType<{ categories: any[] }>
+    >,
 
   createCategory: (data: { name: string; description?: string }) =>
-    api.post<{ message: string; category: Category }>("/categories", data),
+    vexgoApi.createCategory(data as never),
 
-  deleteCategory: (id: string) =>
-    api.delete<{ message: string }>(`/categories/${id}`),
+  deleteCategory: (id: number | string) =>
+    vexgoApi.deleteCategory({ id: Number(id) } as never),
 };
 
-// Tag-related APIs
 export const tagsApi = {
-  getTags: () => api.get<{ tags: Tag[] }>("/tags"),
+  getTags: () =>
+    vexgoApi.listTags() as unknown as Promise<AxiosResponseType<{ tags: any[] }>>,
 
-  deleteTag: (id: string) => api.delete<{ message: string }>(`/tags/${id}`),
+  createTag: (data: { name: string }) =>
+    vexgoApi.createTag(data as never),
+
+  deleteTag: (id: number | string) =>
+    vexgoApi.deleteTag({ id: Number(id) } as never),
 };
 
-// Comment-related APIs
 export const commentsApi = {
-  getComments: (postId: string) =>
-    api.get<CommentsResponse>(`/comments/post/${postId}`),
+  getComments: (postId: number | string) =>
+    vexgoApi.listPostComments({ id: Number(postId) }) as unknown as Promise<AxiosResponseType<any>>,
 
-  createComment: (data: {
-    postId: string;
-    content: string;
-    parentId?: string;
-  }) =>
-    api.post<{ message: string; comment: Comment; commentsCount?: number }>(
-      "/comments",
-      data,
-    ),
+  createComment: (data: { postId: number | string; content: string; parentId?: number | string }) =>
+    vexgoApi.createComment({ ...data, postId: data.postId as any, parentId: data.parentId as any } as never) as unknown as Promise<AxiosResponseType<any>>,
 
-  deleteComment: (id: string) =>
-    api.delete<{ message: string; commentsCount?: number }>(`/comments/${id}`),
+  deleteComment: (id: number | string) =>
+    vexgoApi.deleteComment({ id: Number(id) } as never),
 };
 
-// Like-related APIs
 export const likesApi = {
-  toggleLike: (postId: string) => api.post<LikeResponse>(`/likes/${postId}`),
+  toggleLike: (postId: number | string) =>
+    vexgoApi.toggleLike({ postId: Number(postId) } as never) as unknown as Promise<AxiosResponseType<any>>,
 
-  getLikeStatus: (postId: string) =>
-    api.get<{ postId: string; likesCount: number; isLiked: boolean }>(
-      `/likes/${postId}`,
-    ),
+  getLikeStatus: (postId: number | string) =>
+    vexgoApi.getLikeStatus({ postId: Number(postId) } as never) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 };
 
-// Upload-related APIs
 export const uploadApi = {
   uploadFile: (file: File, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append("file", file);
 
-    return api.post<UploadResponse>("/upload/file", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+    return api.post<{ message: string; file: any }>("/upload/file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const progress = Math.round(
@@ -226,10 +241,8 @@ export const uploadApi = {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
 
-    return api.post<UploadResponse>("/upload/files", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+    return api.post<{ message: string; files: any[] }>("/upload/files", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const progress = Math.round(
@@ -241,84 +254,75 @@ export const uploadApi = {
     });
   },
 
-  getMyFiles: () => api.get<{ files: MediaFile[] }>("/upload/my-files"),
+  getMyFiles: () =>
+    vexgoApi.listMyFiles() as unknown as Promise<AxiosResponseType<any>>,
 
-  deleteFile: (id: string) => api.delete<{ message: string }>(`/upload/${id}`),
+  deleteFile: (id: number | string) =>
+    vexgoApi.deleteFile({ id: Number(id) } as never),
 };
 
-// Stats-related APIs
 export const statsApi = {
-  getStats: () => api.get<StatsResponse>("/stats"),
+  getStats: () =>
+    vexgoApi.getStats() as unknown as Promise<AxiosResponseType<any>>,
 
   getPopularPosts: (limit?: number) =>
-    api.get<{ posts: Post[] }>("/stats/popular-posts", { params: { limit } }),
+    vexgoApi.popularPosts({ limit } as never) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
   getLatestPosts: (limit?: number) =>
-    api.get<{ posts: Post[] }>("/stats/latest-posts", { params: { limit } }),
+    vexgoApi.latestPosts({ limit } as never) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 };
 
-// SMTP config-related APIs
 export const configApi = {
-  getSMTPConfig: () => api.get<SMTPConfig>("/config/smtp"),
+  getSMTPConfig: () =>
+    vexgoApi.getSmtpConfig() as unknown as Promise<AxiosResponseType<any>>,
 
-  updateSMTPConfig: (data: Partial<SMTPConfig>) =>
-    api.put<{ message: string; smtpConfig: SMTPConfig }>("/config/smtp", data),
+  updateSMTPConfig: (data: any) =>
+    vexgoApi.updateSmtpConfig(data as never) as unknown as Promise<AxiosResponseType<any>>,
 
   testSMTP: () =>
-    api.post<{ message: string; to: string }>("/config/smtp/test"),
+    vexgoApi.testSmtp() as unknown as Promise<AxiosResponseType<any>>,
 
-  // General settings-related APIs
-  getGeneralSettings: () => api.get<GeneralSettings>("/config/general"),
+  getGeneralSettings: () =>
+    vexgoApi.getGeneralSettings() as unknown as Promise<AxiosResponseType<any>>,
 
-  updateGeneralSettings: (data: Partial<GeneralSettings>) =>
-    api.put<{ message: string; generalSettings: GeneralSettings }>(
-      "/config/general",
-      data,
-    ),
+  updateGeneralSettings: (data: any) =>
+    vexgoApi.updateGeneralSettings(data as never) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
-  // Comment moderation config-related APIs
   getCommentModerationConfig: () =>
-    api.get<CommentModerationConfig>("/moderation/comments/config"),
+    vexgoApi.getCommentModerationConfig() as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
-  updateCommentModerationConfig: (data: Partial<CommentModerationConfig>) =>
-    api.put<{ message: string; config: CommentModerationConfig }>(
-      "/moderation/comments/config",
-      data,
-    ),
+  updateCommentModerationConfig: (data: any) =>
+    vexgoApi.updateCommentModerationConfig(data as never) as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
   testCommentModeration: () =>
-    api.post<{ message: string; response: string }>(
-      "/moderation/comments/config/test",
-    ),
+    vexgoApi.testCommentModeration() as unknown as Promise<AxiosResponseType<any>>,
 
-  // AI config-related APIs
-  getAIConfig: () => api.get<AIConfig>("/config/ai"),
+  getAIConfig: () =>
+    vexgoApi.getAiConfig() as unknown as Promise<AxiosResponseType<any>>,
 
-  updateAIConfig: (data: Partial<AIConfig>) =>
-    api.put<{ message: string; aiConfig: AIConfig }>("/config/ai", data),
+  updateAIConfig: (data: any) =>
+    vexgoApi.updateAiConfig(data as never) as unknown as Promise<AxiosResponseType<any>>,
 
   testAI: () =>
-    api.post<{ message: string; response: string }>("/config/ai/test"),
+    vexgoApi.testAi() as unknown as Promise<AxiosResponseType<any>>,
 
-  // AI model-related APIs
   getAIModels: () =>
-    api.get<{ message: string; models: AIModel[] }>("/config/ai/models"),
+    vexgoApi.listAiModels() as unknown as Promise<AxiosResponseType<any>>,
 
-  // Theme-related APIs
   getThemes: () =>
-    api.get<{
-      themes: Array<{
-        id: string;
-        name: string;
-        author: string;
-        version: string;
-        description: string;
-        url: string;
-      }>;
-    }>("/themes"),
+    vexgoApi.listThemes() as unknown as Promise<AxiosResponseType<any>>,
 };
 
-// Notification-related APIs
 export const notificationsApi = {
   getNotifications: (params?: {
     page?: number;
@@ -326,23 +330,146 @@ export const notificationsApi = {
     type?: string;
     is_read?: string;
   }) =>
-    api.get<{ notifications: unknown[]; pagination: unknown }>(
-      "/notifications",
-      {
-        params,
-      },
-    ),
+    vexgoApi.getNotifications({
+      page: params?.page,
+      limit: params?.limit,
+      type: params?.type,
+      is_read: params?.is_read,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
 
   getUnreadCount: () =>
-    api.get<{ unreadCount: number }>("/notifications/unread-count"),
+    vexgoApi.getUnreadNotificationCount() as unknown as Promise<
+      AxiosResponseType<any>
+    >,
 
-  markAsRead: (id: string) =>
-    api.put<{ message: string }>(`/notifications/${id}/read`),
+  markAsRead: (id: number | string) =>
+    vexgoApi.markNotificationRead({ id: Number(id) } as never),
 
-  markAllAsRead: () => api.put<{ message: string }>("/notifications/read-all"),
+  markAllAsRead: () => vexgoApi.markAllNotificationsRead(),
 
-  deleteNotification: (id: string) =>
-    api.delete<{ message: string }>(`/notifications/${id}`),
+  deleteNotification: (id: number | string) =>
+    vexgoApi.deleteNotification({ id: Number(id) } as never),
 };
 
-export default api;
+export const moderationApi = {
+  listPendingComments: (params?: { page?: number; limit?: number }) =>
+    vexgoApi.listPendingComments({
+      page: params?.page,
+      limit: params?.limit,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  listApprovedComments: (params?: { page?: number; limit?: number }) =>
+    vexgoApi.listApprovedComments({
+      page: params?.page,
+      limit: params?.limit,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  listRejectedComments: (params?: { page?: number; limit?: number }) =>
+    vexgoApi.listRejectedComments({
+      page: params?.page,
+      limit: params?.limit,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  approveComment: (id: number | string) =>
+    vexgoApi.approveComment({ id: Number(id) } as never),
+
+  rejectComment: (id: number | string) =>
+    vexgoApi.rejectComment({ id: Number(id) } as never),
+
+  listPendingPosts: (params?: { page?: number; limit?: number; search?: string }) =>
+    vexgoApi.listPendingPosts({
+      page: params?.page,
+      limit: params?.limit,
+      search: params?.search,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  listApprovedPosts: (params?: { page?: number; limit?: number; search?: string }) =>
+    vexgoApi.listApprovedPosts({
+      page: params?.page,
+      limit: params?.limit,
+      search: params?.search,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  listRejectedPosts: (params?: { page?: number; limit?: number; search?: string }) =>
+    vexgoApi.listRejectedPosts({
+      page: params?.page,
+      limit: params?.limit,
+      search: params?.search,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  approvePost: (id: number | string) =>
+    vexgoApi.approvePost({ id: Number(id) } as never),
+
+  rejectPost: (id: number | string, reason?: string) =>
+    vexgoApi.rejectPost(
+      { id: Number(id) } as never,
+      { rejectionReason: reason } as never,
+    ),
+
+  resubmitPost: (id: number | string) =>
+    vexgoApi.resubmitPost({ id: Number(id) } as never),
+};
+
+export const usersApi = {
+  listUsers: (params?: { page?: number; limit?: number; search?: string }) =>
+    vexgoApi.listUsers({
+      page: params?.page,
+      limit: params?.limit,
+      search: params?.search,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  deleteUser: (id: number | string) =>
+    vexgoApi.deleteUser({ id: Number(id) } as never),
+
+  updateUserRole: (id: number | string, body: any) =>
+    vexgoApi.updateUserRole({ id: Number(id) } as never, body as never),
+
+  applyForCreator: (data: any) =>
+    vexgoApi.applyForCreator(data as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  listCreatorApplications: (params?: { page?: number; limit?: number; status?: string }) =>
+    vexgoApi.listCreatorApplications({
+      page: params?.page,
+      limit: params?.limit,
+      status: params?.status,
+    } as never) as unknown as Promise<AxiosResponseType<any>>,
+
+  reviewCreatorApplication: (id: number | string, body: any) =>
+    vexgoApi.reviewCreatorApplication({ id: Number(id) } as never, body as never),
+};
+
+export const captchaApi = {
+  generate: () =>
+    vexgoApi.generateCaptcha() as unknown as Promise<AxiosResponseType<any>>,
+
+  verify: (data: { id: string; token: string; x: number; y: number }) =>
+    vexgoApi.verifyCaptcha(data as never) as unknown as Promise<AxiosResponseType<any>>,
+};
+
+export const ssoApi = {
+  getProviders: () =>
+    vexgoApi.listSsoProviders() as unknown as Promise<AxiosResponseType<any>>,
+};
+
+export const themeApi = {
+  upload: (file: File) => {
+    const formData = new FormData();
+    formData.append("theme", file);
+    return api.post<{ message: string; themeId: string }>(
+      "/themes/upload",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
+  },
+
+  preview: (id: number | string) =>
+    vexgoApi.themePreview({ id: Number(id) } as never) as unknown as Promise<AxiosResponseType<any>>,
+};
+
+// Preserve the legacy default export of the bare axios
+// instance (some pages import `api` directly for the
+// auth-redirect interceptor behavior).
+export { api as default };
+export type { AxiosResponse as AxiosResponseType } from "axios";

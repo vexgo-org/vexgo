@@ -139,7 +139,7 @@ export function AdminPage() {
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = async (postId: number | string) => {
     try {
       await postsApi.deletePost(postId);
       // Stay on the post management page and refresh the data
@@ -150,7 +150,7 @@ export function AdminPage() {
     }
   };
 
-  const handleEditPost = (postId: string) => {
+  const handleEditPost = (postId: number | string) => {
     navigate(`/edit-post/${postId}`);
   };
 

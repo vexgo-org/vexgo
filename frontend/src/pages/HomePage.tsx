@@ -61,7 +61,7 @@ export function HomePage() {
     const handler = (e: Event) => {
       try {
         const d = (e as CustomEvent).detail || {};
-        const postId = String(d.postId);
+        const postId = Number(d.postId);
         setPosts((prev) =>
           prev.map((p) =>
             p.id === postId
@@ -85,7 +85,7 @@ export function HomePage() {
     const commentHandler = (e: Event) => {
       try {
         const d = (e as CustomEvent).detail || {};
-        const postId = String(d.postId);
+        const postId = Number(d.postId);
         setPosts((prev) =>
           prev.map((p) =>
             p.id === postId ? { ...p, commentsCount: d.commentsCount } : p,
@@ -111,10 +111,10 @@ export function HomePage() {
     if (!raw) return raw as Post;
     return {
       ...raw,
-      id: String(raw.id),
+      id: Number(raw.id),
       authorId:
         raw.authorId !== undefined && raw.authorId !== null
-          ? String(raw.authorId)
+          ? Number(raw.authorId)
           : raw.authorId,
       createdAt: raw.createdAt
         ? new Date(raw.createdAt).toISOString()
@@ -145,10 +145,10 @@ export function HomePage() {
             category: selectedCategory || undefined,
           }),
         ]);
-        const titleMatches = (respSearch.data.posts || []).map((p) =>
+        const titleMatches = (respSearch.data.posts || []).map((p: any) =>
           normalizePost(p),
         );
-        const bulk = (respBulk.data.posts || []).map((p) => normalizePost(p));
+        const bulk = (respBulk.data.posts || []).map((p: any) => normalizePost(p));
         const q = searchQuery.trim().toLowerCase();
         const tagMatches = bulk.filter((p) =>
           (p.tags || []).some((t: string) =>
@@ -271,7 +271,7 @@ export function HomePage() {
     });
   };
 
-  const handleToggleLike = async (postId: string) => {
+  const handleToggleLike = async (postId: number | string) => {
     try {
       const response = await likesApi.toggleLike(postId);
       const { isLiked, likesCount } = response.data;

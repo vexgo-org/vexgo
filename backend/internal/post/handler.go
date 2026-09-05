@@ -81,7 +81,7 @@ type createPostOutput struct {
 
 type updatePostInput struct {
 	Body api.UpdatePostRequest
-	postIDPathInput
+	ID   string `path:"id" doc:"Numeric post ID"`
 }
 
 type messageOutput struct {
@@ -154,7 +154,7 @@ type approvePostOutput struct {
 
 type rejectPostInput struct {
 	Body api.RejectPostRequest
-	postIDPathInput
+	ID   string `path:"id" doc:"Numeric post ID"`
 }
 
 type rejectPostOutput struct {

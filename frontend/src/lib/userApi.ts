@@ -1,28 +1,33 @@
-import api from "./api";
+// User-domain API surface. Mirrors the shape of the
+// legacy userApi.ts but delegates to the orval-generated
+// `vexgoApi` so the request/response types stay in sync with
+// the backend's huma schema.
+//
+// Pages that imported from `@/lib/userApi` (UserManagement,
+// ApplyForCreator) continue to do so; this file re-exports
+// the function names they use, now backed by the typed client.
+
+import { vexgoApi } from "@/api";
 import type { User, Pagination } from "@/types";
 
-// User list response types
 export interface UsersResponse {
   users: User[];
   pagination: Pagination;
 }
 
-// Creator application response types
 export interface CreatorApplicationResponse {
   message: string;
-  applicationId?: string;
+  applicationId?: number;
 }
 
-// Creator application list response types
 export interface CreatorApplicationsResponse {
   applications: CreatorApplication[];
   pagination: Pagination;
 }
 
-// Creator application types
 export interface CreatorApplication {
-  id: string;
-  userId: string;
+  id: number;
+  userId: number;
   username: string;
   email: string;
   currentRole: string;
@@ -32,42 +37,50 @@ export interface CreatorApplication {
   updatedAt: string;
 }
 
-// Get the user list
 export const getUsers = (params?: {
   page?: number;
   limit?: number;
   search?: string;
-}) => api.get<UsersResponse>("/users", { params });
+}) =>
+  vexgoApi.listUsers({
+    page: params?.page,
+    limit: params?.limit,
+    search: params?.search,
+  } as never) as unknown as Promise<{ data: UsersResponse }>;
 
-// Update a user's role
-export const updateUserRole = (id: string, role: string) =>
-  api.put<{ message: string; user: User }>(`/users/${id}/role`, { role });
+export const updateUserRole = (id: number | string, role: string) =>
+  vexgoApi.updateUserRole(
+    { id: Number(id) } as never,
+    { role } as never,
+  ) as unknown as Promise<{ data: { message: string; user: User } }>;
 
-// Delete a user
-export const deleteUser = (id: string) =>
-  api.delete<{ message: string }>(`/users/${id}`);
+export const deleteUser = (id: number | string) =>
+  vexgoApi.deleteUser({ id: Number(id) } as never) as unknown as Promise<{
+    data: { message: string };
+  }>;
 
-// Apply to become a creator
 export const applyForCreator = (reason?: string) =>
-  api.post<CreatorApplicationResponse>("/users/apply-creator", { reason });
+  vexgoApi.applyForCreator({ reason } as never) as unknown as Promise<{
+    data: CreatorApplicationResponse;
+  }>;
 
-// Get the creator application list (for admins)
 export const getCreatorApplications = (params?: {
   page?: number;
   limit?: number;
   status?: string;
 }) =>
-  api.get<CreatorApplicationsResponse>("/users/creator-applications", {
-    params,
-  });
+  vexgoApi.listCreatorApplications({
+    page: params?.page,
+    limit: params?.limit,
+    status: params?.status,
+  } as never) as unknown as Promise<{ data: CreatorApplicationsResponse }>;
 
-// Review a creator application
 export const reviewCreatorApplication = (
-  applicationId: string,
+  applicationId: number | string,
   action: "approve" | "reject",
   reason?: string,
 ) =>
-  api.put<{ message: string }>(
-    `/users/creator-applications/${applicationId}/review`,
-    { action, reason },
-  );
+  vexgoApi.reviewCreatorApplication(
+    { id: Number(applicationId) } as never,
+    { action, reason } as never,
+  ) as unknown as Promise<{ data: { message: string } }>;

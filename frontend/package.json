@@ -76,6 +76,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.5.4",
     "kimi-plugin-inspect-react": "^1.0.3",
+    "orval": "^8.28.1",
     "oxlint": "^1.80.0",
     "oxlint-tsgolint": "^7.0.2001",
     "postcss": "^8.5.26",

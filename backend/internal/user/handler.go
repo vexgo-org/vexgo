@@ -48,7 +48,7 @@ type updateUserRoleInput struct {
 	Body struct {
 		Role string `json:"role" required:"" doc:"Target role (e.g. admin, author, contributor)"`
 	}
-	userIDPath
+	ID string `path:"id" doc:"Numeric user ID"`
 }
 
 type userRoleUpdateOutput struct {
@@ -79,7 +79,7 @@ type getCreatorApplicationsOutput struct {
 
 type reviewCreatorApplicationInput struct {
 	Body api.ReviewCreatorApplicationRequest
-	userIDPath
+	ID   string `path:"id" doc:"Numeric application ID"`
 }
 
 // RegisterRoutes registers the user domain operations on the given

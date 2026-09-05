@@ -106,7 +106,7 @@ export function UserManagementPage() {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const handleRoleChange = async (userId: number, newRole: string) => {
     try {
       const response = await updateUserRole(userId, newRole);
       toast.success(response.data.message);
@@ -129,7 +129,7 @@ export function UserManagementPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (userId: number | string) => {
     try {
       const response = await deleteUser(userId);
       toast.success(response.data.message);

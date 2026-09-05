@@ -229,7 +229,7 @@ export function PostDetailPage() {
     }
   };
 
-  const handleDeleteComment = async (commentId: string) => {
+  const handleDeleteComment = async (commentId: number | string) => {
     if (!post?.id) return;
     try {
       const response = await commentsApi.deleteComment(commentId);

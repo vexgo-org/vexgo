@@ -1693,6 +1693,39 @@
         ],
         "type": "object"
       },
+      "SsoProvidersBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/SsoProvidersBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allow_local_login": {
+            "description": "True when the local username/password form is available",
+            "type": "boolean"
+          },
+          "providers": {
+            "description": "Enabled provider IDs (github, google, ...)",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "providers",
+          "allow_local_login"
+        ],
+        "type": "object"
+      },
       "Stats": {
         "additionalProperties": false,
         "properties": {
@@ -3885,6 +3918,18 @@
     "/moderation/reject/{id}": {
       "put": {
         "operationId": "reject-post",
+        "parameters": [
+          {
+            "description": "Numeric post ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric post ID",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4684,6 +4729,18 @@
       },
       "put": {
         "operationId": "update-post",
+        "parameters": [
+          {
+            "description": "Numeric post ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric post ID",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4767,6 +4824,37 @@
         "summary": "Get a post by slug",
         "tags": [
           "posts"
+        ]
+      }
+    },
+    "/sso/providers": {
+      "get": {
+        "operationId": "list-sso-providers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SsoProvidersBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List enabled SSO providers",
+        "tags": [
+          "sso"
         ]
       }
     },
@@ -5466,6 +5554,18 @@
     "/users/creator-applications/{id}/review": {
       "put": {
         "operationId": "review-creator-application",
+        "parameters": [
+          {
+            "description": "Numeric application ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric application ID",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -5560,6 +5660,18 @@
     "/users/{id}/role": {
       "put": {
         "operationId": "update-user-role",
+        "parameters": [
+          {
+            "description": "Numeric user ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric user ID",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

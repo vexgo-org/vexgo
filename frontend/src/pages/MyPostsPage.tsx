@@ -88,7 +88,7 @@ export function MyPostsPage() {
     loadPosts();
   }, [currentPage, loadPosts]);
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = async (postId: number | string) => {
     try {
       await postsApi.deletePost(postId);
       loadPosts();
