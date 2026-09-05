@@ -68,6 +68,7 @@ func RegisterHumaRoutes(r *gin.Engine, api huma.API) {
 	post.NewHandler(post.Deps{}).RegisterRoutes(api)
 	settings.NewHandler(settings.Deps{}).RegisterRoutes(api)
 	auth.NewHandler(auth.Deps{}).RegisterRoutes(r, api, r.Group("/api"))
+	sso.NewHandler(sso.Deps{}).RegisterRoutes(api)
 }
 
 // RegisterAPIRoutes wires every domain. The huma-typed domains
@@ -101,8 +102,10 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) huma.API {
 	g := r.Group("/api", jwtAuth.OptionalJWTAuth())
 	auth.NewHandler(deps.Auth).RegisterRoutes(r, api, g)
 
-	// GIN-ONLY (not yet migrated): sso (HTML callback stays on gin)
-	sso.NewHandler(deps.SSO).RegisterRoutes(g)
+	// SSO: list providers is huma; the browser-driven login
+	// redirect and HTML callback are gin.
+	sso.NewHandler(deps.SSO).RegisterRoutes(api)
+	sso.NewHandler(deps.SSO).RegisterGinRoutes(g)
 
 	return api
 }

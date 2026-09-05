@@ -2440,6 +2440,34 @@
           "pagination"
         ],
         "type": "object"
+      },
+      "VerifyEmailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/VerifyEmailResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "newEmail": {
+            "type": "string"
+          },
+          "requireRelogin": {
+            "description": "True when the verification is for an email change",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
       }
     }
   },
@@ -5572,6 +5600,49 @@
         "summary": "Update a user's role (admin only)",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/verify-email": {
+      "get": {
+        "operationId": "verify-email",
+        "parameters": [
+          {
+            "description": "Verification token from the email link",
+            "explode": false,
+            "in": "query",
+            "name": "token",
+            "schema": {
+              "description": "Verification token from the email link",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyEmailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Verify an email via token",
+        "tags": [
+          "auth"
         ]
       }
     }

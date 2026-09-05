@@ -1,10 +1,18 @@
+// Package sso handles single-sign-on providers. The provider
+// list endpoint returns JSON and is exposed via huma; the
+// browser-driven login redirect and HTML callback remain on
+// gin since their responses (302 redirects and text/html
+// postMessage payloads) are not part of the typed API surface
+// the frontend consumes through the generated client.
 package sso
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,24 +26,66 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps)}
 }
 
-// SSOProviders returns which SSO providers are currently enabled.
-// This is a public endpoint — no authentication required.
-//
-// GET /api/sso/providers
-//
-// Response:
-//
-//	{
-//	  "providers": ["github", "google"],   // only enabled ones
-//	  "allow_local_login": true
-//	}
-func (h *Handler) SSOProviders(c *gin.Context) {
-	enabled, allowLocalLogin := h.svc.Providers()
-	c.JSON(http.StatusOK, gin.H{
-		"providers":         enabled,
-		"allow_local_login": allowLocalLogin,
-	})
+// ---------- input / output types ----------
+
+type ssoProvidersOutput struct {
+	Body ssoProvidersBody
 }
+
+// ssoProvidersBody is the body of GET /api/sso/providers. It
+// is the public list of enabled providers plus the
+// allow-local-login flag, which the frontend uses to decide
+// whether to render the local login form.
+type ssoProvidersBody struct {
+	Providers     []string `json:"providers" doc:"Enabled provider IDs (github, google, ...)"`
+	AllowLocalLogin bool   `json:"allow_local_login" doc:"True when the local username/password form is available"`
+}
+
+// ---------- huma handler ----------
+
+// GetProviders returns the public list of enabled SSO providers.
+func (h *Handler) GetProviders(ctx context.Context, _ *struct{}) (*ssoProvidersOutput, error) {
+	enabled, allowLocal := h.svc.Providers()
+	return &ssoProvidersOutput{
+		Body: ssoProvidersBody{
+			Providers:       enabled,
+			AllowLocalLogin: allowLocal,
+		},
+	}, nil
+}
+
+// RegisterRoutes registers the sso domain operations on the
+// given huma.API plus the gin-registered login redirect and
+// HTML callback.
+func (h *Handler) RegisterRoutes(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "list-sso-providers",
+		Method:      http.MethodGet,
+		Path:        "/sso/providers",
+		Summary:     "List enabled SSO providers",
+		Tags:        []string{"sso"},
+	}, h.GetProviders)
+}
+
+// RegisterGinRoutes registers the browser-driven gin handlers
+// (the login redirect and HTML callback). These are not part
+// of the orval surface — the browser handles them via
+// top-level navigation and a postMessage popup. They live on
+// the gin sub-group because huma would have to wrap them in a
+// JSON envelope which the OAuth popup cannot consume.
+func (h *Handler) RegisterGinRoutes(api *gin.RouterGroup) {
+	ssoGroup := api.Group("/sso")
+	ssoGroup.GET("/:provider/login", h.SSOLoginRedirect)
+	ssoGroup.GET("/:provider/callback", h.SSOCallback)
+}
+
+// ---------- gin handlers (kept verbatim) ----------
+//
+// The login redirect and HTML callback are browser-driven
+// endpoints (302 to the provider, then a small HTML page that
+// postMessages the result back to the opener). They are not
+// part of the orval surface and stay on gin so the response
+// stays byte-identical with the legacy implementation.
 
 // SSOLoginRedirect starts the OAuth2 authorization flow.
 //
@@ -71,7 +121,7 @@ func (h *Handler) SSOCallback(c *gin.Context) {
 	respondPostMessage(c, payload)
 }
 
-// SSO_STORAGE_KEY must match the constant in the frontend ssoLogin() helper.
+// SSOStorageKey must match the constant in the frontend ssoLogin() helper.
 const ssoStorageKey = "sso_callback_result"
 
 // respondPostMessage writes the result to localStorage so the opener window
