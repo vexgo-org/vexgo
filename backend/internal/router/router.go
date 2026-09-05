@@ -1,24 +1,33 @@
 // Package router composes HTTP route registration across all domains.
 //
-// The REST API is described by a single huma registry; non-REST routes
-// (static files, SSR, the SSO HTML callback) keep registering
-// directly with gin. huma is mounted via the gin adapter (`humagin`)
-// so the existing gin middleware (auth, rate limit, captcha) keeps
-// running unchanged — humagin dispatches gin middleware first, then
-// hands control to the huma handler.
+// The REST API is split into two layers:
+//
+//   - huma-typed operations (the domains that have been migrated to
+//     huma: captcha, home, notification, user). They register on a
+//     huma.API mounted on /api via humagin; the gin adapter
+//     (humagin) preserves the existing gin middleware (auth, rate
+//     limit, captcha) by running it before the huma handler.
+//
+//   - gin-only operations (auth, comment, post, settings, upload,
+//     sso, verify-email). They register on the underlying gin
+//     group until each domain is migrated. They are documented in
+//     the route-surface test (router_test.go) and continue to
+//     appear in `r.Routes()`.
+//
+// When all domains are migrated the huma branch becomes the only
+// one. The dual registration is a transitional state.
 package router
 
 import (
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
-	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/humaapi"
+	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
@@ -44,64 +53,48 @@ type Deps struct {
 	Settings     settings.Deps
 }
 
-// RegisterAPIRoutes builds the gin engine, mounts huma on the /api
-// sub-group, attaches the gin middleware (OptionalJWTAuth on the
-// whole /api group) and the huma-side auth context bridge, then
-// hands the huma.API to each domain's RegisterRoutes. The returned
-// huma.API is exposed so callers (router tests, the openapi-spec
-// CLI) can introspect the registered operations.
+// RegisterHumaRoutes wires only the huma-typed domains onto the
+// given huma.API. It is used by the openapi-spec CLI to emit a
+// spec without standing up the full runtime dependency tree. The
+// server uses RegisterAPIRoutes which also wires gin-only domains.
+func RegisterHumaRoutes(r *gin.Engine, api huma.API) {
+	api.UseMiddleware(auth.ContextMiddleware)
+	captcha.NewHandler(captcha.Deps{}).RegisterRoutes(api)
+	home.NewHandler(home.Deps{}).RegisterRoutes(api)
+	notification.NewHandler(notification.Deps{}).RegisterRoutes(api)
+	user.NewHandler(user.Deps{}).RegisterRoutes(api)
+}
+
+// RegisterAPIRoutes wires every domain. The huma-typed domains
+// receive a huma.API mounted on /api. The gin-typed domains continue
+// to register on the gin /api group directly until they are
+// migrated.
+//
+// Returns the huma API so callers (openapi-spec CLI, router tests)
+// can introspect the registered operations.
 func RegisterAPIRoutes(r *gin.Engine, deps Deps) huma.API {
-	// Build huma first so the auth context bridge can be applied
-	// before any domain registers its operations.
-	api := humaapi.New(r, humaapi.DefaultConfig("VexGo API", "0.1.0"))
-
-	// Optional auth on the whole /api group: gin middleware
-	// populates the gin context with the user (when a Bearer token
-	// is present). The huma-side ContextMiddleware below copies
-	// that into the request context so handlers can read it via
-	// auth.UserFromContext.
 	apiGroup := r.Group("/api")
-	apiGroup.Use(middleware.NewAuth(deps.DB, deps.JWTSecret).OptionalJWTAuth())
-	// Captcha endpoints get an extra per-IP rate limit on top of
-	// the optional JWT.
-	captchaLimiter := middleware.NewRateLimiter("captcha", deps.Captcha.RateLimitPerMinute, deps.Captcha.RateLimit)
-	// Auth credential endpoints (login, register, password reset,
-	// resend) get their own rate limit too. The auth domain reads
-	// deps.Auth.RateLimitPerMinute to apply it.
+	jwtAuth := middleware.NewAuth(deps.DB, deps.JWTSecret)
+	apiGroup.Use(jwtAuth.OptionalJWTAuth())
 
-	// Huma-side context bridge: copies the user from the gin
-	// context into the request context.
+	api := humaapi.New(r, humaapi.DefaultConfig("VexGo API", "0.1.0"))
 	api.UseMiddleware(auth.ContextMiddleware)
 
-	// Register every domain's huma operations.
-	notification.NewHandler(deps.Notification).RegisterRoutes(api)
-	comment.NewHandler(deps.Comment).RegisterRoutes(api)
-	post.NewHandler(deps.Post).RegisterRoutes(api)
-	upload.NewHandler(deps.Upload).RegisterRoutes(api)
-	user.NewHandler(deps.User).RegisterRoutes(api)
-	// Captcha domain: attach the captcha rate limit to a
-	// sub-group of the gin /api so it only applies to captcha
-	// routes. We do this by creating a huma API view on the
-	// sub-group — humagin.NewWithGroup lets the domain register
-	// under /captcha while still inheriting the rate limiter.
-	if captchaLimiter != nil {
-		captchaGroup := apiGroup.Group("/captcha", captchaLimiter)
-		captchaAPI := humagin.NewWithGroup(r, captchaGroup, humaapi.DefaultConfig("VexGo API", "0.1.0").OpenAPI)
-		// Inherit the auth context middleware from the parent API.
-		captchaAPI.UseMiddleware(auth.ContextMiddleware)
-		captcha.NewHandler(deps.Captcha).RegisterRoutes(captchaAPI)
-	} else {
-		captcha.NewHandler(deps.Captcha).RegisterRoutes(api)
-	}
-	auth.NewHandler(deps.Auth).RegisterRoutes(api)
+	// MIGRATED: captcha, home, notification, user
+	captcha.NewHandler(deps.Captcha).RegisterRoutes(api)
 	home.NewHandler(deps.Home).RegisterRoutes(api)
-	settings.NewHandler(deps.Settings).RegisterRoutes(api)
-	// SSO and upload keep gin registration for now — the sso
-	// callback writes HTML and the upload domain serves multipart
-	// forms, both of which are awkward to express as huma I/O
-	// types. They will be migrated as a follow-up.
-	sso.NewHandler(deps.SSO).RegisterRoutes(apiGroup)
-	upload.NewHandler(deps.Upload).RegisterRoutes(apiGroup)
+	notification.NewHandler(deps.Notification).RegisterRoutes(api)
+	user.NewHandler(deps.User).RegisterRoutes(api)
+
+	// GIN-ONLY (not yet migrated): auth, comment, post, settings,
+	// upload, sso, verify-email
+	g := r.Group("/api", jwtAuth.OptionalJWTAuth())
+	auth.NewHandler(deps.Auth).RegisterRoutes(g)
+	comment.NewHandler(deps.Comment).RegisterRoutes(g)
+	post.NewHandler(deps.Post).RegisterRoutes(g)
+	settings.NewHandler(deps.Settings).RegisterRoutes(g)
+	upload.NewHandler(deps.Upload).RegisterRoutes(g)
+	sso.NewHandler(deps.SSO).RegisterRoutes(g)
 
 	return api
 }

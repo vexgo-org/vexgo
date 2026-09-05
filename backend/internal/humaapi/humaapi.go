@@ -25,20 +25,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// DefaultConfig returns a huma.Config with reasonable defaults for the
-// VexGo API: title + version, JSON-only content types, and a single
-// /api server entry. Callers can mutate the returned config before
-// passing it to New.
+// DefaultConfig returns a huma.Config with reasonable defaults for
+// the VexGo API: title + version, JSON-only content types, and a
+// single /api server entry. Docs, OpenAPI, and schemas auto-routes
+// are disabled — per project requirements, no document generation
+// happens at runtime; the spec is emitted by
+// backend/cmd/openapi-spec to docs/openapi.json for orval.
 func DefaultConfig(title, version string) huma.Config {
 	c := huma.DefaultConfig(title, version)
 	c.Servers = []*huma.Server{{URL: "/api"}}
+	c.DocsPath = ""
+	c.OpenAPIPath = ""
+	c.SchemasPath = ""
 	return c
 }
 
-// New constructs a huma.API mounted on the /api prefix of the given
-// gin engine. Operations registered with the returned API land under
-// /api in the URL space, while non-REST routes (static files, SSR,
-// SSO HTML callback) keep going through gin.
+// New constructs a huma.API mounted on the /api prefix of the
+// given gin engine. Operations registered with the returned API
+// land under /api in the URL space, while non-REST routes (static
+// files, SSR, SSO HTML callback) keep going through gin.
 func New(r *gin.Engine, cfg huma.Config) huma.API {
 	g := r.Group("/api")
 	return humagin.NewWithGroup(r, g, cfg)
