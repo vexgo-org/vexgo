@@ -1,9 +1,10 @@
 // Package api holds the HTTP response types shared by the API
-// handlers. tygo derives the TypeScript interfaces for the
-// frontend from these structs (the existing tygo.yaml at the
-// repository root); huma derives the OpenAPI 3.1 spec from them
-// in parallel. The JSON wire shape and the Go struct definitions
-// cannot drift apart.
+// handlers. huma derives the OpenAPI 3.1 schema from these
+// structs (backend/cmd/openapi-spec walks the registry and
+// writes docs/openapi.json); orval consumes that spec to
+// generate the typed axios client under
+// frontend/src/api/generated/. The JSON wire shape and the
+// Go struct definitions are the single source of truth.
 package api
 
 // Pagination describes a paged list result. Embedded in any
