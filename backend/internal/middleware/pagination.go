@@ -20,16 +20,23 @@ const (
 // Offset/Limit calls — a negative limit makes GORM drop the LIMIT clause
 // entirely, and a zero limit panics on the subsequent totalPages division.
 func ParsePagination(c *gin.Context, defaultLimit int) (page, limit int) {
+	page, limit = ParsePaginationValues(c.DefaultQuery("page", "1"), c.DefaultQuery("limit", strconv.Itoa(defaultLimit)), defaultLimit)
+	return page, limit
+}
+
+// ParsePaginationValues is the gin-free sibling of ParsePagination
+// used by huma handlers. It takes the raw query strings directly.
+func ParsePaginationValues(rawPage, rawLimit string, defaultLimit int) (page, limit int) {
 	if defaultLimit < 1 {
 		defaultLimit = DefaultPaginationLimit
 	}
 
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	page, err := strconv.Atoi(rawPage)
 	if err != nil || page < 1 {
 		page = 1
 	}
 
-	limit, err = strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))
+	limit, err = strconv.Atoi(rawLimit)
 	if err != nil || limit < 1 {
 		limit = defaultLimit
 	}

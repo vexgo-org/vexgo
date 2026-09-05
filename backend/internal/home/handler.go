@@ -1,11 +1,14 @@
+// Package home exposes site-wide counters (the "home" page stats).
 package home
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/gin-gonic/gin"
+	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
 )
 
 // Handler exposes the home domain over HTTP.
@@ -18,20 +21,36 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps)}
 }
 
+// getStatsOutput wraps the stats response. huma renders Body as JSON.
+type getStatsOutput struct {
+	Body api.StatsResponse
+}
+
+// RegisterRoutes registers the home / stats domain operations on the
+// given huma.API.
+func (h *Handler) RegisterRoutes(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-stats",
+		Method:      http.MethodGet,
+		Path:        "/stats",
+		Summary:     "Get site-wide stats",
+		Tags:        []string{"stats"},
+	}, h.GetStats)
+}
+
 // GetStats returns aggregate site statistics.
-func (h *Handler) GetStats(c *gin.Context) {
-	// Get current user role
-	u, _ := middleware.CurrentUser(c)
-
-	stats := h.svc.Stats(c.Request.Context(), u.Role)
-
-	c.JSON(http.StatusOK, gin.H{
-		"stats": gin.H{
-			"posts":      stats.Posts,
-			"users":      stats.Users,
-			"comments":   stats.Comments,
-			"categories": stats.Categories,
-			"tags":       stats.Tags,
+func (h *Handler) GetStats(ctx context.Context, _ *struct{}) (*getStatsOutput, error) {
+	u, _ := auth.UserFromContext(ctx)
+	stats := h.svc.Stats(ctx, u.Role)
+	return &getStatsOutput{
+		Body: api.StatsResponse{
+			Stats: api.Stats{
+				Posts:      stats.Posts,
+				Users:      stats.Users,
+				Comments:   stats.Comments,
+				Categories: stats.Categories,
+				Tags:       stats.Tags,
+			},
 		},
-	})
+	}, nil
 }
