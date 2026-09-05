@@ -40,3 +40,31 @@ build-backend:
 @ensure-dist:
     # Ensure `backend/internal/public/dist` directory exists.
     test -d backend/internal/public/dist || just build-frontend
+
+sync-openapi:
+    # Regenerate docs/openapi.json from the live huma registry.
+    # Run this after any handler signature change so the
+    # committed spec matches the code.
+    go run ./backend/cmd/openapi-spec
+
+sync-frontend-api:
+    # Regenerate the orval typed client from docs/openapi.json.
+    # Run this after `sync-openapi` so the types line up.
+    pnpm --dir frontend exec orval --config orval.config.ts
+
+check-openapi-fresh:
+    #!/usr/bin/env bash
+    # CI guard: fail if docs/openapi.json is out of date with
+    # the current huma registry, or if the generated client
+    # is out of date with the spec. Catches drift between the
+    # backend and the typed frontend.
+    set -euo pipefail
+    tmp=$(mktemp)
+    trap "rm -f $tmp" EXIT
+    go run ./backend/cmd/openapi-spec -o "$tmp"
+    if ! diff -q docs/openapi.json "$tmp" >/dev/null 2>&1; then
+        echo "docs/openapi.json is stale. Run: just sync-openapi"
+        diff docs/openapi.json "$tmp" | head -50
+        exit 1
+    fi
+    echo "openapi.json: fresh"
