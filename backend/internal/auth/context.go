@@ -94,15 +94,24 @@ func GinContextMiddleware(ctx huma.Context, next func(huma.Context)) {
 	next(ctx)
 }
 
-// Permission is the huma-side role check. It must be chained after
-// ContextMiddleware and after JWTAuth has populated the gin
-// context. It is a small replacement for the gin
-// `middleware.Auth.Permission` for huma-registered routes: the
-// gin version still exists for any gin-registered routes (sso,
-// upload).
+// Permission is the huma-side role check. It must be chained
+// after ContextMiddleware and after JWTAuth has populated the
+// gin context. It mirrors the gin `middleware.Auth.Permission`:
+// an unauthenticated request gets 401 (the gin JWTAuth
+// middleware would have rejected it already, so the
+// permission middleware never sees it on gin routes; huma
+// versions re-introduce the 401 here to keep the surface
+// consistent for tests and clients that rely on the status
+// code), and a logged-in user without the required role gets
+// 403.
 func Permission(requiredRoles ...string) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		role := UserRoleFromContext(ctx.Context())
+		if role == "" {
+			ctx.SetStatus(http.StatusUnauthorized)
+			_, _ = ctx.BodyWriter().Write([]byte(`{"error":"Authentication required"}`))
+			return
+		}
 		if !hasRole(role, requiredRoles) {
 			ctx.SetStatus(http.StatusForbidden)
 			_, _ = ctx.BodyWriter().Write([]byte(`{"error":"Insufficient permissions"}`))

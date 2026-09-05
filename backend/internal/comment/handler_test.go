@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humagin"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -59,7 +63,11 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 
 	h := NewHandler(Deps{DB: db, JWTSecret: handlerJWTSecret, Notifier: &fakeNotifier{}})
 	r := gin.New()
-	h.RegisterRoutes(r.Group("/api"))
+	jwtAuth := middleware.NewAuth(db, handlerJWTSecret)
+	g := r.Group("/api", jwtAuth.OptionalJWTAuth())
+	api := humagin.NewWithGroup(r, g, huma.DefaultConfig("VexGo API", "0.1.0"))
+	api.UseMiddleware(auth.ContextMiddleware)
+	h.RegisterRoutes(api)
 	return r, db
 }
 

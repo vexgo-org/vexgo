@@ -136,6 +136,257 @@
         ],
         "type": "object"
       },
+      "Comment": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/User"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "moderationReason": {
+            "type": "string"
+          },
+          "parentId": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "postId": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userId": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "userId",
+          "author",
+          "content",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CommentModerationConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/CommentModerationConfig.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "apiEndpoint": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "blockKeywords": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "keywordFilterEnabled": {
+            "type": "boolean"
+          },
+          "llmReviewEnabled": {
+            "type": "boolean"
+          },
+          "manualReviewEnabled": {
+            "type": "boolean"
+          },
+          "modelName": {
+            "type": "string"
+          },
+          "modelProvider": {
+            "type": "string"
+          },
+          "moderationPrompt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "manualReviewEnabled",
+          "keywordFilterEnabled",
+          "llmReviewEnabled",
+          "modelProvider",
+          "apiKey",
+          "apiEndpoint",
+          "modelName",
+          "moderationPrompt",
+          "blockKeywords",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CommentMutationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/CommentMutationResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "comment": {
+            "$ref": "#/components/schemas/Comment",
+            "description": "The comment after the mutation, when applicable"
+          },
+          "commentsCount": {
+            "description": "Total non-deleted comments on the post (delete only)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "message": {
+            "description": "Human-readable outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "CommentsListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/CommentsListResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "comments": {
+            "description": "Top-level comments for the post",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "comments"
+        ],
+        "type": "object"
+      },
+      "CreateCommentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/CreateCommentRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "content": {
+            "description": "Comment text (max 100 characters)",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "parentId": {
+            "description": "Optional parent comment ID for replies",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "postId": {
+            "description": "Numeric or string post ID"
+          }
+        },
+        "type": "object"
+      },
+      "CreateCommentResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/CreateCommentResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "comment": {
+            "$ref": "#/components/schemas/Comment",
+            "description": "The persisted comment"
+          },
+          "commentsCount": {
+            "description": "Total non-deleted comments on the post after this one",
+            "format": "int64",
+            "type": "integer"
+          },
+          "message": {
+            "description": "Human-readable outcome",
+            "type": "string"
+          },
+          "requiresModeration": {
+            "description": "True when the comment is held in the moderation queue",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message",
+          "comment",
+          "commentsCount",
+          "requiresModeration"
+        ],
+        "type": "object"
+      },
       "CreatorApplicationApplyResponse": {
         "additionalProperties": false,
         "properties": {
@@ -423,6 +674,39 @@
         ],
         "type": "object"
       },
+      "ModerationCommentsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/ModerationCommentsResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "comments": {
+            "description": "Comments in the requested moderation state",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination",
+            "description": "Paging metadata"
+          }
+        },
+        "required": [
+          "comments",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Notification": {
         "additionalProperties": false,
         "properties": {
@@ -634,6 +918,33 @@
         ],
         "type": "object"
       },
+      "TestModerationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/TestModerationResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "message": {
+            "description": "Human-readable outcome",
+            "type": "string"
+          },
+          "response": {
+            "description": "Raw LLM response (or summary)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "response"
+        ],
+        "type": "object"
+      },
       "UnreadCountResponse": {
         "additionalProperties": false,
         "properties": {
@@ -654,6 +965,95 @@
         },
         "required": [
           "unreadCount"
+        ],
+        "type": "object"
+      },
+      "UpdateCommentModerationConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UpdateCommentModerationConfigRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "apiEndpoint": {
+            "description": "Custom LLM endpoint URL",
+            "type": "string"
+          },
+          "apiKey": {
+            "description": "LLM API key (encrypted at rest); empty leaves the existing key in place",
+            "type": "string"
+          },
+          "blockKeywords": {
+            "description": "Comma-separated blocked keywords",
+            "type": "string"
+          },
+          "keywordFilterEnabled": {
+            "description": "Reject comments that match a blocked keyword",
+            "type": "boolean"
+          },
+          "llmReviewEnabled": {
+            "description": "Use the configured LLM to flag comments",
+            "type": "boolean"
+          },
+          "manualReviewEnabled": {
+            "description": "Hold every new comment for manual approval",
+            "type": "boolean"
+          },
+          "modelName": {
+            "description": "Model name (e.g. gpt-3.5-turbo)",
+            "type": "string"
+          },
+          "modelProvider": {
+            "description": "openai|azure|... — selects the LLM client",
+            "type": "string"
+          },
+          "moderationPrompt": {
+            "description": "System prompt sent to the LLM",
+            "type": "string"
+          }
+        },
+        "required": [
+          "manualReviewEnabled",
+          "keywordFilterEnabled",
+          "llmReviewEnabled",
+          "modelProvider",
+          "apiKey",
+          "apiEndpoint",
+          "modelName",
+          "moderationPrompt",
+          "blockKeywords"
+        ],
+        "type": "object"
+      },
+      "UpdateCommentModerationConfigResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "/api/UpdateCommentModerationConfigResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/CommentModerationConfig",
+            "description": "The updated configuration"
+          },
+          "message": {
+            "description": "Human-readable outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "config"
         ],
         "type": "object"
       },
@@ -953,6 +1353,529 @@
         "summary": "Verify a captcha solution",
         "tags": [
           "captcha"
+        ]
+      }
+    },
+    "/comments": {
+      "post": {
+        "operationId": "create-comment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCommentResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create a comment",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/comments/post/{id}": {
+      "get": {
+        "operationId": "list-post-comments",
+        "parameters": [
+          {
+            "description": "Numeric post ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric post ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentsListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List comments for a post",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/comments/{id}": {
+      "delete": {
+        "operationId": "delete-comment",
+        "parameters": [
+          {
+            "description": "Numeric comment ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric comment ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentMutationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Delete a comment (author or admin)",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/moderation/comments/approve/{id}": {
+      "put": {
+        "operationId": "approve-comment",
+        "parameters": [
+          {
+            "description": "Numeric comment ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric comment ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentMutationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Approve a comment (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      }
+    },
+    "/moderation/comments/approved": {
+      "get": {
+        "operationId": "list-approved-comments",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 10,
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationCommentsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List approved comments (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      }
+    },
+    "/moderation/comments/config": {
+      "get": {
+        "operationId": "get-comment-moderation-config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentModerationConfig"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get comment moderation configuration (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      },
+      "put": {
+        "operationId": "update-comment-moderation-config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentModerationConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCommentModerationConfigResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update comment moderation configuration (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      }
+    },
+    "/moderation/comments/config/test": {
+      "post": {
+        "operationId": "test-comment-moderation",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestModerationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Test the stored LLM moderation configuration (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      }
+    },
+    "/moderation/comments/pending": {
+      "get": {
+        "operationId": "list-pending-comments",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 10,
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationCommentsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List pending comments (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      }
+    },
+    "/moderation/comments/reject/{id}": {
+      "put": {
+        "operationId": "reject-comment",
+        "parameters": [
+          {
+            "description": "Numeric comment ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Numeric comment ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentMutationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Reject a comment (admin)",
+        "tags": [
+          "comment-moderation"
+        ]
+      }
+    },
+    "/moderation/comments/rejected": {
+      "get": {
+        "operationId": "list-rejected-comments",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 10,
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationCommentsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List rejected comments (admin)",
+        "tags": [
+          "comment-moderation"
         ]
       }
     },
