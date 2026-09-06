@@ -59,8 +59,8 @@ type UpdateModerationConfigBody struct {
 // field is the same shape as the GET response; the apiKey
 // is masked in the response.
 type UpdateModerationConfigResponse struct {
-	Message string                         `json:"message" example:"Comment moderation configuration updated successfully"`
-	Config  model.CommentModerationConfig  `json:"config"`
+	Message string                        `json:"message" example:"Comment moderation configuration updated successfully"`
+	Config  model.CommentModerationConfig `json:"config"`
 }
 
 // TestModerationResponse is the body of POST

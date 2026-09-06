@@ -12,7 +12,6 @@ import (
 // /api/config/smtp. It is the same model.SMTPConfig the
 // service layer returns, with the password masked.
 type SMTPConfigResponse struct {
-	configEnvelope
 	Enabled   bool   `json:"enabled" example:"true"`
 	Host      string `json:"host" example:"smtp.example.com"`
 	Port      int    `json:"port" example:"587"`
@@ -45,7 +44,6 @@ type TestSMTPResponse struct {
 // up under settings.GeneralSettingsResponse rather than
 // model.GeneralSettings (which is the GORM row).
 type GeneralSettingsResponse struct {
-	configEnvelope
 	CaptchaEnabled      bool   `json:"captchaEnabled" example:"true"`
 	RegistrationEnabled bool   `json:"registrationEnabled" example:"true"`
 	AllowGuestViewPosts bool   `json:"allowGuestViewPosts" example:"false"`
@@ -70,14 +68,13 @@ type GeneralSettingsUpdateRequest struct {
 // GeneralSettingsUpdateResponse is the body of PUT
 // /api/config/general on success.
 type GeneralSettingsUpdateResponse struct {
-	Message         string               `json:"message" example:"General settings updated successfully"`
+	Message         string                `json:"message" example:"General settings updated successfully"`
 	GeneralSettings model.GeneralSettings `json:"generalSettings"`
 }
 
 // AIConfigResponse is the body of GET /api/config/ai. The
 // API key is masked in this shape.
 type AIConfigResponse struct {
-	configEnvelope
 	Enabled     bool   `json:"enabled" example:"true"`
 	Provider    string `json:"provider" example:"openai"`
 	ApiEndpoint string `json:"apiEndpoint" example:"https://api.openai.com/v1"`
@@ -143,8 +140,3 @@ type ThemeConfigUpdateResponse struct {
 type ThemeUploadResponse struct {
 	Message string `json:"message" example:"Theme uploaded successfully"`
 }
-
-// configEnvelope is an internal embedding slot that pulls
-// model.X's json tags into this struct so swag can describe
-// it under the settings package. It is empty by design.
-type configEnvelope struct{}

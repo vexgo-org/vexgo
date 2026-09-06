@@ -122,14 +122,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 	slog.Debug("login request parsed successfully", "email", req.Email)
 
-	token, user, err := h.svc.Login(c.Request.Context(), LoginRequest{
-		Email:        req.Email,
-		Password:     req.Password,
-		CaptchaID:    req.CaptchaID,
-		CaptchaToken: req.CaptchaToken,
-		CaptchaX:     req.CaptchaX,
-		CaptchaY:     req.CaptchaY,
-	})
+	token, user, err := h.svc.Login(c.Request.Context(), LoginRequest(req))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaCheckFailed):
@@ -250,18 +243,18 @@ func (h *Handler) Register(c *gin.Context) {
 
 	if result.RequiresVerification {
 		c.JSON(http.StatusCreated, RegisterResponse{
-			Message:               "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
-			User:                  userToRegisterUser(result.User),
-			EmailVerified:         false,
+			Message:              "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
+			User:                 userToRegisterUser(result.User),
+			EmailVerified:        false,
 			RequiresVerification: true,
 		})
 		return
 	}
 
 	c.JSON(http.StatusCreated, RegisterResponse{
-		Message:               "Registration successful",
-		User:                  userToRegisterUser(result.User),
-		EmailVerified:         result.User.EmailVerified,
+		Message:              "Registration successful",
+		User:                 userToRegisterUser(result.User),
+		EmailVerified:        result.User.EmailVerified,
 		RequiresVerification: false,
 	})
 }
@@ -342,12 +335,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	userID := middleware.CurrentUserID(c)
 
-	user, err := h.svc.UpdateProfile(c.Request.Context(), userID, UpdateProfileRequest{
-		Username: req.Username,
-		Avatar:   req.Avatar,
-		Birthday: req.Birthday,
-		Bio:      req.Bio,
-	})
+	user, err := h.svc.UpdateProfile(c.Request.Context(), userID, UpdateProfileRequest(req))
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
@@ -429,12 +417,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 
 	userID := middleware.CurrentUserID(c)
 
-	user, err := h.svc.UpdateSettings(c.Request.Context(), userID, UpdateSettingsRequest{
-		ProfileVisibility: req.ProfileVisibility,
-		HideEmail:         req.HideEmail,
-		HideBirthday:      req.HideBirthday,
-		HideBio:           req.HideBio,
-	})
+	user, err := h.svc.UpdateSettings(c.Request.Context(), userID, UpdateSettingsRequest(req))
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})

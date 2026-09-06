@@ -10,7 +10,7 @@ import (
 // UploadResponse is the body of POST /api/upload (single file
 // upload). The `file` field is the recorded MediaFile row.
 type UploadResponse struct {
-	Message string         `json:"message" example:"File uploaded successfully"`
+	Message string          `json:"message" example:"File uploaded successfully"`
 	File    model.MediaFile `json:"file"`
 }
 
@@ -19,7 +19,7 @@ type UploadResponse struct {
 // any per-file failures are silently dropped and the response
 // only includes the ones that succeeded.
 type MultiUploadResponse struct {
-	Message string           `json:"message" example:"File upload completed"`
+	Message string            `json:"message" example:"File upload completed"`
 	Files   []model.MediaFile `json:"files"`
 }
 

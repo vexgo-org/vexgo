@@ -45,7 +45,7 @@ type ApplyForCreatorResponse struct {
 // shape is the same as everywhere else.
 type CreatorApplicationListResponse struct {
 	Applications []model.CreatorApplication `json:"applications"`
-	Pagination   Pagination                `json:"pagination"`
+	Pagination   Pagination                 `json:"pagination"`
 }
 
 // ReviewCreatorApplicationBody is the body of PUT

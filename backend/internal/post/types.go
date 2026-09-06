@@ -84,7 +84,7 @@ type CreateCategoryRequest struct {
 
 // CreateCategoryResponse is the body of POST /api/categories.
 type CreateCategoryResponse struct {
-	Message  string         `json:"message" example:"Category created successfully"`
+	Message  string          `json:"message" example:"Category created successfully"`
 	Category *model.Category `json:"category"`
 }
 

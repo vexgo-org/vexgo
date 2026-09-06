@@ -35,7 +35,7 @@ func NewHandler(deps Deps) *Handler {
 func (h *Handler) SSOProviders(c *gin.Context) {
 	enabled, allowLocalLogin := h.svc.Providers()
 	c.JSON(http.StatusOK, SSOProvidersResponse{
-		Providers:      enabled,
+		Providers:       enabled,
 		AllowLocalLogin: allowLocalLogin,
 	})
 }

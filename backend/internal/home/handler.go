@@ -36,12 +36,6 @@ func (h *Handler) GetStats(c *gin.Context) {
 	stats := h.svc.Stats(c.Request.Context(), u.Role)
 
 	c.JSON(http.StatusOK, StatsResponse{
-		Stats: StatsAggregate{
-			Posts:      stats.Posts,
-			Users:      stats.Users,
-			Comments:   stats.Comments,
-			Categories: stats.Categories,
-			Tags:       stats.Tags,
-		},
+		Stats: StatsAggregate(stats),
 	})
 }

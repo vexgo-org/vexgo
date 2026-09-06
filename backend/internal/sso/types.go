@@ -8,6 +8,6 @@ package sso
 // (e.g. ["github", "google"]); allowLocalLogin tells the
 // frontend whether to render the email/password form.
 type SSOProvidersResponse struct {
-	Providers      []string `json:"providers" example:"github,google"`
-	AllowLocalLogin bool   `json:"allow_local_login" example:"true"`
+	Providers       []string `json:"providers" example:"github,google"`
+	AllowLocalLogin bool     `json:"allow_local_login" example:"true"`
 }

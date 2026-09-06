@@ -90,16 +90,7 @@ func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateSMTPConfig(c.Request.Context(), SMTPConfigRequest{
-		Enabled:   req.Enabled,
-		Host:      req.Host,
-		Port:      req.Port,
-		Username:  req.Username,
-		Password:  req.Password,
-		FromEmail: req.FromEmail,
-		FromName:  req.FromName,
-		TestEmail: req.TestEmail,
-	})
+	config, err := h.svc.UpdateSMTPConfig(c.Request.Context(), SMTPConfigRequest(req))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		return
@@ -213,15 +204,7 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest{
-		CaptchaEnabled:      req.CaptchaEnabled,
-		RegistrationEnabled: req.RegistrationEnabled,
-		AllowGuestViewPosts: req.AllowGuestViewPosts,
-		SiteName:            req.SiteName,
-		SiteDescription:     req.SiteDescription,
-		SiteIcon:            req.SiteIcon,
-		ItemsPerPage:        req.ItemsPerPage,
-	})
+	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest(req))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		return
@@ -283,13 +266,7 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateAIConfig(c.Request.Context(), AIConfigRequest{
-		Enabled:     req.Enabled,
-		Provider:    req.Provider,
-		ApiEndpoint: req.ApiEndpoint,
-		ApiKey:      req.ApiKey,
-		ModelName:   req.ModelName,
-	})
+	config, err := h.svc.UpdateAIConfig(c.Request.Context(), AIConfigRequest(req))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		return

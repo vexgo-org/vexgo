@@ -229,17 +229,7 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 		return
 	}
 
-	config, err := h.svc.UpdateModerationConfig(c.Request.Context(), UpdateModerationConfigRequest{
-		ManualReviewEnabled:  req.ManualReviewEnabled,
-		KeywordFilterEnabled: req.KeywordFilterEnabled,
-		LLMReviewEnabled:     req.LLMReviewEnabled,
-		ModelProvider:        req.ModelProvider,
-		ApiKey:               req.ApiKey,
-		ApiEndpoint:          req.ApiEndpoint,
-		ModelName:            req.ModelName,
-		ModerationPrompt:     req.ModerationPrompt,
-		BlockKeywords:        req.BlockKeywords,
-	})
+	config, err := h.svc.UpdateModerationConfig(c.Request.Context(), UpdateModerationConfigRequest(req))
 	if err != nil {
 		if errors.Is(err, ErrLLMConfigIncomplete) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})

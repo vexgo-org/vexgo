@@ -21,12 +21,12 @@ type CaptchaWire struct {
 
 // LoginRequestWire is the body of POST /api/auth/login.
 type LoginRequestWire struct {
-	Email        string      `json:"email" binding:"required" example:"alice@example.com"`
-	Password     string      `json:"password" binding:"required" example:"hunter2"`
-	CaptchaID    string      `json:"captcha_id" example:"ck_2f4e..."`
-	CaptchaToken string      `json:"captcha_token" example:"ct_2f4e..."`
-	CaptchaX     int         `json:"captcha_x" example:"42"`
-	CaptchaY     int         `json:"captcha_y" example:"118"`
+	Email        string `json:"email" binding:"required" example:"alice@example.com"`
+	Password     string `json:"password" binding:"required" example:"hunter2"`
+	CaptchaID    string `json:"captcha_id" example:"ck_2f4e..."`
+	CaptchaToken string `json:"captcha_token" example:"ct_2f4e..."`
+	CaptchaX     int    `json:"captcha_x" example:"42"`
+	CaptchaY     int    `json:"captcha_y" example:"118"`
 }
 
 // LoginUser is the slim user shape returned by /api/auth/login
@@ -94,9 +94,9 @@ type RegisterUser struct {
 // RegisterResponse is the body of POST /api/auth/register
 // when email verification is required.
 type RegisterResponse struct {
-	Message             string        `json:"message" example:"Registration successful! Please verify your email."`
-	User                RegisterUser  `json:"user"`
-	EmailVerified       bool          `json:"email_verified" example:"false"`
+	Message              string       `json:"message" example:"Registration successful! Please verify your email."`
+	User                 RegisterUser `json:"user"`
+	EmailVerified        bool         `json:"email_verified" example:"false"`
 	RequiresVerification bool         `json:"requires_verification" example:"true"`
 }
 
