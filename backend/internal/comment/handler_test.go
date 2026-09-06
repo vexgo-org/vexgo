@@ -311,19 +311,19 @@ func TestModerationQueue_ApproveRejectDelete(t *testing.T) {
 	publishID := create("publish me")
 
 	// Approve two, reject one.
-	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/approve/"+pendingID, adminToken, "")
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/"+pendingID+"/approve", adminToken, "")
 	if w.Code != http.StatusOK {
 		t.Errorf("approve failed: %d %s", w.Code, w.Body.String())
 	}
-	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/approve/"+publishID, adminToken, "")
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/"+publishID+"/approve", adminToken, "")
 	if w.Code != http.StatusOK {
 		t.Errorf("approve failed: %d %s", w.Code, w.Body.String())
 	}
-	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/reject/"+rejectID, adminToken, "")
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/"+rejectID+"/reject", adminToken, "")
 	if w.Code != http.StatusOK {
 		t.Errorf("reject failed: %d %s", w.Code, w.Body.String())
 	}
-	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/approve/99999", adminToken, "")
+	w = doJSON(t, r, http.MethodPut, "/api/moderation/comments/99999/approve", adminToken, "")
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404 approving a missing comment, got %d", w.Code)
 	}

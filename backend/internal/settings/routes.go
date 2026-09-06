@@ -12,8 +12,8 @@ import (
 func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	admin := h.mw.Permission(model.RoleAdmin, model.RoleSuperAdmin)
 
-	api.GET("/themes", h.GetThemes)
-	api.GET("/theme/:id/preview", h.GetThemePreview)
+	api.GET("/config/themes", h.GetThemes)
+	api.GET("/config/themes/:id/preview", h.GetThemePreview)
 
 	api.GET("/config/smtp", h.mw.JWTAuth(), admin, h.GetSMTPConfig)
 	api.PUT("/config/smtp", h.mw.JWTAuth(), admin, h.UpdateSMTPConfig)
@@ -31,5 +31,5 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.PUT("/config/theme", h.mw.JWTAuth(), admin, h.UpdateThemeConfig)
 
 	// Theme upload endpoint
-	api.POST("/themes/upload", h.mw.JWTAuth(), admin, h.UploadTheme)
+	api.POST("/config/theme/upload", h.mw.JWTAuth(), admin, h.UploadTheme)
 }
