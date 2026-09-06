@@ -40,3 +40,26 @@ build-backend:
 @ensure-dist:
     # Ensure `backend/internal/public/dist` directory exists.
     test -d backend/internal/public/dist || just build-frontend
+
+generate:
+    # Codegen using swag and orval.
+    go tool swag init -g backend/cmd/vexgo/main.go --dir . --v3.1 -o ./docs --ot json
+    pnpm --dir frontend exec orval --config orval.config.ts
+
+check-openapi-fresh:
+    #!/usr/bin/env bash
+    # CI guard: fail if docs/swagger.json is stale relative to
+    # the swaggo annotations in the backend. Catches drift
+    # between the code and the OpenAPI spec.
+    set -euo pipefail
+    tmp=$(mktemp)
+    trap "rm -f $tmp" EXIT
+    (cd backend && swag init -g cmd/vexgo/main.go --dir . --v3.1 -o "$tmp" --ot json >/dev/null)
+    # swag only writes swagger.json to the output dir; rename the
+    # tmp's swagger.json to be diffable.
+    if ! diff -q docs/swagger.json "$tmp/swagger.json" >/dev/null 2>&1; then
+        echo "docs/swagger.json is stale. Run: just sync-openapi"
+        diff docs/swagger.json "$tmp/swagger.json" | head -80
+        exit 1
+    fi
+    echo "swagger.json: fresh"
