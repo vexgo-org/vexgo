@@ -75,11 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const response = await getVexGoAPI().postAuthLogin(requestData);
     const { user: u, token } = response.data;
-    if (token && u) {
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(u));
-      setUser(u as User);
+    if (!u || !token) {
+      throw new Error(t("loginPage.loginFailed"));
     }
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(u));
+    setUser(u as User);
   };
 
   const loginWithToken = async (token: string) => {
