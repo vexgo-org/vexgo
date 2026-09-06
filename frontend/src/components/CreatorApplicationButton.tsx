@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { applyForCreator } from "@/lib/userApi";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -53,8 +55,10 @@ export function CreatorApplicationButton({
   const handleApply = async () => {
     setIsLoading(true);
     try {
-      const response = await applyForCreator(reason || undefined);
-      toast.success(response.data.message);
+      const response = await unwrap(
+        getVexGoAPI().postUsersApplyCreator({ reason: reason || undefined }),
+      );
+      toast.success(response.message);
       setIsDialogOpen(false);
       setIsConfirmOpen(false);
       setReason("");

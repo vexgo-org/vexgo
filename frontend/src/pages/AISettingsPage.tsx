@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { configApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { AIConfig, AIModel } from "@/types";
 import type { AxiosError } from "axios";
 import {
@@ -50,8 +52,8 @@ export function AISettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await configApi.getAIConfig();
-      setConfig(response.data);
+      const response = await unwrap(getVexGoAPI().getConfigAi());
+      setConfig(response);
     } catch (error: unknown) {
       console.error("Failed to load AI config:", error);
       toast.error(t("aiSettings.loadFailed"));
@@ -72,8 +74,15 @@ export function AISettingsPage() {
 
     setFetchingModels(true);
     try {
-      const response = await configApi.getAIModels();
-      setModels(response.data.models);
+      const response = await unwrap(getVexGoAPI().getConfigAiModels());
+      setModels(
+        (response.models || []).map((m) => ({
+          id: m,
+          object: "model" as const,
+          created: 0,
+          owned_by: "",
+        })),
+      );
       toast.success(t("aiSettings.testSuccess"));
     } catch (error: unknown) {
       console.error("Failed to fetch the model list:", error);
@@ -88,22 +97,22 @@ export function AISettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!config.apiEndpoint.trim()) {
+    if (!(config.apiEndpoint || "").trim()) {
       toast.error(t("aiSettings.apiEndpoint") + t("common.required"));
       return;
     }
-    if (!config.apiKey.trim()) {
+    if (!(config.apiKey || "").trim()) {
       toast.error(t("aiSettings.apiKey") + t("common.required"));
       return;
     }
-    if (!config.modelName.trim()) {
+    if (!(config.modelName || "").trim()) {
       toast.error(t("aiSettings.selectModel"));
       return;
     }
 
     setSaving(true);
     try {
-      await configApi.updateAIConfig(config);
+      await unwrap(getVexGoAPI().putConfigAi(config));
       toast.success(t("aiSettings.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save AI config:", error);
@@ -121,16 +130,16 @@ export function AISettingsPage() {
       toast.error(t("aiSettings.enableAI"));
       return;
     }
-    if (!config.apiKey.trim()) {
+    if (!(config.apiKey || "").trim()) {
       toast.error(t("common.save") + " " + t("aiSettings.apiKey"));
       return;
     }
 
     setTesting(true);
     try {
-      const response = await configApi.testAI();
+      const response = await unwrap(getVexGoAPI().postConfigAiTest());
       toast.success(t("aiSettings.testSuccess") + "!");
-      console.log("AI Response:", response.data.response);
+      console.log("AI Response:", response.response);
     } catch (error: unknown) {
       console.error("Failed to test the AI connection:", error);
       const axiosError = error as AxiosError<ApiErrorResponse>;

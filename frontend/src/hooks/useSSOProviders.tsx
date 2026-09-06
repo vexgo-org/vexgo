@@ -1,12 +1,7 @@
-// hooks/useSSOProviders.ts
 import { useEffect, useState } from "react";
+import { getVexGoAPI } from "@/api/generated/endpoints";
 
 export type SSOProvider = "github" | "google" | "oidc";
-
-interface SSOProvidersResponse {
-  providers: SSOProvider[];
-  allow_local_login: boolean;
-}
 
 interface UseSSOProvidersResult {
   providers: SSOProvider[];
@@ -20,14 +15,14 @@ export function useSSOProviders(): UseSSOProvidersResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/sso/providers")
-      .then((r) => r.json())
-      .then((data: SSOProvidersResponse) => {
-        setProviders(data.providers ?? []);
+    getVexGoAPI()
+      .getSsoProviders()
+      .then((r) => r.data)
+      .then((data) => {
+        setProviders((data.providers as SSOProvider[]) ?? []);
         setAllowLocalLogin(data.allow_local_login ?? true);
       })
       .catch(() => {
-        // On error: show nothing, keep local login
         setProviders([]);
         setAllowLocalLogin(true);
       })

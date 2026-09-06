@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { configApi, uploadApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { GeneralSettings } from "@/types";
 import {
   Card,
@@ -38,8 +40,8 @@ export function GeneralSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await configApi.getGeneralSettings();
-      setConfig(response.data);
+      const response = await unwrap(getVexGoAPI().getConfigGeneral());
+      setConfig(response);
     } catch (error) {
       console.error("Failed to load general settings:", error);
       toast.error(t("generalSettings.loadFailed"));
@@ -53,18 +55,18 @@ export function GeneralSettingsPage() {
   }, [loadConfig]);
 
   const handleSave = async () => {
-    if (!config.siteName.trim()) {
+    if (!(config.siteName || "").trim()) {
       toast.error(t("generalSettings.siteNameRequired"));
       return;
     }
-    if (config.itemsPerPage <= 0 || config.itemsPerPage > 100) {
+    if ((config.itemsPerPage || 10) <= 0 || (config.itemsPerPage || 10) > 100) {
       toast.error(t("generalSettings.itemsPerPageInvalid"));
       return;
     }
 
     setSaving(true);
     try {
-      await configApi.updateGeneralSettings(config);
+      await unwrap(getVexGoAPI().putConfigGeneral(config));
       toast.success(t("generalSettings.saveSuccess"));
     } catch (error) {
       console.error("Failed to save general settings:", error);
@@ -89,9 +91,9 @@ export function GeneralSettingsPage() {
     }
 
     try {
-      const response = await uploadApi.uploadFile(file);
-      if (response.data.file?.url) {
-        setConfig({ ...config, siteIcon: response.data.file.url });
+      const response = await unwrap(getVexGoAPI().postUpload(file));
+      if (response.file?.url) {
+        setConfig({ ...config, siteIcon: response.file.url });
       }
       toast.success(t("generalSettings.iconUploadSuccess"));
     } catch (error) {

@@ -22,7 +22,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Shield, Key, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { configApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { CommentModerationConfig } from "@/types";
 
 export function CommentConfigPage() {
@@ -47,8 +49,10 @@ export function CommentConfigPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await configApi.getCommentModerationConfig();
-      setConfig(response.data);
+      const response = await unwrap(
+        getVexGoAPI().getModerationCommentsConfig(),
+      );
+      setConfig(response);
     } catch (error: unknown) {
       console.error("Failed to load comment moderation config:", error);
       toast.error(t("commentConfig.loadFailed"));
@@ -64,7 +68,7 @@ export function CommentConfigPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await configApi.updateCommentModerationConfig(config);
+      await unwrap(getVexGoAPI().putModerationCommentsConfig(config));
       toast.success(t("commentConfig.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save config:", error);
@@ -82,9 +86,9 @@ export function CommentConfigPage() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const response = await configApi.testCommentModeration();
+      const response = await unwrap(getVexGoAPI().postModerationCommentsTest());
       toast.success(
-        `${response.data?.message ?? ""} ${response.data?.response ?? ""}`.trim(),
+        `${response?.message ?? ""} ${response?.response ?? ""}`.trim(),
       );
     } catch (error: unknown) {
       console.error("Failed to test LLM moderation endpoint:", error);

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { postsApi, categoriesApi, statsApi, likesApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+import type { ModelPost } from "@/api/generated/model";
 import type { Post, Category } from "@/types";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
@@ -107,7 +109,7 @@ export function HomePage() {
   }, []);
 
   // Normalize posts returned by the backend: id/authorId as strings, timestamps as ISO strings
-  const normalizePost = (raw: Partial<Post>): Post => {
+  const normalizePost = (raw: Partial<Post> | ModelPost): Post => {
     if (!raw) return raw as Post;
     return {
       ...raw,
@@ -132,23 +134,27 @@ export function HomePage() {
       if (searchQuery && searchQuery.trim()) {
         // Prefer the backend title search (pagination-friendly); also fetch extra posts for client-side tag matching as a fallback
         const [respSearch, respBulk] = await Promise.all([
-          postsApi.getPosts({
-            page: currentPage,
-            limit: 10,
-            search: searchQuery,
-            category: selectedCategory || undefined,
-          }),
+          unwrap(
+            getVexGoAPI().getPosts({
+              page: currentPage,
+              limit: 10,
+              search: searchQuery,
+              category: selectedCategory || undefined,
+            }),
+          ),
           // Fetch more posts to match tags on the client (the backend may not support tag search)
-          postsApi.getPosts({
-            page: 1,
-            limit: 200,
-            category: selectedCategory || undefined,
-          }),
+          unwrap(
+            getVexGoAPI().getPosts({
+              page: 1,
+              limit: 200,
+              category: selectedCategory || undefined,
+            }),
+          ),
         ]);
-        const titleMatches = (respSearch.data.posts || []).map((p) =>
+        const titleMatches = (respSearch.posts || []).map((p) =>
           normalizePost(p),
         );
-        const bulk = (respBulk.data.posts || []).map((p) => normalizePost(p));
+        const bulk = (respBulk.posts || []).map((p) => normalizePost(p));
         const q = searchQuery.trim().toLowerCase();
         const tagMatches = bulk.filter((p) =>
           (p.tags || []).some((t: string) =>
@@ -156,21 +162,35 @@ export function HomePage() {
           ),
         );
         const combinedMap = new Map<string, Post>();
-        titleMatches.forEach((p) => combinedMap.set(p.id, p));
-        tagMatches.forEach((p) => combinedMap.set(p.id, p));
+        titleMatches.forEach((p) => combinedMap.set(String(p.id), p));
+        tagMatches.forEach((p) => combinedMap.set(String(p.id), p));
         const combined = Array.from(combinedMap.values());
         setPosts(combined);
         // Use the title search pagination info as the page pagination reference
-        setPagination(respSearch.data.pagination);
-      } else {
-        const response = await postsApi.getPosts({
-          page: currentPage,
-          limit: 10,
-          category: selectedCategory || undefined,
+        const p = respSearch.pagination;
+        setPagination({
+          total: p?.total ?? 0,
+          page: p?.page ?? 1,
+          totalPages: p?.totalPages ?? 1,
+          limit: p?.limit ?? 10,
         });
-        const all = response.data.posts.map((p) => normalizePost(p));
+      } else {
+        const response = await unwrap(
+          getVexGoAPI().getPosts({
+            page: currentPage,
+            limit: 10,
+            category: selectedCategory || undefined,
+          }),
+        );
+        const all = (response.posts || []).map((p) => normalizePost(p));
         setPosts(all);
-        setPagination(response.data.pagination);
+        const p = response.pagination;
+        setPagination({
+          total: p?.total ?? 0,
+          page: p?.page ?? 1,
+          totalPages: p?.totalPages ?? 1,
+          limit: p?.limit ?? 10,
+        });
       }
     } catch (error) {
       console.error("Failed to load posts:", error);
@@ -185,8 +205,8 @@ export function HomePage() {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesApi.getCategories();
-      setCategories(response.data.categories);
+      const response = await getVexGoAPI().getCategories();
+      setCategories((response.data.categories as Category[]) || []);
     } catch (error) {
       console.error("Failed to load categories:", error);
     }
@@ -194,8 +214,10 @@ export function HomePage() {
 
   const loadPopularPosts = async () => {
     try {
-      const response = await statsApi.getPopularPosts(5);
-      setPopularPosts(response.data.posts.map((p) => normalizePost(p)));
+      const response = await unwrap(
+        getVexGoAPI().getStatsPopularPosts({ limit: 5 }),
+      );
+      setPopularPosts((response.posts || []).map((p) => normalizePost(p)));
     } catch (error) {
       console.error("Failed to load popular posts:", error);
     }
@@ -204,8 +226,10 @@ export function HomePage() {
   const loadPopularTags = async () => {
     try {
       // Fetch enough posts to tally tags
-      const response = await postsApi.getPosts({ page: 1, limit: 200 });
-      const allPosts = response.data.posts.map((p) => normalizePost(p));
+      const response = await unwrap(
+        getVexGoAPI().getPosts({ page: 1, limit: 200 }),
+      );
+      const allPosts = (response.posts || []).map((p) => normalizePost(p));
 
       // Count how many times each tag appears
       const tagCounts: Record<string, number> = {};
@@ -273,8 +297,8 @@ export function HomePage() {
 
   const handleToggleLike = async (postId: string) => {
     try {
-      const response = await likesApi.toggleLike(postId);
-      const { isLiked, likesCount } = response.data;
+      const { data } = await getVexGoAPI().postLikesPostId(Number(postId));
+      const { isLiked, likesCount } = data;
       setPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isLiked, likesCount } : p)),
       );
@@ -431,7 +455,9 @@ export function HomePage() {
                               <span className="text-muted-foreground">·</span>
                               <span className="flex items-center gap-1 text-muted-foreground">
                                 <Calendar className="w-3 h-3" />
-                                {formatDate(post.createdAt)}
+                                {post.createdAt
+                                  ? formatDate(post.createdAt)
+                                  : ""}
                               </span>
                             </div>
                             {/* Birthday and bio */}
@@ -460,7 +486,7 @@ export function HomePage() {
 
                         <div className="flex items-center gap-4 text-sm">
                           <button
-                            onClick={() => handleToggleLike(post.id)}
+                            onClick={() => handleToggleLike(String(post.id))}
                             className={`flex items-center gap-1 ${post.isLiked ? "text-red-500" : "text-muted-foreground"}`}
                           >
                             <Heart
@@ -564,7 +590,7 @@ export function HomePage() {
                         : "secondary"
                     }
                     className="cursor-pointer"
-                    onClick={() => handleCategoryClick(category.name)}
+                    onClick={() => handleCategoryClick(category.name || "")}
                   >
                     {category.name}
                   </Badge>

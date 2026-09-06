@@ -7,7 +7,7 @@ import {
 } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { notificationsApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
 
 interface NotificationContextType {
   unreadCount: number;
@@ -28,8 +28,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // Fetch the unread notification count from the backend.
   const refreshUnreadCount = async () => {
     try {
-      const response = await notificationsApi.getUnreadCount();
-      setUnreadCount(response.data.unreadCount);
+      const response = await getVexGoAPI().getNotificationsUnreadCount();
+      setUnreadCount(response.data.unreadCount ?? 0);
     } catch (error) {
       console.error("Failed to fetch the unread notification count:", error);
     }

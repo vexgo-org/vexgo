@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GoCaptcha from "go-captcha-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/I18nContext";
+import { getVexGoAPI } from "@/api/generated/endpoints";
 import { Spinner } from "./spinner";
 
 interface CaptchaResponse {
@@ -80,13 +81,8 @@ export function SliderCaptcha({
   // Generate a captcha
   const generateCaptcha = useCallback(async () => {
     try {
-      const response = await fetch("/api/captcha");
-      if (!response.ok) {
-        throw new Error(t("sliderCaptcha.fetchFailed"));
-      }
-
-      const data: CaptchaResponse = await response.json();
-      setCaptchaData(data);
+      const { data } = await getVexGoAPI().getCaptcha();
+      setCaptchaData(data as CaptchaResponse);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : t("sliderCaptcha.fetchFailed");
@@ -119,30 +115,16 @@ export function SliderCaptcha({
       if (!captchaData) return;
 
       try {
-        const response = await fetch("/api/captcha/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            id: captchaData.id,
-            token: captchaData.token,
-            x,
-            y,
-          }),
+        const { data } = await getVexGoAPI().postCaptchaVerify({
+          id: captchaData.id,
+          token: captchaData.token,
+          x,
+          y,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || t("sliderCaptcha.retryError"));
-        }
-
-        const data = await response.json();
 
         if (data.success) {
           toast.success(t("sliderCaptcha.success"));
           onSuccess({ id: captchaData.id, token: captchaData.token, x, y });
-          // Close the overlay after a successful verification
           setTimeout(() => {
             onClose();
           }, 500);
@@ -154,7 +136,6 @@ export function SliderCaptcha({
           err instanceof Error ? err.message : t("sliderCaptcha.retryError");
         toast.error(message);
         slideRef.current?.reset();
-        // Refresh the captcha after a failed verification
         setTimeout(() => {
           generateCaptcha();
         }, 1000);

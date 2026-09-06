@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { authApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +51,7 @@ export function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await authApi.requestPasswordReset({ email });
+      await unwrap(getVexGoAPI().postAuthPasswordResetRequest({ email }));
       setSuccess(true);
       setError("");
     } catch (err: unknown) {
@@ -84,7 +86,7 @@ export function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await authApi.resetPassword({ token, password });
+      await unwrap(getVexGoAPI().postAuthPasswordReset({ token, password }));
       setSuccess(true);
       setError("");
       // Navigate to the login page after 3 seconds

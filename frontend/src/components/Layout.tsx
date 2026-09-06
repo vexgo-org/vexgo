@@ -1,7 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
-import { configApi } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +26,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-
+import { getVexGoAPI } from "@/api/generated/endpoints";
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -48,7 +47,7 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await configApi.getGeneralSettings();
+        const response = await getVexGoAPI().getConfigGeneral();
         if (response.data.siteName) {
           setSiteName(response.data.siteName);
           document.title = response.data.siteName;

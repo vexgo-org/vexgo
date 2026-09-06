@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { postsApi, commentsApi, likesApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { Post, Comment } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
@@ -74,12 +76,14 @@ export function PostDetailPage() {
   const loadPost = useCallback(async () => {
     try {
       console.log("Loading post by slug:", slug);
-      const response = await postsApi.getPost(slug!);
-      console.log("Post loaded successfully:", response.data);
-      const p = response.data.post;
-      p.tags = normalizeTagsArray(p.tags);
-      setPost(p);
-      setLikesCount(response.data.post.likesCount || 0);
+      const response = await unwrap(getVexGoAPI().getPostsSlug(slug!));
+      console.log("Post loaded successfully:", response);
+      const p = response.post;
+      if (p) {
+        const post = { ...p, tags: normalizeTagsArray(p.tags) } as Post;
+        setPost(post);
+        setLikesCount(response.post?.likesCount || 0);
+      }
     } catch (error: unknown) {
       console.error("Failed to load post:", error);
       const axiosError = error as {
@@ -104,9 +108,11 @@ export function PostDetailPage() {
   const loadComments = useCallback(async () => {
     if (!post?.id) return [] as Comment[];
     try {
-      const response = await commentsApi.getComments(post.id);
-      setComments(response.data.comments);
-      return response.data.comments;
+      const response = await unwrap(
+        getVexGoAPI().getCommentsPostId(String(post.id)),
+      );
+      setComments((response.comments || []) as Comment[]);
+      return response.comments;
     } catch (error) {
       console.error("Failed to load comments:", error);
       return [] as Comment[];
@@ -116,9 +122,11 @@ export function PostDetailPage() {
   const loadLikeStatus = useCallback(async () => {
     if (!post?.id) return;
     try {
-      const response = await likesApi.getLikeStatus(post.id);
-      setIsLiked(response.data.isLiked);
-      setLikesCount(response.data.likesCount);
+      const response = await unwrap(
+        getVexGoAPI().getLikesPostId(Number(post.id)),
+      );
+      setIsLiked(response.isLiked ?? false);
+      setLikesCount(response.likesCount ?? 0);
     } catch (error) {
       console.error("Failed to load like status:", error);
     }
@@ -162,17 +170,19 @@ export function PostDetailPage() {
     if (!post?.id) return;
 
     try {
-      const response = await likesApi.toggleLike(post.id);
-      setIsLiked(response.data.isLiked);
-      setLikesCount(response.data.likesCount);
+      const response = await unwrap(
+        getVexGoAPI().postLikesPostId(Number(post.id)),
+      );
+      setIsLiked(response.isLiked ?? false);
+      setLikesCount(response.likesCount ?? 0);
       // Notify other pages (e.g. the home page) to update the post's like status
       try {
         window.dispatchEvent(
           new CustomEvent("like-changed", {
             detail: {
               postId: post.id,
-              isLiked: response.data.isLiked,
-              likesCount: response.data.likesCount,
+              isLiked: response.isLiked,
+              likesCount: response.likesCount,
             },
           }),
         );
@@ -195,14 +205,16 @@ export function PostDetailPage() {
 
     setSubmittingComment(true);
     try {
-      const response = await commentsApi.createComment({
-        postId: post.id,
-        content: commentContent.trim(),
-      });
+      const response = await unwrap(
+        getVexGoAPI().postComments({
+          postId: post.id,
+          content: commentContent.trim(),
+        }),
+      );
       setCommentContent("");
       await loadComments();
       // Sync the home page using the commentsCount returned by the backend
-      const newCount = response.data.commentsCount ?? comments.length + 1;
+      const newCount = response.commentsCount ?? comments.length + 1;
       try {
         window.dispatchEvent(
           new CustomEvent("comment-changed", {
@@ -222,7 +234,7 @@ export function PostDetailPage() {
   const handleDeletePost = async () => {
     if (!post?.id) return;
     try {
-      await postsApi.deletePost(post.id);
+      await unwrap(getVexGoAPI().deletePostsId(String(post.id)));
       navigate("/");
     } catch (error) {
       console.error("Failed to delete post:", error);
@@ -232,10 +244,10 @@ export function PostDetailPage() {
   const handleDeleteComment = async (commentId: string) => {
     if (!post?.id) return;
     try {
-      const response = await commentsApi.deleteComment(commentId);
+      const response = await unwrap(getVexGoAPI().deleteCommentsId(commentId));
       await loadComments();
       const newCount =
-        response.data.commentsCount ??
+        response.commentsCount ??
         (comments.length > 0 ? comments.length - 1 : 0);
       try {
         window.dispatchEvent(
@@ -389,12 +401,13 @@ export function PostDetailPage() {
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
-                  {formatDate(post.createdAt)}
+                  {formatDate(post.createdAt || "")}
                 </span>
                 {post.updatedAt !== post.createdAt && (
                   <span className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
-                    {t("postDetailPage.updatedAt")} {formatDate(post.updatedAt)}
+                    {t("postDetailPage.updatedAt")}{" "}
+                    {formatDate(post.updatedAt || "")}
                   </span>
                 )}
               </div>
@@ -459,7 +472,7 @@ export function PostDetailPage() {
 
       {/* Post content */}
       <div className="mb-12">
-        <MarkdownRenderer content={post.content} />
+        <MarkdownRenderer content={post.content || ""} />
       </div>
 
       {/* Interaction area */}
@@ -586,7 +599,7 @@ export function PostDetailPage() {
                             {comment.author?.username}
                           </span>
                           <span className="text-sm text-muted-foreground">
-                            {formatDate(comment.createdAt)}
+                            {formatDate(comment.createdAt || "")}
                           </span>
                         </div>
                         {user &&
@@ -596,7 +609,9 @@ export function PostDetailPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteComment(comment.id)}
+                              onClick={() =>
+                                handleDeleteComment(String(comment.id))
+                              }
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

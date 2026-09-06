@@ -7,7 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { notificationsApi, postsApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import { useTranslation } from "@/lib/I18nContext";
 import { CreatorApplicationButton } from "@/components/CreatorApplicationButton";
 
@@ -67,7 +69,7 @@ export function NotificationCenterPage() {
     const fetchNotifications = async () => {
       setLoading(true);
       try {
-        const response = await notificationsApi.getNotifications();
+        const response = await unwrap(getVexGoAPI().getNotifications());
         // Convert the backend data format to the frontend format
         interface RawNotification {
           id: number;
@@ -82,7 +84,7 @@ export function NotificationCenterPage() {
         }
 
         const formattedNotifications = (
-          response.data.notifications as RawNotification[]
+          response.notifications as RawNotification[]
         ).map((notification) => ({
           id: notification.id.toString(),
           type: notification.type as NotificationType,
@@ -125,7 +127,7 @@ export function NotificationCenterPage() {
       (notification) => notification.id === id && !notification.isRead,
     );
     try {
-      await notificationsApi.markAsRead(id);
+      await unwrap(getVexGoAPI().putNotificationsId(Number(id)));
       // Update the local state
       setNotifications((prev) =>
         prev.map((notification) =>
@@ -145,7 +147,7 @@ export function NotificationCenterPage() {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      await notificationsApi.markAllAsRead();
+      await unwrap(getVexGoAPI().postNotificationsReadAll());
       // Update the local state
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true })),
@@ -162,7 +164,7 @@ export function NotificationCenterPage() {
       (notification) => notification.id === id && !notification.isRead,
     );
     try {
-      await notificationsApi.deleteNotification(id);
+      await unwrap(getVexGoAPI().deleteNotificationsId(Number(id)));
       // Update the local state
       setNotifications((prev) =>
         prev.filter((notification) => notification.id !== id),
@@ -191,8 +193,8 @@ export function NotificationCenterPage() {
 
     if (relatedType === "post") {
       try {
-        const response = await postsApi.getPostById(postId);
-        navigate(`/post/${response.data.post.slug}`);
+        const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
+        navigate(`/post/${response.post?.slug || ""}`);
       } catch {
         // Fallback: navigate with the ID (will be handled by the post page)
         navigate(`/post/by-id/${postId}`);
@@ -200,8 +202,8 @@ export function NotificationCenterPage() {
     } else if (relatedType === "comment") {
       // Navigate to the post page and scroll to the comment
       try {
-        const response = await postsApi.getPostById(postId);
-        navigate(`/post/${response.data.post.slug}#comment-${relatedId}`);
+        const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
+        navigate(`/post/${response.post?.slug || ""}#comment-${relatedId}`);
       } catch {
         navigate(`/post/by-id/${postId}#comment-${relatedId}`);
       }

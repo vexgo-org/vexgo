@@ -4,7 +4,8 @@ import { isAxiosError } from "axios";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
-import { statsApi, postsApi, categoriesApi, tagsApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
 import type { Post, Category, Tag as TagType } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,18 +72,24 @@ export function AdminPage() {
     try {
       const [statsRes, postsRes, draftPostsRes, categoriesRes, tagsRes] =
         await Promise.all([
-          statsApi.getStats(),
-          postsApi.getPosts({ limit: 10 }),
-          postsApi.getDraftPosts({ limit: 10 }),
-          categoriesApi.getCategories(),
-          tagsApi.getTags(),
+          unwrap(getVexGoAPI().getStats()),
+          unwrap(getVexGoAPI().getPosts({ limit: 10 })),
+          unwrap(getVexGoAPI().getPostsDrafts({ limit: 10 })),
+          unwrap(getVexGoAPI().getCategories()),
+          unwrap(getVexGoAPI().getTags()),
         ]);
 
-      setStats(statsRes.data.stats);
-      setPosts(postsRes.data.posts);
-      setDraftPosts(draftPostsRes.data.posts);
-      setCategories(categoriesRes.data.categories);
-      setTags(tagsRes.data.tags);
+      setStats({
+        posts: statsRes.stats?.posts ?? 0,
+        users: statsRes.stats?.users ?? 0,
+        comments: statsRes.stats?.comments ?? 0,
+        categories: statsRes.stats?.categories ?? 0,
+        tags: statsRes.stats?.tags ?? 0,
+      });
+      setPosts((postsRes.posts as Post[]) || []);
+      setDraftPosts((draftPostsRes.posts as Post[]) || []);
+      setCategories((categoriesRes.categories as Category[]) || []);
+      setTags((tagsRes.tags as TagType[]) || []);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -103,10 +110,12 @@ export function AdminPage() {
     if (!newCategoryName.trim()) return;
 
     try {
-      await categoriesApi.createCategory({
-        name: newCategoryName,
-        description: newCategoryDesc,
-      });
+      await unwrap(
+        getVexGoAPI().postCategories({
+          name: newCategoryName,
+          description: newCategoryDesc,
+        }),
+      );
       setNewCategoryName("");
       setNewCategoryDesc("");
       setActionError("");
@@ -117,9 +126,9 @@ export function AdminPage() {
     }
   };
 
-  const handleDeleteCategory = async (categoryId: string) => {
+  const handleDeleteCategory = async (categoryId: string | number) => {
     try {
-      await categoriesApi.deleteCategory(categoryId);
+      await unwrap(getVexGoAPI().deleteCategoriesId(Number(categoryId)));
       setActionError("");
       loadData();
     } catch (error) {
@@ -128,9 +137,9 @@ export function AdminPage() {
     }
   };
 
-  const handleDeleteTag = async (tagId: string) => {
+  const handleDeleteTag = async (tagId: string | number) => {
     try {
-      await tagsApi.deleteTag(tagId);
+      await unwrap(getVexGoAPI().deleteTagsId(Number(tagId)));
       setActionError("");
       loadData();
     } catch (error) {
@@ -139,9 +148,9 @@ export function AdminPage() {
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const handleDeletePost = async (postId: string | number) => {
     try {
-      await postsApi.deletePost(postId);
+      await unwrap(getVexGoAPI().deletePostsId(String(postId)));
       // Stay on the post management page and refresh the data
       setActiveTab("posts");
       loadData();
@@ -476,7 +485,7 @@ export function AdminPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {(() => {
-                          const status = getStatusBadge(post.status);
+                          const status = getStatusBadge(post.status || "");
                           const IconComponent = status.icon;
                           return (
                             <Badge
@@ -489,19 +498,19 @@ export function AdminPage() {
                           );
                         })()}
                         <span className="text-sm text-muted-foreground">
-                          {formatDate(post.createdAt)}
+                          {formatDate(post.createdAt || "")}
                         </span>
                       </div>
                       <h3 className="font-medium">{post.title}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {t("posts.author")}: {post.author?.username}
+                        {t("posts.author")}: {post.author?.username || ""}
                       </p>
                     </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleEditPost(post.id)}
+                        onClick={() => handleEditPost(String(post.id))}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -541,19 +550,19 @@ export function AdminPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="secondary">{t("posts.draft")}</Badge>
                           <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt)}
+                            {formatDate(post.createdAt || "")}
                           </span>
                         </div>
                         <h3 className="font-medium">{post.title}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {t("posts.author")}: {post.author?.username}
+                          {t("posts.author")}: {post.author?.username || ""}
                         </p>
                       </div>
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEditPost(post.id)}
+                          onClick={() => handleEditPost(String(post.id))}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>

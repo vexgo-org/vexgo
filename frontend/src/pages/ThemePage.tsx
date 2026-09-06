@@ -2,7 +2,9 @@ import { useCallback, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import api from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,14 +58,12 @@ export function ThemePage() {
     setLoading(true);
     try {
       const [themesRes, configRes] = await Promise.all([
-        api.get<{ themes: ThemeInfo[] }>("/themes"),
-        api.get<{ activeTheme: string }>("/config/theme", {
-          params: { _t: Date.now() }, // add a timestamp to bust the cache
-        }),
+        unwrap(getVexGoAPI().getConfigThemes()),
+        unwrap(getVexGoAPI().getConfigTheme()),
       ]);
-      setThemes(themesRes.data.themes || []);
-      setActiveTheme(configRes.data.activeTheme || "default");
-      console.log("activeTheme from API:", configRes.data.activeTheme);
+      setThemes((themesRes.themes || []) as ThemeInfo[]);
+      setActiveTheme(configRes.activeTheme || "default");
+      console.log("activeTheme from API:", configRes.activeTheme);
     } catch (error) {
       console.error("Failed to load theme data:", error);
       setMessage({ type: "error", text: t("themePage.loadFailed") });
@@ -87,7 +87,7 @@ export function ThemePage() {
     setApplying(themeId);
     setMessage(null);
     try {
-      await api.put("/config/theme", { activeTheme: themeId });
+      await unwrap(getVexGoAPI().putConfigTheme({ activeTheme: themeId }));
       setActiveTheme(themeId);
       const themeName = themes.find((t) => t.id === themeId)?.name || themeId;
       setMessage({
@@ -131,11 +131,7 @@ export function ThemePage() {
     formData.append("theme", file);
 
     try {
-      await api.post("/themes/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await getVexGoAPI().postConfigThemeUpload(formData);
       setMessage({ type: "success", text: t("themePage.uploadSuccess") });
       // Reload the theme list
       loadData();

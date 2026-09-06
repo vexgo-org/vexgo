@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { authApi, uploadApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+import type { User as UserType } from "@/types";
+
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,12 +76,14 @@ export function ProfilePage() {
     setLoading(true);
 
     try {
-      const response = await authApi.updateProfile({
-        username,
-        birthday,
-        bio,
-      });
-      updateUser(response.data.user);
+      const response = await unwrap(
+        getVexGoAPI().putAuthProfile({
+          username,
+          birthday,
+          bio,
+        }),
+      );
+      updateUser(response.user as UserType);
       setSuccess(t("profilePage.updateSuccess"));
     } catch (err: unknown) {
       const errorMessage =
@@ -107,7 +112,7 @@ export function ProfilePage() {
     setPasswordLoading(true);
 
     try {
-      await authApi.changePassword({ oldPassword, newPassword });
+      await unwrap(getVexGoAPI().putAuthPassword({ oldPassword, newPassword }));
       setSuccess(t("profilePage.passwordChangeSuccess"));
       setOldPassword("");
       setNewPassword("");
@@ -142,15 +147,17 @@ export function ProfilePage() {
     setEmailLoading(true);
 
     try {
-      const response = await authApi.updateEmail({ email: newEmail });
-      setSuccess(response.data.message);
+      const response = await unwrap(
+        getVexGoAPI().postAuthEmail({ email: newEmail }),
+      );
+      setSuccess(response.message ?? "");
       setNewEmail("");
-      if (response.data.pending) {
+      if (response.pending) {
         // If pending: true is returned, email verification is required; wait for the user to click the link
         // No need to update the local user; it will be updated after verification
-      } else if (response.data.user) {
+      } else if ("user" in response && response.user) {
         // If the update succeeded directly (SMTP disabled), update the local user
-        updateUser(response.data.user);
+        updateUser(response.user as UserType);
       } else {
         // When pending, update the displayed local email (awaiting verification)
         if (user) {
@@ -189,13 +196,17 @@ export function ProfilePage() {
 
     try {
       // Use the existing upload API
-      const uploadResponse = await uploadApi.uploadFile(croppedFile);
-      if (uploadResponse.data.file && uploadResponse.data.file.url) {
+      const uploadResponse = await unwrap(
+        getVexGoAPI().postUpload(croppedFile),
+      );
+      if (uploadResponse.file && uploadResponse.file.url) {
         // Update the user avatar
-        const updateResponse = await authApi.updateProfile({
-          avatar: uploadResponse.data.file.url,
-        });
-        updateUser(updateResponse.data.user);
+        const updateResponse = await unwrap(
+          getVexGoAPI().putAuthProfile({
+            avatar: uploadResponse.file.url,
+          }),
+        );
+        updateUser(updateResponse.user as UserType);
         setSuccess(t("profilePage.updateAvatar"));
       }
     } catch (err: unknown) {

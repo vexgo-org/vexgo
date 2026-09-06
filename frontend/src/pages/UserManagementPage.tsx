@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getUsers, updateUserRole, deleteUser } from "@/lib/userApi";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
 import type { User } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,13 +77,15 @@ export function UserManagementPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getUsers({
-        page: currentPage,
-        limit: 10,
-        search: searchQuery,
-      });
-      setUsers(response.data.users);
-      setTotalPages(response.data.pagination.totalPages);
+      const response = await unwrap(
+        getVexGoAPI().getUsers({
+          page: currentPage,
+          limit: 10,
+          search: searchQuery,
+        }),
+      );
+      setUsers((response.users || []) as User[]);
+      setTotalPages(response.pagination?.totalPages ?? 0);
     } catch (error) {
       console.error("Failed to load user list:", error);
       toast.error(t("userManagement.loadingUsers"));
@@ -108,8 +111,10 @@ export function UserManagementPage() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
-      const response = await updateUserRole(userId, newRole);
-      toast.success(response.data.message);
+      const response = await unwrap(
+        getVexGoAPI().putUsersIdRole(Number(userId), { role: newRole }),
+      );
+      toast.success(response.message);
 
       // Update the local user list
       setUsers((prevUsers) =>
@@ -131,8 +136,10 @@ export function UserManagementPage() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const response = await deleteUser(userId);
-      toast.success(response.data.message);
+      const response = await unwrap(
+        getVexGoAPI().deleteUsersId(Number(userId)),
+      );
+      toast.success(response.message);
 
       // Remove the deleted user from the local list
       setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
@@ -269,7 +276,7 @@ export function UserManagementPage() {
                         <Select
                           value={user.role}
                           onValueChange={(value) =>
-                            handleRoleChange(user.id, value)
+                            handleRoleChange(String(user.id), value)
                           }
                         >
                           <SelectTrigger className="w-32">
@@ -310,7 +317,7 @@ export function UserManagementPage() {
                             {t("common.cancel")}
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => handleDeleteUser(String(user.id))}
                           >
                             {t("userManagement.delete")}
                           </AlertDialogAction>

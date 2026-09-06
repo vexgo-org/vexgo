@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Calendar, MessageSquare, Heart } from "lucide-react";
-import { postsApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
 import type { Post, User } from "@/types";
 
 export function UserPostsPage() {
@@ -24,15 +25,16 @@ export function UserPostsPage() {
   const loadUserPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await postsApi.getUserPosts(id!, {
-        page: currentPage,
-        limit: 10,
-      });
-      setPosts(response.data.posts);
-      setTotalPages(response.data.pagination.totalPages);
-      // Get the user info from the first post
-      if (response.data.posts.length > 0 && response.data.posts[0].author) {
-        setUser(response.data.posts[0].author);
+      const response = await unwrap(
+        getVexGoAPI().getPostsUserId(id!, {
+          page: currentPage,
+          limit: 10,
+        }),
+      );
+      setPosts((response.posts || []) as Post[]);
+      setTotalPages(response.pagination?.totalPages ?? 1);
+      if (response.posts?.[0]?.author) {
+        setUser(response.posts[0].author as User);
       }
     } catch (error) {
       console.error("Failed to load user posts:", error);
@@ -237,7 +239,7 @@ export function UserPostsPage() {
                           <span>·</span>
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            {formatDate(post.createdAt)}
+                            {formatDate(post.createdAt || "")}
                           </span>
                         </div>
                       </div>

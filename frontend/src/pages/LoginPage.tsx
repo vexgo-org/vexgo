@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { authApi, configApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -212,8 +214,8 @@ export function LoginPage() {
   useEffect(() => {
     const loadCaptchaSettings = async () => {
       try {
-        const response = await configApi.getGeneralSettings();
-        setCaptchaEnabled(response.data.captchaEnabled);
+        const response = await unwrap(getVexGoAPI().getConfigGeneral());
+        setCaptchaEnabled(response.captchaEnabled ?? false);
       } catch (error) {
         console.error(t("common.error"), error);
         setCaptchaEnabled(false);
@@ -284,8 +286,10 @@ export function LoginPage() {
     setResendMessage("");
     setError("");
     try {
-      const response = await authApi.resendVerification({ email });
-      setResendMessage(response.data.message);
+      const response = await unwrap(
+        getVexGoAPI().postAuthEmailVerifyResend({ email }),
+      );
+      setResendMessage(response.message ?? "");
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
       setError(
