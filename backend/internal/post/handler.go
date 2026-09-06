@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 // Handler exposes the post domain over HTTP.
@@ -24,7 +25,23 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
-// GetPosts returns the post list.
+// GetPosts godoc
+//
+//	@Summary		List posts
+//	@Description	Returns the published post list, paginated and
+//	@Description	optionally filtered by category or free-text search.
+//	@Description	Anonymous callers see a reduced view (no
+//	@Description	pending posts).
+//	@Tags			posts
+//	@Produce		json
+//	@Param			page		query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit		query		int		false	"page size"				default(10)
+//	@Param			category	query		string	false	"category id or slug filter"
+//	@Param			search		query		string	false	"free-text filter"
+//	@Success		200			{object}	PostListResponse
+//	@Failure		403			{object}	api.ErrorResponse	"guest view denied"
+//	@Failure		500			{object}	api.ErrorResponse
+//	@Router			/posts [get]
 func (h *Handler) GetPosts(c *gin.Context) {
 	page, limit := middleware.ParsePagination(c, 10)
 
@@ -41,10 +58,10 @@ func (h *Handler) GetPosts(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrGuestViewDenied) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view posts"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "You must be logged in to view posts"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch posts"})
 		return
 	}
 
@@ -53,19 +70,30 @@ func (h *Handler) GetPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, PostListResponse{
+		Posts: posts,
+		Pagination: Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
 
-// GetPostByID returns a single post by numeric ID. Used by internal callers
-// (notifications, moderation) that need to resolve a post ID to its slug.
+// GetPostByID godoc
+//
+//	@Summary		Look up a post by numeric id
+//	@Description	Used by internal callers (notifications, moderation) that
+//	@Description	need to resolve a post id to its slug.
+//	@Tags			posts
+//	@Produce		json
+//	@Param			id	path		string	true	"numeric post id"
+//	@Success		200		{object}	PostSingleResponse
+//	@Failure		403		{object}	api.ErrorResponse	"guest view denied"
+//	@Failure		404		{object}	api.NotFoundWithIDResponse	"post not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts/by-id/{id} [get]
 func (h *Handler) GetPostByID(c *gin.Context) {
 	id := c.Param("id")
 	u, _ := middleware.CurrentUser(c)
@@ -74,17 +102,27 @@ func (h *Handler) GetPostByID(c *gin.Context) {
 	post, err := h.svc.Get(c.Request.Context(), id, userRole, userID)
 	if err != nil {
 		if errors.Is(err, ErrGuestViewDenied) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view this post"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "You must be logged in to view this post"})
 			return
 		}
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "postId": id})
+		c.JSON(http.StatusNotFound, api.NotFoundWithIDResponse{Error: "Post does not exist", PostID: id})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"post": post})
+	c.JSON(http.StatusOK, PostSingleResponse{Post: post})
 }
 
-// GetPost returns a single post by slug.
+// GetPost godoc
+//
+//	@Summary		Look up a post by slug
+//	@Tags			posts
+//	@Produce		json
+//	@Param			slug	path		string	true	"post slug"
+//	@Success		200		{object}	PostSingleResponse
+//	@Failure		403		{object}	api.ErrorResponse	"guest view denied"
+//	@Failure		404		{object}	api.NotFoundWithSlugResponse	"post not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts/{slug} [get]
 func (h *Handler) GetPost(c *gin.Context) {
 	slug := c.Param("slug")
 	u, _ := middleware.CurrentUser(c)
@@ -93,26 +131,43 @@ func (h *Handler) GetPost(c *gin.Context) {
 	post, err := h.svc.GetBySlug(c.Request.Context(), slug, userRole, userID)
 	if err != nil {
 		if errors.Is(err, ErrGuestViewDenied) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view this post"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "You must be logged in to view this post"})
 			return
 		}
 		if errors.Is(err, ErrPostNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist", "slug": slug})
+			c.JSON(http.StatusNotFound, api.NotFoundWithSlugResponse{Error: "Post does not exist", Slug: slug})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load post"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to load post"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"post": post})
+	c.JSON(http.StatusOK, PostSingleResponse{Post: post})
 }
 
-// CreatePost creates a post.
+// CreatePost godoc
+//
+//	@Summary		Create a post
+//	@Description	Contributors and above can create posts. The `status`
+//	@Description	field controls whether the post goes directly
+//	@Description	to published, lands in pending for moderation, or
+//	@Description	is saved as a draft.
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		CreatePostRequest	true	"post payload"
+//	@Success		201		{object}	PostMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"validation error / invalid slug"
+//	@Failure		403		{object}	api.ErrorResponse	"insufficient permissions / not logged in"
+//	@Failure		409		{object}	api.CodeErrorResponse	"slug already taken"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts [post]
 func (h *Handler) CreatePost(c *gin.Context) {
 	// Check if user is logged in
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Please log in first"})
+		c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Please log in first"})
 		return
 	}
 
@@ -120,19 +175,10 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
 
-	var req struct {
-		Slug       string   `json:"slug" binding:"required"`
-		Title      string   `json:"title" binding:"required"`
-		Content    string   `json:"content" binding:"required"`
-		Category   any      `json:"category" binding:"required"`
-		Tags       []string `json:"tags"`
-		Excerpt    string   `json:"excerpt"`
-		CoverImage string   `json:"coverImage"`
-		Status     string   `json:"status"`
-	}
+	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -148,42 +194,50 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a post"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to create a post"})
 			return
 		}
 		if errors.Is(err, model.ErrSlugTaken) {
-			c.JSON(http.StatusConflict, gin.H{"error": "Slug is already taken by another post", "code": "slug_taken"})
+			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 			return
 		}
 		if errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create post"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Post created successfully", "post": post})
+	c.JSON(http.StatusCreated, PostMessageResponse{Message: "Post created successfully", Post: post})
 }
 
-// UpdatePost updates a post (author or admin only).
+// UpdatePost godoc
+//
+//	@Summary		Update a post
+//	@Description	Authors can update their own posts; admins can update
+//	@Description	any post. Only the supplied fields are updated.
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string				true	"post id"
+//	@Param			request	body		UpdatePostRequest	true	"updated post fields"
+//	@Success		200		{object}	PostMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid slug"
+//	@Failure		403		{object}	api.ErrorResponse	"not author or admin"
+//	@Failure		404		{object}	api.ErrorResponse	"post not found"
+//	@Failure		409		{object}	api.CodeErrorResponse	"slug already taken"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts/{id} [put]
 func (h *Handler) UpdatePost(c *gin.Context) {
 	id := c.Param("id")
 	userID := middleware.CurrentUserID(c)
 
-	var req struct {
-		Slug       string   `json:"slug"`
-		Title      string   `json:"title"`
-		Content    string   `json:"content"`
-		Category   any      `json:"category"`
-		Tags       []string `json:"tags"`
-		Excerpt    string   `json:"excerpt"`
-		CoverImage string   `json:"coverImage"`
-		Status     string   `json:"status"`
-	}
+	var req UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -200,23 +254,37 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPostNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this post"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to modify this post"})
 		case errors.Is(err, model.ErrSlugTaken):
-			c.JSON(http.StatusConflict, gin.H{"error": "Slug is already taken by another post", "code": "slug_taken"})
+			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 		case errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update post"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update post"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post updated successfully", "post": post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post updated successfully", Post: post})
 }
 
-// DeletePost deletes a post (author or admin only).
+// DeletePost godoc
+//
+//	@Summary		Delete a post
+//	@Description	Authors can delete their own posts; admins can delete
+//	@Description	any post. All comments on the post are removed in
+//	@Description	the same transaction.
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"post id"
+//	@Success		200	{object}	PostDeleteResponse
+//	@Failure		403	{object}	api.ErrorResponse	"not author or admin"
+//	@Failure		404	{object}	api.ErrorResponse	"post not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/posts/{id} [delete]
 func (h *Handler) DeletePost(c *gin.Context) {
 	id := c.Param("id")
 	userID := middleware.CurrentUserID(c)
@@ -225,19 +293,33 @@ func (h *Handler) DeletePost(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPostNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this post"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to delete this post"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete post"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete post"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+	c.JSON(http.StatusOK, PostDeleteResponse{Message: "Post deleted successfully"})
 }
 
-// GetMyPosts returns the current user's own posts.
+// GetMyPosts godoc
+//
+//	@Summary		List the authenticated user's posts
+//	@Description	All statuses (draft, pending, published, rejected) by
+//	@Description	default; the `status` query param narrows to one.
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Param			status	query		string	false	"status filter"	Enums(draft,pending,published,rejected)
+//	@Success		200		{object}	PostListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts/user/my-posts [get]
 func (h *Handler) GetMyPosts(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
@@ -251,7 +333,7 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 		Status: status,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch posts"})
 		return
 	}
 
@@ -260,18 +342,29 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, PostListResponse{
+		Posts: posts,
+		Pagination: Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
 
-// GetDraftPosts returns draft posts.
+// GetDraftPosts godoc
+//
+//	@Summary		List the authenticated user's drafts
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int	false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int	false	"page size"				default(10)
+//	@Success		200		{object}	PostListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts/drafts [get]
 func (h *Handler) GetDraftPosts(c *gin.Context) {
 	page, limit := middleware.ParsePagination(c, 10)
 
@@ -285,7 +378,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 		Limit:    limit,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch drafts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch drafts"})
 		return
 	}
 
@@ -294,18 +387,31 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, PostListResponse{
+		Posts: posts,
+		Pagination: Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
 
-// GetUserPosts returns the posts of a specific user.
+// GetUserPosts godoc
+//
+//	@Summary		List a specific user's posts
+//	@Description	Public for published posts; pending and rejected posts
+//	@Description	are only visible to the author and to admins.
+//	@Tags			posts
+//	@Produce		json
+//	@Param			id		path		string	true	"author user id or username"
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Success		200		{object}	PostListResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid user id"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/posts/user/{id} [get]
 func (h *Handler) GetUserPosts(c *gin.Context) {
 	userIDStr := c.Param("id")
 	page, limit := middleware.ParsePagination(c, 10)
@@ -322,10 +428,10 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrBadRequest) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid user ID"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch posts"})
 		return
 	}
 
@@ -334,18 +440,28 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, PostListResponse{
+		Posts: posts,
+		Pagination: Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
 
-// GetPopularPosts returns popular posts.
+// GetPopularPosts godoc
+//
+//	@Summary		Popular posts
+//	@Description	Top posts by view count, capped to the requested limit.
+//	@Tags			posts
+//	@Produce		json
+//	@Param			limit	query		int	false	"max posts to return"	default(5)
+//	@Success		200		{object}	PostListResponseData
+//	@Failure		403		{object}	api.ErrorResponse	"guest view denied"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/stats/popular-posts [get]
 func (h *Handler) GetPopularPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
@@ -354,17 +470,27 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 	posts, err := h.svc.Popular(c.Request.Context(), userRole, limit)
 	if err != nil {
 		if errors.Is(err, ErrGuestViewDenied) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You must be logged in to view popular posts"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "You must be logged in to view popular posts"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch popular posts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch popular posts"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"posts": posts})
+	c.JSON(http.StatusOK, PostListResponseData{Posts: posts})
 }
 
-// GetLatestPosts returns the latest posts.
+// GetLatestPosts godoc
+//
+//	@Summary		Latest posts
+//	@Description	Most recently published posts, capped to the
+//	@Description	requested limit.
+//	@Tags			posts
+//	@Produce		json
+//	@Param			limit	query		int	false	"max posts to return"	default(5)
+//	@Success		200		{object}	PostListResponseData
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/stats/latest-posts [get]
 func (h *Handler) GetLatestPosts(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
@@ -372,36 +498,54 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 
 	posts, err := h.svc.Latest(c.Request.Context(), userRole, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch latest posts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch latest posts"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"posts": posts})
+	c.JSON(http.StatusOK, PostListResponseData{Posts: posts})
 }
 
-// GetCategories returns the category list.
+// GetCategories godoc
+//
+//	@Summary		List categories
+//	@Tags			categories
+//	@Produce		json
+//	@Success		200	{object}	CategoriesListResponse
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/categories [get]
 func (h *Handler) GetCategories(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
 
 	categories, err := h.svc.Categories(c.Request.Context(), userRole)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch categories"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"categories": categories})
+	c.JSON(http.StatusOK, CategoriesListResponse{Categories: categories})
 }
 
-// CreateCategory creates a category.
+// CreateCategory godoc
+//
+//	@Summary		Create a category
+//	@Description	Contributors and above can create categories.
+//	@Tags			categories
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		CreateCategoryRequest	true	"category payload"
+//	@Success		201		{object}	CreateCategoryResponse
+//	@Failure		400		{object}	api.ErrorResponse	"name is blank"
+//	@Failure		403		{object}	api.ErrorResponse	"insufficient permissions"
+//	@Failure		409		{object}	api.CodeErrorResponse	"duplicate name"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/categories [post]
 func (h *Handler) CreateCategory(c *gin.Context) {
-	var req struct {
-		Name        string `json:"name" binding:"required,max=100"`
-		Description string `json:"description" binding:"max=500"`
-	}
+	var req CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -410,43 +554,62 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrBadRequest):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Category name must not be blank"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Category name must not be blank"})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a category"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to create a category"})
 		case errors.Is(err, ErrDuplicateName):
-			c.JSON(http.StatusConflict, gin.H{"error": "A category with this name already exists", "code": "duplicate_name"})
+			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "A category with this name already exists", Code: "duplicate_name"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create category"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create category"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":  "Category created successfully",
-		"category": category,
+	c.JSON(http.StatusCreated, CreateCategoryResponse{
+		Message:  "Category created successfully",
+		Category: category,
 	})
 }
 
-// GetTags returns the tag list.
+// GetTags godoc
+//
+//	@Summary		List tags
+//	@Tags			tags
+//	@Produce		json
+//	@Success		200	{object}	TagsListResponse
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/tags [get]
 func (h *Handler) GetTags(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
 
 	tags, err := h.svc.Tags(c.Request.Context(), userRole)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tags"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch tags"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"tags": tags})
+	c.JSON(http.StatusOK, TagsListResponse{Tags: tags})
 }
 
-// DeleteCategory deletes an empty category (contributor and above; 403 for
-// insufficient roles is produced by the middleware).
+// DeleteCategory godoc
+//
+//	@Summary		Delete an empty category
+//	@Description	Returns 400 if the category is still referenced by posts.
+//	@Tags			categories
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"category id"
+//	@Success		200	{object}	DeleteMessageResponse
+//	@Failure		400	{object}	api.ErrorResponse	"category still in use"
+//	@Failure		403	{object}	api.ErrorResponse	"insufficient permissions"
+//	@Failure		404	{object}	api.ErrorResponse	"category not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/categories/{id} [delete]
 func (h *Handler) DeleteCategory(c *gin.Context) {
 	id, ok := parseIDParam(c)
 	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Category does not exist"})
+		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Category does not exist"})
 		return
 	}
 
@@ -456,26 +619,38 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 		var inUse *InUseError
 		switch {
 		case errors.Is(err, ErrCategoryNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Category does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Category does not exist"})
 		case errors.As(err, &inUse):
-			c.JSON(http.StatusBadRequest, gin.H{"error": inUseMessage("Category", inUse.Count)})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: inUseMessage("Category", inUse.Count)})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to delete a category"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to delete a category"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete category"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
+	c.JSON(http.StatusOK, DeleteMessageResponse{Message: "Category deleted successfully"})
 }
 
-// DeleteTag deletes an empty tag (contributor and above; 403 for insufficient
-// roles is produced by the middleware).
+// DeleteTag godoc
+//
+//	@Summary		Delete an empty tag
+//	@Description	Returns 400 if the tag is still referenced by posts.
+//	@Tags			tags
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"tag id"
+//	@Success		200	{object}	DeleteMessageResponse
+//	@Failure		400	{object}	api.ErrorResponse	"tag still in use"
+//	@Failure		403	{object}	api.ErrorResponse	"insufficient permissions"
+//	@Failure		404	{object}	api.ErrorResponse	"tag not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/tags/{id} [delete]
 func (h *Handler) DeleteTag(c *gin.Context) {
 	id, ok := parseIDParam(c)
 	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Tag does not exist"})
+		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Tag does not exist"})
 		return
 	}
 
@@ -485,18 +660,18 @@ func (h *Handler) DeleteTag(c *gin.Context) {
 		var inUse *InUseError
 		switch {
 		case errors.Is(err, ErrTagNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tag does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Tag does not exist"})
 		case errors.As(err, &inUse):
-			c.JSON(http.StatusBadRequest, gin.H{"error": inUseMessage("Tag", inUse.Count)})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: inUseMessage("Tag", inUse.Count)})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to delete a tag"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to delete a tag"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tag"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete tag"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Tag deleted successfully"})
+	c.JSON(http.StatusOK, DeleteMessageResponse{Message: "Tag deleted successfully"})
 }
 
 // parseIDParam parses a numeric route :id, reporting whether it is valid.
@@ -521,14 +696,26 @@ func inUseMessage(kind string, count int64) string {
 	return fmt.Sprintf("%s is used by %d %s", kind, count, noun)
 }
 
-// CreateTag creates a tag.
+// CreateTag godoc
+//
+//	@Summary		Create a tag
+//	@Description	Contributors and above can create tags.
+//	@Tags			tags
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		CreateTagRequest	true	"tag payload"
+//	@Success		201		{object}	CreateTagResponse
+//	@Failure		400		{object}	api.ErrorResponse	"name is blank"
+//	@Failure		403		{object}	api.ErrorResponse	"insufficient permissions"
+//	@Failure		409		{object}	api.CodeErrorResponse	"duplicate name"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/tags [post]
 func (h *Handler) CreateTag(c *gin.Context) {
-	var req struct {
-		Name string `json:"name" binding:"required,max=100"`
-	}
+	var req CreateTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -537,34 +724,70 @@ func (h *Handler) CreateTag(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrBadRequest):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Tag name must not be blank"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Tag name must not be blank"})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create a tag"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to create a tag"})
 		case errors.Is(err, ErrDuplicateName):
-			c.JSON(http.StatusConflict, gin.H{"error": "A tag with this name already exists", "code": "duplicate_name"})
+			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "A tag with this name already exists", Code: "duplicate_name"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create tag"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Tag created successfully",
-		"tag":     tag,
-	})
+	c.JSON(http.StatusCreated, CreateTagResponse{Message: "Tag created successfully", Tag: tag})
 }
 
-// GetPendingPosts gets pending posts for moderation.
+// GetPendingPosts godoc
+//
+//	@Summary		List pending posts (moderation queue)
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Param			search	query		string	false	"free-text filter"
+//	@Success		200		{object}	PostListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		403		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/pending [get]
 func (h *Handler) GetPendingPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusPending)
 }
 
-// GetApprovedPosts gets approved posts list.
+// GetApprovedPosts godoc
+//
+//	@Summary		List approved posts (moderation history)
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Param			search	query		string	false	"free-text filter"
+//	@Success		200		{object}	PostListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		403		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/approved [get]
 func (h *Handler) GetApprovedPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusPublished)
 }
 
-// GetRejectedPosts gets rejected posts list.
+// GetRejectedPosts godoc
+//
+//	@Summary		List rejected posts (moderation history)
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Param			search	query		string	false	"free-text filter"
+//	@Success		200		{object}	PostListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		403		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/rejected [get]
 func (h *Handler) GetRejectedPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusRejected)
 }
@@ -581,7 +804,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 		Search: search,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation posts"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch moderation posts"})
 		return
 	}
 
@@ -590,74 +813,130 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"posts": posts,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       page,
-			"limit":      limit,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, PostListResponse{
+		Posts: posts,
+		Pagination: Pagination{
+			Total:      total,
+			Page:       page,
+			Limit:      limit,
+			TotalPages: totalPages,
 		},
 	})
 }
 
-// ApprovePost approves a post.
+// ApprovePost godoc
+//
+//	@Summary		Approve a pending post
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"post id"
+//	@Success		200	{object}	PostMessageResponse
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		403	{object}	api.ErrorResponse
+//	@Failure		404	{object}	api.ErrorResponse	"post not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/moderation/approve/{id} [put]
 func (h *Handler) ApprovePost(c *gin.Context) {
 	post, err := h.svc.Approve(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve post"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to approve post"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post approved", "post": post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post approved", Post: post})
 }
 
-// RejectPost rejects a post.
+// RejectPost godoc
+//
+//	@Summary		Reject a pending post
+//	@Description	The optional rejectionReason is stored on the post and
+//	@Description	shown to the author.
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string				true	"post id"
+//	@Param			request	body		RejectPostRequest	true	"rejection reason"
+//	@Success		200		{object}	PostMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid request"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		403		{object}	api.ErrorResponse
+//	@Failure		404		{object}	api.ErrorResponse	"post not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/reject/{id} [put]
 func (h *Handler) RejectPost(c *gin.Context) {
-	var req struct {
-		RejectionReason string `json:"rejectionReason"`
-	}
+	var req RejectPostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request parameters"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request parameters"})
 		return
 	}
 
 	post, err := h.svc.Reject(c.Request.Context(), c.Param("id"), req.RejectionReason)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject post"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to reject post"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post has been rejected", "post": post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post has been rejected", Post: post})
 }
 
-// ResubmitPost resubmits a rejected post for moderation.
+// ResubmitPost godoc
+//
+//	@Summary		Resubmit a rejected post
+//	@Description	Authors can move a rejected post back into the
+//	@Description	pending queue after editing. Only rejected posts
+//	@Description	can be resubmitted.
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"post id"
+//	@Success		200	{object}	PostMessageResponse
+//	@Failure		400	{object}	api.ErrorResponse	"post is not rejected"
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		403	{object}	api.ErrorResponse
+//	@Failure		404	{object}	api.ErrorResponse	"post not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/moderation/resubmit/{id} [put]
 func (h *Handler) ResubmitPost(c *gin.Context) {
 	post, err := h.svc.Resubmit(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPostNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 		case errors.Is(err, ErrBadRequest):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Only rejected posts can be resubmitted for moderation"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Only rejected posts can be resubmitted for moderation"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resubmit post"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to resubmit post"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post resubmitted for moderation", "post": post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post resubmitted for moderation", Post: post})
 }
 
-// ToggleLike likes or unlikes a post.
+// ToggleLike godoc
+//
+//	@Summary		Like or unlike a post
+//	@Description	Idempotent toggle: likes the post on the first call
+//	@Description	from a given user, unlikes on the second. The
+//	@Description	response includes the new like count.
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			postId	path		int	true	"post id"
+//	@Success		200		{object}	LikeResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/likes/{postId} [post]
 func (h *Handler) ToggleLike(c *gin.Context) {
 	postIDStr := c.Param("postId")
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
@@ -667,18 +946,28 @@ func (h *Handler) ToggleLike(c *gin.Context) {
 
 	isLiked, count, err := h.svc.ToggleLike(c.Request.Context(), postID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove like"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to remove like"})
 		return
 	}
 
 	if isLiked {
-		c.JSON(http.StatusOK, gin.H{"message": "Liked successfully", "postId": postID, "isLiked": true, "likesCount": count})
+		c.JSON(http.StatusOK, LikeResponse{Message: "Liked successfully", PostID: postID, IsLiked: true, LikesCount: count})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Like removed", "postId": postID, "isLiked": false, "likesCount": count})
+	c.JSON(http.StatusOK, LikeResponse{Message: "Like removed", PostID: postID, IsLiked: false, LikesCount: count})
 }
 
-// GetLikeStatus returns the like status of a post (public, optional login).
+// GetLikeStatus godoc
+//
+//	@Summary		Read the like status for a post
+//	@Description	Public — anonymous callers see the count but always
+//	@Description	get `isLiked: false`. Authenticated callers see their
+//	@Description	own like state.
+//	@Tags			posts
+//	@Produce		json
+//	@Param			postId	path		int	true	"post id"
+//	@Success		200		{object}	LikeStatusResponse
+//	@Router			/likes/{postId} [get]
 func (h *Handler) GetLikeStatus(c *gin.Context) {
 	postIDStr := c.Param("postId")
 	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
@@ -688,9 +977,9 @@ func (h *Handler) GetLikeStatus(c *gin.Context) {
 
 	isLiked, count := h.svc.LikeStatus(c.Request.Context(), postID, userID)
 
-	c.JSON(http.StatusOK, gin.H{
-		"postId":     postID,
-		"likesCount": count,
-		"isLiked":    isLiked,
+	c.JSON(http.StatusOK, LikeStatusResponse{
+		PostID:     postID,
+		IsLiked:    isLiked,
+		LikesCount: count,
 	})
 }

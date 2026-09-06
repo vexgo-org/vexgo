@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 // Handler exposes the comment domain over HTTP.
@@ -24,7 +25,18 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
 }
 
-// GetComments gets comments for a specific post
+// GetComments godoc
+//
+//	@Summary		List comments for a post
+//	@Description	Returns all published comments for the post. Pending
+//	@Description	comments are only visible to the author and to admins
+//	@Description	(the service layer filters by role).
+//	@Tags			comments
+//	@Produce		json
+//	@Param			id	path		string	true	"post id or slug"
+//	@Success		200	{object}	CommentListResponse
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/comments/post/{id} [get]
 func (h *Handler) GetComments(c *gin.Context) {
 	postID := c.Param("id")
 
@@ -34,31 +46,44 @@ func (h *Handler) GetComments(c *gin.Context) {
 
 	comments, err := h.svc.ListByPost(c.Request.Context(), postID, currentUserID, currentUserRole)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch comments"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"comments": comments})
+	c.JSON(http.StatusOK, CommentListResponse{Comments: comments})
 }
 
-// CreateComment creates a comment (requires login)
+// CreateComment godoc
+//
+//	@Summary		Create a comment
+//	@Description	Adds a comment to a post. Content is capped at 100
+//	@Description	characters. The postId accepts either a number or a
+//	@Description	string. The reply is held for moderation when the
+//	@Description	manual review queue is on, the keyword filter rejects
+//	@Description	it, or the LLM filter rejects it.
+//	@Tags			comments
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		CreateCommentRequest	true	"comment payload"
+//	@Success		201		{object}	CreateCommentResponse
+//	@Failure		400		{object}	api.ErrorResponse	"validation error or invalid postId"
+//	@Failure		401		{object}	api.ErrorResponse	"not logged in"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/comments [post]
 func (h *Handler) CreateComment(c *gin.Context) {
 	// Support postId as number or string from frontend
-	var req struct {
-		PostID   any    `json:"postId" binding:"required"`
-		Content  string `json:"content" binding:"required"`
-		ParentID *uint  `json:"parentId"`
-	}
+	var req CreateCommentRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
 	// Check comment length limit (no more than 100 characters)
 	if len(req.Content) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment cannot exceed 100 characters"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Comment cannot exceed 100 characters"})
 		return
 	}
 
@@ -69,20 +94,20 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		// JSON numbers decode as float64; reject out-of-range or negative
 		// values instead of letting the conversion wrap into garbage IDs.
 		if v < 1 || v > math.MaxUint32 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId"})
 			return
 		}
 		postID = uint(v)
 	case string:
 		id64, err := strconv.ParseUint(v, 10, 64)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId"})
 			return
 		}
 		postID = uint(id64)
 	case int:
 		if v < 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId"})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId"})
 			return
 		}
 		postID = uint(v)
@@ -90,14 +115,14 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		postID = v
 	default:
 		// If cannot parse, return error
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid postId type"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId type"})
 		return
 	}
 
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
 		// Reject unauthenticated request
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+		c.JSON(http.StatusUnauthorized, api.ErrorResponse{Error: "Not logged in"})
 		return
 	}
 
@@ -108,26 +133,39 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		ParentID: req.ParentID,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create comment"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":            "Comment created successfully",
-		"comment":            comment,
-		"commentsCount":      count,
-		"requiresModeration": comment.Status == model.CommentStatusPending,
+	c.JSON(http.StatusCreated, CreateCommentResponse{
+		Message:            "Comment created successfully",
+		Comment:            comment,
+		CommentsCount:      count,
+		RequiresModeration: comment.Status == model.CommentStatusPending,
 	})
 }
 
-// DeleteComment deletes a comment (requires login, author or admin)
+// DeleteComment godoc
+//
+//	@Summary		Delete a comment
+//	@Description	The author or an admin may delete a comment.
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"comment id"
+//	@Success		200	{object}	DeleteCommentResponse
+//	@Failure		401	{object}	api.ErrorResponse	"not logged in"
+//	@Failure		403	{object}	api.ErrorResponse	"not author or admin"
+//	@Failure		404	{object}	api.ErrorResponse	"comment not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/comments/{id} [delete]
 func (h *Handler) DeleteComment(c *gin.Context) {
 	id := c.Param("id")
 
 	// Get current operating user ID
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+		c.JSON(http.StatusUnauthorized, api.ErrorResponse{Error: "Not logged in"})
 		return
 	}
 
@@ -135,48 +173,59 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCommentNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Comment does not exist"})
 		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "User does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "User does not exist"})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this comment"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to delete this comment"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete comment"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted", "commentsCount": count})
+	c.JSON(http.StatusOK, DeleteCommentResponse{Message: "Comment deleted", CommentsCount: count})
 }
 
-// GetCommentModerationConfig gets comment moderation configuration
+// GetCommentModerationConfig godoc
+//
+//	@Summary		Get comment moderation config
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	model.CommentModerationConfig
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/moderation/comments/config [get]
 func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
 	config, err := h.svc.GetModerationConfig(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment moderation configuration"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get comment moderation configuration"})
 		return
 	}
 
 	c.JSON(http.StatusOK, config)
 }
 
-// UpdateCommentModerationConfig updates comment moderation configuration
+// UpdateCommentModerationConfig godoc
+//
+//	@Summary		Update comment moderation config
+//	@Tags			comments
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		UpdateModerationConfigBody	true	"new config"
+//	@Success		200		{object}	UpdateModerationConfigResponse
+//	@Failure		400		{object}	api.ErrorResponse	"incomplete LLM config"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/comments/config [put]
 func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
-	var req struct {
-		ManualReviewEnabled  bool   `json:"manualReviewEnabled"`
-		KeywordFilterEnabled bool   `json:"keywordFilterEnabled"`
-		LLMReviewEnabled     bool   `json:"llmReviewEnabled"`
-		ModelProvider        string `json:"modelProvider"`
-		ApiKey               string `json:"apiKey"` // if empty, don't update
-		ApiEndpoint          string `json:"apiEndpoint"`
-		ModelName            string `json:"modelName"`
-		ModerationPrompt     string `json:"moderationPrompt"`
-		BlockKeywords        string `json:"blockKeywords"`
-	}
+	var req UpdateModerationConfigBody
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -193,56 +242,102 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrLLMConfigIncomplete) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
 		// The wrapped error names the failing persistence step; log it here
 		// so the generic client response does not lose the root cause.
 		slog.Error("failed to update comment moderation configuration", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment moderation configuration"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update comment moderation configuration"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Comment moderation configuration updated successfully",
-		"config":  config,
+	c.JSON(http.StatusOK, UpdateModerationConfigResponse{
+		Message: "Comment moderation configuration updated successfully",
+		Config:  config,
 	})
 }
 
-// TestModerationConfig verifies the stored LLM moderation configuration by
-// calling the configured endpoint with a test prompt.
+// TestModerationConfig godoc
+//
+//	@Summary		Test the LLM moderation endpoint
+//	@Description	Issues a small test prompt against the configured LLM
+//	@Description	to confirm the credentials and endpoint are wired up
+//	@Description	correctly. The `response` field is whatever the model
+//	@Description	replied with.
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	TestModerationResponse
+//	@Failure		400	{object}	api.ErrorResponse	"incomplete LLM config"
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/moderation/comments/test [post]
 func (h *Handler) TestModerationConfig(c *gin.Context) {
 	result, err := h.svc.TestModerationLLM(c.Request.Context())
 	if err != nil {
 		if errors.Is(err, ErrLLMConfigIncomplete) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
 		// The raw error can carry network details and the upstream endpoint's
 		// response body; log it server-side and keep the client response
 		// generic.
 		slog.Error("LLM moderation test failed", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to test LLM moderation endpoint"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to test LLM moderation endpoint"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":  result.Message,
-		"response": result.Response,
+	c.JSON(http.StatusOK, TestModerationResponse{
+		Message:  result.Message,
+		Response: result.Response,
 	})
 }
 
-// GetPendingComments gets pending comments for moderation
+// GetPendingComments godoc
+//
+//	@Summary		List pending comments (moderation queue)
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int	false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int	false	"page size"				default(10)
+//	@Success		200		{object}	CommentModerationListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/comments/pending [get]
 func (h *Handler) GetPendingComments(c *gin.Context) {
 	h.listModeration(c, model.CommentStatusPending)
 }
 
-// GetApprovedComments gets approved comments
+// GetApprovedComments godoc
+//
+//	@Summary		List approved comments
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int	false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int	false	"page size"				default(10)
+//	@Success		200		{object}	CommentModerationListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/comments/approved [get]
 func (h *Handler) GetApprovedComments(c *gin.Context) {
 	h.listModeration(c, model.CommentStatusPublished)
 }
 
-// GetRejectedComments gets rejected comments
+// GetRejectedComments godoc
+//
+//	@Summary		List rejected comments
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			page	query		int	false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int	false	"page size"				default(10)
+//	@Success		200		{object}	CommentModerationListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/moderation/comments/rejected [get]
 func (h *Handler) GetRejectedComments(c *gin.Context) {
 	h.listModeration(c, model.CommentStatusRejected)
 }
@@ -269,7 +364,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 
 	comments, total, err := h.svc.ListModeration(c.Request.Context(), status, pageNum, limitNum)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderation comments"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch moderation comments"})
 		return
 	}
 
@@ -278,23 +373,47 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"comments": comments,
-		"pagination": gin.H{
-			"total":      total,
-			"page":       pageNum,
-			"limit":      limitNum,
-			"totalPages": totalPages,
+	c.JSON(http.StatusOK, CommentModerationListResponse{
+		Comments: comments,
+		Pagination: Pagination{
+			Total:      total,
+			Page:       pageNum,
+			Limit:      limitNum,
+			TotalPages: totalPages,
 		},
 	})
 }
 
-// ApproveComment approves a comment
+// ApproveComment godoc
+//
+//	@Summary		Approve a comment
+//	@Description	Moves the comment from pending to published.
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"comment id"
+//	@Success		200	{object}	CommentMessageResponse
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		404	{object}	api.ErrorResponse	"comment not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/moderation/comments/{id}/approve [put]
 func (h *Handler) ApproveComment(c *gin.Context) {
 	h.setStatus(c, model.CommentStatusPublished, "Comment approved", "Failed to approve comment")
 }
 
-// RejectComment rejects a comment
+// RejectComment godoc
+//
+//	@Summary		Reject a comment
+//	@Description	Moves the comment from pending to rejected.
+//	@Tags			comments
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"comment id"
+//	@Success		200	{object}	CommentMessageResponse
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		404	{object}	api.ErrorResponse	"comment not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/moderation/comments/{id}/reject [put]
 func (h *Handler) RejectComment(c *gin.Context) {
 	h.setStatus(c, model.CommentStatusRejected, "Comment rejected", "Failed to reject comment")
 }
@@ -304,15 +423,15 @@ func (h *Handler) setStatus(c *gin.Context, status model.CommentStatus, successM
 	comment, err := h.svc.SetStatus(c.Request.Context(), c.Param("id"), status)
 	if err != nil {
 		if errors.Is(err, ErrCommentNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Comment does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Comment does not exist"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": failureMsg})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: failureMsg})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": successMsg,
-		"comment": comment,
+	c.JSON(http.StatusOK, CommentMessageResponse{
+		Message: successMsg,
+		Comment: comment,
 	})
 }

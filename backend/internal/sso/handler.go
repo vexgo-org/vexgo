@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 )
 
 // Handler exposes the sso domain over HTTP.
@@ -18,49 +20,74 @@ func NewHandler(deps Deps) *Handler {
 	return &Handler{svc: NewService(deps)}
 }
 
-// SSOProviders returns which SSO providers are currently enabled.
-// This is a public endpoint — no authentication required.
+// SSOProviders godoc
 //
-// GET /api/sso/providers
-//
-// Response:
-//
-//	{
-//	  "providers": ["github", "google"],   // only enabled ones
-//	  "allow_local_login": true
-//	}
+//	@Summary		List enabled SSO providers
+//	@Description	Returns the slugs of every enabled SSO provider
+//	@Description	(e.g. "github", "google") and whether the
+//	@Description	local email/password login is allowed. The login
+//	@Description	page uses this to decide which buttons to render.
+//	@Description	Public endpoint — no authentication required.
+//	@Tags			sso
+//	@Produce		json
+//	@Success		200	{object}	SSOProvidersResponse
+//	@Router			/sso/providers [get]
 func (h *Handler) SSOProviders(c *gin.Context) {
 	enabled, allowLocalLogin := h.svc.Providers()
-	c.JSON(http.StatusOK, gin.H{
-		"providers":         enabled,
-		"allow_local_login": allowLocalLogin,
+	c.JSON(http.StatusOK, SSOProvidersResponse{
+		Providers:      enabled,
+		AllowLocalLogin: allowLocalLogin,
 	})
 }
 
-// SSOLoginRedirect starts the OAuth2 authorization flow.
+// SSOLoginRedirect godoc
 //
-// GET /api/sso/:provider/login?method=sso_get_token|get_sso_id
-//
-//   - sso_get_token  → full login, issues a JWT on callback
-//   - get_sso_id     → only returns the provider-side ID (used to bind SSO
-//     to an existing account from the settings page)
+//	@Summary		Start an OAuth2 SSO flow
+//	@Description	Redirects the browser to the OAuth2 provider's
+//	@Description	authorization endpoint. The `method` query
+//	@Description	parameter controls the post-callback behaviour:
+//	@Description	` sso_get_token` (default) issues a JWT for full
+//	@Description	login; `get_sso_id` only returns the
+//	@Description	provider-side user id (used to bind SSO to an
+//	@Description	existing account).
+//	@Tags			sso
+//	@Param			provider	path		string	true	"provider slug (github, google, ...)"
+//	@Param			method		query		string	false	"flow variant"	Enums(sso_get_token, get_sso_id)
+//	@Success		302			"redirect to the provider's authorization URL"
+//	@Failure		400			{object}	api.ErrorResponse	"unknown provider or method"
+//	@Failure		500			{object}	api.ErrorResponse
+//	@Router			/sso/{provider}/login [get]
 func (h *Handler) SSOLoginRedirect(c *gin.Context) {
 	provider := c.Param("provider")
 	method := c.DefaultQuery("method", "sso_get_token")
 
 	authURL, status, message := h.svc.LoginRedirect(c, provider, method)
 	if message != "" {
-		c.JSON(status, gin.H{"error": message})
+		c.JSON(status, api.ErrorResponse{Error: message})
 		return
 	}
 
 	c.Redirect(http.StatusFound, authURL)
 }
 
-// SSOCallback handles the OAuth2 callback for all providers.
-// The popup window calls postMessage to pass data back to the opener, then closes.
+// SSOCallback godoc
 //
-// GET /api/sso/:provider/callback?method=...&code=...&state=...
+//	@Summary		OAuth2 callback endpoint
+//	@Description	Handles the redirect-back from the provider. On
+//	@Description	success it returns an HTML page that writes the
+//	@Description	result to localStorage and closes the popup; on
+//	@Description	failure the same shape is used with an "error"
+//	@Description	field. The frontend listens for the storage event
+//	@Description	under the key `sso_callback_result` to pick up
+//	@Description	the data.
+//	@Tags			sso
+//	@Produce		html
+//	@Param			provider	path		string	true	"provider slug"
+//	@Param			state		query		string	true	"state nonce from the original /login redirect"
+//	@Param			code		query		string	true	"authorization code from the provider"
+//	@Success		200			"HTML — success popup closer"
+//	@Failure		400			"HTML — error popup closer"
+//	@Router			/sso/{provider}/callback [get]
 func (h *Handler) SSOCallback(c *gin.Context) {
 	provider := c.Param("provider")
 	payload, message := h.svc.Callback(c, provider, c.Query("state"), c.Query("code"))

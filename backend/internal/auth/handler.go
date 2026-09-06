@@ -7,9 +7,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
-
 	"github.com/gin-gonic/gin"
+
+	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // Handler exposes the auth domain over HTTP.
@@ -89,23 +91,32 @@ func (h *Handler) emailLinkOrigin(c *gin.Context) (protocol, host string) {
 	return protocol, c.Request.Host
 }
 
-// Login logs a user in and returns a signed JWT
+// Login godoc
+//
+//	@Summary		Log in
+//	@Description	Verifies the email and password, returns a signed
+//	@Description	JWT for use in the Authorization header. The
+//	@Description	captcha fields are required when the server is
+//	@Description	configured to require captcha on login.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		LoginRequestWire	true	"login payload"
+//	@Success		200		{object}	LoginResponse
+//	@Failure		400		{object}	api.ErrorResponse	"validation / captcha failed"
+//	@Failure		401		{object}	InvalidCredentialsResponse
+//	@Failure		403		{object}	EmailUnverifiedResponse	"email not verified"
+//	@Failure		404		{object}	api.ErrorResponse	"captcha not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
 	slog.Debug("user login attempt started")
 
-	var req struct {
-		Email        string `json:"email" binding:"required"`
-		Password     string `json:"password" binding:"required"`
-		CaptchaID    string `json:"captcha_id"`
-		CaptchaToken string `json:"captcha_token"`
-		CaptchaX     int    `json:"captcha_x"`
-		CaptchaY     int    `json:"captcha_y"`
-	}
-
+	var req LoginRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("failed to bind login request JSON", "err", err)
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -122,62 +133,72 @@ func (h *Handler) Login(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCaptchaCheckFailed):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaRequired):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaExpired), errors.Is(err, ErrCaptchaMismatch):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaFailed):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrEmailUnverified):
-			c.JSON(http.StatusForbidden, gin.H{
-				"message":        "Please verify your email address first. Check your inbox and click the verification link, or request to resend the verification email.",
-				"email_verified": false,
+			c.JSON(http.StatusForbidden, EmailUnverifiedResponse{
+				Message:       "Please verify your email address first. Check your inbox and click the verification link, or request to resend the verification email.",
+				EmailVerified: false,
 			})
 		case errors.Is(err, ErrInvalidCredentials):
-			c.JSON(http.StatusUnauthorized, gin.H{"message": err.Error()})
+			c.JSON(http.StatusUnauthorized, InvalidCredentialsResponse{Message: err.Error()})
 		case errors.Is(err, ErrTokenGeneration):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to generate token"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to login"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to login"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"role":     user.Role,
-			"avatar":   user.Avatar,
-			"bio":      user.Bio,
-			"birthday": user.Birthday,
+	c.JSON(http.StatusOK, LoginResponse{
+		Token: token,
+		User: LoginUser{
+			ID:       user.ID,
+			Username: user.Username,
+			Email:    user.Email,
+			Role:     user.Role,
+			Avatar:   user.Avatar,
+			Bio:      user.Bio,
+			Birthday: user.Birthday,
 		},
 	})
 }
 
-// Register creates a new user account
+// Register godoc
+//
+//	@Summary		Register a new account
+//	@Description	Creates a new user account. The captcha fields are
+//	@Description	required when the server is configured to require
+//	@Description	captcha on registration. When email verification
+//	@Description	is required, the response carries
+//	@Description	`requires_verification: true` and the new account
+//	@Description	cannot log in until it is verified.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		RegisterRequestWire	true	"registration payload"
+//	@Success		201		{object}	RegisterResponse
+//	@Failure		400		{object}	api.ErrorResponse	"validation / captcha failed"
+//	@Failure		403		{object}	api.ErrorResponse	"registration disabled"
+//	@Failure		404		{object}	api.ErrorResponse	"captcha not found"
+//	@Failure		409		{object}	api.ErrorResponse	"user already exists"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
 	slog.Debug("user registration attempt started")
 
-	var req struct {
-		Email        string `json:"email" binding:"required,email"`
-		Password     string `json:"password" binding:"required"`
-		Username     string `json:"username" binding:"required"`
-		CaptchaID    string `json:"captcha_id"`
-		CaptchaToken string `json:"captcha_token"`
-		CaptchaX     int    `json:"captcha_x"`
-		CaptchaY     int    `json:"captcha_y"`
-	}
-
+	var req RegisterRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Error("failed to bind registration request JSON", "err", err)
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -202,81 +223,120 @@ func (h *Handler) Register(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrSettingsCheckFailed), errors.Is(err, ErrCaptchaCheckFailed):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrRegistrationDisabled):
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaRequired):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaExpired), errors.Is(err, ErrCaptchaMismatch):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCaptchaFailed):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrUserExists):
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			c.JSON(http.StatusConflict, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrHashPassword):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrCreateUser):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrMailConfigCheck), errors.Is(err, ErrSendEmail):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to register"})
 		}
 		return
 	}
 
 	if result.RequiresVerification {
-		c.JSON(http.StatusCreated, gin.H{
-			"message":               "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
-			"user":                  result.User,
-			"email_verified":        false,
-			"requires_verification": true,
+		c.JSON(http.StatusCreated, RegisterResponse{
+			Message:               "Registration successful! Please verify your email address before logging in. Check your inbox and click the verification link.",
+			User:                  userToRegisterUser(result.User),
+			EmailVerified:         false,
+			RequiresVerification: true,
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message":               "Registration successful",
-		"user":                  result.User,
-		"email_verified":        result.User.EmailVerified,
-		"requires_verification": false,
+	c.JSON(http.StatusCreated, RegisterResponse{
+		Message:               "Registration successful",
+		User:                  userToRegisterUser(result.User),
+		EmailVerified:         result.User.EmailVerified,
+		RequiresVerification: false,
 	})
 }
 
-// GetCurrentUser gets the current logged-in user's information
+// userToRegisterUser projects a model.User into the slim
+// RegisterUser shape.
+func userToRegisterUser(u *model.User) RegisterUser {
+	if u == nil {
+		return RegisterUser{}
+	}
+	return RegisterUser{
+		ID:            u.ID,
+		Username:      u.Username,
+		Email:         u.Email,
+		Role:          u.Role,
+		Avatar:        u.Avatar,
+		EmailVerified: u.EmailVerified,
+		CreatedAt:     u.CreatedAt,
+		Birthday:      u.Birthday,
+		Bio:           u.Bio,
+	}
+}
+
+// GetCurrentUser godoc
+//
+//	@Summary		Get the authenticated user
+//	@Tags			auth
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	CurrentUserResponse
+//	@Failure		401	{object}	api.ErrorResponse	"not logged in"
+//	@Failure		404	{object}	api.ErrorResponse	"user not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/auth/me [get]
 func (h *Handler) GetCurrentUser(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+		c.JSON(http.StatusUnauthorized, api.ErrorResponse{Error: "Not logged in"})
 		return
 	}
 
 	user, err := h.svc.GetCurrentUser(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get user"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, CurrentUserResponse{User: user})
 }
 
-// UpdateProfile updates the current user's profile
+// UpdateProfile godoc
+//
+//	@Summary		Update profile fields
+//	@Description	Updates the authenticated user's username, avatar,
+//	@Description	birthday, and bio. Any field left out of the
+//	@Description	request is left unchanged.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		UpdateProfileRequestWire	true	"profile fields to update"
+//	@Success		200		{object}	CurrentUserResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		404		{object}	api.ErrorResponse	"user not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/profile [put]
 func (h *Handler) UpdateProfile(c *gin.Context) {
-	var req struct {
-		Username *string `json:"username"`
-		Avatar   *string `json:"avatar"`
-		Birthday *string `json:"birthday"`
-		Bio      *string `json:"bio"`
-	}
-
+	var req UpdateProfileRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -290,26 +350,35 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update profile"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, CurrentUserResponse{User: user})
 }
 
-// ChangePassword changes the current user's password
+// ChangePassword godoc
+//
+//	@Summary		Change the authenticated user's password
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		ChangePasswordRequestWire	true	"old and new password"
+//	@Success		200		{object}	GenericMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure		401		{object}	api.ErrorResponse	"old password is wrong"
+//	@Failure		404		{object}	api.ErrorResponse	"user not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
-	var req struct {
-		OldPassword string `json:"oldPassword" binding:"required"`
-		NewPassword string `json:"newPassword" binding:"required,min=6"`
-	}
-
+	var req ChangePasswordRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -319,32 +388,42 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrWrongPassword):
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.JSON(http.StatusUnauthorized, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrEncryptPassword):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to change password"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to change password"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
+	c.JSON(http.StatusOK, GenericMessageResponse{Message: "Password changed successfully"})
 }
 
-// UpdateSettings updates the current user's privacy settings
+// UpdateSettings godoc
+//
+//	@Summary		Update privacy settings
+//	@Description	Updates the profile visibility and the per-field
+//	@Description	hide flags. Any field left out of the request is
+//	@Description	left unchanged.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		UpdateSettingsRequestWire	true	"settings fields"
+//	@Success		200		{object}	UpdateSettingsResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		404		{object}	api.ErrorResponse	"user not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/settings [put]
 func (h *Handler) UpdateSettings(c *gin.Context) {
-	var req struct {
-		ProfileVisibility *string `json:"profile_visibility"`
-		HideEmail         *bool   `json:"hide_email"`
-		HideBirthday      *bool   `json:"hide_birthday"`
-		HideBio           *bool   `json:"hide_bio"`
-	}
-
+	var req UpdateSettingsRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -358,32 +437,48 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 			return
 		}
 		if errors.Is(err, ErrSaveSettings) {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update settings"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Settings updated successfully",
-		"user":    user,
+	c.JSON(http.StatusOK, UpdateSettingsResponse{
+		Message: "Settings updated successfully",
+		User:    user,
 	})
 }
 
-// UpdateEmail changes the current user's email
+// UpdateEmail godoc
+//
+//	@Summary		Change the authenticated user's email
+//	@Description	Sends a verification link to the new address when
+//	@Description	SMTP is enabled, or applies the change directly
+//	@Description	otherwise. The 200 response indicates the request
+//	@Description	was accepted; the body distinguishes the two paths
+//	@Description	via the `pending` boolean.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		UpdateEmailRequestWire	true	"new email"
+//	@Success		200		{object}	UpdateEmailPendingResponse		"pending verification"
+//	@Success		200		{object}	UpdateEmailCompleteResponse	"applied directly"
+//	@Failure		400		{object}	api.ErrorResponse	"invalid payload / same email / email in use"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		404		{object}	api.ErrorResponse	"user not found"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/email [post]
 func (h *Handler) UpdateEmail(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
-
+	var req UpdateEmailRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -399,43 +494,54 @@ func (h *Handler) UpdateEmail(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrSameEmail), errors.Is(err, ErrEmailInUse):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrMailConfigCheck), errors.Is(err, ErrGenerateToken), errors.Is(err, ErrSendEmail):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update email"})
 		}
 		return
 	}
 
 	if pending {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Verification email sent. Please check your inbox and click the link to complete email change.",
-			"pending": true,
+		c.JSON(http.StatusOK, UpdateEmailPendingResponse{
+			Message: "Verification email sent. Please check your inbox and click the link to complete email change.",
+			Pending: true,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Email updated successfully",
-		"pending": false,
-		"user": gin.H{
-			"email": req.Email,
-		},
-	})
+	resp := UpdateEmailCompleteResponse{
+		Message: "Email updated successfully",
+		Pending: false,
+	}
+	resp.User.Email = req.Email
+	c.JSON(http.StatusOK, resp)
 }
 
-// RequestPasswordReset requests a password reset email
+// RequestPasswordReset godoc
+//
+//	@Summary		Request a password reset email
+//	@Description	The response is intentionally uniform for every
+//	@Description	outcome: an unknown address, an SMTP failure, and a
+//	@Description	successful send all return the same body. This
+//	@Description	prevents callers from probing whether an email is
+//	@Description	registered.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		RequestPasswordResetRequestWire	true	"email"
+//	@Success		200		{object}	GenericMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/password/reset/request [post]
 func (h *Handler) RequestPasswordReset(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
-
+	var req RequestPasswordResetRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -444,30 +550,39 @@ func (h *Handler) RequestPasswordReset(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrGenerateResetToken):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrSendResetEmail):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to request password reset"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to request password reset"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, reset link has been sent"})
+	c.JSON(http.StatusOK, GenericMessageResponse{Message: "If the email exists, reset link has been sent"})
 }
 
-// ResendVerification sends another verification email for an unverified
-// account. The HTTP response is intentionally uniform for every outcome
-// (unknown email, verified account, SMTP failure, database fault): any status
-// or body difference would let callers probe whether an address exists and is
-// unverified. Failures are logged inside the service layer.
+// ResendVerification godoc
+//
+//	@Summary		Resend the verification email
+//	@Description	The response is intentionally uniform: unknown
+//	@Description	email, verified account, SMTP failure, and
+//	@Description	database fault all return the same body. This
+//	@Description	prevents callers from probing whether an address
+//	@Description	exists and is unverified.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		ResendVerificationRequestWire	true	"email"
+//	@Success		200		{object}	GenericMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/email/verify/resend [post]
 func (h *Handler) ResendVerification(c *gin.Context) {
-	var req struct {
-		Email string `json:"email" binding:"required,email"`
-	}
+	var req ResendVerificationRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -477,21 +592,30 @@ func (h *Handler) ResendVerification(c *gin.Context) {
 		Email: req.Email, Protocol: protocol, Host: host,
 	})
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "If the account exists and is not verified, a verification email has been sent.",
+	c.JSON(http.StatusOK, GenericMessageResponse{
+		Message: "If the account exists and is not verified, a verification email has been sent.",
 	})
 }
 
-// ResetPassword resets the password with an emailed token
+// ResetPassword godoc
+//
+//	@Summary		Reset password with an emailed token
+//	@Description	Consumes the single-use token from
+//	@Description	/api/auth/password/reset/request and sets a new
+//	@Description	password for the matching account.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		ResetPasswordRequestWire	true	"reset token and new password"
+//	@Success		200		{object}	GenericMessageResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid / expired token or invalid payload"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/password/reset [post]
 func (h *Handler) ResetPassword(c *gin.Context) {
-	var req struct {
-		Token    string `json:"token" binding:"required"`
-		Password string `json:"password" binding:"required,min=6"`
-	}
-
+	var req ResetPasswordRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
@@ -499,28 +623,43 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidResetToken):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrQueryFailed):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrResetTokenExpired):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrEncryptPassword), errors.Is(err, ErrUpdatePassword):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to reset password"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+	c.JSON(http.StatusOK, GenericMessageResponse{Message: "Password reset successfully"})
 }
 
+// VerifyEmail godoc
+//
+//	@Summary		Verify the email address (or a pending email change)
+//	@Description	Consumes the single-use token from the verification
+//	@Description	email. The same endpoint handles both new-account
+//	@Description	verification and pending email changes; the
+//	@Description	`require_relogin` and `new_email` response fields
+//	@Description	appear only on the email-change path.
+//	@Tags			auth
+//	@Produce		json
+//	@Param			token	query		string	true	"single-use verification token"
+//	@Success		200		{object}	VerifyEmailResponse
+//	@Failure		400		{object}	api.ErrorResponse	"invalid / expired token"
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/auth/email/verify [get]
 func (h *Handler) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	slog.Debug("email verification request received", "hasToken", token != "")
 
 	if token == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token cannot be empty"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Verification token cannot be empty"})
 		return
 	}
 
@@ -528,64 +667,74 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidVerificationToken):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrVerificationTokenExpired):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrEmailChangeNoPending), errors.Is(err, ErrEmailChangeEmailInUse):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrQueryFailed),
 			errors.Is(err, ErrUpdateUserVerification),
 			errors.Is(err, ErrUpdateEmailChange):
 			// Internal failures: log is already emitted by the service; do not
 			// leak the underlying error (e.g. DB dial string) to the client.
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to verify email"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to verify email"})
 		}
 		return
 	}
 
 	if emailChange {
-		if newEmail != "" {
-			c.JSON(http.StatusOK, gin.H{
-				"message":         "Email change successful! Your new email is now active.",
-				"require_relogin": true,
-				"new_email":       newEmail,
-			})
-		} else {
-			c.JSON(http.StatusOK, gin.H{
-				"message":         "Email change successful! Your new email is now active.",
-				"require_relogin": true,
-			})
+		resp := VerifyEmailResponse{
+			Message:        "Email change successful! Your new email is now active.",
+			RequireRelogin: true,
 		}
+		if newEmail != "" {
+			resp.NewEmail = newEmail
+		}
+		c.JSON(http.StatusOK, resp)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Email verification successful! You can now log in.",
+	c.JSON(http.StatusOK, VerifyEmailResponse{
+		Message: "Email verification successful! You can now log in.",
 	})
 }
 
-// GetVerificationStatus gets current user's email verification status
+// GetVerificationStatus godoc
+//
+//	@Summary		Email verification status
+//	@Description	Returns the authenticated user's verification
+//	@Description	flag and current email. Used by the frontend to
+//	@Description	decide whether to show the "verify your email"
+//	@Description	banner.
+//	@Tags			auth
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	VerificationStatusResponse
+//	@Failure		401	{object}	api.ErrorResponse	"not logged in"
+//	@Failure		404	{object}	api.ErrorResponse	"user not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/auth/email/verify/status [get]
 func (h *Handler) GetVerificationStatus(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not logged in"})
+		c.JSON(http.StatusUnauthorized, api.ErrorResponse{Error: "Not logged in"})
 		return
 	}
 
 	emailVerified, email, err := h.svc.VerificationStatus(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user information"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get user information"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"email_verified": emailVerified,
-		"email":          email,
+	c.JSON(http.StatusOK, VerificationStatusResponse{
+		EmailVerified: emailVerified,
+		Email:         email,
 	})
 }
