@@ -7,7 +7,7 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["dist"],
+  "ignorePatterns": ["dist", "src/api/generated/**"],
   "options": {
     "typeAware": true,
     "typeCheck": true
