@@ -4,6 +4,7 @@ format:
     # Run formatter.
     gofumpt -w -extra .
     prettier --write "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json" "./*.{json,yml,yaml}"
+    go tool swag fmt backend/
 
 lint:
     # Run linter.
@@ -13,6 +14,8 @@ lint:
     diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
     oxlint --deny-warnings -c frontend/.oxlintrc.json frontend/
     output=$(gopls check -severity=hint ./**/*.go); test -z "$output" || { echo "$output"; exit 1;}
+    just check-swag-fmt
+    just check-openapi-fresh
 
 test:
     # Run tests.
@@ -49,17 +52,48 @@ generate:
 check-openapi-fresh:
     #!/usr/bin/env bash
     # CI guard: fail if docs/swagger.json is stale relative to
-    # the swaggo annotations in the backend. Catches drift
-    # between the code and the OpenAPI spec.
+    # the swaggo annotations in the backend.
     set -euo pipefail
-    tmp=$(mktemp)
-    trap "rm -f $tmp" EXIT
-    (cd backend && swag init -g cmd/vexgo/main.go --dir . --v3.1 -o "$tmp" --ot json >/dev/null)
-    # swag only writes swagger.json to the output dir; rename the
-    # tmp's swagger.json to be diffable.
-    if ! diff -q docs/swagger.json "$tmp/swagger.json" >/dev/null 2>&1; then
-        echo "docs/swagger.json is stale. Run: just sync-openapi"
-        diff docs/swagger.json "$tmp/swagger.json" | head -80
+
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+
+    cd backend
+    swag_output=$(
+        go tool swag init \
+            -g cmd/vexgo/main.go \
+            --dir . \
+            --v3.1 \
+            -o "$tmp" \
+            --ot json 2>&1 >/dev/null
+    )
+    if [[ -n "$swag_output" ]]; then
+        echo "$swag_output" >&2
         exit 1
     fi
-    echo "swagger.json: fresh"
+
+    if ! diff -q ../docs/swagger.json "$tmp/swagger.json" >/dev/null 2>&1; then
+        echo "docs/swagger.json is stale. Run: just generate"
+        diff ../docs/swagger.json "$tmp/swagger.json" | head -80
+        exit 1
+    fi
+
+check-swag-fmt:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    tmp=$(mktemp -d)
+    trap 'git worktree remove --force "$tmp" 2>/dev/null || true' EXIT
+    git worktree add --detach "$tmp" HEAD >/dev/null
+    (
+        cd "$tmp/backend"
+        go tool swag fmt
+    )
+
+    if ! git -C "$tmp" diff --quiet -- '*.go'; then
+        echo "Swag annotations are not formatted."
+        echo "Run: just format"
+        echo
+        git -C "$tmp" diff -- '*.go'
+        exit 1
+    fi
