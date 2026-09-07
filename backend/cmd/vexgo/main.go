@@ -22,46 +22,46 @@ import (
 //	go build -ldflags "-X main.Version=1.2.3"
 var Version = "dev"
 
-// @title			VexGo API
-// @version		1.0.0
-// @description	Self-hosted blog CMS HTTP API.
-// @termsOfService	https://github.com/vexgo-org/vexgo
+//	@title			VexGo API
+//	@version		1.0.0
+//	@description	Self-hosted blog CMS HTTP API.
+//	@termsOfService	https://github.com/vexgo-org/vexgo
 
-// @contact.name	GitHub Issues
-// @contact.url		https://github.com/vexgo-org/vexgo/issues
+//	@contact.name	GitHub Issues
+//	@contact.url	https://github.com/vexgo-org/vexgo/issues
 
-// @license.name	MIT
-// @license.url		https://opensource.org/licenses/MIT
+//	@license.name	MIT
+//	@license.url	https://opensource.org/licenses/MIT
 
 //	@securityDefinitions.apikey	BearerAuth
 //	@in							header
 //	@name						Authorization
 //	@description				JWT bearer token issued by /api/auth/login
 
-// @tag.name					auth
-// @tag.description			Authentication, registration, profile, email
-// @tag.name					users
-// @tag.description			User administration and creator application
-// @tag.name					posts
-// @tag.description			Post CRUD, drafts, likes
-// @tag.name					comments
-// @tag.description			Comments and moderation queue
-// @tag.name					categories
-// @tag.description			Post categories
-// @tag.name					tags
-// @tag.description			Post tags
-// @tag.name					notifications
-// @tag.description			User notifications
-// @tag.name					uploads
-// @tag.description			File uploads
-// @tag.name					stats
-// @tag.description			Home-page statistics
-// @tag.name					captcha
-// @tag.description			Sliding-puzzle captcha
-// @tag.name					sso
-// @tag.description			Single sign-on provider list
-// @tag.name					config
-// @tag.description			Site configuration (admin only)
+// @tag.name			auth
+// @tag.description	Authentication, registration, profile, email
+// @tag.name			users
+// @tag.description	User administration and creator application
+// @tag.name			posts
+// @tag.description	Post CRUD, drafts, likes
+// @tag.name			comments
+// @tag.description	Comments and moderation queue
+// @tag.name			categories
+// @tag.description	Post categories
+// @tag.name			tags
+// @tag.description	Post tags
+// @tag.name			notifications
+// @tag.description	User notifications
+// @tag.name			uploads
+// @tag.description	File uploads
+// @tag.name			stats
+// @tag.description	Home-page statistics
+// @tag.name			captcha
+// @tag.description	Sliding-puzzle captcha
+// @tag.name			sso
+// @tag.description	Single sign-on provider list
+// @tag.name			config
+// @tag.description	Site configuration (admin only)
 func main() {
 	cfg, err := cli.Execute(Version, os.Args[1:])
 	if err != nil {

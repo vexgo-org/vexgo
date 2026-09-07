@@ -84,7 +84,7 @@ func generateFilename(originalName string) string {
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			file	formData	file			true	"file to upload"
+//	@Param			file	formData	file	true	"file to upload"
 //	@Success		200		{object}	UploadResponse
 //	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form"
 //	@Failure		401		{object}	api.ErrorResponse
@@ -132,7 +132,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			files	formData	file			true	"files to upload (repeatable)"
+//	@Param			files	formData	file	true	"files to upload (repeatable)"
 //	@Success		200		{object}	MultiUploadResponse
 //	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form"
 //	@Failure		401		{object}	api.ErrorResponse
@@ -173,14 +173,14 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 
 // GetMyFiles godoc
 //
-//	@Summary		List the authenticated user's uploads
-//	@Tags			uploads
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{object}	FilesListResponse
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/upload/my [get]
+//	@Summary	List the authenticated user's uploads
+//	@Tags		uploads
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	FilesListResponse
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/upload/my [get]
 func (h *Handler) GetMyFiles(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 

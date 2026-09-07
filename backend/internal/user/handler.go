@@ -32,13 +32,13 @@ func NewHandler(deps Deps) *Handler {
 //	@Tags			users
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			page		query		int		false	"page number (1-based)"	default(1)
-//	@Param			limit		query		int		false	"page size"				default(10)
-//	@Param			search		query		string	false	"username/email filter"
-//	@Success		200			{object}	UserListResponse
-//	@Failure		401			{object}	api.ErrorResponse
-//	@Failure		403			{object}	api.ErrorResponse
-//	@Failure		500			{object}	api.ErrorResponse
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Param			search	query		string	false	"username/email filter"
+//	@Success		200		{object}	UserListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		403		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/users [get]
 func (h *Handler) GetUserList(c *gin.Context) {
 	// Pagination parameters
@@ -254,7 +254,7 @@ func (h *Handler) ApplyForCreator(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			page	query		int		false	"page number (1-based)"	default(1)
 //	@Param			limit	query		int		false	"page size"				default(10)
-//	@Param			status	query		string	false	"status filter"	Enums(pending,approved,rejected)	default(pending)
+//	@Param			status	query		string	false	"status filter"			Enums(pending,approved,rejected)	default(pending)
 //	@Success		200		{object}	CreatorApplicationListResponse
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		403		{object}	api.ErrorResponse
@@ -312,8 +312,8 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id		path		int									true	"application id"
-//	@Param			request	body		ReviewCreatorApplicationBody		true	"approve or reject"
+//	@Param			id		path		int								true	"application id"
+//	@Param			request	body		ReviewCreatorApplicationBody	true	"approve or reject"
 //	@Success		200		{object}	MessageResponse
 //	@Failure		400		{object}	api.ErrorResponse	"invalid id, payload, or already processed"
 //	@Failure		401		{object}	api.ErrorResponse

@@ -106,7 +106,7 @@ func (h *Handler) emailLinkOrigin(c *gin.Context) (protocol, host string) {
 //	@Failure		400		{object}	api.ErrorResponse	"validation / captcha failed"
 //	@Failure		401		{object}	InvalidCredentialsResponse
 //	@Failure		403		{object}	EmailUnverifiedResponse	"email not verified"
-//	@Failure		404		{object}	api.ErrorResponse	"captcha not found"
+//	@Failure		404		{object}	api.ErrorResponse		"captcha not found"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
@@ -280,15 +280,15 @@ func userToRegisterUser(u *model.User) RegisterUser {
 
 // GetCurrentUser godoc
 //
-//	@Summary		Get the authenticated user
-//	@Tags			auth
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{object}	CurrentUserResponse
-//	@Failure		401	{object}	api.ErrorResponse	"not logged in"
-//	@Failure		404	{object}	api.ErrorResponse	"user not found"
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/auth/me [get]
+//	@Summary	Get the authenticated user
+//	@Tags		auth
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	CurrentUserResponse
+//	@Failure	401	{object}	api.ErrorResponse	"not logged in"
+//	@Failure	404	{object}	api.ErrorResponse	"user not found"
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/auth/me [get]
 func (h *Handler) GetCurrentUser(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
@@ -350,18 +350,18 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 // ChangePassword godoc
 //
-//	@Summary		Change the authenticated user's password
-//	@Tags			auth
-//	@Accept			json
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			request	body		ChangePasswordRequestWire	true	"old and new password"
-//	@Success		200		{object}	GenericMessageResponse
-//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
-//	@Failure		401		{object}	api.ErrorResponse	"old password is wrong"
-//	@Failure		404		{object}	api.ErrorResponse	"user not found"
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/auth/password [put]
+//	@Summary	Change the authenticated user's password
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		request	body		ChangePasswordRequestWire	true	"old and new password"
+//	@Success	200		{object}	GenericMessageResponse
+//	@Failure	400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure	401		{object}	api.ErrorResponse	"old password is wrong"
+//	@Failure	404		{object}	api.ErrorResponse	"user not found"
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/auth/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -449,10 +449,10 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			request	body		UpdateEmailRequestWire	true	"new email"
-//	@Success		200		{object}	UpdateEmailPendingResponse		"pending verification"
+//	@Param			request	body		UpdateEmailRequestWire		true	"new email"
+//	@Success		200		{object}	UpdateEmailPendingResponse	"pending verification"
 //	@Success		200		{object}	UpdateEmailCompleteResponse	"applied directly"
-//	@Failure		400		{object}	api.ErrorResponse	"invalid payload / same email / email in use"
+//	@Failure		400		{object}	api.ErrorResponse			"invalid payload / same email / email in use"
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		404		{object}	api.ErrorResponse	"user not found"
 //	@Failure		500		{object}	api.ErrorResponse

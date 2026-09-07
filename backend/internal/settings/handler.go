@@ -184,17 +184,17 @@ func (h *Handler) GetGeneralSettings(c *gin.Context) {
 
 // UpdateGeneralSettings godoc
 //
-//	@Summary		Update general site settings
-//	@Tags			config
-//	@Accept			json
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			request	body		GeneralSettingsUpdateRequest	true	"new general settings"
-//	@Success		200		{object}	GeneralSettingsUpdateResponse
-//	@Failure		400		{object}	api.ErrorResponse	"invalid payload"
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/config/general [put]
+//	@Summary	Update general site settings
+//	@Tags		config
+//	@Accept		json
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		request	body		GeneralSettingsUpdateRequest	true	"new general settings"
+//	@Success	200		{object}	GeneralSettingsUpdateResponse
+//	@Failure	400		{object}	api.ErrorResponse	"invalid payload"
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/config/general [put]
 func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 	var req GeneralSettingsUpdateRequest
 
@@ -355,11 +355,11 @@ func (h *Handler) GetAIModels(c *gin.Context) {
 
 // GetThemes godoc
 //
-//	@Summary		List available themes
-//	@Tags			config
-//	@Produce		json
-//	@Success		200	{object}	ThemesListResponse
-//	@Router			/config/themes [get]
+//	@Summary	List available themes
+//	@Tags		config
+//	@Produce	json
+//	@Success	200	{object}	ThemesListResponse
+//	@Router		/config/themes [get]
 func (h *Handler) GetThemes(c *gin.Context) {
 	themes := h.svc.GetThemes()
 	c.JSON(http.StatusOK, ThemesListResponse{Themes: themes})
@@ -373,7 +373,7 @@ func (h *Handler) GetThemes(c *gin.Context) {
 //	@Description	does not exist.
 //	@Tags			config
 //	@Produce		png
-//	@Param			id	path		string	true	"theme id"
+//	@Param			id	path	string	true	"theme id"
 //	@Success		200	"preview image bytes"
 //	@Failure		404	{object}	api.ErrorResponse	"theme or preview not found"
 //	@Failure		500	{object}	api.ErrorResponse
@@ -402,12 +402,12 @@ func (h *Handler) GetThemePreview(c *gin.Context) {
 
 // GetThemeConfig godoc
 //
-//	@Summary		Get the active theme
-//	@Tags			config
-//	@Produce		json
-//	@Success		200	{object}	ThemeConfigResponse
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/config/theme [get]
+//	@Summary	Get the active theme
+//	@Tags		config
+//	@Produce	json
+//	@Success	200	{object}	ThemeConfigResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/config/theme [get]
 func (h *Handler) GetThemeConfig(c *gin.Context) {
 	activeTheme, err := h.svc.GetThemeConfig(c.Request.Context())
 	if err != nil {
@@ -419,17 +419,17 @@ func (h *Handler) GetThemeConfig(c *gin.Context) {
 
 // UpdateThemeConfig godoc
 //
-//	@Summary		Set the active theme
-//	@Tags			config
-//	@Accept			json
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			request	body		ThemeConfigUpdateRequest	true	"theme id"
-//	@Success		200		{object}	ThemeConfigUpdateResponse
-//	@Failure		400		{object}	api.ErrorResponse	"theme not found / invalid payload"
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/config/theme [put]
+//	@Summary	Set the active theme
+//	@Tags		config
+//	@Accept		json
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		request	body		ThemeConfigUpdateRequest	true	"theme id"
+//	@Success	200		{object}	ThemeConfigUpdateResponse
+//	@Failure	400		{object}	api.ErrorResponse	"theme not found / invalid payload"
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/config/theme [put]
 func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 	var req ThemeConfigUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -466,7 +466,7 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			theme	formData	file			true	"theme zip archive"
+//	@Param			theme	formData	file	true	"theme zip archive"
 //	@Success		200		{object}	ThemeUploadResponse
 //	@Failure		400		{object}	api.ErrorResponse	"invalid zip / missing metadata / zip-slip entry"
 //	@Failure		401		{object}	api.ErrorResponse

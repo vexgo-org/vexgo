@@ -89,10 +89,10 @@ func (h *Handler) GetPosts(c *gin.Context) {
 //	@Tags			posts
 //	@Produce		json
 //	@Param			id	path		string	true	"numeric post id"
-//	@Success		200		{object}	PostSingleResponse
-//	@Failure		403		{object}	api.ErrorResponse	"guest view denied"
-//	@Failure		404		{object}	api.NotFoundWithIDResponse	"post not found"
-//	@Failure		500		{object}	api.ErrorResponse
+//	@Success		200	{object}	PostSingleResponse
+//	@Failure		403	{object}	api.ErrorResponse			"guest view denied"
+//	@Failure		404	{object}	api.NotFoundWithIDResponse	"post not found"
+//	@Failure		500	{object}	api.ErrorResponse
 //	@Router			/posts/by-id/{id} [get]
 func (h *Handler) GetPostByID(c *gin.Context) {
 	id := c.Param("id")
@@ -114,15 +114,15 @@ func (h *Handler) GetPostByID(c *gin.Context) {
 
 // GetPost godoc
 //
-//	@Summary		Look up a post by slug
-//	@Tags			posts
-//	@Produce		json
-//	@Param			slug	path		string	true	"post slug"
-//	@Success		200		{object}	PostSingleResponse
-//	@Failure		403		{object}	api.ErrorResponse	"guest view denied"
-//	@Failure		404		{object}	api.NotFoundWithSlugResponse	"post not found"
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/posts/{slug} [get]
+//	@Summary	Look up a post by slug
+//	@Tags		posts
+//	@Produce	json
+//	@Param		slug	path		string	true	"post slug"
+//	@Success	200		{object}	PostSingleResponse
+//	@Failure	403		{object}	api.ErrorResponse				"guest view denied"
+//	@Failure	404		{object}	api.NotFoundWithSlugResponse	"post not found"
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/posts/{slug} [get]
 func (h *Handler) GetPost(c *gin.Context) {
 	slug := c.Param("slug")
 	u, _ := middleware.CurrentUser(c)
@@ -158,8 +158,8 @@ func (h *Handler) GetPost(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			request	body		CreatePostRequest	true	"post payload"
 //	@Success		201		{object}	PostMessageResponse
-//	@Failure		400		{object}	api.ErrorResponse	"validation error / invalid slug"
-//	@Failure		403		{object}	api.ErrorResponse	"insufficient permissions / not logged in"
+//	@Failure		400		{object}	api.ErrorResponse		"validation error / invalid slug"
+//	@Failure		403		{object}	api.ErrorResponse		"insufficient permissions / not logged in"
 //	@Failure		409		{object}	api.CodeErrorResponse	"slug already taken"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/posts [post]
@@ -224,9 +224,9 @@ func (h *Handler) CreatePost(c *gin.Context) {
 //	@Param			id		path		string				true	"post id"
 //	@Param			request	body		UpdatePostRequest	true	"updated post fields"
 //	@Success		200		{object}	PostMessageResponse
-//	@Failure		400		{object}	api.ErrorResponse	"invalid slug"
-//	@Failure		403		{object}	api.ErrorResponse	"not author or admin"
-//	@Failure		404		{object}	api.ErrorResponse	"post not found"
+//	@Failure		400		{object}	api.ErrorResponse		"invalid slug"
+//	@Failure		403		{object}	api.ErrorResponse		"not author or admin"
+//	@Failure		404		{object}	api.ErrorResponse		"post not found"
 //	@Failure		409		{object}	api.CodeErrorResponse	"slug already taken"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/posts/{id} [put]
@@ -315,7 +315,7 @@ func (h *Handler) DeletePost(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			page	query		int		false	"page number (1-based)"	default(1)
 //	@Param			limit	query		int		false	"page size"				default(10)
-//	@Param			status	query		string	false	"status filter"	Enums(draft,pending,published,rejected)
+//	@Param			status	query		string	false	"status filter"			Enums(draft,pending,published,rejected)
 //	@Success		200		{object}	PostListResponse
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		500		{object}	api.ErrorResponse
@@ -355,16 +355,16 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 
 // GetDraftPosts godoc
 //
-//	@Summary		List the authenticated user's drafts
-//	@Tags			posts
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int	false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int	false	"page size"				default(10)
-//	@Success		200		{object}	PostListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/posts/drafts [get]
+//	@Summary	List the authenticated user's drafts
+//	@Tags		posts
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int	false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int	false	"page size"				default(10)
+//	@Success	200		{object}	PostListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/posts/drafts [get]
 func (h *Handler) GetDraftPosts(c *gin.Context) {
 	page, limit := middleware.ParsePagination(c, 10)
 
@@ -507,12 +507,12 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 
 // GetCategories godoc
 //
-//	@Summary		List categories
-//	@Tags			categories
-//	@Produce		json
-//	@Success		200	{object}	CategoriesListResponse
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/categories [get]
+//	@Summary	List categories
+//	@Tags		categories
+//	@Produce	json
+//	@Success	200	{object}	CategoriesListResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/categories [get]
 func (h *Handler) GetCategories(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
@@ -536,8 +536,8 @@ func (h *Handler) GetCategories(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			request	body		CreateCategoryRequest	true	"category payload"
 //	@Success		201		{object}	CreateCategoryResponse
-//	@Failure		400		{object}	api.ErrorResponse	"name is blank"
-//	@Failure		403		{object}	api.ErrorResponse	"insufficient permissions"
+//	@Failure		400		{object}	api.ErrorResponse		"name is blank"
+//	@Failure		403		{object}	api.ErrorResponse		"insufficient permissions"
 //	@Failure		409		{object}	api.CodeErrorResponse	"duplicate name"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/categories [post]
@@ -573,12 +573,12 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 
 // GetTags godoc
 //
-//	@Summary		List tags
-//	@Tags			tags
-//	@Produce		json
-//	@Success		200	{object}	TagsListResponse
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/tags [get]
+//	@Summary	List tags
+//	@Tags		tags
+//	@Produce	json
+//	@Success	200	{object}	TagsListResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/tags [get]
 func (h *Handler) GetTags(c *gin.Context) {
 	u, _ := middleware.CurrentUser(c)
 	userRole := u.Role
@@ -706,8 +706,8 @@ func inUseMessage(kind string, count int64) string {
 //	@Security		BearerAuth
 //	@Param			request	body		CreateTagRequest	true	"tag payload"
 //	@Success		201		{object}	CreateTagResponse
-//	@Failure		400		{object}	api.ErrorResponse	"name is blank"
-//	@Failure		403		{object}	api.ErrorResponse	"insufficient permissions"
+//	@Failure		400		{object}	api.ErrorResponse		"name is blank"
+//	@Failure		403		{object}	api.ErrorResponse		"insufficient permissions"
 //	@Failure		409		{object}	api.CodeErrorResponse	"duplicate name"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/tags [post]
@@ -740,54 +740,54 @@ func (h *Handler) CreateTag(c *gin.Context) {
 
 // GetPendingPosts godoc
 //
-//	@Summary		List pending posts (moderation queue)
-//	@Tags			posts
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int		false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int		false	"page size"				default(10)
-//	@Param			search	query		string	false	"free-text filter"
-//	@Success		200		{object}	PostListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		403		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/pending [get]
+//	@Summary	List pending posts (moderation queue)
+//	@Tags		posts
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int		false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int		false	"page size"				default(10)
+//	@Param		search	query		string	false	"free-text filter"
+//	@Success	200		{object}	PostListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	403		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/pending [get]
 func (h *Handler) GetPendingPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusPending)
 }
 
 // GetApprovedPosts godoc
 //
-//	@Summary		List approved posts (moderation history)
-//	@Tags			posts
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int		false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int		false	"page size"				default(10)
-//	@Param			search	query		string	false	"free-text filter"
-//	@Success		200		{object}	PostListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		403		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/approved [get]
+//	@Summary	List approved posts (moderation history)
+//	@Tags		posts
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int		false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int		false	"page size"				default(10)
+//	@Param		search	query		string	false	"free-text filter"
+//	@Success	200		{object}	PostListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	403		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/approved [get]
 func (h *Handler) GetApprovedPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusPublished)
 }
 
 // GetRejectedPosts godoc
 //
-//	@Summary		List rejected posts (moderation history)
-//	@Tags			posts
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int		false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int		false	"page size"				default(10)
-//	@Param			search	query		string	false	"free-text filter"
-//	@Success		200		{object}	PostListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		403		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/rejected [get]
+//	@Summary	List rejected posts (moderation history)
+//	@Tags		posts
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int		false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int		false	"page size"				default(10)
+//	@Param		search	query		string	false	"free-text filter"
+//	@Success	200		{object}	PostListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	403		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/rejected [get]
 func (h *Handler) GetRejectedPosts(c *gin.Context) {
 	h.listModeration(c, model.PostStatusRejected)
 }
@@ -826,17 +826,17 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 
 // ApprovePost godoc
 //
-//	@Summary		Approve a pending post
-//	@Tags			posts
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			id	path		string	true	"post id"
-//	@Success		200	{object}	PostMessageResponse
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		403	{object}	api.ErrorResponse
-//	@Failure		404	{object}	api.ErrorResponse	"post not found"
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/moderation/approve/{id} [put]
+//	@Summary	Approve a pending post
+//	@Tags		posts
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		id	path		string	true	"post id"
+//	@Success	200	{object}	PostMessageResponse
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	403	{object}	api.ErrorResponse
+//	@Failure	404	{object}	api.ErrorResponse	"post not found"
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/moderation/approve/{id} [put]
 func (h *Handler) ApprovePost(c *gin.Context) {
 	post, err := h.svc.Approve(c.Request.Context(), c.Param("id"))
 	if err != nil {

@@ -31,13 +31,13 @@ func NewHandler(deps Deps) *Handler {
 //	@Tags			notifications
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			page		query		int		false	"page number (1-based)"	default(1)
-//	@Param			limit		query		int		false	"page size"				default(10)
-//	@Param			type		query		string	false	"notification type filter"
-//	@Param			is_read		query		string	false	"read state filter (true/false)"
-//	@Success		200			{object}	NotificationListResponse
-//	@Failure		401			{object}	api.ErrorResponse
-//	@Failure		500			{object}	api.ErrorResponse
+//	@Param			page	query		int		false	"page number (1-based)"	default(1)
+//	@Param			limit	query		int		false	"page size"				default(10)
+//	@Param			type	query		string	false	"notification type filter"
+//	@Param			is_read	query		string	false	"read state filter (true/false)"
+//	@Success		200		{object}	NotificationListResponse
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/notifications [get]
 func (h *Handler) GetNotifications(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
@@ -69,17 +69,17 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 
 // MarkAsRead godoc
 //
-//	@Summary		Mark a single notification as read
-//	@Tags			notifications
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			id	path		int	true	"notification id"
-//	@Success		200	{object}	MessageResponse
-//	@Failure		400	{object}	api.ErrorResponse	"invalid id"
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		404	{object}	api.ErrorResponse	"notification not found or not updated"
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/notifications/{id} [put]
+//	@Summary	Mark a single notification as read
+//	@Tags		notifications
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		id	path		int	true	"notification id"
+//	@Success	200	{object}	MessageResponse
+//	@Failure	400	{object}	api.ErrorResponse	"invalid id"
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	404	{object}	api.ErrorResponse	"notification not found or not updated"
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/notifications/{id} [put]
 func (h *Handler) MarkAsRead(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
@@ -105,14 +105,14 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 
 // MarkAllAsRead godoc
 //
-//	@Summary		Mark all notifications as read
-//	@Tags			notifications
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{object}	MessageResponse
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/notifications/read-all [post]
+//	@Summary	Mark all notifications as read
+//	@Tags		notifications
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	MessageResponse
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/notifications/read-all [post]
 func (h *Handler) MarkAllAsRead(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
@@ -126,17 +126,17 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 
 // DeleteNotification godoc
 //
-//	@Summary		Delete a notification
-//	@Tags			notifications
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			id	path		int	true	"notification id"
-//	@Success		200	{object}	MessageResponse
-//	@Failure		400	{object}	api.ErrorResponse	"invalid id"
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		404	{object}	api.ErrorResponse	"notification not found"
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/notifications/{id} [delete]
+//	@Summary	Delete a notification
+//	@Tags		notifications
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		id	path		int	true	"notification id"
+//	@Success	200	{object}	MessageResponse
+//	@Failure	400	{object}	api.ErrorResponse	"invalid id"
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	404	{object}	api.ErrorResponse	"notification not found"
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/notifications/{id} [delete]
 func (h *Handler) DeleteNotification(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 

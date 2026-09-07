@@ -189,14 +189,14 @@ func (h *Handler) DeleteComment(c *gin.Context) {
 
 // GetCommentModerationConfig godoc
 //
-//	@Summary		Get comment moderation config
-//	@Tags			comments
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{object}	model.CommentModerationConfig
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/moderation/comments/config [get]
+//	@Summary	Get comment moderation config
+//	@Tags		comments
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	model.CommentModerationConfig
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/moderation/comments/config [get]
 func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
 	config, err := h.svc.GetModerationConfig(c.Request.Context())
 	if err != nil {
@@ -209,17 +209,17 @@ func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
 
 // UpdateCommentModerationConfig godoc
 //
-//	@Summary		Update comment moderation config
-//	@Tags			comments
-//	@Accept			json
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			request	body		UpdateModerationConfigBody	true	"new config"
-//	@Success		200		{object}	UpdateModerationConfigResponse
-//	@Failure		400		{object}	api.ErrorResponse	"incomplete LLM config"
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/comments/config [put]
+//	@Summary	Update comment moderation config
+//	@Tags		comments
+//	@Accept		json
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		request	body		UpdateModerationConfigBody	true	"new config"
+//	@Success	200		{object}	UpdateModerationConfigResponse
+//	@Failure	400		{object}	api.ErrorResponse	"incomplete LLM config"
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/comments/config [put]
 func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 	var req UpdateModerationConfigBody
 
@@ -286,48 +286,48 @@ func (h *Handler) TestModerationConfig(c *gin.Context) {
 
 // GetPendingComments godoc
 //
-//	@Summary		List pending comments (moderation queue)
-//	@Tags			comments
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int	false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int	false	"page size"				default(10)
-//	@Success		200		{object}	CommentModerationListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/comments/pending [get]
+//	@Summary	List pending comments (moderation queue)
+//	@Tags		comments
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int	false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int	false	"page size"				default(10)
+//	@Success	200		{object}	CommentModerationListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/comments/pending [get]
 func (h *Handler) GetPendingComments(c *gin.Context) {
 	h.listModeration(c, model.CommentStatusPending)
 }
 
 // GetApprovedComments godoc
 //
-//	@Summary		List approved comments
-//	@Tags			comments
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int	false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int	false	"page size"				default(10)
-//	@Success		200		{object}	CommentModerationListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/comments/approved [get]
+//	@Summary	List approved comments
+//	@Tags		comments
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int	false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int	false	"page size"				default(10)
+//	@Success	200		{object}	CommentModerationListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/comments/approved [get]
 func (h *Handler) GetApprovedComments(c *gin.Context) {
 	h.listModeration(c, model.CommentStatusPublished)
 }
 
 // GetRejectedComments godoc
 //
-//	@Summary		List rejected comments
-//	@Tags			comments
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			page	query		int	false	"page number (1-based)"	default(1)
-//	@Param			limit	query		int	false	"page size"				default(10)
-//	@Success		200		{object}	CommentModerationListResponse
-//	@Failure		401		{object}	api.ErrorResponse
-//	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/moderation/comments/rejected [get]
+//	@Summary	List rejected comments
+//	@Tags		comments
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		page	query		int	false	"page number (1-based)"	default(1)
+//	@Param		limit	query		int	false	"page size"				default(10)
+//	@Success	200		{object}	CommentModerationListResponse
+//	@Failure	401		{object}	api.ErrorResponse
+//	@Failure	500		{object}	api.ErrorResponse
+//	@Router		/moderation/comments/rejected [get]
 func (h *Handler) GetRejectedComments(c *gin.Context) {
 	h.listModeration(c, model.CommentStatusRejected)
 }

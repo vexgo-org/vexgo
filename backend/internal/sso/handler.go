@@ -51,8 +51,8 @@ func (h *Handler) SSOProviders(c *gin.Context) {
 //	@Description	provider-side user id (used to bind SSO to an
 //	@Description	existing account).
 //	@Tags			sso
-//	@Param			provider	path		string	true	"provider slug (github, google, ...)"
-//	@Param			method		query		string	false	"flow variant"	Enums(sso_get_token, get_sso_id)
+//	@Param			provider	path	string	true	"provider slug (github, google, ...)"
+//	@Param			method		query	string	false	"flow variant"	Enums(sso_get_token, get_sso_id)
 //	@Success		302			"redirect to the provider's authorization URL"
 //	@Failure		400			{object}	api.ErrorResponse	"unknown provider or method"
 //	@Failure		500			{object}	api.ErrorResponse
@@ -82,9 +82,9 @@ func (h *Handler) SSOLoginRedirect(c *gin.Context) {
 //	@Description	the data.
 //	@Tags			sso
 //	@Produce		html
-//	@Param			provider	path		string	true	"provider slug"
-//	@Param			state		query		string	true	"state nonce from the original /login redirect"
-//	@Param			code		query		string	true	"authorization code from the provider"
+//	@Param			provider	path	string	true	"provider slug"
+//	@Param			state		query	string	true	"state nonce from the original /login redirect"
+//	@Param			code		query	string	true	"authorization code from the provider"
 //	@Success		200			"HTML — success popup closer"
 //	@Failure		400			"HTML — error popup closer"
 //	@Router			/sso/{provider}/callback [get]
