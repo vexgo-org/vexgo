@@ -6,7 +6,13 @@ export default defineConfig({
     output: {
       mode: "split",
       client: "axios",
+      formatter: "prettier",
       target: "src/api/generated/endpoints.ts",
+      tsconfig: {
+        compilerOptions: {
+          target: "es2022",
+        },
+      },
       schemas: "src/api/generated/model",
       clean: true,
       override: {
