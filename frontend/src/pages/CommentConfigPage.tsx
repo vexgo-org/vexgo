@@ -86,7 +86,9 @@ export function CommentConfigPage() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const response = await unwrap(getVexGoAPI().postModerationCommentsTest());
+      const response = await unwrap(
+        getVexGoAPI().postModerationCommentsConfigTest(),
+      );
       toast.success(
         `${response?.message ?? ""} ${response?.response ?? ""}`.trim(),
       );

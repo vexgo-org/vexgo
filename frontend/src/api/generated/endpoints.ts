@@ -675,6 +675,20 @@ export const getVexGoAPI = () => {
   };
 
   /**
+   * Issues a small test prompt against the configured LLM
+   * to confirm the credentials and endpoint are wired up
+   * correctly. The `response` field is whatever the model
+   * replied with.
+   * @summary Test the LLM moderation endpoint
+   */
+  const postModerationCommentsConfigTest = () => {
+    return customInstance<CommentTestModerationResponse>({
+      url: `/moderation/comments/config/test`,
+      method: "POST",
+    });
+  };
+
+  /**
    * @summary List pending comments (moderation queue)
    */
   const getModerationCommentsPending = (
@@ -697,20 +711,6 @@ export const getVexGoAPI = () => {
       url: `/moderation/comments/rejected`,
       method: "GET",
       params,
-    });
-  };
-
-  /**
-   * Issues a small test prompt against the configured LLM
-   * to confirm the credentials and endpoint are wired up
-   * correctly. The `response` field is whatever the model
-   * replied with.
-   * @summary Test the LLM moderation endpoint
-   */
-  const postModerationCommentsTest = () => {
-    return customInstance<CommentTestModerationResponse>({
-      url: `/moderation/comments/test`,
-      method: "POST",
     });
   };
 
@@ -1281,9 +1281,9 @@ export const getVexGoAPI = () => {
     getModerationCommentsApproved,
     getModerationCommentsConfig,
     putModerationCommentsConfig,
+    postModerationCommentsConfigTest,
     getModerationCommentsPending,
     getModerationCommentsRejected,
-    postModerationCommentsTest,
     putModerationCommentsIdApprove,
     putModerationCommentsIdReject,
     getModerationPending,
@@ -1462,6 +1462,13 @@ export type PutModerationCommentsConfigResult = NonNullable<
     ReturnType<ReturnType<typeof getVexGoAPI>["putModerationCommentsConfig"]>
   >
 >;
+export type PostModerationCommentsConfigTestResult = NonNullable<
+  Awaited<
+    ReturnType<
+      ReturnType<typeof getVexGoAPI>["postModerationCommentsConfigTest"]
+    >
+  >
+>;
 export type GetModerationCommentsPendingResult = NonNullable<
   Awaited<
     ReturnType<ReturnType<typeof getVexGoAPI>["getModerationCommentsPending"]>
@@ -1470,11 +1477,6 @@ export type GetModerationCommentsPendingResult = NonNullable<
 export type GetModerationCommentsRejectedResult = NonNullable<
   Awaited<
     ReturnType<ReturnType<typeof getVexGoAPI>["getModerationCommentsRejected"]>
-  >
->;
-export type PostModerationCommentsTestResult = NonNullable<
-  Awaited<
-    ReturnType<ReturnType<typeof getVexGoAPI>["postModerationCommentsTest"]>
   >
 >;
 export type PutModerationCommentsIdApproveResult = NonNullable<

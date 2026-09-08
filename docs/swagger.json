@@ -4799,6 +4799,62 @@
                 ]
             }
         },
+        "/moderation/comments/config/test": {
+            "post": {
+                "description": "Issues a small test prompt against the configured LLM\nto confirm the credentials and endpoint are wired up\ncorrectly. The `response` field is whatever the model\nreplied with.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/comment.TestModerationResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "incomplete LLM config"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Test the LLM moderation endpoint",
+                "tags": [
+                    "comments"
+                ]
+            }
+        },
         "/moderation/comments/pending": {
             "get": {
                 "parameters": [
@@ -4924,62 +4980,6 @@
                     }
                 ],
                 "summary": "List rejected comments",
-                "tags": [
-                    "comments"
-                ]
-            }
-        },
-        "/moderation/comments/test": {
-            "post": {
-                "description": "Issues a small test prompt against the configured LLM\nto confirm the credentials and endpoint are wired up\ncorrectly. The `response` field is whatever the model\nreplied with.",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/comment.TestModerationResponse"
-                                }
-                            }
-                        },
-                        "description": "OK"
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "incomplete LLM config"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "Test the LLM moderation endpoint",
                 "tags": [
                     "comments"
                 ]

@@ -262,7 +262,7 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 //	@Failure		400	{object}	api.ErrorResponse	"incomplete LLM config"
 //	@Failure		401	{object}	api.ErrorResponse
 //	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/moderation/comments/test [post]
+//	@Router			/moderation/comments/config/test [post]
 func (h *Handler) TestModerationConfig(c *gin.Context) {
 	result, err := h.svc.TestModerationLLM(c.Request.Context())
 	if err != nil {
