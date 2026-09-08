@@ -9,16 +9,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
-// CaptchaWire is the inline captcha block on the login and
-// register requests. All four fields are required when the
-// server is configured to require captcha on those endpoints.
-type CaptchaWire struct {
-	ID    string `json:"captcha_id" example:"ck_2f4e..."`
-	Token string `json:"captcha_token" example:"ct_2f4e..."`
-	X     int    `json:"captcha_x" example:"42"`
-	Y     int    `json:"captcha_y" example:"118"`
-}
-
 // LoginRequestWire is the body of POST /api/auth/login.
 type LoginRequestWire struct {
 	Email        string `json:"email" binding:"required" example:"alice@example.com"`
