@@ -127,7 +127,7 @@ export function NotificationCenterPage() {
       (notification) => notification.id === id && !notification.isRead,
     );
     try {
-      await unwrap(getVexGoAPI().putNotificationsId(Number(id)));
+      await unwrap(getVexGoAPI().putNotificationsIdRead(Number(id)));
       // Update the local state
       setNotifications((prev) =>
         prev.map((notification) =>

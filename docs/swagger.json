@@ -5726,7 +5726,9 @@
                 "tags": [
                     "notifications"
                 ]
-            },
+            }
+        },
+        "/notifications/{id}/read": {
             "put": {
                 "parameters": [
                     {

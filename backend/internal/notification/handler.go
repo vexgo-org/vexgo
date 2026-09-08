@@ -79,7 +79,7 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 //	@Failure	401	{object}	api.ErrorResponse
 //	@Failure	404	{object}	api.ErrorResponse	"notification not found or not updated"
 //	@Failure	500	{object}	api.ErrorResponse
-//	@Router		/notifications/{id} [put]
+//	@Router		/notifications/{id}/read [put]
 func (h *Handler) MarkAsRead(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 
