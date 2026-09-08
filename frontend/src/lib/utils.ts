@@ -1,3 +1,4 @@
+import { UserUpdateUserRoleBodyRole } from "@/api/generated/model";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -32,4 +33,10 @@ export function normalizeTagsArray(raw: unknown): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+export function isUserRole(value: string): value is UserUpdateUserRoleBodyRole {
+  return Object.values(UserUpdateUserRoleBodyRole).includes(
+    value as UserUpdateUserRoleBodyRole,
+  );
 }

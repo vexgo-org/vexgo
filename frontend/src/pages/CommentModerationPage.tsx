@@ -13,23 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, XCircle, Clock, User } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { Comment } from "@/types";
-
-interface PendingCommentsResponse {
-  comments: Comment[];
-  total: number;
-}
-
-interface ApprovedCommentsResponse {
-  comments: Comment[];
-  total: number;
-}
-
-interface RejectedCommentsResponse {
-  comments: Comment[];
-  total: number;
-}
 
 export function CommentModerationPage() {
   const { t } = useTranslation();
@@ -43,20 +30,20 @@ export function CommentModerationPage() {
     setLoading(true);
     try {
       if (activeTab === "pending") {
-        const response = await api.get<PendingCommentsResponse>(
-          "/moderation/comments/pending",
+        const response = await unwrap(
+          getVexGoAPI().getModerationCommentsPending(),
         );
-        setPendingComments(response.data.comments);
+        setPendingComments((response.comments || []) as Comment[]);
       } else if (activeTab === "approved") {
-        const response = await api.get<ApprovedCommentsResponse>(
-          "/moderation/comments/approved",
+        const response = await unwrap(
+          getVexGoAPI().getModerationCommentsApproved(),
         );
-        setApprovedComments(response.data.comments);
+        setApprovedComments((response.comments || []) as Comment[]);
       } else if (activeTab === "rejected") {
-        const response = await api.get<RejectedCommentsResponse>(
-          "/moderation/comments/rejected",
+        const response = await unwrap(
+          getVexGoAPI().getModerationCommentsRejected(),
         );
-        setRejectedComments(response.data.comments);
+        setRejectedComments((response.comments || []) as Comment[]);
       }
     } catch (error) {
       console.error("Failed to load comments:", error);
@@ -72,7 +59,7 @@ export function CommentModerationPage() {
 
   const handleApproveComment = async (commentId: string) => {
     try {
-      await api.put(`/moderation/comments/approve/${commentId}`);
+      await unwrap(getVexGoAPI().putModerationCommentsIdApprove(commentId));
       toast.success(t("moderation.approveSuccess"));
       loadData();
     } catch (error) {
@@ -83,7 +70,7 @@ export function CommentModerationPage() {
 
   const handleRejectComment = async (commentId: string) => {
     try {
-      await api.put(`/moderation/comments/reject/${commentId}`);
+      await unwrap(getVexGoAPI().putModerationCommentsIdReject(commentId));
       toast.success(t("moderation.rejectSuccess"));
       loadData();
     } catch (error) {
@@ -166,7 +153,7 @@ export function CommentModerationPage() {
                               t("commentModeration.anonymous")}
                           </span>
                           <span className="text-muted-foreground text-sm">
-                            {new Date(comment.createdAt).toLocaleString(
+                            {new Date(comment.createdAt || "").toLocaleString(
                               getLocale(),
                             )}
                           </span>
@@ -175,7 +162,9 @@ export function CommentModerationPage() {
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={() => handleApproveComment(comment.id)}
+                            onClick={() =>
+                              handleApproveComment(String(comment.id))
+                            }
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             {t("moderation.approve")}
@@ -183,7 +172,9 @@ export function CommentModerationPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => handleRejectComment(comment.id)}
+                            onClick={() =>
+                              handleRejectComment(String(comment.id))
+                            }
                           >
                             <XCircle className="h-4 w-4 mr-1" />
                             {t("moderation.reject")}
@@ -229,7 +220,7 @@ export function CommentModerationPage() {
                             t("commentModeration.anonymous")}
                         </span>
                         <span className="text-muted-foreground text-sm">
-                          {new Date(comment.createdAt).toLocaleString(
+                          {new Date(comment.createdAt || "").toLocaleString(
                             getLocale(),
                           )}
                         </span>
@@ -276,7 +267,7 @@ export function CommentModerationPage() {
                             t("commentModeration.anonymous")}
                         </span>
                         <span className="text-muted-foreground text-sm">
-                          {new Date(comment.createdAt).toLocaleString(
+                          {new Date(comment.createdAt || "").toLocaleString(
                             getLocale(),
                           )}
                         </span>

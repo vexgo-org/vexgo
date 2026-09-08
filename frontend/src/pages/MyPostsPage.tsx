@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { postsApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { Post } from "@/types";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
@@ -66,17 +68,24 @@ export function MyPostsPage() {
   const loadPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await postsApi.getMyPosts({
-        page: currentPage,
-        limit: 10,
-      });
+      const response = await unwrap(
+        getVexGoAPI().getPostsUserMyPosts({
+          page: currentPage,
+          limit: 10,
+        }),
+      );
       setPosts(
-        response.data.posts.map((p) => ({
+        (response.posts || []).map((p) => ({
           ...p,
           tags: normalizeTagsArray(p.tags),
-        })),
+        })) as Post[],
       );
-      setPagination(response.data.pagination);
+      setPagination({
+        total: response.pagination?.total ?? 0,
+        page: response.pagination?.page ?? 1,
+        totalPages: response.pagination?.totalPages ?? 1,
+        limit: response.pagination?.limit ?? 10,
+      });
     } catch (error) {
       console.error("Failed to load posts:", error);
     } finally {
@@ -90,7 +99,7 @@ export function MyPostsPage() {
 
   const handleDeletePost = async (postId: string) => {
     try {
-      await postsApi.deletePost(postId);
+      await unwrap(getVexGoAPI().deletePostsId(postId));
       loadPosts();
     } catch (error) {
       console.error("Failed to delete post:", error);
@@ -222,7 +231,7 @@ export function MyPostsPage() {
                       {/* Status badge */}
                       <div className="flex items-center gap-2 mb-2">
                         {(() => {
-                          const status = getStatusBadge(post.status);
+                          const status = getStatusBadge(post.status || "");
                           const IconComponent = status.icon;
                           return (
                             <Badge
@@ -236,7 +245,7 @@ export function MyPostsPage() {
                         })()}
                         <span className="text-sm text-muted-foreground flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {formatDate(post.createdAt)}
+                          {formatDate(post.createdAt || "")}
                         </span>
                       </div>
 
@@ -300,7 +309,7 @@ export function MyPostsPage() {
                               {t("myPostsPage.cancel")}
                             </AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleDeletePost(post.id)}
+                              onClick={() => handleDeletePost(String(post.id))}
                               className="bg-destructive"
                             >
                               {t("myPostsPage.delete")}

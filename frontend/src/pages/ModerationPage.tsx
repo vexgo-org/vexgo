@@ -2,14 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
-import {
-  getPendingPosts,
-  getApprovedPosts,
-  getRejectedPosts,
-  approvePost,
-  rejectPost,
-  resubmitPost,
-} from "@/lib/moderationApi";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
 import type { Post } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +33,9 @@ export function ModerationPage() {
   const [rejectedPosts, setRejectedPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
-  const [rejectingPostId, setRejectingPostId] = useState<string | null>(null);
+  const [rejectingPostId, setRejectingPostId] = useState<
+    string | number | null
+  >(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,42 +44,25 @@ export function ModerationPage() {
     async (search?: string) => {
       setLoading(true);
       try {
-        // Only update the active tab's data so other tabs aren't cleared
         if (activeTab === "pending") {
-          const response = await getPendingPosts({
-            limit: 100,
-            search: search,
-          });
-          if (response && response.data) {
-            setPendingPosts(response.data.posts || []);
-          } else {
-            setPendingPosts([]);
-          }
+          const response = await unwrap(
+            getVexGoAPI().getModerationPending({ limit: 100, search }),
+          );
+          setPendingPosts((response.posts as Post[]) || []);
         } else if (activeTab === "approved") {
-          const response = await getApprovedPosts({
-            limit: 100,
-            search: search,
-          });
-          if (response && response.data) {
-            setApprovedPosts(response.data.posts || []);
-          } else {
-            setApprovedPosts([]);
-          }
+          const response = await unwrap(
+            getVexGoAPI().getModerationApproved({ limit: 100, search }),
+          );
+          setApprovedPosts((response.posts as Post[]) || []);
         } else if (activeTab === "rejected") {
-          const response = await getRejectedPosts({
-            limit: 100,
-            search: search,
-          });
-          if (response && response.data) {
-            setRejectedPosts(response.data.posts || []);
-          } else {
-            setRejectedPosts([]);
-          }
+          const response = await unwrap(
+            getVexGoAPI().getModerationRejected({ limit: 100, search }),
+          );
+          setRejectedPosts((response.posts as Post[]) || []);
         }
       } catch (error) {
         console.error("Failed to load data:", error);
         toast.error(t("moderation.loadFailed"));
-        // Keep the current data unchanged on error to avoid a blank screen
       } finally {
         setLoading(false);
       }
@@ -96,7 +75,6 @@ export function ModerationPage() {
   }, [activeTab, loadData]);
 
   const handleSearch = async () => {
-    // Call loadData directly with the search term
     await loadData(searchTerm);
   };
 
@@ -106,15 +84,14 @@ export function ModerationPage() {
     }
   };
 
-  // Clear the search when switching tabs
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setSearchTerm("");
   };
 
-  const handleApprovePost = async (postId: string) => {
+  const handleApprovePost = async (postId: string | number) => {
     try {
-      await approvePost(postId);
+      await unwrap(getVexGoAPI().putModerationApproveId(String(postId)));
       toast.success(t("moderation.approveSuccess"));
       loadData();
     } catch (error) {
@@ -123,7 +100,7 @@ export function ModerationPage() {
     }
   };
 
-  const handleRejectPost = async (postId: string) => {
+  const handleRejectPost = async (postId: string | number) => {
     setRejectingPostId(postId);
     setShowRejectDialog(true);
     setRejectionReason("");
@@ -133,7 +110,11 @@ export function ModerationPage() {
     if (!rejectingPostId) return;
 
     try {
-      await rejectPost(rejectingPostId, rejectionReason);
+      await unwrap(
+        getVexGoAPI().putModerationRejectId(String(rejectingPostId), {
+          rejectionReason,
+        }),
+      );
       toast.success(t("moderation.rejectSuccess"));
       setShowRejectDialog(false);
       setRejectingPostId(null);
@@ -151,9 +132,9 @@ export function ModerationPage() {
     setRejectionReason("");
   };
 
-  const handleResubmitPost = async (postId: string) => {
+  const handleResubmitPost = async (postId: string | number) => {
     try {
-      await resubmitPost(postId);
+      await unwrap(getVexGoAPI().putModerationResubmitId(String(postId)));
       toast.success(t("moderation.resubmitSuccess"));
       loadData();
     } catch (error) {
@@ -166,7 +147,7 @@ export function ModerationPage() {
     navigate(`/post/${postSlug}`);
   };
 
-  const handleEditPost = (postId: string) => {
+  const handleEditPost = (postId: string | number) => {
     navigate(`/edit-post/${postId}`);
   };
 
@@ -278,7 +259,7 @@ export function ModerationPage() {
                             {t("moderation.pending")}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt)}
+                            {formatDate(post.createdAt || "")}
                           </span>
                         </div>
                         <h3 className="font-medium text-lg mb-1">
@@ -306,7 +287,7 @@ export function ModerationPage() {
                       <div className="flex flex-col gap-2 ml-4">
                         <Button
                           size="sm"
-                          onClick={() => handleViewPost(post.slug)}
+                          onClick={() => handleViewPost(String(post.slug))}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}
@@ -376,7 +357,7 @@ export function ModerationPage() {
                             {t("moderation.approved")}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt)}
+                            {formatDate(post.createdAt || "")}
                           </span>
                         </div>
                         <h3 className="font-medium text-lg mb-1">
@@ -394,7 +375,7 @@ export function ModerationPage() {
                       <div className="flex flex-col gap-2 ml-4">
                         <Button
                           size="sm"
-                          onClick={() => handleViewPost(post.slug)}
+                          onClick={() => handleViewPost(String(post.slug))}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}
@@ -437,7 +418,7 @@ export function ModerationPage() {
                             {t("moderation.rejected")}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt)}
+                            {formatDate(post.createdAt || "")}
                           </span>
                         </div>
                         <h3 className="font-medium text-lg mb-1">
@@ -463,7 +444,7 @@ export function ModerationPage() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleViewPost(post.slug)}
+                          onClick={() => handleViewPost(String(post.slug))}
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}
@@ -487,7 +468,6 @@ export function ModerationPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Reject reason dialog */}
       {showRejectDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">

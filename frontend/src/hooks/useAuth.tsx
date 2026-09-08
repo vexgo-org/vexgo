@@ -6,8 +6,9 @@ import {
   type ReactNode,
 } from "react";
 import type { User } from "@/types";
-import { authApi } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import type { AuthLoginRequestWire } from "@/api/generated/model";
 
 interface AuthContextType {
   user: User | null;
@@ -41,10 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
-      authApi
-        .getMe()
+      getVexGoAPI()
+        .getAuthMe()
         .then((response) => {
-          setUser(response.data.user);
+          setUser(response.data.user as User);
           localStorage.setItem("user", JSON.stringify(response.data.user));
         })
         .catch(() => {
@@ -65,36 +66,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     captchaData?: { id: string; token: string; x: number; y: number },
   ) => {
-    const requestData: {
-      email: string;
-      password: string;
-      captcha_id?: string;
-      captcha_token?: string;
-      captcha_x?: number;
-      captcha_y?: number;
-    } = { email, password };
+    const requestData: AuthLoginRequestWire = { email, password };
     if (captchaData) {
       requestData.captcha_id = captchaData.id;
       requestData.captcha_token = captchaData.token;
       requestData.captcha_x = captchaData.x;
       requestData.captcha_y = captchaData.y;
     }
-    const response = await authApi.login(requestData);
-    const { user, token } = response.data;
-    if (token) {
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      setUser(user);
+    const response = await getVexGoAPI().postAuthLogin(requestData);
+    const { user: u, token } = response.data;
+    if (!u || !token) {
+      throw new Error(t("loginPage.loginFailed"));
     }
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(u));
+    setUser(u as User);
   };
 
-  // SSO login: accept the JWT issued by the backend, fetch the user, and update the context
   const loginWithToken = async (token: string) => {
     localStorage.setItem("token", token);
-    const response = await authApi.getMe();
+    const response = await getVexGoAPI().getAuthMe();
     const u = response.data.user;
     localStorage.setItem("user", JSON.stringify(u));
-    setUser(u);
+    setUser(u as User);
   };
 
   const register = async (
@@ -119,9 +113,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestData.captcha_y = captchaData.y;
     }
     try {
-      const response = await authApi.register(requestData);
-      const { user, token, requires_verification, email_verified } =
-        response.data;
+      const response = await getVexGoAPI().postAuthRegister(requestData);
+      const { user: u, requires_verification, email_verified } = response.data;
 
       if (requires_verification && !email_verified) {
         const error = new Error(
@@ -137,16 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
 
-      if (token) {
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(user));
-        setUser(user);
-      } else {
-        setUser(user);
+      if (u) {
+        setUser(u as User);
+        localStorage.setItem("user", JSON.stringify(u));
       }
     } catch (error: unknown) {
-      // Registration pending email verification is signaled with a dedicated
-      // flag; let it pass through untouched so callers can react to it.
       if (
         error instanceof Error &&
         (error as Error & { requiresVerification?: boolean })
@@ -154,7 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ) {
         throw error;
       }
-      // Extract error message from response
       const apiError = error as {
         response?: { data?: { error?: string } };
         message?: string;

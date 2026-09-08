@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { configApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+
 import type { SMTPConfig } from "@/types";
 import {
   Card,
@@ -39,8 +41,8 @@ export function SMTPSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await configApi.getSMTPConfig();
-      setConfig(response.data);
+      const response = await unwrap(getVexGoAPI().getConfigSmtp());
+      setConfig(response);
     } catch (error: unknown) {
       console.error("Failed to load SMTP config:", error);
       toast.error(t("commentConfig.loadFailed"));
@@ -54,30 +56,30 @@ export function SMTPSettingsPage() {
   }, [loadConfig]);
 
   const handleSave = async () => {
-    if (!config.host.trim()) {
+    if (!config.host?.trim()) {
       toast.error(t("smtpSettings.smtpHost") + t("common.required"));
       return;
     }
-    if (config.port <= 0 || config.port > 65535) {
+    if ((config.port ?? 0) <= 0 || (config.port ?? 0) > 65535) {
       toast.error(t("smtpSettings.smtpPort") + t("common.invalid"));
       return;
     }
-    if (!config.username.trim()) {
+    if (!config.username?.trim()) {
       toast.error(t("smtpSettings.emailAccount") + t("common.required"));
       return;
     }
-    if (config.enabled && !config.password.trim()) {
+    if (config.enabled && !config.password?.trim()) {
       toast.error(t("smtpSettings.passwordRequired"));
       return;
     }
-    if (!config.fromEmail.trim()) {
+    if (!config.fromEmail?.trim()) {
       toast.error(t("smtpSettings.fromEmail") + t("common.required"));
       return;
     }
 
     setSaving(true);
     try {
-      await configApi.updateSMTPConfig(config);
+      await unwrap(getVexGoAPI().putConfigSmtp(config));
       toast.success(t("generalSettings.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save SMTP config:", error);
@@ -97,14 +99,14 @@ export function SMTPSettingsPage() {
       toast.error(t("smtpSettings.testFirst"));
       return;
     }
-    if (!config.password.trim()) {
+    if (!config.password?.trim()) {
       toast.error(t("smtpSettings.savePasswordFirst"));
       return;
     }
 
     setTesting(true);
     try {
-      await configApi.testSMTP();
+      await unwrap(getVexGoAPI().postConfigSmtpTest());
       toast.success(t("smtpSettings.testSucceeded"));
     } catch (error: unknown) {
       console.error("Failed to send test email:", error);

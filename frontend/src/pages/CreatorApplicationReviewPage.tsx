@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import {
-  getCreatorApplications,
-  reviewCreatorApplication,
-  type CreatorApplication,
-} from "@/lib/userApi";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +20,16 @@ import {
 import { toast } from "sonner";
 import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
 
+interface CreatorApplication {
+  id?: number;
+  username?: string;
+  email?: string;
+  currentRole?: string;
+  createdAt?: string;
+  reason?: string;
+  status?: string;
+}
+
 export function CreatorApplicationReviewPage() {
   const { user: currentUser, isLoading: isAuthLoading } = useAuth();
   const { t } = useTranslation();
@@ -38,13 +45,15 @@ export function CreatorApplicationReviewPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getCreatorApplications({
-        page: 1,
-        limit: 100,
-        status: "pending",
-      });
+      const response = await unwrap(
+        getVexGoAPI().getUsersCreatorApplications({
+          page: 1,
+          limit: 100,
+          status: "pending",
+        }),
+      );
       // Ensure applications is an array even if the backend returns null or undefined
-      setApplications(response.data.applications || []);
+      setApplications(response.applications || []);
     } catch (error) {
       console.error("Failed to load creator applications:", error);
       toast.error(t("errors.networkError"));
@@ -100,12 +109,13 @@ export function CreatorApplicationReviewPage() {
     setIsProcessing(true);
     try {
       const reason = action === "reject" ? rejectReason : undefined;
-      const response = await reviewCreatorApplication(
-        selectedApplication.id,
-        action,
-        reason,
+      const response = await unwrap(
+        getVexGoAPI().putUsersCreatorApplicationsIdReview(
+          selectedApplication.id!,
+          { action, reason },
+        ),
       );
-      toast.success(response.data.message);
+      toast.success(response.message);
 
       // Remove the processed application from the list
       setApplications((prev) =>
@@ -272,7 +282,7 @@ export function CreatorApplicationReviewPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {getStatusBadge(application.status)}
+                    {getStatusBadge(application.status || "")}
                     <div className="flex items-center gap-2">
                       <Button
                         variant="default"

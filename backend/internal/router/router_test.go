@@ -73,14 +73,15 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"POST /api/auth/register",
 		"POST /api/auth/login",
 		"GET /api/auth/me",
-		"GET /api/auth/user",
 		"PUT /api/auth/profile",
 		"PUT /api/auth/password",
 		"PUT /api/auth/email",
 		"PUT /api/auth/settings",
-		"POST /api/auth/request-password-reset",
-		"POST /api/auth/resend-verification",
-		"POST /api/auth/reset-password",
+		"POST /api/auth/password/reset/request",
+		"POST /api/auth/email/verify/resend",
+		"POST /api/auth/password/reset",
+		"GET /api/auth/email/verify",
+		"GET /api/auth/email/verify/status",
 		// comment
 		"GET /api/comments/post/:id",
 		"POST /api/comments",
@@ -88,8 +89,8 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"GET /api/moderation/comments/pending",
 		"GET /api/moderation/comments/approved",
 		"GET /api/moderation/comments/rejected",
-		"PUT /api/moderation/comments/approve/:id",
-		"PUT /api/moderation/comments/reject/:id",
+		"PUT /api/moderation/comments/:id/approve",
+		"PUT /api/moderation/comments/:id/reject",
 		"GET /api/moderation/comments/config",
 		"PUT /api/moderation/comments/config",
 		"POST /api/moderation/comments/config/test",
@@ -128,8 +129,8 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"PUT /api/moderation/reject/:id",
 		"PUT /api/moderation/resubmit/:id",
 		// settings
-		"GET /api/themes",
-		"GET /api/theme/:id/preview",
+		"GET /api/config/themes",
+		"GET /api/config/themes/:id/preview",
 		"GET /api/config/smtp",
 		"PUT /api/config/smtp",
 		"POST /api/config/smtp/test",
@@ -141,15 +142,15 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"PUT /api/config/general",
 		"GET /api/config/theme",
 		"PUT /api/config/theme",
-		"POST /api/themes/upload",
+		"POST /api/config/theme/upload",
 		// sso
 		"GET /api/sso/providers",
 		"GET /api/sso/:provider/login",
 		"GET /api/sso/:provider/callback",
 		// upload
-		"POST /api/upload/file",
-		"POST /api/upload/files",
-		"GET /api/upload/my-files",
+		"POST /api/upload",
+		"POST /api/upload/multiple",
+		"GET /api/upload/my",
 		"DELETE /api/upload/:id",
 		// user
 		"GET /api/users",
@@ -158,11 +159,9 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"POST /api/users/apply-creator",
 		"GET /api/users/creator-applications",
 		"PUT /api/users/creator-applications/:id/review",
-		// verification
-		"GET /api/verify-email",
+		// captcha
 		"GET /api/captcha",
 		"POST /api/captcha/verify",
-		"GET /api/auth/verification-status",
 	}
 	sort.Strings(want)
 

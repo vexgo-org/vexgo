@@ -795,6 +795,7 @@ export const zhCN = {
     updateFailed: "个人信息更新失败",
     passwordChangeSuccess: "密码修改成功",
     passwordChangeFailed: "密码修改失败",
+    invalidPayload: "请求数据无效",
     emailChangeSuccess: "邮箱修改成功",
     emailChangeFailed: "邮箱修改失败",
     changeEmailDialog: "修改邮箱",

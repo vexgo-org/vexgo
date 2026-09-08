@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from "react";
 import { useIsDark } from "@/hooks/useIsDark";
-import { uploadApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
 import {
   MDXEditor,
   type MDXEditorMethods,
@@ -56,8 +56,8 @@ export function RichTextEditor({
   const imageUploadHandler = useCallback(
     async (file: File): Promise<string> => {
       try {
-        const response = await uploadApi.uploadFile(file);
-        return response.data.file!.url;
+        const response = await getVexGoAPI().postUpload({ file });
+        return response.data.file!.url ?? "";
       } catch (error) {
         console.error("Failed to upload image:", error);
         alert("Failed to upload image, please try again");

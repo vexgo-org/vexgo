@@ -20,25 +20,23 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 		if limited != nil {
 			auth.POST("/register", limited, h.Register)
 			auth.POST("/login", limited, h.Login)
-			auth.POST("/request-password-reset", limited, h.RequestPasswordReset)
-			auth.POST("/resend-verification", limited, h.ResendVerification)
-			auth.POST("/reset-password", limited, h.ResetPassword)
+			auth.POST("/password/reset/request", limited, h.RequestPasswordReset)
+			auth.POST("/email/verify/resend", limited, h.ResendVerification)
+			auth.POST("/password/reset", limited, h.ResetPassword)
 		} else {
 			auth.POST("/register", h.Register)
 			auth.POST("/login", h.Login)
-			auth.POST("/request-password-reset", h.RequestPasswordReset)
-			auth.POST("/resend-verification", h.ResendVerification)
-			auth.POST("/reset-password", h.ResetPassword)
+			auth.POST("/password/reset/request", h.RequestPasswordReset)
+			auth.POST("/email/verify/resend", h.ResendVerification)
+			auth.POST("/password/reset", h.ResetPassword)
 		}
 
 		auth.GET("/me", h.mw.JWTAuth(), h.GetCurrentUser)
-		auth.GET("/user", h.mw.JWTAuth(), h.GetCurrentUser)
 		auth.PUT("/profile", h.mw.JWTAuth(), h.UpdateProfile)
 		auth.PUT("/password", h.mw.JWTAuth(), h.ChangePassword)
 		auth.PUT("/email", h.mw.JWTAuth(), h.UpdateEmail)
 		auth.PUT("/settings", h.mw.JWTAuth(), h.UpdateSettings)
-		auth.GET("/verification-status", h.mw.JWTAuth(), h.GetVerificationStatus)
+		auth.GET("/email/verify", h.VerifyEmail)
+		auth.GET("/email/verify/status", h.mw.JWTAuth(), h.GetVerificationStatus)
 	}
-
-	api.GET("/verify-email", h.VerifyEmail)
 }

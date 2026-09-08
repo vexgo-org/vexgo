@@ -96,6 +96,26 @@ go run ./cmd/vexgo
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password` — change it on your profile page.
 
+### API codegen (swag + orval)
+
+The typed frontend API client is generated, not handwritten. The pipeline is:
+
+`swag` annotations on backend handlers → `docs/swagger.json` → `orval` → `frontend/src/api/generated/`
+
+```bash
+just generate            # regenerate docs/swagger.json, then the TypeScript client
+just check-openapi-fresh # CI guard: fails if docs/swagger.json is stale
+```
+
+Rules:
+
+- Declare request/response shapes as Go types with JSON tags plus swag annotations (`@Summary`, `@Param`, `@Success`, `@Failure`, `@Router`) on the handler. The general API block lives in `backend/cmd/vexgo/main.go`.
+- Never hand-edit `docs/swagger.json` or anything under `frontend/src/api/generated/` — change the backend annotations/types and re-run `just generate`.
+- File uploads use `@Accept multipart/form-data` with `@Param <name> formData file true "<desc>"`. (swag v2 is pinned past `v2.0.0-rc5` in `go.mod` because rc5 cannot emit a correct multipart file schema.)
+- Keep annotation formatting clean: `just format` runs `go tool swag fmt backend/`; CI enforces it via `just check-swag-fmt`.
+- If you add, remove, or rename a route, also update the route surface locked by `backend/internal/router/router_test.go` — and make sure the `@Router` path/method matches the registered route, otherwise the generated client calls a URL that 404s.
+- In frontend code, call the API via `getVexGoAPI()` from `@/api/generated/endpoints`. Requests go through the shared axios instance in `frontend/src/api/customAxios.ts` (attaches the token, redirects to `/login` on non-auth 401s).
+
 ## Project Layout
 
 ```text

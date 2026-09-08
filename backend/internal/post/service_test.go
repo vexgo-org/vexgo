@@ -77,7 +77,7 @@ func TestCreate_SavesDraftAndPublished(t *testing.T) {
 		Slug:       "hello-world",
 		Title:      "Hello",
 		Content:    "world",
-		Category:   1,
+		Category:   "1",
 		Tags:       []string{"go", "gin"},
 		Excerpt:    "ex",
 		CoverImage: "/img.png",
@@ -140,7 +140,7 @@ func TestUpdate_ModifiesFields(t *testing.T) {
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleContributor)
 
-	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "alpha", Title: "A", Content: "B", Category: 1, Status: model.PostStatusDraft})
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "alpha", Title: "A", Content: "B", Category: "1", Status: model.PostStatusDraft})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 		Slug:       "delete-test",
 		Title:      "A",
 		Content:    "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
-		Category:   1,
+		Category:   "1",
 		CoverImage: "/uploads/cover.jpg",
 		Status:     model.PostStatusPublished,
 	})
@@ -219,7 +219,7 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 		t.Errorf("comments not deleted")
 	}
 
-	post2, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "beta", Title: "B", Content: "b", Category: 1, Status: model.PostStatusPublished})
+	post2, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "beta", Title: "B", Content: "b", Category: "1", Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 	ctx := context.Background()
 	contributor := seedUser(t, db, "contrib", model.RoleContributor)
 
-	post, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "mod-test", Title: "t", Content: "c", Category: 1})
+	post, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "mod-test", Title: "t", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestToggleLike(t *testing.T) {
 	author := seedUser(t, db, "author", model.RoleAuthor)
 	liker := seedUser(t, db, "liker", model.RoleGuest)
 
-	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "like-test", Title: "t", Content: "c", Category: 1, Status: model.PostStatusPublished})
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "like-test", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -336,10 +336,10 @@ func TestList_RoleVisibility(t *testing.T) {
 	contributor := seedUser(t, db, "contrib", model.RoleContributor)
 	db.Create(&model.GeneralSettings{AllowGuestViewPosts: true})
 
-	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "pub-post", Title: "pub", Content: "c", Category: 1, Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "pub-post", Title: "pub", Content: "c", Category: "1", Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "pend-post", Title: "pend", Content: "c", Category: 1, Status: model.PostStatusPending}); err != nil {
+	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "pend-post", Title: "pend", Content: "c", Category: "1", Status: model.PostStatusPending}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
@@ -352,7 +352,7 @@ func TestList_RoleVisibility(t *testing.T) {
 	}
 
 	other := seedUser(t, db, "other", model.RoleAuthor)
-	if _, err := svc.Create(ctx, other.Role, other.ID, CreateRequest{Slug: "otherpub", Title: "otherpub", Content: "c", Category: 1, Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Create(ctx, other.Role, other.ID, CreateRequest{Slug: "otherpub", Title: "otherpub", Content: "c", Category: "1", Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
@@ -385,7 +385,7 @@ func TestList_GuestViewDenied(t *testing.T) {
 	}
 
 	author := seedUser(t, db, "author", model.RoleAuthor)
-	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "guest-test", Title: "t", Content: "c", Category: 1, Status: model.PostStatusPublished})
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "guest-test", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestCreate_RejectsEmptySlug(t *testing.T) {
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 
-	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "", Title: "t", Content: "c", Category: 1})
+	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "", Title: "t", Content: "c", Category: "1"})
 	if !errors.Is(err, model.ErrEmptySlug) {
 		t.Errorf("expected ErrEmptySlug, got %v", err)
 	}
@@ -428,7 +428,7 @@ func TestCreate_RejectsInvalidSlug(t *testing.T) {
 			if len(slug) > 10 {
 				t.Skip("long string")
 			}
-			_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: slug, Title: "t", Content: "c", Category: 1})
+			_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: slug, Title: "t", Content: "c", Category: "1"})
 			if err == nil {
 				t.Errorf("expected error for slug %q, but got nil", slug)
 			}
@@ -441,12 +441,12 @@ func TestCreate_RejectsDuplicateSlug(t *testing.T) {
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 
-	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-post", Title: "First", Content: "c", Category: 1})
+	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-post", Title: "First", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("first Create error: %v", err)
 	}
 
-	_, err = svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-post", Title: "Second", Content: "c", Category: 1})
+	_, err = svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-post", Title: "Second", Content: "c", Category: "1"})
 	if !errors.Is(err, model.ErrSlugTaken) {
 		t.Errorf("expected ErrSlugTaken, got %v", err)
 	}
@@ -457,12 +457,12 @@ func TestUpdate_RejectsDuplicateSlug(t *testing.T) {
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 
-	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "first-post", Title: "First", Content: "c", Category: 1})
+	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "first-post", Title: "First", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("first Create error: %v", err)
 	}
 
-	second, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "second-post", Title: "Second", Content: "c", Category: 1})
+	second, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "second-post", Title: "Second", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("second Create error: %v", err)
 	}
@@ -489,7 +489,7 @@ func TestFindBySlug_ReturnsPost(t *testing.T) {
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 	db.Create(&model.GeneralSettings{AllowGuestViewPosts: true})
 
-	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "hello-world", Title: "Hello", Content: "World", Category: 1, Status: model.PostStatusPublished})
+	_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "hello-world", Title: "Hello", Content: "World", Category: "1", Status: model.PostStatusPublished})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -671,7 +671,7 @@ func TestCreate_NormalizesUppercaseSlug(t *testing.T) {
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 
-	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "HELLO-WORLD", Title: "t", Content: "c", Category: 1})
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "HELLO-WORLD", Title: "t", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("expected uppercase slug to be normalized, got error: %v", err)
 	}
@@ -688,7 +688,7 @@ func TestUpdate_NormalizesUppercaseSlug(t *testing.T) {
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
 
-	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-slug", Title: "t", Content: "c", Category: 1})
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "my-slug", Title: "t", Content: "c", Category: "1"})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
@@ -715,7 +715,7 @@ func TestCreate_SupportsInternationalSlugs(t *testing.T) {
 		Slug:     "中文-标题-测试",
 		Title:    "中文标题",
 		Content:  "内容",
-		Category: 1,
+		Category: "1",
 		Status:   model.PostStatusPublished,
 	})
 	if err != nil {

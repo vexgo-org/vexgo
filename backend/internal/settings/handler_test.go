@@ -264,7 +264,7 @@ func doThemeUpload(t *testing.T, r *gin.Engine, token string, zipBytes []byte) *
 		t.Fatalf("multipart close: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/themes/upload", &body)
+	req := httptest.NewRequest(http.MethodPost, "/api/config/theme/upload", &body)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()

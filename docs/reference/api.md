@@ -335,7 +335,7 @@ Get latest posts by creation date.
 
 ---
 
-### GET /themes
+### GET /config/themes
 
 Get all available themes.
 
@@ -360,7 +360,7 @@ The embedded default theme is always returned. Additional themes installed under
 
 ---
 
-### GET /theme/:id/preview
+### GET /config/themes/:id/preview
 
 Get the preview image for a specific theme.
 
@@ -430,7 +430,7 @@ Get published posts of a specific user.
 
 ---
 
-### GET /verify-email
+### GET /auth/email/verify
 
 Verify an email address using a token.
 
@@ -656,12 +656,6 @@ Get current user information (requires authentication).
 
 ---
 
-### GET /auth/user
-
-Alias of `/auth/me` (requires authentication).
-
----
-
 ### PUT /auth/profile
 
 Update the current user's profile (requires authentication). All fields are optional.
@@ -766,7 +760,7 @@ Update the current user's privacy settings (requires authentication).
 
 ---
 
-### POST /auth/request-password-reset
+### POST /auth/password/reset/request
 
 Request a password reset email (public).
 
@@ -784,7 +778,7 @@ Request a password reset email (public).
 
 ---
 
-### POST /auth/reset-password
+### POST /auth/password/reset
 
 Reset a password with the emailed token (public).
 
@@ -804,7 +798,29 @@ Reset a password with the emailed token (public).
 
 ---
 
-### GET /auth/verification-status
+### POST /auth/email/verify/resend
+
+Resend the verification email (public).
+
+**Request:**
+
+```json
+{ "email": "user@example.com" }
+```
+
+**Response:**
+
+```json
+{
+  "message": "If the account exists and is not verified, a verification email has been sent."
+}
+```
+
+The response is intentionally uniform: unknown email, verified account, SMTP failure, and database fault all return the same body, so callers cannot probe whether an address exists and is unverified.
+
+---
+
+### GET /auth/email/verify/status
 
 Get the current user's email verification status (requires authentication).
 
@@ -1054,7 +1070,7 @@ Calling it again removes the like:
 
 ## File Upload
 
-### POST /upload/file
+### POST /upload
 
 Upload a single file (requires authentication).
 
@@ -1082,7 +1098,7 @@ Files are stored with a UUID filename. Storage is local disk or S3 depending on 
 
 ---
 
-### POST /upload/files
+### POST /upload/multiple
 
 Upload multiple files (requires authentication).
 
@@ -1104,7 +1120,7 @@ Upload multiple files (requires authentication).
 
 ---
 
-### GET /upload/my-files
+### GET /upload/my
 
 Get the current user's uploaded files (requires authentication).
 
@@ -1268,7 +1284,7 @@ Get approved (`published`) comments. Same parameters and shape as above.
 
 Get rejected comments. Same parameters and shape as above.
 
-#### PUT /moderation/comments/approve/:id
+#### PUT /moderation/comments/:id/approve
 
 Approve a comment (status → `published`).
 
@@ -1278,7 +1294,7 @@ Approve a comment (status → `published`).
 { "message": "Comment approved", "comment": { "id": 1, "status": "published" } }
 ```
 
-#### PUT /moderation/comments/reject/:id
+#### PUT /moderation/comments/:id/reject
 
 Reject a comment (status → `rejected`). No request body.
 
@@ -1788,7 +1804,7 @@ Set the globally active theme (admin only).
 { "message": "Theme updated successfully", "activeTheme": "theme_id" }
 ```
 
-#### POST /themes/upload
+#### POST /config/theme/upload
 
 Upload and install a new theme (admin only).
 

@@ -333,7 +333,7 @@
 
 ---
 
-### GET /themes
+### GET /config/themes
 
 获取所有可用主题。
 
@@ -358,7 +358,7 @@
 
 ---
 
-### GET /theme/:id/preview
+### GET /config/themes/:id/preview
 
 获取指定主题的预览图。
 
@@ -428,7 +428,7 @@
 
 ---
 
-### GET /verify-email
+### GET /auth/email/verify
 
 使用 token 验证邮箱地址。
 
@@ -644,12 +644,6 @@
 
 ---
 
-### GET /auth/user
-
-`/auth/me` 的别名（需要认证）。
-
----
-
 ### PUT /auth/profile
 
 更新当前用户的个人资料（需要认证）。所有字段均为可选。
@@ -754,7 +748,7 @@
 
 ---
 
-### POST /auth/request-password-reset
+### POST /auth/password/reset/request
 
 请求密码重置邮件（公开）。
 
@@ -772,7 +766,7 @@
 
 ---
 
-### POST /auth/reset-password
+### POST /auth/password/reset
 
 使用邮件中的 token 重置密码（公开）。
 
@@ -792,7 +786,29 @@
 
 ---
 
-### GET /auth/verification-status
+### POST /auth/email/verify/resend
+
+重新发送验证邮件（公开接口）。
+
+**请求：**
+
+```json
+{ "email": "user@example.com" }
+```
+
+**响应：**
+
+```json
+{
+  "message": "If the account exists and is not verified, a verification email has been sent."
+}
+```
+
+响应是刻意统一的：未知邮箱、已验证账号、SMTP 失败和数据库故障都返回相同的正文，调用方无法借此探测某个地址是否存在且未验证。
+
+---
+
+### GET /auth/email/verify/status
 
 获取当前用户的邮箱验证状态（需要认证）。
 
@@ -1042,7 +1058,7 @@ SSO 回调端点；提供商重定向到这里。
 
 ## 文件上传
 
-### POST /upload/file
+### POST /upload
 
 上传单个文件（需要认证）。
 
@@ -1070,7 +1086,7 @@ SSO 回调端点；提供商重定向到这里。
 
 ---
 
-### POST /upload/files
+### POST /upload/multiple
 
 上传多个文件（需要认证）。
 
@@ -1092,7 +1108,7 @@ SSO 回调端点；提供商重定向到这里。
 
 ---
 
-### GET /upload/my-files
+### GET /upload/my
 
 获取当前用户上传的文件（需要认证）。
 
@@ -1253,7 +1269,7 @@ SSO 回调端点；提供商重定向到这里。
 
 获取已拒绝的评论。参数和结构与上面相同。
 
-#### PUT /moderation/comments/approve/:id
+#### PUT /moderation/comments/:id/approve
 
 批准评论（状态 → `published`）。
 
@@ -1263,7 +1279,7 @@ SSO 回调端点；提供商重定向到这里。
 { "message": "Comment approved", "comment": { "id": 1, "status": "published" } }
 ```
 
-#### PUT /moderation/comments/reject/:id
+#### PUT /moderation/comments/:id/reject
 
 拒绝评论（状态 → `rejected`）。无请求体。
 
@@ -1773,7 +1789,7 @@ SSO 回调端点；提供商重定向到这里。
 { "message": "Theme updated successfully", "activeTheme": "theme_id" }
 ```
 
-#### POST /themes/upload
+#### POST /config/theme/upload
 
 上传并安装新主题（仅管理员）。
 

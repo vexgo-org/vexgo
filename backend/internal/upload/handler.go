@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vexgo-org/vexgo/backend/internal/model"
-
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // Handler exposes the upload domain over HTTP.
@@ -72,13 +72,30 @@ func generateFilename(originalName string) string {
 	return uid
 }
 
-// UploadFile uploads a single file (requires login) and records it in the database.
+// UploadFile godoc
+//
+//	@Summary		Upload a single file
+//	@Description	Accepts a multipart/form-data body with a single 'file'
+//	@Description	part. The stored filename is a freshly generated UUID
+//	@Description	plus the sanitized extension from the original filename;
+//	@Description	any untrusted characters are stripped before persistence.
+//	@Description	Requires authentication.
+//	@Tags			uploads
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			file	formData	file	true	"file to upload"
+//	@Success		200		{object}	UploadResponse
+//	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse	"failed to persist file"
+//	@Router			/upload [post]
 func (h *Handler) UploadFile(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File upload failed"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "File upload failed"})
 		return
 	}
 
@@ -87,35 +104,50 @@ func (h *Handler) UploadFile(c *gin.Context) {
 
 	src, err := file.Open()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to open file"})
 		return
 	}
 	defer src.Close()
 
 	media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to upload: %v", err)})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: fmt.Sprintf("Failed to upload: %v", err)})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "File uploaded successfully",
-		"file":    media,
+	c.JSON(http.StatusOK, UploadResponse{
+		Message: "File uploaded successfully",
+		File:    media,
 	})
 }
 
-// UploadFiles uploads multiple files (requires login) and records them in the database.
+// UploadFiles godoc
+//
+//	@Summary		Upload multiple files
+//	@Description	Accepts a multipart/form-data body with one or more
+//	@Description	'files' parts. Per-file failures are silently dropped;
+//	@Description	the response only includes the rows that persisted.
+//	@Description	Requires authentication.
+//	@Tags			uploads
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			files	formData	file	true	"files to upload (repeatable)"
+//	@Success		200		{object}	MultiUploadResponse
+//	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form"
+//	@Failure		401		{object}	api.ErrorResponse
+//	@Router			/upload/multiple [post]
 func (h *Handler) UploadFiles(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
 	form, err := c.MultipartForm()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File upload failed"})
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "File upload failed"})
 		return
 	}
 
 	files := form.File["files"]
-	var uploadedFiles []model.MediaFile
+	uploadedFiles := make([]model.MediaFile, 0, len(files))
 
 	for _, file := range files {
 		filename := generateFilename(file.Filename)
@@ -133,26 +165,48 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 		uploadedFiles = append(uploadedFiles, media)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "File upload completed",
-		"files":   uploadedFiles,
+	c.JSON(http.StatusOK, MultiUploadResponse{
+		Message: "File upload completed",
+		Files:   uploadedFiles,
 	})
 }
 
-// GetMyFiles returns the current user's uploaded files.
+// GetMyFiles godoc
+//
+//	@Summary	List the authenticated user's uploads
+//	@Tags		uploads
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	FilesListResponse
+//	@Failure	401	{object}	api.ErrorResponse
+//	@Failure	500	{object}	api.ErrorResponse
+//	@Router		/upload/my [get]
 func (h *Handler) GetMyFiles(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
 	files, err := h.svc.ListByUser(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch files"})
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch files"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"files": files})
+	c.JSON(http.StatusOK, FilesListResponse{Files: files})
 }
 
-// DeleteFile deletes a file (must be uploader or admin).
+// DeleteFile godoc
+//
+//	@Summary		Delete an uploaded file
+//	@Description	Only the original uploader or an admin may delete a file.
+//	@Description	The id is the MediaFile.ID from the upload response.
+//	@Tags			uploads
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"file id (UUID filename without extension)"
+//	@Success		200	{object}	MessageResponse
+//	@Failure		403	{object}	api.ErrorResponse	"not authorized"
+//	@Failure		404	{object}	api.ErrorResponse	"file not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/upload/{id} [delete]
 func (h *Handler) DeleteFile(c *gin.Context) {
 	id := c.Param("id")
 
@@ -162,14 +216,14 @@ func (h *Handler) DeleteFile(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "File does not exist"})
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "File does not exist"})
 		case errors.Is(err, ErrForbidden):
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to delete this file"})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to delete this file"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete file"})
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete file"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
+	c.JSON(http.StatusOK, MessageResponse{Message: "File deleted"})
 }

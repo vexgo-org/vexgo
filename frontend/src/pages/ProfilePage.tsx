@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { authApi, uploadApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
+import { unwrap } from "@/lib/api";
+import type { User as UserType } from "@/types";
+
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +43,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ImageCropper from "@/components/image/ImageCropper";
+import { isAxiosError } from "axios";
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -73,12 +77,14 @@ export function ProfilePage() {
     setLoading(true);
 
     try {
-      const response = await authApi.updateProfile({
-        username,
-        birthday,
-        bio,
-      });
-      updateUser(response.data.user);
+      const response = await unwrap(
+        getVexGoAPI().putAuthProfile({
+          username,
+          birthday,
+          bio,
+        }),
+      );
+      updateUser(response.user as UserType);
       setSuccess(t("profilePage.updateSuccess"));
     } catch (err: unknown) {
       const errorMessage =
@@ -107,16 +113,24 @@ export function ProfilePage() {
     setPasswordLoading(true);
 
     try {
-      await authApi.changePassword({ oldPassword, newPassword });
+      await unwrap(getVexGoAPI().putAuthPassword({ oldPassword, newPassword }));
       setSuccess(t("profilePage.passwordChangeSuccess"));
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : t("profilePage.passwordChangeFailed");
+      let errorMessage = t("profilePage.passwordChangeFailed");
+      if (isAxiosError(err)) {
+        switch (err.response?.status) {
+          case 400:
+            errorMessage = t("profilePage.invalidPayload");
+            break;
+          case 403:
+            errorMessage = t("profilePage.currentPasswordIncorrect");
+            break;
+        }
+      }
+
       setError(errorMessage);
     } finally {
       setPasswordLoading(false);
@@ -142,20 +156,22 @@ export function ProfilePage() {
     setEmailLoading(true);
 
     try {
-      const response = await authApi.updateEmail({ email: newEmail });
-      setSuccess(response.data.message);
+      const response = await unwrap(
+        getVexGoAPI().putAuthEmail({ email: newEmail }),
+      );
+      setSuccess(response.message ?? "");
       setNewEmail("");
-      if (response.data.pending) {
-        // If pending: true is returned, email verification is required; wait for the user to click the link
-        // No need to update the local user; it will be updated after verification
-      } else if (response.data.user) {
+
+      let newUserEmail = newEmail;
+      if ("user" in response && response.user) {
         // If the update succeeded directly (SMTP disabled), update the local user
-        updateUser(response.data.user);
-      } else {
-        // When pending, update the displayed local email (awaiting verification)
-        if (user) {
-          updateUser({ ...user, email: newEmail });
-        }
+        newUserEmail = response.user.email ?? newEmail;
+      }
+
+      // If pending: true is returned, email verification is required; wait for the user to click the link
+      // No need to update the local user; it will be updated after verification
+      if (!response.pending && user) {
+        updateUser({ ...user, email: newUserEmail });
       }
     } catch (err: unknown) {
       const errorMessage =
@@ -189,13 +205,17 @@ export function ProfilePage() {
 
     try {
       // Use the existing upload API
-      const uploadResponse = await uploadApi.uploadFile(croppedFile);
-      if (uploadResponse.data.file && uploadResponse.data.file.url) {
+      const uploadResponse = await unwrap(
+        getVexGoAPI().postUpload({ file: croppedFile }),
+      );
+      if (uploadResponse.file && uploadResponse.file.url) {
         // Update the user avatar
-        const updateResponse = await authApi.updateProfile({
-          avatar: uploadResponse.data.file.url,
-        });
-        updateUser(updateResponse.data.user);
+        const updateResponse = await unwrap(
+          getVexGoAPI().putAuthProfile({
+            avatar: uploadResponse.file.url,
+          }),
+        );
+        updateUser(updateResponse.user as UserType);
         setSuccess(t("profilePage.updateAvatar"));
       }
     } catch (err: unknown) {

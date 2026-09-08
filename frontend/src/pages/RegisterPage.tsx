@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { configApi } from "@/lib/api";
+import { getVexGoAPI } from "@/api/generated/endpoints";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -183,9 +183,9 @@ export function RegisterPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await configApi.getGeneralSettings();
-      setCaptchaEnabled(response.data.captchaEnabled);
-      setRegistrationEnabled(response.data.registrationEnabled);
+      const response = await getVexGoAPI().getConfigGeneral();
+      setCaptchaEnabled(response.data.captchaEnabled ?? false);
+      setRegistrationEnabled(response.data.registrationEnabled ?? false);
     } catch (error) {
       console.error("Failed to load settings:", error);
     }
