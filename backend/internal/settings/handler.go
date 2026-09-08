@@ -92,7 +92,8 @@ func (h *Handler) UpdateSMTPConfig(c *gin.Context) {
 
 	config, err := h.svc.UpdateSMTPConfig(c.Request.Context(), SMTPConfigRequest(req))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+		slog.Error("failed to update SMTP configuration", "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update SMTP configuration"})
 		return
 	}
 
@@ -144,7 +145,8 @@ func (h *Handler) TestSMTP(c *gin.Context) {
 		case errors.Is(err, ErrSMTPDisabled), errors.Is(err, ErrSMTPIncomplete), errors.Is(err, ErrSMTPNoRecipient):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+			slog.Error("failed to send test email", "err", err)
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to send test email"})
 		}
 		return
 	}
@@ -206,7 +208,8 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 
 	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest(req))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+		slog.Error("failed to update general settings", "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update general settings"})
 		return
 	}
 
@@ -268,7 +271,8 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 
 	config, err := h.svc.UpdateAIConfig(c.Request.Context(), AIConfigRequest(req))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+		slog.Error("failed to update AI configuration", "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update AI configuration"})
 		return
 	}
 
@@ -308,7 +312,8 @@ func (h *Handler) TestAI(c *gin.Context) {
 		case errors.Is(err, ErrAIDisabled), errors.Is(err, ErrAIIncomplete):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+			slog.Error("failed to test AI endpoint", "err", err)
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to test AI endpoint"})
 		}
 		return
 	}
@@ -342,7 +347,8 @@ func (h *Handler) GetAIModels(c *gin.Context) {
 		case errors.Is(err, ErrAIDisabled), errors.Is(err, ErrAIIncompleteModels):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+			slog.Error("failed to fetch AI models", "err", err)
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch AI models"})
 		}
 		return
 	}
@@ -391,7 +397,8 @@ func (h *Handler) GetThemePreview(c *gin.Context) {
 		case errors.Is(err, ErrPreviewNotFound):
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+			slog.Error("failed to load theme preview", "err", err)
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to load theme preview"})
 		}
 		return
 	}
@@ -444,7 +451,8 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
+		slog.Error("failed to update theme configuration", "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update theme configuration"})
 		return
 	}
 
