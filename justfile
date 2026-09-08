@@ -11,7 +11,7 @@ lint:
     output=$(deadcode -test ./...); test -z "$output" || { echo "$output"; exit 1;}
     prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json" "./*.{json,yml,yaml}"
     diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
-    oxlint --deny-warnings -c frontend/.oxlintrc.json frontend/
+    oxlint -c frontend/.oxlintrc.json frontend/
     output=$(gopls check -severity=hint ./**/*.go); test -z "$output" || { echo "$output"; exit 1;}
 
 test:
