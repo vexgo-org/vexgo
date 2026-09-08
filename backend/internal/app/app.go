@@ -262,6 +262,9 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 		return storage, nil
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	s3Cfg := &config.S3Config{
 		Enabled:                  cfg.S3Enabled,
 		Endpoint:                 cfg.S3Endpoint,
@@ -281,7 +284,7 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 		"bucket", s3Cfg.Bucket,
 	)
 
-	s3Storage, err := upload.NewS3Storage(s3Cfg)
+	s3Storage, err := upload.NewS3Storage(ctx, s3Cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init S3 storage: %w", err)
 	}

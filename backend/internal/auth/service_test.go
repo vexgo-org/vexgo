@@ -47,7 +47,7 @@ type fakeFiles struct {
 	deleted []string
 }
 
-func (f *fakeFiles) Delete(url string) error {
+func (f *fakeFiles) Delete(_ context.Context, url string) error {
 	f.deleted = append(f.deleted, url)
 	return nil
 }
