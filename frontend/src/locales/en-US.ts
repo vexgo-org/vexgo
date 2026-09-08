@@ -827,6 +827,7 @@ export const enUS = {
     updateFailed: "Profile update failed",
     passwordChangeSuccess: "Password changed successfully",
     passwordChangeFailed: "Password change failed",
+    invalidPayload: "Invalid payload",
     emailChangeSuccess: "Email changed successfully",
     emailChangeFailed: "Email change failed",
     changeEmailDialog: "Change Email",

@@ -120,8 +120,15 @@ export function ProfilePage() {
       setConfirmPassword("");
     } catch (err: unknown) {
       let errorMessage = t("profilePage.passwordChangeFailed");
-      if (isAxiosError(err) && err.response?.status === 400) {
-        errorMessage = t("profilePage.currentPasswordIncorrect");
+      if (isAxiosError(err)) {
+        switch (err.response?.status) {
+          case 400:
+            errorMessage = t("profilePage.invalidPayload");
+            break;
+          case 403:
+            errorMessage = t("profilePage.currentPasswordIncorrect");
+            break;
+        }
       }
 
       setError(errorMessage);
