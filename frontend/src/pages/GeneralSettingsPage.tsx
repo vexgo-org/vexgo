@@ -91,7 +91,7 @@ export function GeneralSettingsPage() {
     }
 
     try {
-      const response = await unwrap(getVexGoAPI().postUpload(file));
+      const response = await unwrap(getVexGoAPI().postUpload({ file }));
       if (response.file?.url) {
         setConfig({ ...config, siteIcon: response.file.url });
       }

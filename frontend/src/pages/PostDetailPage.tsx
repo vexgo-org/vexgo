@@ -207,7 +207,7 @@ export function PostDetailPage() {
     try {
       const response = await unwrap(
         getVexGoAPI().postComments({
-          postId: post.id,
+          postId: Number(post.id),
           content: commentContent.trim(),
         }),
       );

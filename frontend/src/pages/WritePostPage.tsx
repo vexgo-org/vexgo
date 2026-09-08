@@ -258,7 +258,9 @@ export function WritePostPage() {
     setShowCropper(false);
     setUploadingImage(true);
     try {
-      const response = await unwrap(getVexGoAPI().postUpload(croppedFile));
+      const response = await unwrap(
+        getVexGoAPI().postUpload({ file: croppedFile }),
+      );
       setCoverImage(response.file?.url || "");
     } catch (err) {
       console.error("Failed to upload cropped image:", err);

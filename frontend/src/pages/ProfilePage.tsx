@@ -197,7 +197,7 @@ export function ProfilePage() {
     try {
       // Use the existing upload API
       const uploadResponse = await unwrap(
-        getVexGoAPI().postUpload(croppedFile),
+        getVexGoAPI().postUpload({ file: croppedFile }),
       );
       if (uploadResponse.file && uploadResponse.file.url) {
         // Update the user avatar

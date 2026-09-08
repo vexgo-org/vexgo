@@ -8,7 +8,7 @@ import {
 import type { User } from "@/types";
 import { t } from "@/lib/i18n";
 import { getVexGoAPI } from "@/api/generated/endpoints";
-import type { PostAuthLoginBody } from "@/api/generated/model";
+import type { AuthLoginRequestWire } from "@/api/generated/model";
 
 interface AuthContextType {
   user: User | null;
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     captchaData?: { id: string; token: string; x: number; y: number },
   ) => {
-    const requestData: PostAuthLoginBody = { email, password };
+    const requestData: AuthLoginRequestWire = { email, password };
     if (captchaData) {
       requestData.captcha_id = captchaData.id;
       requestData.captcha_token = captchaData.token;

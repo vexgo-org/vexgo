@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { isUserRole } from "@/lib/utils";
 
 export function UserManagementPage() {
   const { user: currentUser } = useAuth();
@@ -111,6 +112,10 @@ export function UserManagementPage() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
+      if (!isUserRole(newRole)) {
+        throw new Error(`Invalid user role: ${newRole}`);
+      }
+
       const response = await unwrap(
         getVexGoAPI().putUsersIdRole(Number(userId), { role: newRole }),
       );

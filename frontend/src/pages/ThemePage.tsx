@@ -127,11 +127,8 @@ export function ThemePage() {
     setUploading(true);
     setMessage(null);
 
-    const formData = new FormData();
-    formData.append("theme", file);
-
     try {
-      await getVexGoAPI().postConfigThemeUpload(formData);
+      await getVexGoAPI().postConfigThemeUpload({ theme: file });
       setMessage({ type: "success", text: t("themePage.uploadSuccess") });
       // Reload the theme list
       loadData();

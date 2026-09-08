@@ -56,7 +56,7 @@ export function RichTextEditor({
   const imageUploadHandler = useCallback(
     async (file: File): Promise<string> => {
       try {
-        const response = await getVexGoAPI().postUpload(file);
+        const response = await getVexGoAPI().postUpload({ file });
         return response.data.file!.url ?? "";
       } catch (error) {
         console.error("Failed to upload image:", error);
