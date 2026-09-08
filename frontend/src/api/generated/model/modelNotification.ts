@@ -19,9 +19,11 @@ export interface ModelNotification {
   related_id?: string;
   /** Owning post ID for reply/comment notifications */
   related_post_id?: number;
+  /** Related resource type */
   related_type?: ModelNotificationRelatedType;
   /** Notification title */
   title?: string;
+  /** Notification type: comment, like, reply, review, role */
   type?: ModelNotificationType;
   updated_at?: string;
   /** Receiving user ID */

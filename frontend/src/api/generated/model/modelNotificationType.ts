@@ -6,9 +6,6 @@
  * OpenAPI spec version: 1.0.0
  */
 
-/**
- * Notification type: comment, like, reply, review, role
- */
 export type ModelNotificationType =
   (typeof ModelNotificationType)[keyof typeof ModelNotificationType];
 

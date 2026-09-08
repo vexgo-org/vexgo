@@ -26,6 +26,7 @@ export interface ModelPost {
   /** rejection reason */
   rejectionReason?: string;
   slug?: string;
+  /** draft/published/pending/rejected */
   status?: ModelPostStatus;
   tags?: ModelTag[];
   title: string;

@@ -6,9 +6,6 @@
  * OpenAPI spec version: 1.0.0
  */
 
-/**
- * Related resource type
- */
 export type ModelNotificationRelatedType =
   (typeof ModelNotificationRelatedType)[keyof typeof ModelNotificationRelatedType];
 

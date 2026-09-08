@@ -840,7 +840,8 @@
                         "type": "integer"
                     },
                     "status": {
-                        "$ref": "#/components/schemas/model.CommentStatus"
+                        "$ref": "#/components/schemas/model.CommentStatus",
+                        "description": "published, pending, rejected"
                     },
                     "updatedAt": {
                         "type": "string"
@@ -902,7 +903,6 @@
                 "type": "object"
             },
             "model.CommentStatus": {
-                "description": "published, pending, rejected",
                 "enum": [
                     "pending",
                     "published",
@@ -1056,14 +1056,16 @@
                         "type": "integer"
                     },
                     "related_type": {
-                        "$ref": "#/components/schemas/model.NotificationRelatedType"
+                        "$ref": "#/components/schemas/model.NotificationRelatedType",
+                        "description": "Related resource type"
                     },
                     "title": {
                         "description": "Notification title",
                         "type": "string"
                     },
                     "type": {
-                        "$ref": "#/components/schemas/model.NotificationType"
+                        "$ref": "#/components/schemas/model.NotificationType",
+                        "description": "Notification type: comment, like, reply, review, role"
                     },
                     "updated_at": {
                         "type": "string"
@@ -1076,7 +1078,6 @@
                 "type": "object"
             },
             "model.NotificationRelatedType": {
-                "description": "Related resource type",
                 "enum": [
                     "post",
                     "comment",
@@ -1090,7 +1091,6 @@
                 ]
             },
             "model.NotificationType": {
-                "description": "Notification type: comment, like, reply, review, role",
                 "enum": [
                     "role",
                     "comment",
@@ -1152,7 +1152,8 @@
                         "type": "string"
                     },
                     "status": {
-                        "$ref": "#/components/schemas/model.PostStatus"
+                        "$ref": "#/components/schemas/model.PostStatus",
+                        "description": "draft/published/pending/rejected"
                     },
                     "tags": {
                         "items": {
@@ -1178,7 +1179,6 @@
                 "type": "object"
             },
             "model.PostStatus": {
-                "description": "draft/published/pending/rejected",
                 "enum": [
                     "pending",
                     "published",
@@ -2210,16 +2210,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.UpdateEmailRequestWire",
-                                        "summary": "request",
-                                        "description": "new email"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.UpdateEmailRequestWire",
+                                "summary": "request",
+                                "description": "new email"
                             }
                         }
                     },
@@ -2355,16 +2348,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.ResendVerificationRequestWire",
-                                        "summary": "request",
-                                        "description": "email"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.ResendVerificationRequestWire",
+                                "summary": "request",
+                                "description": "email"
                             }
                         }
                     },
@@ -2472,16 +2458,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.LoginRequestWire",
-                                        "summary": "request",
-                                        "description": "login payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.LoginRequestWire",
+                                "summary": "request",
+                                "description": "login payload"
                             }
                         }
                     },
@@ -2617,16 +2596,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.ChangePasswordRequestWire",
-                                        "summary": "request",
-                                        "description": "old and new password"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.ChangePasswordRequestWire",
+                                "summary": "request",
+                                "description": "old and new password"
                             }
                         }
                     },
@@ -2703,16 +2675,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.ResetPasswordRequestWire",
-                                        "summary": "request",
-                                        "description": "reset token and new password"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.ResetPasswordRequestWire",
+                                "summary": "request",
+                                "description": "reset token and new password"
                             }
                         }
                     },
@@ -2764,16 +2729,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.RequestPasswordResetRequestWire",
-                                        "summary": "request",
-                                        "description": "email"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.RequestPasswordResetRequestWire",
+                                "summary": "request",
+                                "description": "email"
                             }
                         }
                     },
@@ -2825,16 +2783,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.UpdateProfileRequestWire",
-                                        "summary": "request",
-                                        "description": "profile fields to update"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.UpdateProfileRequestWire",
+                                "summary": "request",
+                                "description": "profile fields to update"
                             }
                         }
                     },
@@ -2911,16 +2862,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.RegisterRequestWire",
-                                        "summary": "request",
-                                        "description": "registration payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.RegisterRequestWire",
+                                "summary": "request",
+                                "description": "registration payload"
                             }
                         }
                     },
@@ -3002,16 +2946,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/auth.UpdateSettingsRequestWire",
-                                        "summary": "request",
-                                        "description": "settings fields"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/auth.UpdateSettingsRequestWire",
+                                "summary": "request",
+                                "description": "settings fields"
                             }
                         }
                     },
@@ -3129,16 +3066,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/captcha.CaptchaVerifyRequest",
-                                        "summary": "request",
-                                        "description": "captcha id, token, and coordinates"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/captcha.CaptchaVerifyRequest",
+                                "summary": "request",
+                                "description": "captcha id, token, and coordinates"
                             }
                         }
                     },
@@ -3228,16 +3158,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/post.CreateCategoryRequest",
-                                        "summary": "request",
-                                        "description": "category payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/post.CreateCategoryRequest",
+                                "summary": "request",
+                                "description": "category payload"
                             }
                         }
                     },
@@ -3391,16 +3314,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/comment.CreateCommentRequest",
-                                        "summary": "request",
-                                        "description": "comment payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/comment.CreateCommentRequest",
+                                "summary": "request",
+                                "description": "comment payload"
                             }
                         }
                     },
@@ -3630,16 +3546,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/settings.AIConfigUpdateRequestBody",
-                                        "summary": "request",
-                                        "description": "new AI config"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/settings.AIConfigUpdateRequestBody",
+                                "summary": "request",
+                                "description": "new AI config"
                             }
                         }
                     },
@@ -3866,16 +3775,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/settings.GeneralSettingsUpdateRequest",
-                                        "summary": "request",
-                                        "description": "new general settings"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/settings.GeneralSettingsUpdateRequest",
+                                "summary": "request",
+                                "description": "new general settings"
                             }
                         }
                     },
@@ -3986,16 +3888,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/settings.SMTPConfigUpdateRequest",
-                                        "summary": "request",
-                                        "description": "new config"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/settings.SMTPConfigUpdateRequest",
+                                "summary": "request",
+                                "description": "new config"
                             }
                         }
                     },
@@ -4155,16 +4050,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/settings.ThemeConfigUpdateRequest",
-                                        "summary": "request",
-                                        "description": "theme id"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/settings.ThemeConfigUpdateRequest",
+                                "summary": "request",
+                                "description": "theme id"
                             }
                         }
                     },
@@ -4229,14 +4117,18 @@
                 "description": "Accepts a multipart/form-data body with a single\n'theme' part. The zip must contain a vexgo-theme.json\nmetadata file (either at the root or inside a single\nsubdirectory). Existing themes with the same id are\noverwritten.",
                 "requestBody": {
                     "content": {
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "title": "theme",
-                                "type": "file"
-                            }
-                        },
                         "multipart/form-data": {
                             "schema": {
+                                "properties": {
+                                    "theme": {
+                                        "description": "theme zip archive",
+                                        "format": "binary",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "theme"
+                                ],
                                 "type": "object"
                             }
                         }
@@ -4730,16 +4622,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/comment.UpdateModerationConfigBody",
-                                        "summary": "request",
-                                        "description": "new config"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/comment.UpdateModerationConfigBody",
+                                "summary": "request",
+                                "description": "new config"
                             }
                         }
                     },
@@ -5220,16 +5105,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/post.RejectPostRequest",
-                                        "summary": "request",
-                                        "description": "rejection reason"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/post.RejectPostRequest",
+                                "summary": "request",
+                                "description": "rejection reason"
                             }
                         }
                     },
@@ -5886,16 +5764,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/post.CreatePostRequest",
-                                        "summary": "request",
-                                        "description": "post payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/post.CreatePostRequest",
+                                "summary": "request",
+                                "description": "post payload"
                             }
                         }
                     },
@@ -6325,16 +6196,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/post.UpdatePostRequest",
-                                        "summary": "request",
-                                        "description": "updated post fields"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/post.UpdatePostRequest",
+                                "summary": "request",
+                                "description": "updated post fields"
                             }
                         }
                     },
@@ -6766,16 +6630,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/post.CreateTagRequest",
-                                        "summary": "request",
-                                        "description": "tag payload"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/post.CreateTagRequest",
+                                "summary": "request",
+                                "description": "tag payload"
                             }
                         }
                     },
@@ -6927,14 +6784,18 @@
                 "description": "Accepts a multipart/form-data body with a single 'file'\npart. The stored filename is a freshly generated UUID\nplus the sanitized extension from the original filename;\nany untrusted characters are stripped before persistence.\nRequires authentication.",
                 "requestBody": {
                     "content": {
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "title": "file",
-                                "type": "file"
-                            }
-                        },
                         "multipart/form-data": {
                             "schema": {
+                                "properties": {
+                                    "file": {
+                                        "description": "file to upload",
+                                        "format": "binary",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ],
                                 "type": "object"
                             }
                         }
@@ -7000,14 +6861,18 @@
                 "description": "Accepts a multipart/form-data body with one or more\n'files' parts. Per-file failures are silently dropped;\nthe response only includes the rows that persisted.\nRequires authentication.",
                 "requestBody": {
                     "content": {
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "title": "files",
-                                "type": "file"
-                            }
-                        },
                         "multipart/form-data": {
                             "schema": {
+                                "properties": {
+                                    "files": {
+                                        "description": "files to upload (repeatable)",
+                                        "format": "binary",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ],
                                 "type": "object"
                             }
                         }
@@ -7261,16 +7126,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/user.ApplyForCreatorRequest",
-                                        "summary": "request",
-                                        "description": "application reason"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/user.ApplyForCreatorRequest",
+                                "summary": "request",
+                                "description": "application reason"
                             }
                         }
                     },
@@ -7438,16 +7296,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/user.ReviewCreatorApplicationBody",
-                                        "summary": "request",
-                                        "description": "approve or reject"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/user.ReviewCreatorApplicationBody",
+                                "summary": "request",
+                                "description": "approve or reject"
                             }
                         }
                     },
@@ -7632,16 +7483,9 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/user.UpdateUserRoleBody",
-                                        "summary": "request",
-                                        "description": "new role"
-                                    }
-                                ]
+                                "$ref": "#/components/schemas/user.UpdateUserRoleBody",
+                                "summary": "request",
+                                "description": "new role"
                             }
                         }
                     },

@@ -20,6 +20,7 @@ export interface ModelComment {
   moderationReason?: string;
   parentId?: number;
   postId?: number;
+  /** published, pending, rejected */
   status?: ModelCommentStatus;
   updatedAt?: string;
   userId?: number;

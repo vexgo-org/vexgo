@@ -6,9 +6,6 @@
  * OpenAPI spec version: 1.0.0
  */
 
-/**
- * published, pending, rejected
- */
 export type ModelCommentStatus =
   (typeof ModelCommentStatus)[keyof typeof ModelCommentStatus];
 

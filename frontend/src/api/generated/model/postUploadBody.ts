@@ -6,4 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type PostUploadMultipleBodyTwo = { [key: string]: unknown };
+export type PostUploadBody = {
+  /** file to upload */
+  file: Blob | File;
+};

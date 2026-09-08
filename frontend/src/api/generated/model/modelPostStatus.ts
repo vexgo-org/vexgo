@@ -6,9 +6,6 @@
  * OpenAPI spec version: 1.0.0
  */
 
-/**
- * draft/published/pending/rejected
- */
 export type ModelPostStatus =
   (typeof ModelPostStatus)[keyof typeof ModelPostStatus];
 

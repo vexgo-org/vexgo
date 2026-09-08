@@ -6,23 +6,35 @@
  * OpenAPI spec version: 1.0.0
  */
 import type {
+  AuthChangePasswordRequestWire,
   AuthCurrentUserResponse,
   AuthGenericMessageResponse,
+  AuthLoginRequestWire,
   AuthLoginResponse,
+  AuthRegisterRequestWire,
   AuthRegisterResponse,
+  AuthRequestPasswordResetRequestWire,
+  AuthResendVerificationRequestWire,
+  AuthResetPasswordRequestWire,
   AuthUpdateEmailCompleteResponse,
   AuthUpdateEmailPendingResponse,
+  AuthUpdateEmailRequestWire,
+  AuthUpdateProfileRequestWire,
+  AuthUpdateSettingsRequestWire,
   AuthUpdateSettingsResponse,
   AuthVerificationStatusResponse,
   AuthVerifyEmailResponse,
   CaptchaCaptchaGenerateResponse,
+  CaptchaCaptchaVerifyRequest,
   CaptchaCaptchaVerifyResponse,
   CommentCommentListResponse,
   CommentCommentMessageResponse,
   CommentCommentModerationListResponse,
+  CommentCreateCommentRequest,
   CommentCreateCommentResponse,
   CommentDeleteCommentResponse,
   CommentTestModerationResponse,
+  CommentUpdateModerationConfigBody,
   CommentUpdateModerationConfigResponse,
   GetAuthEmailVerifyParams,
   GetModerationApprovedParams,
@@ -47,17 +59,12 @@ import type {
   NotificationMessageResponse,
   NotificationNotificationListResponse,
   NotificationUnreadCountResponse,
-  PostAuthEmailVerifyResendBody,
-  PostAuthLoginBody,
-  PostAuthPasswordResetBody,
-  PostAuthPasswordResetRequestBody,
-  PostAuthRegisterBody,
-  PostCaptchaVerifyBody,
-  PostCategoriesBody,
   PostCategoriesListResponse,
-  PostCommentsBody,
-  PostConfigThemeUploadBodyTwo,
+  PostConfigThemeUploadBody,
+  PostCreateCategoryRequest,
   PostCreateCategoryResponse,
+  PostCreatePostRequest,
+  PostCreateTagRequest,
   PostCreateTagResponse,
   PostDeleteMessageResponse,
   PostLikeResponse,
@@ -67,34 +74,24 @@ import type {
   PostPostListResponseData,
   PostPostMessageResponse,
   PostPostSingleResponse,
-  PostPostsBody,
-  PostTagsBody,
+  PostRejectPostRequest,
   PostTagsListResponse,
-  PostUploadBodyTwo,
-  PostUploadMultipleBodyTwo,
-  PostUsersApplyCreatorBody,
-  PutAuthEmailBody,
-  PutAuthPasswordBody,
-  PutAuthProfileBody,
-  PutAuthSettingsBody,
-  PutConfigAiBody,
-  PutConfigGeneralBody,
-  PutConfigSmtpBody,
-  PutConfigThemeBody,
-  PutModerationCommentsConfigBody,
-  PutModerationRejectIdBody,
-  PutPostsIdBody,
-  PutUsersCreatorApplicationsIdReviewBody,
-  PutUsersIdRoleBody,
+  PostUpdatePostRequest,
+  PostUploadBody,
+  PostUploadMultipleBody,
   SettingsAIConfigResponse,
+  SettingsAIConfigUpdateRequestBody,
   SettingsAIConfigUpdateResponse,
   SettingsAIModelsResponse,
   SettingsAITestResponse,
   SettingsGeneralSettingsResponse,
+  SettingsGeneralSettingsUpdateRequest,
   SettingsGeneralSettingsUpdateResponse,
   SettingsSMTPConfigResponse,
+  SettingsSMTPConfigUpdateRequest,
   SettingsTestSMTPResponse,
   SettingsThemeConfigResponse,
+  SettingsThemeConfigUpdateRequest,
   SettingsThemeConfigUpdateResponse,
   SettingsThemeUploadResponse,
   SettingsThemesListResponse,
@@ -103,9 +100,12 @@ import type {
   UploadMessageResponse,
   UploadMultiUploadResponse,
   UploadUploadResponse,
+  UserApplyForCreatorRequest,
   UserApplyForCreatorResponse,
   UserCreatorApplicationListResponse,
   UserMessageResponse,
+  UserReviewCreatorApplicationBody,
+  UserUpdateUserRoleBody,
   UserUserListResponse,
   UserUserMessageResponse,
 } from "./model";
@@ -121,14 +121,16 @@ export const getVexGoAPI = () => {
    * via the `pending` boolean.
    * @summary Change the authenticated user's email
    */
-  const putAuthEmail = (putAuthEmailBody: PutAuthEmailBody) => {
+  const putAuthEmail = (
+    authUpdateEmailRequestWire: AuthUpdateEmailRequestWire,
+  ) => {
     return customInstance<
       AuthUpdateEmailPendingResponse | AuthUpdateEmailCompleteResponse
     >({
       url: `/auth/email`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putAuthEmailBody,
+      data: authUpdateEmailRequestWire,
     });
   };
 
@@ -157,13 +159,13 @@ export const getVexGoAPI = () => {
    * @summary Resend the verification email
    */
   const postAuthEmailVerifyResend = (
-    postAuthEmailVerifyResendBody: PostAuthEmailVerifyResendBody,
+    authResendVerificationRequestWire: AuthResendVerificationRequestWire,
   ) => {
     return customInstance<AuthGenericMessageResponse>({
       url: `/auth/email/verify/resend`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postAuthEmailVerifyResendBody,
+      data: authResendVerificationRequestWire,
     });
   };
 
@@ -188,12 +190,12 @@ export const getVexGoAPI = () => {
    * configured to require captcha on login.
    * @summary Log in
    */
-  const postAuthLogin = (postAuthLoginBody: PostAuthLoginBody) => {
+  const postAuthLogin = (authLoginRequestWire: AuthLoginRequestWire) => {
     return customInstance<AuthLoginResponse>({
       url: `/auth/login`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postAuthLoginBody,
+      data: authLoginRequestWire,
     });
   };
 
@@ -210,12 +212,14 @@ export const getVexGoAPI = () => {
   /**
    * @summary Change the authenticated user's password
    */
-  const putAuthPassword = (putAuthPasswordBody: PutAuthPasswordBody) => {
+  const putAuthPassword = (
+    authChangePasswordRequestWire: AuthChangePasswordRequestWire,
+  ) => {
     return customInstance<AuthGenericMessageResponse>({
       url: `/auth/password`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putAuthPasswordBody,
+      data: authChangePasswordRequestWire,
     });
   };
 
@@ -226,13 +230,13 @@ export const getVexGoAPI = () => {
    * @summary Reset password with an emailed token
    */
   const postAuthPasswordReset = (
-    postAuthPasswordResetBody: PostAuthPasswordResetBody,
+    authResetPasswordRequestWire: AuthResetPasswordRequestWire,
   ) => {
     return customInstance<AuthGenericMessageResponse>({
       url: `/auth/password/reset`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postAuthPasswordResetBody,
+      data: authResetPasswordRequestWire,
     });
   };
 
@@ -245,13 +249,13 @@ export const getVexGoAPI = () => {
    * @summary Request a password reset email
    */
   const postAuthPasswordResetRequest = (
-    postAuthPasswordResetRequestBody: PostAuthPasswordResetRequestBody,
+    authRequestPasswordResetRequestWire: AuthRequestPasswordResetRequestWire,
   ) => {
     return customInstance<AuthGenericMessageResponse>({
       url: `/auth/password/reset/request`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postAuthPasswordResetRequestBody,
+      data: authRequestPasswordResetRequestWire,
     });
   };
 
@@ -261,12 +265,14 @@ export const getVexGoAPI = () => {
    * request is left unchanged.
    * @summary Update profile fields
    */
-  const putAuthProfile = (putAuthProfileBody: PutAuthProfileBody) => {
+  const putAuthProfile = (
+    authUpdateProfileRequestWire: AuthUpdateProfileRequestWire,
+  ) => {
     return customInstance<AuthCurrentUserResponse>({
       url: `/auth/profile`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putAuthProfileBody,
+      data: authUpdateProfileRequestWire,
     });
   };
 
@@ -279,12 +285,14 @@ export const getVexGoAPI = () => {
    * cannot log in until it is verified.
    * @summary Register a new account
    */
-  const postAuthRegister = (postAuthRegisterBody: PostAuthRegisterBody) => {
+  const postAuthRegister = (
+    authRegisterRequestWire: AuthRegisterRequestWire,
+  ) => {
     return customInstance<AuthRegisterResponse>({
       url: `/auth/register`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postAuthRegisterBody,
+      data: authRegisterRequestWire,
     });
   };
 
@@ -294,12 +302,14 @@ export const getVexGoAPI = () => {
    * left unchanged.
    * @summary Update privacy settings
    */
-  const putAuthSettings = (putAuthSettingsBody: PutAuthSettingsBody) => {
+  const putAuthSettings = (
+    authUpdateSettingsRequestWire: AuthUpdateSettingsRequestWire,
+  ) => {
     return customInstance<AuthUpdateSettingsResponse>({
       url: `/auth/settings`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putAuthSettingsBody,
+      data: authUpdateSettingsRequestWire,
     });
   };
 
@@ -326,12 +336,14 @@ export const getVexGoAPI = () => {
    * require captcha verification.
    * @summary Verify a captcha solution
    */
-  const postCaptchaVerify = (postCaptchaVerifyBody: PostCaptchaVerifyBody) => {
+  const postCaptchaVerify = (
+    captchaCaptchaVerifyRequest: CaptchaCaptchaVerifyRequest,
+  ) => {
     return customInstance<CaptchaCaptchaVerifyResponse>({
       url: `/captcha/verify`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postCaptchaVerifyBody,
+      data: captchaCaptchaVerifyRequest,
     });
   };
 
@@ -349,12 +361,14 @@ export const getVexGoAPI = () => {
    * Contributors and above can create categories.
    * @summary Create a category
    */
-  const postCategories = (postCategoriesBody: PostCategoriesBody) => {
+  const postCategories = (
+    postCreateCategoryRequest: PostCreateCategoryRequest,
+  ) => {
     return customInstance<PostCreateCategoryResponse>({
       url: `/categories`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postCategoriesBody,
+      data: postCreateCategoryRequest,
     });
   };
 
@@ -377,12 +391,14 @@ export const getVexGoAPI = () => {
    * it, or the LLM filter rejects it.
    * @summary Create a comment
    */
-  const postComments = (postCommentsBody: PostCommentsBody) => {
+  const postComments = (
+    commentCreateCommentRequest: CommentCreateCommentRequest,
+  ) => {
     return customInstance<CommentCreateCommentResponse>({
       url: `/comments`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postCommentsBody,
+      data: commentCreateCommentRequest,
     });
   };
 
@@ -428,12 +444,14 @@ export const getVexGoAPI = () => {
    * unchanged.
    * @summary Update AI configuration
    */
-  const putConfigAi = (putConfigAiBody: PutConfigAiBody) => {
+  const putConfigAi = (
+    settingsAIConfigUpdateRequestBody: SettingsAIConfigUpdateRequestBody,
+  ) => {
     return customInstance<SettingsAIConfigUpdateResponse>({
       url: `/config/ai`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putConfigAiBody,
+      data: settingsAIConfigUpdateRequestBody,
     });
   };
 
@@ -477,12 +495,14 @@ export const getVexGoAPI = () => {
   /**
    * @summary Update general site settings
    */
-  const putConfigGeneral = (putConfigGeneralBody: PutConfigGeneralBody) => {
+  const putConfigGeneral = (
+    settingsGeneralSettingsUpdateRequest: SettingsGeneralSettingsUpdateRequest,
+  ) => {
     return customInstance<SettingsGeneralSettingsUpdateResponse>({
       url: `/config/general`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putConfigGeneralBody,
+      data: settingsGeneralSettingsUpdateRequest,
     });
   };
 
@@ -504,12 +524,14 @@ export const getVexGoAPI = () => {
    * existing password unchanged.
    * @summary Update SMTP configuration
    */
-  const putConfigSmtp = (putConfigSmtpBody: PutConfigSmtpBody) => {
+  const putConfigSmtp = (
+    settingsSMTPConfigUpdateRequest: SettingsSMTPConfigUpdateRequest,
+  ) => {
     return customInstance<SettingsSMTPConfigResponse>({
       url: `/config/smtp`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putConfigSmtpBody,
+      data: settingsSMTPConfigUpdateRequest,
     });
   };
 
@@ -539,12 +561,14 @@ export const getVexGoAPI = () => {
   /**
    * @summary Set the active theme
    */
-  const putConfigTheme = (putConfigThemeBody: PutConfigThemeBody) => {
+  const putConfigTheme = (
+    settingsThemeConfigUpdateRequest: SettingsThemeConfigUpdateRequest,
+  ) => {
     return customInstance<SettingsThemeConfigUpdateResponse>({
       url: `/config/theme`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putConfigThemeBody,
+      data: settingsThemeConfigUpdateRequest,
     });
   };
 
@@ -557,12 +581,16 @@ export const getVexGoAPI = () => {
    * @summary Upload a theme zip
    */
   const postConfigThemeUpload = (
-    postConfigThemeUploadBody: unknown | PostConfigThemeUploadBodyTwo,
+    postConfigThemeUploadBody: PostConfigThemeUploadBody,
   ) => {
+    const formData = new FormData();
+    formData.append(`theme`, postConfigThemeUploadBody.theme);
+
     return customInstance<SettingsThemeUploadResponse>({
       url: `/config/theme/upload`,
       method: "POST",
-      data: postConfigThemeUploadBody,
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
     });
   };
 
@@ -664,13 +692,13 @@ export const getVexGoAPI = () => {
    * @summary Update comment moderation config
    */
   const putModerationCommentsConfig = (
-    putModerationCommentsConfigBody: PutModerationCommentsConfigBody,
+    commentUpdateModerationConfigBody: CommentUpdateModerationConfigBody,
   ) => {
     return customInstance<CommentUpdateModerationConfigResponse>({
       url: `/moderation/comments/config`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putModerationCommentsConfigBody,
+      data: commentUpdateModerationConfigBody,
     });
   };
 
@@ -754,13 +782,13 @@ export const getVexGoAPI = () => {
    */
   const putModerationRejectId = (
     id: string,
-    putModerationRejectIdBody: PutModerationRejectIdBody,
+    postRejectPostRequest: PostRejectPostRequest,
   ) => {
     return customInstance<PostPostMessageResponse>({
       url: `/moderation/reject/${id}`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putModerationRejectIdBody,
+      data: postRejectPostRequest,
     });
   };
 
@@ -867,12 +895,12 @@ export const getVexGoAPI = () => {
    * is saved as a draft.
    * @summary Create a post
    */
-  const postPosts = (postPostsBody: PostPostsBody) => {
+  const postPosts = (postCreatePostRequest: PostCreatePostRequest) => {
     return customInstance<PostPostMessageResponse>({
       url: `/posts`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postPostsBody,
+      data: postCreatePostRequest,
     });
   };
 
@@ -943,12 +971,15 @@ export const getVexGoAPI = () => {
    * any post. Only the supplied fields are updated.
    * @summary Update a post
    */
-  const putPostsId = (id: string, putPostsIdBody: PutPostsIdBody) => {
+  const putPostsId = (
+    id: string,
+    postUpdatePostRequest: PostUpdatePostRequest,
+  ) => {
     return customInstance<PostPostMessageResponse>({
       url: `/posts/${id}`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putPostsIdBody,
+      data: postUpdatePostRequest,
     });
   };
 
@@ -1068,12 +1099,12 @@ export const getVexGoAPI = () => {
    * Contributors and above can create tags.
    * @summary Create a tag
    */
-  const postTags = (postTagsBody: PostTagsBody) => {
+  const postTags = (postCreateTagRequest: PostCreateTagRequest) => {
     return customInstance<PostCreateTagResponse>({
       url: `/tags`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postTagsBody,
+      data: postCreateTagRequest,
     });
   };
 
@@ -1096,11 +1127,15 @@ export const getVexGoAPI = () => {
    * Requires authentication.
    * @summary Upload a single file
    */
-  const postUpload = (postUploadBody: unknown | PostUploadBodyTwo) => {
+  const postUpload = (postUploadBody: PostUploadBody) => {
+    const formData = new FormData();
+    formData.append(`file`, postUploadBody.file);
+
     return customInstance<UploadUploadResponse>({
       url: `/upload`,
       method: "POST",
-      data: postUploadBody,
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
     });
   };
 
@@ -1112,12 +1147,16 @@ export const getVexGoAPI = () => {
    * @summary Upload multiple files
    */
   const postUploadMultiple = (
-    postUploadMultipleBody: unknown | PostUploadMultipleBodyTwo,
+    postUploadMultipleBody: PostUploadMultipleBody,
   ) => {
+    const formData = new FormData();
+    formData.append(`files`, postUploadMultipleBody.files);
+
     return customInstance<UploadMultiUploadResponse>({
       url: `/upload/multiple`,
       method: "POST",
-      data: postUploadMultipleBody,
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
     });
   };
 
@@ -1164,13 +1203,13 @@ export const getVexGoAPI = () => {
    * @summary Apply for the creator role
    */
   const postUsersApplyCreator = (
-    postUsersApplyCreatorBody: PostUsersApplyCreatorBody,
+    userApplyForCreatorRequest: UserApplyForCreatorRequest,
   ) => {
     return customInstance<UserApplyForCreatorResponse>({
       url: `/users/apply-creator`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: postUsersApplyCreatorBody,
+      data: userApplyForCreatorRequest,
     });
   };
 
@@ -1197,13 +1236,13 @@ export const getVexGoAPI = () => {
    */
   const putUsersCreatorApplicationsIdReview = (
     id: number,
-    putUsersCreatorApplicationsIdReviewBody: PutUsersCreatorApplicationsIdReviewBody,
+    userReviewCreatorApplicationBody: UserReviewCreatorApplicationBody,
   ) => {
     return customInstance<UserMessageResponse>({
       url: `/users/creator-applications/${id}/review`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putUsersCreatorApplicationsIdReviewBody,
+      data: userReviewCreatorApplicationBody,
     });
   };
 
@@ -1229,13 +1268,13 @@ export const getVexGoAPI = () => {
    */
   const putUsersIdRole = (
     id: number,
-    putUsersIdRoleBody: PutUsersIdRoleBody,
+    userUpdateUserRoleBody: UserUpdateUserRoleBody,
   ) => {
     return customInstance<UserUserMessageResponse>({
       url: `/users/${id}/role`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: putUsersIdRoleBody,
+      data: userUpdateUserRoleBody,
     });
   };
 
