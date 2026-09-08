@@ -8,7 +8,7 @@
 import type { PostUpdatePostRequestStatus } from "./postUpdatePostRequestStatus";
 
 export interface PostUpdatePostRequest {
-  category?: number;
+  category?: string;
   content?: string;
   coverImage?: string;
   excerpt?: string;

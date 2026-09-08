@@ -51,7 +51,7 @@ type CreatePostRequest struct {
 	Slug       string   `json:"slug" binding:"required" example:"my-first-post"`
 	Title      string   `json:"title" binding:"required" example:"My First Post"`
 	Content    string   `json:"content" binding:"required" example:"<p>Hello world</p>"`
-	Category   any      `json:"category" binding:"required" swaggertype:"primitive,integer" example:"1"`
+	Category   string   `json:"category" binding:"required" example:"1"`
 	Tags       []string `json:"tags" example:"intro,personal"`
 	Excerpt    string   `json:"excerpt" example:"A short summary"`
 	CoverImage string   `json:"coverImage" example:"https://example.com/cover.jpg"`
@@ -64,7 +64,7 @@ type UpdatePostRequest struct {
 	Slug       string   `json:"slug" example:"my-first-post"`
 	Title      string   `json:"title" example:"My First Post"`
 	Content    string   `json:"content" example:"<p>Hello world</p>"`
-	Category   any      `json:"category" swaggertype:"primitive,integer" example:"1"`
+	Category   string   `json:"category" example:"1"`
 	Tags       []string `json:"tags" example:"intro,personal"`
 	Excerpt    string   `json:"excerpt" example:"A short summary"`
 	CoverImage string   `json:"coverImage" example:"https://example.com/cover.jpg"`

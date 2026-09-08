@@ -8,7 +8,7 @@
 import type { PostCreatePostRequestStatus } from "./postCreatePostRequestStatus";
 
 export interface PostCreatePostRequest {
-  category: number;
+  category: string;
   content: string;
   coverImage?: string;
   excerpt?: string;

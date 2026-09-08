@@ -10,5 +10,6 @@ export interface CommentCreateCommentRequest {
   /** @maxLength 100 */
   content: string;
   parentId?: number;
+  /** TODO: Consider change the type of `PostID` to `uint`. */
   postId: number;
 }

@@ -16,6 +16,7 @@ type CommentListResponse struct {
 // The postId field accepts either a number or a string; the
 // service layer normalises the type before persisting.
 type CreateCommentRequest struct {
+	// TODO: Consider change the type of `PostID` to `uint`.
 	PostID   any    `json:"postId" binding:"required" swaggertype:"primitive,integer" example:"42"`
 	Content  string `json:"content" binding:"required" maxLength:"100" example:"Great post!"`
 	ParentID *uint  `json:"parentId" swaggertype:"primitive,integer" example:"7"`

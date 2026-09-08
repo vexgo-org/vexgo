@@ -601,6 +601,7 @@
                         "type": "integer"
                     },
                     "postId": {
+                        "description": "TODO: Consider change the type of `PostID` to `uint`.",
                         "example": 42,
                         "type": "integer"
                     }
@@ -1369,8 +1370,8 @@
             "post.CreatePostRequest": {
                 "properties": {
                     "category": {
-                        "example": 1,
-                        "type": "integer"
+                        "example": "1",
+                        "type": "string"
                     },
                     "content": {
                         "example": "\u003cp\u003eHello world\u003c/p\u003e",
@@ -1594,8 +1595,8 @@
             "post.UpdatePostRequest": {
                 "properties": {
                     "category": {
-                        "example": 1,
-                        "type": "integer"
+                        "example": "1",
+                        "type": "string"
                     },
                     "content": {
                         "example": "\u003cp\u003eHello world\u003c/p\u003e",
