@@ -456,7 +456,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		404		{object}	api.ErrorResponse	"user not found"
 //	@Failure		500		{object}	api.ErrorResponse
-//	@Router			/auth/email [post]
+//	@Router			/auth/email [put]
 func (h *Handler) UpdateEmail(c *gin.Context) {
 	var req UpdateEmailRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {

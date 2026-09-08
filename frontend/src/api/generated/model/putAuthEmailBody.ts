@@ -7,5 +7,5 @@
  */
 import type { AuthUpdateEmailRequestWire } from "./authUpdateEmailRequestWire";
 
-export type PostAuthEmailBody =
+export type PutAuthEmailBody =
   { [key: string]: unknown } | AuthUpdateEmailRequestWire;

@@ -2204,7 +2204,7 @@
     },
     "paths": {
         "/auth/email": {
-            "post": {
+            "put": {
                 "description": "Sends a verification link to the new address when\nSMTP is enabled, or applies the change directly\notherwise. The 200 response indicates the request\nwas accepted; the body distinguishes the two paths\nvia the `pending` boolean.",
                 "requestBody": {
                     "content": {

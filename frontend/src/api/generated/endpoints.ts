@@ -47,7 +47,6 @@ import type {
   NotificationMessageResponse,
   NotificationNotificationListResponse,
   NotificationUnreadCountResponse,
-  PostAuthEmailBody,
   PostAuthEmailVerifyResendBody,
   PostAuthLoginBody,
   PostAuthPasswordResetBody,
@@ -74,6 +73,7 @@ import type {
   PostUploadBodyTwo,
   PostUploadMultipleBodyTwo,
   PostUsersApplyCreatorBody,
+  PutAuthEmailBody,
   PutAuthPasswordBody,
   PutAuthProfileBody,
   PutAuthSettingsBody,
@@ -121,14 +121,14 @@ export const getVexGoAPI = () => {
    * via the `pending` boolean.
    * @summary Change the authenticated user's email
    */
-  const postAuthEmail = (postAuthEmailBody: PostAuthEmailBody) => {
+  const putAuthEmail = (putAuthEmailBody: PutAuthEmailBody) => {
     return customInstance<
       AuthUpdateEmailPendingResponse | AuthUpdateEmailCompleteResponse
     >({
       url: `/auth/email`,
-      method: "POST",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      data: postAuthEmailBody,
+      data: putAuthEmailBody,
     });
   };
 
@@ -1240,7 +1240,7 @@ export const getVexGoAPI = () => {
   };
 
   return {
-    postAuthEmail,
+    putAuthEmail,
     getAuthEmailVerify,
     postAuthEmailVerifyResend,
     getAuthEmailVerifyStatus,
@@ -1325,8 +1325,8 @@ export const getVexGoAPI = () => {
     putUsersIdRole,
   };
 };
-export type PostAuthEmailResult = NonNullable<
-  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAuthEmail"]>>
+export type PutAuthEmailResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putAuthEmail"]>>
 >;
 export type GetAuthEmailVerifyResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getAuthEmailVerify"]>>

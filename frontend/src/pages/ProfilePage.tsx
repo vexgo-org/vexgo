@@ -148,7 +148,7 @@ export function ProfilePage() {
 
     try {
       const response = await unwrap(
-        getVexGoAPI().postAuthEmail({ email: newEmail }),
+        getVexGoAPI().putAuthEmail({ email: newEmail }),
       );
       setSuccess(response.message ?? "");
       setNewEmail("");
