@@ -211,7 +211,7 @@ type UpdateRequest struct {
 	Slug       string
 	Title      string
 	Content    string
-	Category   any
+	Category   string
 	Tags       []string
 	Excerpt    string
 	CoverImage string
@@ -266,19 +266,8 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 	if req.Content != "" {
 		post.Content = req.Content
 	}
-	if req.Category != nil {
-		switch v := req.Category.(type) {
-		case string:
-			post.Category = v
-		case float64:
-			post.Category = strconv.FormatFloat(v, 'f', -1, 64)
-		case int:
-			post.Category = strconv.Itoa(v)
-		case int64:
-			post.Category = strconv.FormatInt(v, 10)
-		default:
-			post.Category = fmt.Sprintf("%v", v)
-		}
+	if req.Category != "" {
+		post.Category = req.Category
 	}
 	if req.Excerpt != "" {
 		post.Excerpt = req.Excerpt
