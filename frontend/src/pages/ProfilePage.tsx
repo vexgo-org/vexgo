@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ImageCropper from "@/components/image/ImageCropper";
+import { isAxiosError } from "axios";
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -118,10 +119,11 @@ export function ProfilePage() {
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : t("profilePage.passwordChangeFailed");
+      let errorMessage = t("profilePage.passwordChangeFailed");
+      if (isAxiosError(err) && err.response?.status === 400) {
+        errorMessage = t("profilePage.currentPasswordIncorrect");
+      }
+
       setError(errorMessage);
     } finally {
       setPasswordLoading(false);

@@ -363,6 +363,8 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 //	@Failure	500		{object}	api.ErrorResponse
 //	@Router		/auth/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
+	// TODO: Discuss status code of `invalid payload` and `old password is wrong`.
+
 	var req ChangePasswordRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
