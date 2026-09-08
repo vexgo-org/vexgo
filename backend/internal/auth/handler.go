@@ -378,7 +378,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		case errors.Is(err, ErrUserNotFound):
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrWrongPassword):
-			c.JSON(http.StatusUnauthorized, api.ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrEncryptPassword):
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:
