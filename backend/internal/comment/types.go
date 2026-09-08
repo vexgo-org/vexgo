@@ -65,7 +65,7 @@ type UpdateModerationConfigResponse struct {
 }
 
 // TestModerationResponse is the body of POST
-// /api/moderation/comments/test. The `response` field is the
+// /api/moderation/comments/config/test. The `response` field is the
 // raw text the configured LLM returned for the test prompt.
 type TestModerationResponse struct {
 	Message  string `json:"message"`

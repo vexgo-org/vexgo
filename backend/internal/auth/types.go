@@ -127,19 +127,19 @@ type UpdateSettingsResponse struct {
 	User    *model.User `json:"user"`
 }
 
-// UpdateEmailRequestWire is the body of POST /api/auth/email.
+// UpdateEmailRequestWire is the body of PUT /api/auth/email.
 type UpdateEmailRequestWire struct {
 	Email string `json:"email" binding:"required,email" example:"newmail@example.com"`
 }
 
-// UpdateEmailPendingResponse is the body of POST /api/auth/email
+// UpdateEmailPendingResponse is the body of PUT /api/auth/email
 // when a verification email has been sent.
 type UpdateEmailPendingResponse struct {
 	Message string `json:"message" example:"Verification email sent."`
 	Pending bool   `json:"pending" example:"true"`
 }
 
-// UpdateEmailCompleteResponse is the body of POST /api/auth/email
+// UpdateEmailCompleteResponse is the body of PUT /api/auth/email
 // when the change is applied directly (no verification step).
 type UpdateEmailCompleteResponse struct {
 	Message string `json:"message" example:"Email updated successfully"`
