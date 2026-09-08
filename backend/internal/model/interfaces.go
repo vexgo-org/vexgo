@@ -23,5 +23,5 @@ type Notifier interface {
 // FileRemover deletes a stored file by its public URL; implemented by
 // upload.Storage and injected so it can be faked in tests.
 type FileRemover interface {
-	Delete(url string) error
+	Delete(ctx context.Context, url string) error
 }

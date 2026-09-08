@@ -508,7 +508,7 @@ func (s *Service) deleteOldAvatar(ctx context.Context, userID uint, url string) 
 		slog.Warn("old avatar media record belongs to another user, skipping deletion", "userID", userID, "ownerID", media.UserID, "url", url)
 		return
 	}
-	if err := s.files.Delete(url); err != nil {
+	if err := s.files.Delete(ctx, url); err != nil {
 		slog.Warn("failed to delete old avatar", "url", url, "err", err)
 	}
 }

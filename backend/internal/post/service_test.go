@@ -26,7 +26,7 @@ type fakeRemover struct {
 	deleted []string
 }
 
-func (f *fakeRemover) Delete(url string) error {
+func (f *fakeRemover) Delete(_ context.Context, url string) error {
 	f.deleted = append(f.deleted, url)
 	return nil
 }

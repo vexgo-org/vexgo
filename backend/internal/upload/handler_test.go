@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -72,7 +73,7 @@ func TestLocalStorage_ContainsHostileFilenames(t *testing.T) {
 	}
 
 	for _, name := range []string{"../evil.txt", "media/../../evil.txt", "/tmp/evil.txt", ".."} {
-		if _, err := storage.Upload(strings.NewReader("evil"), name, ""); err == nil {
+		if _, err := storage.Upload(context.Background(), strings.NewReader("evil"), name, ""); err == nil {
 			t.Errorf("Upload(%q): expected error, got nil", name)
 		}
 		// Delete cannot escape either: filepath.Base neutralizes traversal
@@ -80,7 +81,7 @@ func TestLocalStorage_ContainsHostileFilenames(t *testing.T) {
 		// rejected outright, and os.Root confines the removal; the decoy must
 		// survive all of them.
 		for _, url := range []string{"/uploads/" + name, name} {
-			err := storage.Delete(url)
+			err := storage.Delete(context.Background(), url)
 			if name == ".." {
 				if err == nil {
 					t.Errorf("Delete(%q): expected error, got nil", url)

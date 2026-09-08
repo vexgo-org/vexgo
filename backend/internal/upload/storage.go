@@ -22,10 +22,10 @@ import (
 type Storage interface {
 	// Upload stores the file content under a generated key and returns its
 	// public URL.
-	Upload(reader io.Reader, filename, contentType string) (string, error)
+	Upload(ctx context.Context, reader io.Reader, filename, contentType string) (string, error)
 	// Delete removes the file identified by its public URL. Missing files are
 	// not an error.
-	Delete(url string) error
+	Delete(ctx context.Context, url string) error
 }
 
 // S3Storage stores files in an S3-compatible bucket.
@@ -36,7 +36,7 @@ type S3Storage struct {
 
 // NewS3Storage initializes the MinIO client and verifies the bucket,
 // mirroring the previous handler.InitS3 behavior.
-func NewS3Storage(cfg *config.S3Config) (*S3Storage, error) {
+func NewS3Storage(ctx context.Context, cfg *config.S3Config) (*S3Storage, error) {
 	if !cfg.IsEnabled() {
 		return nil, nil
 	}
@@ -67,7 +67,7 @@ func NewS3Storage(cfg *config.S3Config) (*S3Storage, error) {
 	}
 
 	// Verify connectivity by checking if the target bucket exists
-	exists, err := client.BucketExists(context.TODO(), cfg.Bucket)
+	exists, err := client.BucketExists(ctx, cfg.Bucket)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to S3: %w", err)
 	}
@@ -82,7 +82,7 @@ func NewS3Storage(cfg *config.S3Config) (*S3Storage, error) {
 // Upload uploads a file to the configured S3 bucket.
 // Passing size as -1 lets minio-go handle multipart upload automatically.
 // Returns the public URL of the uploaded file.
-func (s *S3Storage) Upload(reader io.Reader, filename, contentType string) (string, error) {
+func (s *S3Storage) Upload(ctx context.Context, reader io.Reader, filename, contentType string) (string, error) {
 	if s.client == nil {
 		return "", fmt.Errorf("S3 storage not initialized")
 	}
@@ -92,7 +92,7 @@ func (s *S3Storage) Upload(reader io.Reader, filename, contentType string) (stri
 		contentType = detectContentType(filename)
 	}
 
-	_, err := s.client.PutObject(context.TODO(), s.cfg.Bucket, filename, reader, -1, minio.PutObjectOptions{
+	_, err := s.client.PutObject(ctx, s.cfg.Bucket, filename, reader, -1, minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
@@ -106,27 +106,27 @@ func (s *S3Storage) Upload(reader io.Reader, filename, contentType string) (stri
 
 // Delete removes an object from the configured S3 bucket by extracting the key
 // from its public URL (with a filename fallback).
-func (s *S3Storage) Delete(url string) error {
+func (s *S3Storage) Delete(ctx context.Context, url string) error {
 	if s.client == nil {
 		return fmt.Errorf("S3 storage not initialized")
 	}
 
 	key := ExtractS3Key(url, s.cfg)
 	if key != "" {
-		return s.remove(key)
+		return s.remove(ctx, key)
 	}
 
 	// If key extraction failed, try to delete using filename as key (fallback)
 	filename := filepath.Base(url)
 	if filename != "" && filename != "/" {
-		return s.remove(filename)
+		return s.remove(ctx, filename)
 	}
 	return fmt.Errorf("invalid S3 key from URL: %s", url)
 }
 
 // remove deletes the object with the given key from the configured bucket.
-func (s *S3Storage) remove(key string) error {
-	return s.client.RemoveObject(context.TODO(), s.cfg.Bucket, key, minio.RemoveObjectOptions{})
+func (s *S3Storage) remove(ctx context.Context, key string) error {
+	return s.client.RemoveObject(ctx, s.cfg.Bucket, key, minio.RemoveObjectOptions{})
 }
 
 // LocalStorage stores files under <dataDir>/media and serves them at
@@ -156,7 +156,7 @@ func (s *LocalStorage) mediaRoot() (*os.Root, error) {
 }
 
 // Upload writes the file to the local media directory.
-func (s *LocalStorage) Upload(reader io.Reader, filename, contentType string) (string, error) {
+func (s *LocalStorage) Upload(_ context.Context, reader io.Reader, filename, contentType string) (string, error) {
 	root, err := s.mediaRoot()
 	if err != nil {
 		return "", err
@@ -188,7 +188,7 @@ func (s *LocalStorage) Upload(reader io.Reader, filename, contentType string) (s
 
 // Delete removes a local file identified by its /uploads/ URL. Missing files
 // are not an error.
-func (s *LocalStorage) Delete(url string) error {
+func (s *LocalStorage) Delete(_ context.Context, url string) error {
 	root, err := s.mediaRoot()
 	if err != nil {
 		return err

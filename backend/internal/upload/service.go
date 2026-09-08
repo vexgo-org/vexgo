@@ -40,7 +40,7 @@ func NewService(deps Deps) *Service {
 
 // Upload stores a file and records it in the database.
 func (s *Service) Upload(ctx context.Context, userID uint, filename string, size int64, src io.Reader) (model.MediaFile, error) {
-	url, err := s.storage.Upload(src, filename, "")
+	url, err := s.storage.Upload(ctx, src, filename, "")
 	if err != nil {
 		return model.MediaFile{}, err
 	}
@@ -85,7 +85,7 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	}
 
 	// Delete the underlying file; log but continue to delete the DB record
-	if err := s.storage.Delete(media.URL); err != nil {
+	if err := s.storage.Delete(ctx, media.URL); err != nil {
 		slog.Warn("failed to delete file", "err", err)
 	}
 
