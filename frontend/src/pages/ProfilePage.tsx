@@ -161,17 +161,17 @@ export function ProfilePage() {
       );
       setSuccess(response.message ?? "");
       setNewEmail("");
-      if (response.pending) {
-        // If pending: true is returned, email verification is required; wait for the user to click the link
-        // No need to update the local user; it will be updated after verification
-      } else if ("user" in response && response.user) {
+
+      let newUserEmail = newEmail;
+      if ("user" in response && response.user) {
         // If the update succeeded directly (SMTP disabled), update the local user
-        updateUser(response.user as UserType);
-      } else {
-        // When pending, update the displayed local email (awaiting verification)
-        if (user) {
-          updateUser({ ...user, email: newEmail });
-        }
+        newUserEmail = response.user.email ?? newEmail;
+      }
+
+      // If pending: true is returned, email verification is required; wait for the user to click the link
+      // No need to update the local user; it will be updated after verification
+      if (!response.pending && user) {
+        updateUser({ ...user, email: newUserEmail });
       }
     } catch (err: unknown) {
       const errorMessage =
