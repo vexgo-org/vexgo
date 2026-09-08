@@ -358,7 +358,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 //	@Param		request	body		ChangePasswordRequestWire	true	"old and new password"
 //	@Success	200		{object}	GenericMessageResponse
 //	@Failure	400		{object}	api.ErrorResponse	"invalid payload"
-//	@Failure	401		{object}	api.ErrorResponse	"old password is wrong"
+//	@Failure	400		{object}	api.ErrorResponse	"old password is wrong"
 //	@Failure	404		{object}	api.ErrorResponse	"user not found"
 //	@Failure	500		{object}	api.ErrorResponse
 //	@Router		/auth/password [put]
