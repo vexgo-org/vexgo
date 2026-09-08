@@ -133,7 +133,7 @@ type CreateRequest struct {
 	Slug       string
 	Title      string
 	Content    string
-	Category   any
+	Category   string
 	Tags       []string
 	Excerpt    string
 	CoverImage string
@@ -164,21 +164,6 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		return nil, fmt.Errorf("%w", model.ErrSlugTaken)
 	}
 
-	// Convert category to string regardless of number or string type
-	var catStr string
-	switch v := req.Category.(type) {
-	case string:
-		catStr = v
-	case float64:
-		catStr = strconv.FormatFloat(v, 'f', -1, 64)
-	case int:
-		catStr = strconv.Itoa(v)
-	case int64:
-		catStr = strconv.FormatInt(v, 10)
-	default:
-		catStr = fmt.Sprintf("%v", v)
-	}
-
 	// Determine initial post status based on user role
 	initialStatus := model.PostStatus(req.Status)
 	if initialStatus == "" {
@@ -196,7 +181,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		Slug:       req.Slug,
 		Title:      req.Title,
 		Content:    req.Content,
-		Category:   catStr,
+		Category:   req.Category,
 		Excerpt:    req.Excerpt,
 		CoverImage: req.CoverImage,
 		Status:     initialStatus,
