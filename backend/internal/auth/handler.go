@@ -358,13 +358,11 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 //	@Param		request	body		ChangePasswordRequestWire	true	"old and new password"
 //	@Success	200		{object}	GenericMessageResponse
 //	@Failure	400		{object}	api.ErrorResponse	"invalid payload"
-//	@Failure	400		{object}	api.ErrorResponse	"old password is wrong"
+//	@Failure	403		{object}	api.ErrorResponse	"old password is wrong"
 //	@Failure	404		{object}	api.ErrorResponse	"user not found"
 //	@Failure	500		{object}	api.ErrorResponse
 //	@Router		/auth/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
-	// TODO: Discuss status code of `invalid payload` and `old password is wrong`.
-
 	var req ChangePasswordRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
@@ -380,7 +378,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		case errors.Is(err, ErrUserNotFound):
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrWrongPassword):
-			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrEncryptPassword):
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: err.Error()})
 		default:

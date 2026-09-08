@@ -2621,14 +2621,17 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "oneOf": [
-                                        {
-                                            "$ref": "#/components/schemas/api.ErrorResponse"
-                                        },
-                                        {
-                                            "$ref": "#/components/schemas/api.ErrorResponse"
-                                        }
-                                    ]
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "invalid payload"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
