@@ -112,7 +112,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 //	@Success	200	{object}	MessageResponse
 //	@Failure	401	{object}	api.ErrorResponse
 //	@Failure	500	{object}	api.ErrorResponse
-//	@Router		/notifications/read-all [post]
+//	@Router		/notifications/read-all [put]
 func (h *Handler) MarkAllAsRead(c *gin.Context) {
 	uid := middleware.CurrentUserID(c)
 

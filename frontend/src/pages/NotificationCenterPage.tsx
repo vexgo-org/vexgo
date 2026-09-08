@@ -147,7 +147,7 @@ export function NotificationCenterPage() {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      await unwrap(getVexGoAPI().postNotificationsReadAll());
+      await unwrap(getVexGoAPI().putNotificationsReadAll());
       // Update the local state
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true })),

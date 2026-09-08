@@ -805,10 +805,10 @@ export const getVexGoAPI = () => {
   /**
    * @summary Mark all notifications as read
    */
-  const postNotificationsReadAll = () => {
+  const putNotificationsReadAll = () => {
     return customInstance<NotificationMessageResponse>({
       url: `/notifications/read-all`,
-      method: "POST",
+      method: "PUT",
     });
   };
 
@@ -1291,7 +1291,7 @@ export const getVexGoAPI = () => {
     getModerationRejected,
     putModerationResubmitId,
     getNotifications,
-    postNotificationsReadAll,
+    putNotificationsReadAll,
     getNotificationsUnreadCount,
     deleteNotificationsId,
     putNotificationsIdRead,
@@ -1502,10 +1502,8 @@ export type PutModerationResubmitIdResult = NonNullable<
 export type GetNotificationsResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getNotifications"]>>
 >;
-export type PostNotificationsReadAllResult = NonNullable<
-  Awaited<
-    ReturnType<ReturnType<typeof getVexGoAPI>["postNotificationsReadAll"]>
-  >
+export type PutNotificationsReadAllResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putNotificationsReadAll"]>>
 >;
 export type GetNotificationsUnreadCountResult = NonNullable<
   Awaited<
