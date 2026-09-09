@@ -9,4 +9,4 @@
   - [架构](/zh-cn/concepts/architecture)
 - 📚 参考
   - [配置参考](/zh-cn/reference/configuration)
-  - [API 参考](/zh-cn/reference/api)
+  - [API 参考](api.html ":ignore")

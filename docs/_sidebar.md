@@ -9,4 +9,4 @@
   - [Architecture](/concepts/architecture)
 - 📚 Reference
   - [Configuration](/reference/configuration)
-  - [API](/reference/api)
+  - [API](api.html ":ignore")
