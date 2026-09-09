@@ -112,7 +112,7 @@ func TestCreateComment_KeywordReject_ExposesReasonInModerationList(t *testing.T)
 	}
 
 	w = doJSON(t, r, http.MethodPost, "/api/comments", userToken,
-		`{"postId": "`+strconv.FormatUint(uint64(post.ID), 10)+`", "content": "buy spam now"}`)
+		`{"postId": `+strconv.FormatUint(uint64(post.ID), 10)+`, "content": "buy spam now"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create comment failed: %d %s", w.Code, w.Body.String())
 	}
@@ -288,7 +288,7 @@ func TestModerationQueue_ApproveRejectDelete(t *testing.T) {
 
 	create := func(content string) string {
 		w := doJSON(t, r, http.MethodPost, "/api/comments", userToken,
-			`{"postId": "`+strconv.FormatUint(uint64(post.ID), 10)+`", "content": "`+content+`"}`)
+			`{"postId": `+strconv.FormatUint(uint64(post.ID), 10)+`, "content": "`+content+`"}`)
 		if w.Code != http.StatusCreated {
 			t.Fatalf("create comment failed: %d %s", w.Code, w.Body.String())
 		}

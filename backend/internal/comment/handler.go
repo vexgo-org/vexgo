@@ -3,7 +3,6 @@ package comment
 import (
 	"errors"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 
@@ -57,8 +56,8 @@ func (h *Handler) GetComments(c *gin.Context) {
 //
 //	@Summary		Create a comment
 //	@Description	Adds a comment to a post. Content is capped at 100
-//	@Description	characters. The postId accepts either a number or a
-//	@Description	string. The reply is held for moderation when the
+//	@Description	characters.
+//	@Description	The reply is held for moderation when the
 //	@Description	manual review queue is on, the keyword filter rejects
 //	@Description	it, or the LLM filter rejects it.
 //	@Tags			comments
@@ -72,7 +71,6 @@ func (h *Handler) GetComments(c *gin.Context) {
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/comments [post]
 func (h *Handler) CreateComment(c *gin.Context) {
-	// Support postId as number or string from frontend
 	var req CreateCommentRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -87,38 +85,6 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	// Parse PostID to uint
-	var postID uint
-	switch v := req.PostID.(type) {
-	case float64:
-		// JSON numbers decode as float64; reject out-of-range or negative
-		// values instead of letting the conversion wrap into garbage IDs.
-		if v < 1 || v > math.MaxUint32 {
-			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId"})
-			return
-		}
-		postID = uint(v)
-	case string:
-		id64, err := strconv.ParseUint(v, 10, 64)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId"})
-			return
-		}
-		postID = uint(id64)
-	case int:
-		if v < 1 {
-			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId"})
-			return
-		}
-		postID = uint(v)
-	case uint:
-		postID = v
-	default:
-		// If cannot parse, return error
-		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid postId type"})
-		return
-	}
-
 	userID := middleware.CurrentUserID(c)
 	if userID == 0 {
 		// Reject unauthenticated request
@@ -127,7 +93,7 @@ func (h *Handler) CreateComment(c *gin.Context) {
 	}
 
 	comment, count, err := h.svc.Create(c.Request.Context(), CreateRequest{
-		PostID:   postID,
+		PostID:   req.PostID,
 		UserID:   userID,
 		Content:  req.Content,
 		ParentID: req.ParentID,

@@ -601,7 +601,6 @@
                         "type": "integer"
                     },
                     "postId": {
-                        "description": "TODO: Consider change the type of `PostID` to `uint`.",
                         "example": 42,
                         "type": "integer"
                     }
@@ -3310,7 +3309,7 @@
         },
         "/comments": {
             "post": {
-                "description": "Adds a comment to a post. Content is capped at 100\ncharacters. The postId accepts either a number or a\nstring. The reply is held for moderation when the\nmanual review queue is on, the keyword filter rejects\nit, or the LLM filter rejects it.",
+                "description": "Adds a comment to a post. Content is capped at 100\ncharacters.\nThe reply is held for moderation when the\nmanual review queue is on, the keyword filter rejects\nit, or the LLM filter rejects it.",
                 "requestBody": {
                     "content": {
                         "application/json": {
