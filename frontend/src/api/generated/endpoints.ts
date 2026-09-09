@@ -385,8 +385,8 @@ export const getVexGoAPI = () => {
 
   /**
    * Adds a comment to a post. Content is capped at 100
-   * characters. The postId accepts either a number or a
-   * string. The reply is held for moderation when the
+   * characters.
+   * The reply is held for moderation when the
    * manual review queue is on, the keyword filter rejects
    * it, or the LLM filter rejects it.
    * @summary Create a comment
