@@ -9,20 +9,32 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
-// PostTemplateData represents template data for post pages
-type PostTemplateData struct {
-	Post      model.Post
-	Title     string
-	MetaDesc  string
-	Canonical string
+// postTemplateData represents template data for post pages
+type postTemplateData struct {
+	Post          model.Post
+	Title         string
+	MetaDesc      string
+	Canonical     string
+	PostJSON      template.JS
+	IndexCSS      string
+	IndexJS       string
+	ReactVendorJS string
+	UIVendorJS    string
+	UtilsVendorJS string
 }
 
-// IndexTemplateData represents template data for the homepage
-type IndexTemplateData struct {
-	Posts     []model.Post
-	Title     string
-	MetaDesc  string
-	Canonical string
+// indexTemplateData represents template data for the homepage
+type indexTemplateData struct {
+	Posts         []model.Post
+	Title         string
+	MetaDesc      string
+	Canonical     string
+	PostsJSON     template.JS
+	IndexCSS      string
+	IndexJS       string
+	ReactVendorJS string
+	UIVendorJS    string
+	UtilsVendorJS string
 }
 
 // RenderPostHTML renders post page HTML
@@ -82,17 +94,17 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 		return nil, err
 	}
 
-	data := map[string]any{
-		"Post":          post,
-		"Title":         post.Title,
-		"MetaDesc":      metaDesc,
-		"Canonical":     canonical,
-		"PostJSON":      template.JS(postJSON),
-		"IndexCSS":      GetAssetURL("css", "index"),
-		"IndexJS":       GetAssetURL("js", "index"),
-		"ReactVendorJS": GetAssetURL("js", "react-vendor"),
-		"UIVendorJS":    GetAssetURL("js", "ui-vendor"),
-		"UtilsVendorJS": GetAssetURL("js", "utils-vendor"),
+	data := postTemplateData{
+		Post:          post,
+		Title:         post.Title,
+		MetaDesc:      metaDesc,
+		Canonical:     canonical,
+		PostJSON:      template.JS(postJSON),
+		IndexCSS:      GetAssetURL("css", "index"),
+		IndexJS:       GetAssetURL("js", "index"),
+		ReactVendorJS: GetAssetURL("js", "react-vendor"),
+		UIVendorJS:    GetAssetURL("js", "ui-vendor"),
+		UtilsVendorJS: GetAssetURL("js", "utils-vendor"),
 	}
 
 	// Parse template
@@ -181,17 +193,17 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 		return nil, err
 	}
 
-	data := map[string]any{
-		"Posts":         posts,
-		"Title":         "Homepage",
-		"MetaDesc":      metaDesc,
-		"Canonical":     canonical,
-		"PostsJSON":     template.JS(postsJSON),
-		"IndexCSS":      GetAssetURL("css", "index"),
-		"IndexJS":       GetAssetURL("js", "index"),
-		"ReactVendorJS": GetAssetURL("js", "react-vendor"),
-		"UIVendorJS":    GetAssetURL("js", "ui-vendor"),
-		"UtilsVendorJS": GetAssetURL("js", "utils-vendor"),
+	data := indexTemplateData{
+		Posts:         posts,
+		Title:         "Homepage",
+		MetaDesc:      metaDesc,
+		Canonical:     canonical,
+		PostsJSON:     template.JS(postsJSON),
+		IndexCSS:      GetAssetURL("css", "index"),
+		IndexJS:       GetAssetURL("js", "index"),
+		ReactVendorJS: GetAssetURL("js", "react-vendor"),
+		UIVendorJS:    GetAssetURL("js", "ui-vendor"),
+		UtilsVendorJS: GetAssetURL("js", "utils-vendor"),
 	}
 
 	// Render template
