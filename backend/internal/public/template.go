@@ -28,7 +28,7 @@ type IndexTemplateData struct {
 // RenderPostHTML renders post page HTML
 func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 	tmpl := `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -114,7 +114,7 @@ func RenderPostHTML(post model.Post, baseURL string) ([]byte, error) {
 // RenderIndexHTML renders homepage HTML
 func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 	tmpl := `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -164,11 +164,11 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 	}
 
 	// Generate meta description
-	metaDesc := "最新文章列表"
+	metaDesc := "Latest posts and updates"
 	if len(posts) > 0 {
-		metaDesc = fmt.Sprintf("最新文章: %s", posts[0].Title)
+		metaDesc = fmt.Sprintf("Latest post: %s", posts[0].Title)
 		if len(posts) > 1 {
-			metaDesc += fmt.Sprintf("、%s 等", posts[1].Title)
+			metaDesc += fmt.Sprintf(", %s, and more", posts[1].Title)
 		}
 	}
 
@@ -183,7 +183,7 @@ func RenderIndexHTML(posts []model.Post, baseURL string) ([]byte, error) {
 
 	data := map[string]any{
 		"Posts":         posts,
-		"Title":         "博客首页",
+		"Title":         "Homepage",
 		"MetaDesc":      metaDesc,
 		"Canonical":     canonical,
 		"PostsJSON":     template.JS(postsJSON),
