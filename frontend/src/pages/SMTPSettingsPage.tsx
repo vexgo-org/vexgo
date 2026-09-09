@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 
 import type { SMTPConfig } from "@/types";
 import {
@@ -41,8 +40,8 @@ export function SMTPSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await unwrap(getVexGoAPI().getConfigSmtp());
-      setConfig(response);
+      const result = await sdk.settings.getSmtp();
+      setConfig(result);
     } catch (error: unknown) {
       console.error("Failed to load SMTP config:", error);
       toast.error(t("commentConfig.loadFailed"));
@@ -79,15 +78,14 @@ export function SMTPSettingsPage() {
 
     setSaving(true);
     try {
-      await unwrap(getVexGoAPI().putConfigSmtp(config));
+      await sdk.settings.updateSmtp(config);
       toast.success(t("generalSettings.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save SMTP config:", error);
-      const apiError = error as { response?: { data?: { error?: string } } };
       toast.error(
         t("smtpSettings.saveFailed") +
           ": " +
-          (apiError.response?.data?.error || t("common.unknownError")),
+          getErrorMessage(error, t("common.unknownError")),
       );
     } finally {
       setSaving(false);
@@ -106,15 +104,14 @@ export function SMTPSettingsPage() {
 
     setTesting(true);
     try {
-      await unwrap(getVexGoAPI().postConfigSmtpTest());
+      await sdk.settings.testSmtp();
       toast.success(t("smtpSettings.testSucceeded"));
     } catch (error: unknown) {
       console.error("Failed to send test email:", error);
-      const apiError = error as { response?: { data?: { error?: string } } };
       toast.error(
         t("smtpSettings.testFailed") +
           ": " +
-          (apiError.response?.data?.error || t("common.unknownError")),
+          getErrorMessage(error, t("common.unknownError")),
       );
     } finally {
       setTesting(false);

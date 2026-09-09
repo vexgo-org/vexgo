@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GoCaptcha from "go-captcha-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
+import { sdk } from "@/lib/sdk";
 import { Spinner } from "./spinner";
 
 interface CaptchaResponse {
@@ -81,7 +81,7 @@ export function SliderCaptcha({
   // Generate a captcha
   const generateCaptcha = useCallback(async () => {
     try {
-      const { data } = await getVexGoAPI().getCaptcha();
+      const data = await sdk.captcha.get();
       setCaptchaData(data as CaptchaResponse);
     } catch (err) {
       const message =
@@ -115,7 +115,7 @@ export function SliderCaptcha({
       if (!captchaData) return;
 
       try {
-        const { data } = await getVexGoAPI().postCaptchaVerify({
+        const data = await sdk.captcha.verify({
           id: captchaData.id,
           token: captchaData.token,
           x,

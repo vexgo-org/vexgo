@@ -2,8 +2,7 @@ import { useCallback, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,8 +57,8 @@ export function ThemePage() {
     setLoading(true);
     try {
       const [themesRes, configRes] = await Promise.all([
-        unwrap(getVexGoAPI().getConfigThemes()),
-        unwrap(getVexGoAPI().getConfigTheme()),
+        sdk.settings.listThemes(),
+        sdk.settings.getTheme(),
       ]);
       setThemes((themesRes.themes || []) as ThemeInfo[]);
       setActiveTheme(configRes.activeTheme || "default");
@@ -87,7 +86,7 @@ export function ThemePage() {
     setApplying(themeId);
     setMessage(null);
     try {
-      await unwrap(getVexGoAPI().putConfigTheme({ activeTheme: themeId }));
+      await sdk.settings.updateTheme({ activeTheme: themeId });
       setActiveTheme(themeId);
       const themeName = themes.find((t) => t.id === themeId)?.name || themeId;
       setMessage({
@@ -128,7 +127,7 @@ export function ThemePage() {
     setMessage(null);
 
     try {
-      await getVexGoAPI().postConfigThemeUpload({ theme: file });
+      await sdk.settings.uploadTheme(file);
       setMessage({ type: "success", text: t("themePage.uploadSuccess") });
       // Reload the theme list
       loadData();

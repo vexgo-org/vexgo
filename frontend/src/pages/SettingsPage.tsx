@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
+import { sdk } from "@/lib/sdk";
 import type { User } from "@/types";
 import {
   Card,
@@ -89,7 +89,7 @@ export function SettingsPage() {
 
     try {
       // Save the privacy settings to the server
-      const response = await getVexGoAPI().putAuthSettings({
+      const result = await sdk.auth.updateSettings({
         profile_visibility: profileVisibility,
         hide_email: hideEmail,
         hide_birthday: hideBirthday,
@@ -97,8 +97,8 @@ export function SettingsPage() {
       });
 
       // Update the local user info
-      if (response.data.user) {
-        updateUser(response.data.user as User);
+      if (result.user) {
+        updateUser(result.user as User);
       }
 
       // Save the theme setting separately

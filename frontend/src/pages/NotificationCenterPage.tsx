@@ -7,8 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 
 import { useTranslation } from "@/lib/I18nContext";
 import { CreatorApplicationButton } from "@/components/CreatorApplicationButton";
@@ -69,7 +68,7 @@ export function NotificationCenterPage() {
     const fetchNotifications = async () => {
       setLoading(true);
       try {
-        const response = await unwrap(getVexGoAPI().getNotifications());
+        const result = await sdk.notifications.list();
         // Convert the backend data format to the frontend format
         interface RawNotification {
           id: number;
@@ -84,7 +83,7 @@ export function NotificationCenterPage() {
         }
 
         const formattedNotifications = (
-          response.notifications as RawNotification[]
+          result.notifications as RawNotification[]
         ).map((notification) => ({
           id: notification.id.toString(),
           type: notification.type as NotificationType,
@@ -127,7 +126,7 @@ export function NotificationCenterPage() {
       (notification) => notification.id === id && !notification.isRead,
     );
     try {
-      await unwrap(getVexGoAPI().putNotificationsIdRead(Number(id)));
+      await sdk.notifications.markRead(Number(id));
       // Update the local state
       setNotifications((prev) =>
         prev.map((notification) =>
@@ -147,7 +146,7 @@ export function NotificationCenterPage() {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      await unwrap(getVexGoAPI().putNotificationsReadAll());
+      await sdk.notifications.markAllRead();
       // Update the local state
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true })),
@@ -164,7 +163,7 @@ export function NotificationCenterPage() {
       (notification) => notification.id === id && !notification.isRead,
     );
     try {
-      await unwrap(getVexGoAPI().deleteNotificationsId(Number(id)));
+      await sdk.notifications.remove(Number(id));
       // Update the local state
       setNotifications((prev) =>
         prev.filter((notification) => notification.id !== id),
@@ -193,8 +192,8 @@ export function NotificationCenterPage() {
 
     if (relatedType === "post") {
       try {
-        const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
-        navigate(`/post/${response.post?.slug || ""}`);
+        const result = await sdk.posts.getById(postId);
+        navigate(`/post/${result.post?.slug || ""}`);
       } catch {
         // Fallback: navigate with the ID (will be handled by the post page)
         navigate(`/post/by-id/${postId}`);
@@ -202,8 +201,8 @@ export function NotificationCenterPage() {
     } else if (relatedType === "comment") {
       // Navigate to the post page and scroll to the comment
       try {
-        const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
-        navigate(`/post/${response.post?.slug || ""}#comment-${relatedId}`);
+        const result = await sdk.posts.getById(postId);
+        navigate(`/post/${result.post?.slug || ""}#comment-${relatedId}`);
       } catch {
         navigate(`/post/by-id/${postId}#comment-${relatedId}`);
       }

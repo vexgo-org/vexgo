@@ -9,8 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Calendar, MessageSquare, Heart } from "lucide-react";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 import type { Post, User } from "@/types";
 
 export function UserPostsPage() {
@@ -25,16 +24,14 @@ export function UserPostsPage() {
   const loadUserPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().getPostsUserId(id!, {
-          page: currentPage,
-          limit: 10,
-        }),
-      );
-      setPosts((response.posts || []) as Post[]);
-      setTotalPages(response.pagination?.totalPages ?? 1);
-      if (response.posts?.[0]?.author) {
-        setUser(response.posts[0].author as User);
+      const result = await sdk.posts.listByUser(id!, {
+        page: currentPage,
+        limit: 10,
+      });
+      setPosts((result.posts || []) as Post[]);
+      setTotalPages(result.pagination?.totalPages ?? 1);
+      if (result.posts?.[0]?.author) {
+        setUser(result.posts[0].author as User);
       }
     } catch (error) {
       console.error("Failed to load user posts:", error);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { isVexGoError } from "@vexgo/sdk";
+import { sdk } from "@/lib/sdk";
 
 import type { Post, Comment } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
@@ -76,27 +76,22 @@ export function PostDetailPage() {
   const loadPost = useCallback(async () => {
     try {
       console.log("Loading post by slug:", slug);
-      const response = await unwrap(getVexGoAPI().getPostsSlug(slug!));
-      console.log("Post loaded successfully:", response);
-      const p = response.post;
+      const result = await sdk.posts.getBySlug(slug!);
+      console.log("Post loaded successfully:", result);
+      const p = result.post;
       if (p) {
         const post = { ...p, tags: normalizeTagsArray(p.tags) } as Post;
         setPost(post);
-        setLikesCount(response.post?.likesCount || 0);
+        setLikesCount(result.post?.likesCount || 0);
       }
     } catch (error: unknown) {
       console.error("Failed to load post:", error);
-      const axiosError = error as {
-        message?: string;
-        response?: { status?: number; data?: unknown };
-      };
       console.error("Error details:", {
-        message: axiosError.message,
-        response: axiosError.response,
-        status: axiosError.response?.status,
-        data: axiosError.response?.data,
+        message: error instanceof Error ? error.message : error,
+        status: isVexGoError(error) ? error.status : undefined,
+        data: isVexGoError(error) ? error.data : undefined,
       });
-      if (axiosError.response?.status === 404) {
+      if (isVexGoError(error) && error.status === 404) {
         setNotFound(true);
       }
       // For other errors, still set loading to false so that users can see the error message.
@@ -108,11 +103,9 @@ export function PostDetailPage() {
   const loadComments = useCallback(async () => {
     if (!post?.id) return [] as Comment[];
     try {
-      const response = await unwrap(
-        getVexGoAPI().getCommentsPostId(String(post.id)),
-      );
-      setComments((response.comments || []) as Comment[]);
-      return response.comments;
+      const result = await sdk.comments.listByPost(String(post.id));
+      setComments((result.comments || []) as Comment[]);
+      return result.comments;
     } catch (error) {
       console.error("Failed to load comments:", error);
       return [] as Comment[];
@@ -122,11 +115,9 @@ export function PostDetailPage() {
   const loadLikeStatus = useCallback(async () => {
     if (!post?.id) return;
     try {
-      const response = await unwrap(
-        getVexGoAPI().getLikesPostId(Number(post.id)),
-      );
-      setIsLiked(response.isLiked ?? false);
-      setLikesCount(response.likesCount ?? 0);
+      const result = await sdk.posts.likeStatus(Number(post.id));
+      setIsLiked(result.isLiked ?? false);
+      setLikesCount(result.likesCount ?? 0);
     } catch (error) {
       console.error("Failed to load like status:", error);
     }
@@ -170,19 +161,17 @@ export function PostDetailPage() {
     if (!post?.id) return;
 
     try {
-      const response = await unwrap(
-        getVexGoAPI().postLikesPostId(Number(post.id)),
-      );
-      setIsLiked(response.isLiked ?? false);
-      setLikesCount(response.likesCount ?? 0);
+      const result = await sdk.posts.like(Number(post.id));
+      setIsLiked(result.isLiked ?? false);
+      setLikesCount(result.likesCount ?? 0);
       // Notify other pages (e.g. the home page) to update the post's like status
       try {
         window.dispatchEvent(
           new CustomEvent("like-changed", {
             detail: {
               postId: post.id,
-              isLiked: response.isLiked,
-              likesCount: response.likesCount,
+              isLiked: result.isLiked,
+              likesCount: result.likesCount,
             },
           }),
         );
@@ -205,16 +194,14 @@ export function PostDetailPage() {
 
     setSubmittingComment(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().postComments({
-          postId: Number(post.id),
-          content: commentContent.trim(),
-        }),
-      );
+      const result = await sdk.comments.create({
+        postId: Number(post.id),
+        content: commentContent.trim(),
+      });
       setCommentContent("");
       await loadComments();
       // Sync the home page using the commentsCount returned by the backend
-      const newCount = response.commentsCount ?? comments.length + 1;
+      const newCount = result.commentsCount ?? comments.length + 1;
       try {
         window.dispatchEvent(
           new CustomEvent("comment-changed", {
@@ -234,7 +221,7 @@ export function PostDetailPage() {
   const handleDeletePost = async () => {
     if (!post?.id) return;
     try {
-      await unwrap(getVexGoAPI().deletePostsId(String(post.id)));
+      await sdk.posts.remove(String(post.id));
       navigate("/");
     } catch (error) {
       console.error("Failed to delete post:", error);
@@ -244,11 +231,10 @@ export function PostDetailPage() {
   const handleDeleteComment = async (commentId: string) => {
     if (!post?.id) return;
     try {
-      const response = await unwrap(getVexGoAPI().deleteCommentsId(commentId));
+      const result = await sdk.comments.remove(commentId);
       await loadComments();
       const newCount =
-        response.commentsCount ??
-        (comments.length > 0 ? comments.length - 1 : 0);
+        result.commentsCount ?? (comments.length > 0 ? comments.length - 1 : 0);
       try {
         window.dispatchEvent(
           new CustomEvent("comment-changed", {

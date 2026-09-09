@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 
 import type { GeneralSettings } from "@/types";
 import {
@@ -40,8 +39,8 @@ export function GeneralSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await unwrap(getVexGoAPI().getConfigGeneral());
-      setConfig(response);
+      const result = await sdk.settings.getGeneral();
+      setConfig(result);
     } catch (error) {
       console.error("Failed to load general settings:", error);
       toast.error(t("generalSettings.loadFailed"));
@@ -66,15 +65,14 @@ export function GeneralSettingsPage() {
 
     setSaving(true);
     try {
-      await unwrap(getVexGoAPI().putConfigGeneral(config));
+      await sdk.settings.updateGeneral(config);
       toast.success(t("generalSettings.saveSuccess"));
     } catch (error) {
       console.error("Failed to save general settings:", error);
-      const err = error as { response?: { data?: { error?: string } } };
       toast.error(
         t("generalSettings.saveFailed") +
           ": " +
-          (err.response?.data?.error || t("common.unknownError")),
+          getErrorMessage(error, t("common.unknownError")),
       );
     } finally {
       setSaving(false);
@@ -91,9 +89,9 @@ export function GeneralSettingsPage() {
     }
 
     try {
-      const response = await unwrap(getVexGoAPI().postUpload({ file }));
-      if (response.file?.url) {
-        setConfig({ ...config, siteIcon: response.file.url });
+      const result = await sdk.upload.uploadFile(file);
+      if (result.file?.url) {
+        setConfig({ ...config, siteIcon: result.file.url });
       }
       toast.success(t("generalSettings.iconUploadSuccess"));
     } catch (error) {

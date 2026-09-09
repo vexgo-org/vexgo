@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 import type { User as UserType } from "@/types";
 
 import { useTranslation } from "@/lib/I18nContext";
@@ -43,7 +42,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ImageCropper from "@/components/image/ImageCropper";
-import { isAxiosError } from "axios";
+import { isVexGoError } from "@vexgo/sdk";
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -77,14 +76,12 @@ export function ProfilePage() {
     setLoading(true);
 
     try {
-      const response = await unwrap(
-        getVexGoAPI().putAuthProfile({
-          username,
-          birthday,
-          bio,
-        }),
-      );
-      updateUser(response.user as UserType);
+      const result = await sdk.auth.updateProfile({
+        username,
+        birthday,
+        bio,
+      });
+      updateUser(result.user as UserType);
       setSuccess(t("profilePage.updateSuccess"));
     } catch (err: unknown) {
       const errorMessage =
@@ -113,15 +110,15 @@ export function ProfilePage() {
     setPasswordLoading(true);
 
     try {
-      await unwrap(getVexGoAPI().putAuthPassword({ oldPassword, newPassword }));
+      await sdk.auth.changePassword({ oldPassword, newPassword });
       setSuccess(t("profilePage.passwordChangeSuccess"));
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: unknown) {
       let errorMessage = t("profilePage.passwordChangeFailed");
-      if (isAxiosError(err)) {
-        switch (err.response?.status) {
+      if (isVexGoError(err)) {
+        switch (err.status) {
           case 400:
             errorMessage = t("profilePage.invalidPayload");
             break;
@@ -156,21 +153,19 @@ export function ProfilePage() {
     setEmailLoading(true);
 
     try {
-      const response = await unwrap(
-        getVexGoAPI().putAuthEmail({ email: newEmail }),
-      );
-      setSuccess(response.message ?? "");
+      const result = await sdk.auth.updateEmail({ email: newEmail });
+      setSuccess(result.message ?? "");
       setNewEmail("");
 
       let newUserEmail = newEmail;
-      if ("user" in response && response.user) {
+      if ("user" in result && result.user) {
         // If the update succeeded directly (SMTP disabled), update the local user
-        newUserEmail = response.user.email ?? newEmail;
+        newUserEmail = result.user.email ?? newEmail;
       }
 
       // If pending: true is returned, email verification is required; wait for the user to click the link
       // No need to update the local user; it will be updated after verification
-      if (!response.pending && user) {
+      if (!result.pending && user) {
         updateUser({ ...user, email: newUserEmail });
       }
     } catch (err: unknown) {
@@ -205,17 +200,13 @@ export function ProfilePage() {
 
     try {
       // Use the existing upload API
-      const uploadResponse = await unwrap(
-        getVexGoAPI().postUpload({ file: croppedFile }),
-      );
-      if (uploadResponse.file && uploadResponse.file.url) {
+      const uploadResult = await sdk.upload.uploadFile(croppedFile);
+      if (uploadResult.file && uploadResult.file.url) {
         // Update the user avatar
-        const updateResponse = await unwrap(
-          getVexGoAPI().putAuthProfile({
-            avatar: uploadResponse.file.url,
-          }),
-        );
-        updateUser(updateResponse.user as UserType);
+        const updateResult = await sdk.auth.updateProfile({
+          avatar: uploadResult.file.url,
+        });
+        updateUser(updateResult.user as UserType);
         setSuccess(t("profilePage.updateAvatar"));
       }
     } catch (err: unknown) {

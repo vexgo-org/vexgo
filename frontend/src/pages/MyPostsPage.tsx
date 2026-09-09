@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 
 import type { Post } from "@/types";
 import { useTranslation } from "@/lib/I18nContext";
@@ -68,23 +67,21 @@ export function MyPostsPage() {
   const loadPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().getPostsUserMyPosts({
-          page: currentPage,
-          limit: 10,
-        }),
-      );
+      const result = await sdk.posts.myPosts({
+        page: currentPage,
+        limit: 10,
+      });
       setPosts(
-        (response.posts || []).map((p) => ({
+        (result.posts || []).map((p) => ({
           ...p,
           tags: normalizeTagsArray(p.tags),
         })) as Post[],
       );
       setPagination({
-        total: response.pagination?.total ?? 0,
-        page: response.pagination?.page ?? 1,
-        totalPages: response.pagination?.totalPages ?? 1,
-        limit: response.pagination?.limit ?? 10,
+        total: result.pagination?.total ?? 0,
+        page: result.pagination?.page ?? 1,
+        totalPages: result.pagination?.totalPages ?? 1,
+        limit: result.pagination?.limit ?? 10,
       });
     } catch (error) {
       console.error("Failed to load posts:", error);
@@ -99,7 +96,7 @@ export function MyPostsPage() {
 
   const handleDeletePost = async (postId: string) => {
     try {
-      await unwrap(getVexGoAPI().deletePostsId(postId));
+      await sdk.posts.remove(postId);
       loadPosts();
     } catch (error) {
       console.error("Failed to delete post:", error);

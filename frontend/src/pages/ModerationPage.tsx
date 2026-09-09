@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 import type { Post } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,20 +44,23 @@ export function ModerationPage() {
       setLoading(true);
       try {
         if (activeTab === "pending") {
-          const response = await unwrap(
-            getVexGoAPI().getModerationPending({ limit: 100, search }),
-          );
-          setPendingPosts((response.posts as Post[]) || []);
+          const result = await sdk.posts.moderationPending({
+            limit: 100,
+            search,
+          });
+          setPendingPosts((result.posts as Post[]) || []);
         } else if (activeTab === "approved") {
-          const response = await unwrap(
-            getVexGoAPI().getModerationApproved({ limit: 100, search }),
-          );
-          setApprovedPosts((response.posts as Post[]) || []);
+          const result = await sdk.posts.moderationApproved({
+            limit: 100,
+            search,
+          });
+          setApprovedPosts((result.posts as Post[]) || []);
         } else if (activeTab === "rejected") {
-          const response = await unwrap(
-            getVexGoAPI().getModerationRejected({ limit: 100, search }),
-          );
-          setRejectedPosts((response.posts as Post[]) || []);
+          const result = await sdk.posts.moderationRejected({
+            limit: 100,
+            search,
+          });
+          setRejectedPosts((result.posts as Post[]) || []);
         }
       } catch (error) {
         console.error("Failed to load data:", error);
@@ -91,7 +93,7 @@ export function ModerationPage() {
 
   const handleApprovePost = async (postId: string | number) => {
     try {
-      await unwrap(getVexGoAPI().putModerationApproveId(String(postId)));
+      await sdk.posts.moderationApprove(String(postId));
       toast.success(t("moderation.approveSuccess"));
       loadData();
     } catch (error) {
@@ -110,11 +112,9 @@ export function ModerationPage() {
     if (!rejectingPostId) return;
 
     try {
-      await unwrap(
-        getVexGoAPI().putModerationRejectId(String(rejectingPostId), {
-          rejectionReason,
-        }),
-      );
+      await sdk.posts.moderationReject(String(rejectingPostId), {
+        rejectionReason,
+      });
       toast.success(t("moderation.rejectSuccess"));
       setShowRejectDialog(false);
       setRejectingPostId(null);
@@ -134,7 +134,7 @@ export function ModerationPage() {
 
   const handleResubmitPost = async (postId: string | number) => {
     try {
-      await unwrap(getVexGoAPI().putModerationResubmitId(String(postId)));
+      await sdk.posts.moderationResubmit(String(postId));
       toast.success(t("moderation.resubmitSuccess"));
       loadData();
     } catch (error) {

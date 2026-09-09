@@ -22,8 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Shield, Key, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 
 import type { CommentModerationConfig } from "@/types";
 
@@ -49,10 +48,8 @@ export function CommentConfigPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await unwrap(
-        getVexGoAPI().getModerationCommentsConfig(),
-      );
-      setConfig(response);
+      const result = await sdk.comments.getModerationConfig();
+      setConfig(result);
     } catch (error: unknown) {
       console.error("Failed to load comment moderation config:", error);
       toast.error(t("commentConfig.loadFailed"));
@@ -68,14 +65,11 @@ export function CommentConfigPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await unwrap(getVexGoAPI().putModerationCommentsConfig(config));
+      await sdk.comments.updateModerationConfig(config);
       toast.success(t("commentConfig.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save config:", error);
-      const apiError = error as { response?: { data?: { error?: string } } };
-      toast.error(
-        apiError.response?.data?.error || t("commentConfig.saveFailed"),
-      );
+      toast.error(getErrorMessage(error, t("commentConfig.saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -86,18 +80,13 @@ export function CommentConfigPage() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().postModerationCommentsConfigTest(),
-      );
+      const result = await sdk.comments.testModerationConfig();
       toast.success(
-        `${response?.message ?? ""} ${response?.response ?? ""}`.trim(),
+        `${result?.message ?? ""} ${result?.response ?? ""}`.trim(),
       );
     } catch (error: unknown) {
       console.error("Failed to test LLM moderation endpoint:", error);
-      const apiError = error as { response?: { data?: { error?: string } } };
-      toast.error(
-        apiError.response?.data?.error || t("commentConfig.testFailed"),
-      );
+      toast.error(getErrorMessage(error, t("commentConfig.testFailed")));
     } finally {
       setTesting(false);
     }

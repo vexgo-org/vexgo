@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,15 +44,13 @@ export function CreatorApplicationReviewPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().getUsersCreatorApplications({
-          page: 1,
-          limit: 100,
-          status: "pending",
-        }),
-      );
+      const result = await sdk.users.listCreatorApplications({
+        page: 1,
+        limit: 100,
+        status: "pending",
+      });
       // Ensure applications is an array even if the backend returns null or undefined
-      setApplications(response.applications || []);
+      setApplications(result.applications || []);
     } catch (error) {
       console.error("Failed to load creator applications:", error);
       toast.error(t("errors.networkError"));
@@ -109,13 +106,11 @@ export function CreatorApplicationReviewPage() {
     setIsProcessing(true);
     try {
       const reason = action === "reject" ? rejectReason : undefined;
-      const response = await unwrap(
-        getVexGoAPI().putUsersCreatorApplicationsIdReview(
-          selectedApplication.id!,
-          { action, reason },
-        ),
+      const result = await sdk.users.reviewCreatorApplication(
+        selectedApplication.id!,
+        { action, reason },
       );
-      toast.success(response.message);
+      toast.success(result.message);
 
       // Remove the processed application from the list
       setApplications((prev) =>
@@ -129,8 +124,7 @@ export function CreatorApplicationReviewPage() {
       setRejectReason("");
     } catch (error: unknown) {
       console.error("Failed to review creator application:", error);
-      const apiError = error as { response?: { data?: { error?: string } } };
-      toast.error(apiError.response?.data?.error || t("errors.networkError"));
+      toast.error(getErrorMessage(error, t("errors.networkError")));
     } finally {
       setIsProcessing(false);
     }

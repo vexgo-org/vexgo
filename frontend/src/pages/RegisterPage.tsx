@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
+import { sdk } from "@/lib/sdk";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -183,9 +183,9 @@ export function RegisterPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await getVexGoAPI().getConfigGeneral();
-      setCaptchaEnabled(response.data.captchaEnabled ?? false);
-      setRegistrationEnabled(response.data.registrationEnabled ?? false);
+      const result = await sdk.settings.getGeneral();
+      setCaptchaEnabled(result.captchaEnabled ?? false);
+      setRegistrationEnabled(result.registrationEnabled ?? false);
     } catch (error) {
       console.error("Failed to load settings:", error);
     }
@@ -242,11 +242,7 @@ export function RegisterPage() {
         return;
       }
       // Backend errors such as email verification can still be shown in a dialog
-      const error = err as {
-        response?: { data?: { message?: string } };
-        message?: string;
-      };
-      let errorMessage = error.response?.data?.message || error.message || "";
+      let errorMessage = err instanceof Error ? err.message : "";
 
       // Convert English error messages from the backend into the current locale
       if (errorMessage === "Email already registered") {

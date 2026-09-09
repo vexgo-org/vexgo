@@ -1,4 +1,4 @@
-import { UserUpdateUserRoleBodyRole } from "@/api/generated/model";
+import { UserUpdateUserRoleBodyRole } from "@vexgo/sdk";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 

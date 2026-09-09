@@ -9,7 +9,6 @@
   },
   "ignorePatterns": [
     "dist",
-    "src/api/generated/**",
     "packages/sdk/src/generated/**",
     "**/node_modules/**"
   ],

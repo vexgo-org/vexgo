@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 
 import {
   Card,
@@ -35,20 +34,15 @@ export function VerifyEmailPage() {
 
     const verifyEmail = async () => {
       try {
-        const response = await unwrap(
-          getVexGoAPI().getAuthEmailVerify({ token }),
-        );
+        const result = await sdk.auth.verifyEmail({ token });
         setStatus("success");
-        setMessage(
-          response.message || t("verifyEmail.emailVerificationSuccess"),
-        );
+        setMessage(result.message || t("verifyEmail.emailVerificationSuccess"));
 
         // Check whether re-login is required (email change succeeded)
-        if (response.require_relogin) {
+        if (result.require_relogin) {
           setRequireRelogin(true);
           // Clear the local login state
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          sdk.auth.logout();
         }
       } catch (err: unknown) {
         setStatus("error");

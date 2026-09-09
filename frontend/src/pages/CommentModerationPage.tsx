@@ -13,8 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, XCircle, Clock, User } from "lucide-react";
 import { toast } from "sonner";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 
 import type { Comment } from "@/types";
 
@@ -30,20 +29,14 @@ export function CommentModerationPage() {
     setLoading(true);
     try {
       if (activeTab === "pending") {
-        const response = await unwrap(
-          getVexGoAPI().getModerationCommentsPending(),
-        );
-        setPendingComments((response.comments || []) as Comment[]);
+        const result = await sdk.comments.moderationPending();
+        setPendingComments((result.comments || []) as Comment[]);
       } else if (activeTab === "approved") {
-        const response = await unwrap(
-          getVexGoAPI().getModerationCommentsApproved(),
-        );
-        setApprovedComments((response.comments || []) as Comment[]);
+        const result = await sdk.comments.moderationApproved();
+        setApprovedComments((result.comments || []) as Comment[]);
       } else if (activeTab === "rejected") {
-        const response = await unwrap(
-          getVexGoAPI().getModerationCommentsRejected(),
-        );
-        setRejectedComments((response.comments || []) as Comment[]);
+        const result = await sdk.comments.moderationRejected();
+        setRejectedComments((result.comments || []) as Comment[]);
       }
     } catch (error) {
       console.error("Failed to load comments:", error);
@@ -59,7 +52,7 @@ export function CommentModerationPage() {
 
   const handleApproveComment = async (commentId: string) => {
     try {
-      await unwrap(getVexGoAPI().putModerationCommentsIdApprove(commentId));
+      await sdk.comments.moderationApprove(commentId);
       toast.success(t("moderation.approveSuccess"));
       loadData();
     } catch (error) {
@@ -70,7 +63,7 @@ export function CommentModerationPage() {
 
   const handleRejectComment = async (commentId: string) => {
     try {
-      await unwrap(getVexGoAPI().putModerationCommentsIdReject(commentId));
+      await sdk.comments.moderationReject(commentId);
       toast.success(t("moderation.rejectSuccess"));
       loadData();
     } catch (error) {

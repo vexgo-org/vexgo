@@ -7,8 +7,13 @@ import {
 } from "react";
 import type { User } from "@/types";
 import { t } from "@/lib/i18n";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import type { AuthLoginRequestWire } from "@/api/generated/model";
+import { sdk } from "@/lib/sdk";
+import {
+  getStoredToken,
+  getStoredUserJson,
+  setStoredUserJson,
+  type AuthLoginRequestWire,
+} from "@vexgo/sdk";
 
 interface AuthContextType {
   user: User | null;
@@ -37,20 +42,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
+    const token = getStoredToken();
+    const savedUser = getStoredUserJson();
 
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
-      getVexGoAPI()
-        .getAuthMe()
-        .then((response) => {
-          setUser(response.data.user as User);
-          localStorage.setItem("user", JSON.stringify(response.data.user));
+      sdk.auth
+        .me()
+        .then((result) => {
+          setUser(result.user as User);
+          if (result.user) setStoredUserJson(JSON.stringify(result.user));
         })
         .catch(() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          sdk.auth.logout();
           setUser(null);
         })
         .finally(() => {
@@ -73,21 +77,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestData.captcha_x = captchaData.x;
       requestData.captcha_y = captchaData.y;
     }
-    const response = await getVexGoAPI().postAuthLogin(requestData);
-    const { user: u, token } = response.data;
+    const { user: u, token } = await sdk.auth.login(requestData);
     if (!u || !token) {
       throw new Error(t("loginPage.loginFailed"));
     }
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(u));
     setUser(u as User);
   };
 
   const loginWithToken = async (token: string) => {
-    localStorage.setItem("token", token);
-    const response = await getVexGoAPI().getAuthMe();
-    const u = response.data.user;
-    localStorage.setItem("user", JSON.stringify(u));
+    const result = await sdk.auth.loginWithToken(token);
+    const u = result.user;
     setUser(u as User);
   };
 
@@ -113,12 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestData.captcha_y = captchaData.y;
     }
     try {
-      const response = await getVexGoAPI().postAuthRegister(requestData);
-      const { user: u, requires_verification, email_verified } = response.data;
+      const result = await sdk.auth.register(requestData);
+      const { user: u, requires_verification, email_verified } = result;
 
       if (requires_verification && !email_verified) {
         const error = new Error(
-          response.data.message || t("auth.emailVerificationRequired"),
+          result.message || t("auth.emailVerificationRequired"),
         ) as Error & {
           requiresVerification: boolean;
           email: string;
@@ -126,13 +125,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         error.requiresVerification = true;
         error.email = email;
-        error.registrationMessage = response.data.message || "";
+        error.registrationMessage = result.message || "";
         throw error;
       }
 
       if (u) {
         setUser(u as User);
-        localStorage.setItem("user", JSON.stringify(u));
+        setStoredUserJson(JSON.stringify(u));
       }
     } catch (error: unknown) {
       if (
@@ -142,27 +141,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ) {
         throw error;
       }
-      const apiError = error as {
-        response?: { data?: { error?: string } };
-        message?: string;
-      };
       const errorMessage =
-        apiError.response?.data?.error ||
-        apiError.message ||
-        t("auth.registrationFailed");
+        error instanceof Error && error.message
+          ? error.message
+          : t("auth.registrationFailed");
       throw new Error(errorMessage);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    sdk.auth.logout();
     setUser(null);
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    setStoredUserJson(JSON.stringify(updatedUser));
   };
 
   return (

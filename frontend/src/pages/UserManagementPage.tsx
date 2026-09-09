@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 import type { User } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,15 +77,13 @@ export function UserManagementPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().getUsers({
-          page: currentPage,
-          limit: 10,
-          search: searchQuery,
-        }),
-      );
-      setUsers((response.users || []) as User[]);
-      setTotalPages(response.pagination?.totalPages ?? 0);
+      const result = await sdk.users.list({
+        page: currentPage,
+        limit: 10,
+        search: searchQuery,
+      });
+      setUsers((result.users || []) as User[]);
+      setTotalPages(result.pagination?.totalPages ?? 0);
     } catch (error) {
       console.error("Failed to load user list:", error);
       toast.error(t("userManagement.loadingUsers"));
@@ -116,10 +113,10 @@ export function UserManagementPage() {
         throw new Error(`Invalid user role: ${newRole}`);
       }
 
-      const response = await unwrap(
-        getVexGoAPI().putUsersIdRole(Number(userId), { role: newRole }),
-      );
-      toast.success(response.message);
+      const result = await sdk.users.updateRole(Number(userId), {
+        role: newRole,
+      });
+      toast.success(result.message);
 
       // Update the local user list
       setUsers((prevUsers) =>
@@ -141,10 +138,8 @@ export function UserManagementPage() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const response = await unwrap(
-        getVexGoAPI().deleteUsersId(Number(userId)),
-      );
-      toast.success(response.message);
+      const result = await sdk.users.remove(Number(userId));
+      toast.success(result.message);
 
       // Remove the deleted user from the local list
       setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));

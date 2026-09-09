@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAxiosError } from "axios";
+import { isVexGoError } from "@vexgo/sdk";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { sdk } from "@/lib/sdk";
 import type { Post, Category, Tag as TagType } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,11 +71,11 @@ export function AdminPage() {
     try {
       const [statsRes, postsRes, draftPostsRes, categoriesRes, tagsRes] =
         await Promise.all([
-          unwrap(getVexGoAPI().getStats()),
-          unwrap(getVexGoAPI().getPosts({ limit: 10 })),
-          unwrap(getVexGoAPI().getPostsDrafts({ limit: 10 })),
-          unwrap(getVexGoAPI().getCategories()),
-          unwrap(getVexGoAPI().getTags()),
+          sdk.home.stats(),
+          sdk.posts.list({ limit: 10 }),
+          sdk.posts.drafts({ limit: 10 }),
+          sdk.posts.listCategories(),
+          sdk.posts.listTags(),
         ]);
 
       setStats({
@@ -100,8 +99,8 @@ export function AdminPage() {
   // apiErrorMessage extracts the server-provided error message from a failed
   // API call, falling back to a generic message.
   const apiErrorMessage = (error: unknown, fallback: string) => {
-    if (isAxiosError<{ error?: string }>(error) && error.response?.data.error) {
-      return error.response.data.error;
+    if (isVexGoError(error) && error.message) {
+      return error.message;
     }
     return fallback;
   };
@@ -110,12 +109,10 @@ export function AdminPage() {
     if (!newCategoryName.trim()) return;
 
     try {
-      await unwrap(
-        getVexGoAPI().postCategories({
-          name: newCategoryName,
-          description: newCategoryDesc,
-        }),
-      );
+      await sdk.posts.createCategory({
+        name: newCategoryName,
+        description: newCategoryDesc,
+      });
       setNewCategoryName("");
       setNewCategoryDesc("");
       setActionError("");
@@ -128,7 +125,7 @@ export function AdminPage() {
 
   const handleDeleteCategory = async (categoryId: string | number) => {
     try {
-      await unwrap(getVexGoAPI().deleteCategoriesId(Number(categoryId)));
+      await sdk.posts.deleteCategory(Number(categoryId));
       setActionError("");
       loadData();
     } catch (error) {
@@ -139,7 +136,7 @@ export function AdminPage() {
 
   const handleDeleteTag = async (tagId: string | number) => {
     try {
-      await unwrap(getVexGoAPI().deleteTagsId(Number(tagId)));
+      await sdk.posts.deleteTag(Number(tagId));
       setActionError("");
       loadData();
     } catch (error) {
@@ -150,7 +147,7 @@ export function AdminPage() {
 
   const handleDeletePost = async (postId: string | number) => {
     try {
-      await unwrap(getVexGoAPI().deletePostsId(String(postId)));
+      await sdk.posts.remove(String(postId));
       // Stay on the post management page and refresh the data
       setActiveTab("posts");
       loadData();

@@ -34,7 +34,7 @@ export default defineConfig({
             "lucide-react",
           ],
           // Bundle state-management and utility libraries separately
-          "utils-vendor": ["axios", "date-fns"],
+          "utils-vendor": ["date-fns"],
         },
       },
     },

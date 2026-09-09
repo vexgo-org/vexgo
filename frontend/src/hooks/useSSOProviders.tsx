@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getVexGoAPI } from "@/api/generated/endpoints";
+import { sdk } from "@/lib/sdk";
 
 export type SSOProvider = "github" | "google" | "oidc";
 
@@ -15,9 +15,8 @@ export function useSSOProviders(): UseSSOProvidersResult {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getVexGoAPI()
-      .getSsoProviders()
-      .then((r) => r.data)
+    sdk.sso
+      .providers()
       .then((data) => {
         setProviders((data.providers as SSOProvider[]) ?? []);
         setAllowLocalLogin(data.allow_local_login ?? true);

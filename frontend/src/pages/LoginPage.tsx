@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
+import { isVexGoError } from "@vexgo/sdk";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,8 +214,8 @@ export function LoginPage() {
   useEffect(() => {
     const loadCaptchaSettings = async () => {
       try {
-        const response = await unwrap(getVexGoAPI().getConfigGeneral());
-        setCaptchaEnabled(response.captchaEnabled ?? false);
+        const result = await sdk.settings.getGeneral();
+        setCaptchaEnabled(result.captchaEnabled ?? false);
       } catch (error) {
         console.error(t("common.error"), error);
         setCaptchaEnabled(false);
@@ -258,17 +258,10 @@ export function LoginPage() {
       resetCaptcha();
       navigate(from, { replace: true });
     } catch (err) {
-      const error = err as {
-        response?: { data?: { message?: string; email_verified?: boolean } };
-        message?: string;
-      };
-      setError(
-        error.response?.data?.message ||
-          error.message ||
-          t("loginPage.loginFailed"),
-      );
-      if (error.response?.data?.email_verified === false)
-        setEmailVerified(false);
+      setError(getErrorMessage(err, t("loginPage.loginFailed")));
+      const body = (isVexGoError(err) ? err.data : undefined) as
+        { email_verified?: boolean } | undefined;
+      if (body?.email_verified === false) setEmailVerified(false);
       if (captchaEnabled) {
         resetCaptcha();
       }
@@ -286,15 +279,10 @@ export function LoginPage() {
     setResendMessage("");
     setError("");
     try {
-      const response = await unwrap(
-        getVexGoAPI().postAuthEmailVerifyResend({ email }),
-      );
-      setResendMessage(response.message ?? "");
+      const result = await sdk.auth.resendVerification({ email });
+      setResendMessage(result.message ?? "");
     } catch (err) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(
-        error.response?.data?.error || t("loginPage.resendVerificationFailed"),
-      );
+      setError(getErrorMessage(err, t("loginPage.resendVerificationFailed")));
     } finally {
       setResendLoading(false);
     }

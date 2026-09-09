@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
@@ -51,14 +50,11 @@ export function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await unwrap(getVexGoAPI().postAuthPasswordResetRequest({ email }));
+      await sdk.auth.requestPasswordReset({ email });
       setSuccess(true);
       setError("");
     } catch (err: unknown) {
-      const apiError = err as { response?: { data?: { error?: string } } };
-      setError(
-        apiError.response?.data?.error || t("resetPasswordPage.requestFailed"),
-      );
+      setError(getErrorMessage(err, t("resetPasswordPage.requestFailed")));
     } finally {
       setLoading(false);
     }
@@ -86,7 +82,7 @@ export function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await unwrap(getVexGoAPI().postAuthPasswordReset({ token, password }));
+      await sdk.auth.resetPassword({ token, password });
       setSuccess(true);
       setError("");
       // Navigate to the login page after 3 seconds
@@ -94,10 +90,7 @@ export function ResetPasswordPage() {
         navigate("/login");
       }, 3000);
     } catch (err: unknown) {
-      const apiError = err as { response?: { data?: { error?: string } } };
-      setError(
-        apiError.response?.data?.error || t("resetPasswordPage.resetFailed"),
-      );
+      setError(getErrorMessage(err, t("resetPasswordPage.resetFailed")));
     } finally {
       setLoading(false);
     }

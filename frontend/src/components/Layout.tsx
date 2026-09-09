@@ -26,7 +26,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getVexGoAPI } from "@/api/generated/endpoints";
+import { sdk } from "@/lib/sdk";
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -47,13 +47,13 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await getVexGoAPI().getConfigGeneral();
-        if (response.data.siteName) {
-          setSiteName(response.data.siteName);
-          document.title = response.data.siteName;
+        const result = await sdk.settings.getGeneral();
+        if (result.siteName) {
+          setSiteName(result.siteName);
+          document.title = result.siteName;
         }
-        if (response.data.siteIcon) {
-          setSiteIcon(response.data.siteIcon);
+        if (result.siteIcon) {
+          setSiteIcon(result.siteIcon);
           // Update favicon link
           let link =
             document.querySelector<HTMLLinkElement>("link[rel~='icon']");
@@ -62,9 +62,9 @@ export function Layout({ children }: LayoutProps) {
             link.rel = "icon";
             document.head.appendChild(link);
           }
-          link.href = response.data.siteIcon;
+          link.href = result.siteIcon;
         }
-        setAllowGuestView(response.data.allowGuestViewPosts !== false);
+        setAllowGuestView(result.allowGuestViewPosts !== false);
       } catch (error) {
         console.error(t("common.error"), error);
       } finally {

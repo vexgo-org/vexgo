@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 
 import type { AIConfig, AIModel } from "@/types";
-import type { AxiosError } from "axios";
 import {
   Card,
   CardContent,
@@ -26,10 +24,6 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Cpu, Save, TestTube, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-
-interface ApiErrorResponse {
-  error?: string;
-}
 
 export function AISettingsPage() {
   const navigate = useNavigate();
@@ -52,8 +46,8 @@ export function AISettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const response = await unwrap(getVexGoAPI().getConfigAi());
-      setConfig(response);
+      const result = await sdk.settings.getAi();
+      setConfig(result);
     } catch (error: unknown) {
       console.error("Failed to load AI config:", error);
       toast.error(t("aiSettings.loadFailed"));
@@ -74,9 +68,9 @@ export function AISettingsPage() {
 
     setFetchingModels(true);
     try {
-      const response = await unwrap(getVexGoAPI().getConfigAiModels());
+      const result = await sdk.settings.listAiModels();
       setModels(
-        (response.models || []).map((m) => ({
+        (result.models || []).map((m) => ({
           id: m,
           object: "model" as const,
           created: 0,
@@ -86,9 +80,7 @@ export function AISettingsPage() {
       toast.success(t("aiSettings.testSuccess"));
     } catch (error: unknown) {
       console.error("Failed to fetch the model list:", error);
-      const axiosError = error as AxiosError<ApiErrorResponse>;
-      const errorMessage =
-        axiosError.response?.data?.error || t("common.unknownError");
+      const errorMessage = getErrorMessage(error, t("common.unknownError"));
       toast.error(t("aiSettings.testFailed") + ": " + errorMessage);
       setModels([]);
     } finally {
@@ -112,13 +104,11 @@ export function AISettingsPage() {
 
     setSaving(true);
     try {
-      await unwrap(getVexGoAPI().putConfigAi(config));
+      await sdk.settings.updateAi(config);
       toast.success(t("aiSettings.saveSuccess"));
     } catch (error: unknown) {
       console.error("Failed to save AI config:", error);
-      const axiosError = error as AxiosError<ApiErrorResponse>;
-      const errorMessage =
-        axiosError.response?.data?.error || t("common.unknownError");
+      const errorMessage = getErrorMessage(error, t("common.unknownError"));
       toast.error(t("aiSettings.saveFailed") + ": " + errorMessage);
     } finally {
       setSaving(false);
@@ -137,14 +127,12 @@ export function AISettingsPage() {
 
     setTesting(true);
     try {
-      const response = await unwrap(getVexGoAPI().postConfigAiTest());
+      const result = await sdk.settings.testAi();
       toast.success(t("aiSettings.testSuccess") + "!");
-      console.log("AI Response:", response.response);
+      console.log("AI Response:", result.response);
     } catch (error: unknown) {
       console.error("Failed to test the AI connection:", error);
-      const axiosError = error as AxiosError<ApiErrorResponse>;
-      const errorMessage =
-        axiosError.response?.data?.error || t("common.unknownError");
+      const errorMessage = getErrorMessage(error, t("common.unknownError"));
       toast.error(t("aiSettings.testFailed") + ": " + errorMessage);
     } finally {
       setTesting(false);

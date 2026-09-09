@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
-import type { ModelPost } from "@/api/generated/model";
+import { sdk } from "@/lib/sdk";
+import type { ModelPost } from "@vexgo/sdk";
 import type { Post, Category } from "@/types";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
@@ -134,22 +133,18 @@ export function HomePage() {
       if (searchQuery && searchQuery.trim()) {
         // Prefer the backend title search (pagination-friendly); also fetch extra posts for client-side tag matching as a fallback
         const [respSearch, respBulk] = await Promise.all([
-          unwrap(
-            getVexGoAPI().getPosts({
-              page: currentPage,
-              limit: 10,
-              search: searchQuery,
-              category: selectedCategory || undefined,
-            }),
-          ),
+          sdk.posts.list({
+            page: currentPage,
+            limit: 10,
+            search: searchQuery,
+            category: selectedCategory || undefined,
+          }),
           // Fetch more posts to match tags on the client (the backend may not support tag search)
-          unwrap(
-            getVexGoAPI().getPosts({
-              page: 1,
-              limit: 200,
-              category: selectedCategory || undefined,
-            }),
-          ),
+          sdk.posts.list({
+            page: 1,
+            limit: 200,
+            category: selectedCategory || undefined,
+          }),
         ]);
         const titleMatches = (respSearch.posts || []).map((p) =>
           normalizePost(p),
@@ -175,13 +170,11 @@ export function HomePage() {
           limit: p?.limit ?? 10,
         });
       } else {
-        const response = await unwrap(
-          getVexGoAPI().getPosts({
-            page: currentPage,
-            limit: 10,
-            category: selectedCategory || undefined,
-          }),
-        );
+        const response = await sdk.posts.list({
+          page: currentPage,
+          limit: 10,
+          category: selectedCategory || undefined,
+        });
         const all = (response.posts || []).map((p) => normalizePost(p));
         setPosts(all);
         const p = response.pagination;
@@ -205,8 +198,8 @@ export function HomePage() {
 
   const loadCategories = async () => {
     try {
-      const response = await getVexGoAPI().getCategories();
-      setCategories((response.data.categories as Category[]) || []);
+      const result = await sdk.posts.listCategories();
+      setCategories((result.categories as Category[]) || []);
     } catch (error) {
       console.error("Failed to load categories:", error);
     }
@@ -214,9 +207,7 @@ export function HomePage() {
 
   const loadPopularPosts = async () => {
     try {
-      const response = await unwrap(
-        getVexGoAPI().getStatsPopularPosts({ limit: 5 }),
-      );
+      const response = await sdk.home.popularPosts({ limit: 5 });
       setPopularPosts((response.posts || []).map((p) => normalizePost(p)));
     } catch (error) {
       console.error("Failed to load popular posts:", error);
@@ -226,9 +217,7 @@ export function HomePage() {
   const loadPopularTags = async () => {
     try {
       // Fetch enough posts to tally tags
-      const response = await unwrap(
-        getVexGoAPI().getPosts({ page: 1, limit: 200 }),
-      );
+      const response = await sdk.posts.list({ page: 1, limit: 200 });
       const allPosts = (response.posts || []).map((p) => normalizePost(p));
 
       // Count how many times each tag appears
@@ -297,7 +286,7 @@ export function HomePage() {
 
   const handleToggleLike = async (postId: string) => {
     try {
-      const { data } = await getVexGoAPI().postLikesPostId(Number(postId));
+      const data = await sdk.posts.like(Number(postId));
       const { isLiked, likesCount } = data;
       setPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, isLiked, likesCount } : p)),

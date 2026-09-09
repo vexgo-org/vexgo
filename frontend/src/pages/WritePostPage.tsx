@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { isAxiosError } from "axios";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { isVexGoError } from "@vexgo/sdk";
+import { sdk } from "@/lib/sdk";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
@@ -114,13 +113,13 @@ export function WritePostPage() {
 
   const loadCategories = async () => {
     try {
-      const response = await unwrap(getVexGoAPI().getCategories());
-      if (!response || response.categories?.length === 0) {
+      const result = await sdk.posts.listCategories();
+      if (!result || result.categories?.length === 0) {
         throw Error("no default category");
       }
 
       // Ensure category ids are strings so they match the Select options (the backend may return numeric ids)
-      const normalized = (response.categories || []).map((c) => ({
+      const normalized = (result.categories || []).map((c) => ({
         ...c,
         id: String(c.id),
       }));
@@ -139,8 +138,8 @@ export function WritePostPage() {
 
   const loadPost = async () => {
     try {
-      const response = await unwrap(getVexGoAPI().getPostsByIdId(id!));
-      const post = response.post as LoadedPost;
+      const result = await sdk.posts.getById(id!);
+      const post = result.post as LoadedPost;
       console.debug("WritePostPage loaded post:", post);
       console.log("Post content:", post.content);
       console.log("Post content type:", typeof post.content);
@@ -258,10 +257,8 @@ export function WritePostPage() {
     setShowCropper(false);
     setUploadingImage(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().postUpload({ file: croppedFile }),
-      );
-      setCoverImage(response.file?.url || "");
+      const result = await sdk.upload.uploadFile(croppedFile);
+      setCoverImage(result.file?.url || "");
     } catch (err) {
       console.error("Failed to upload cropped image:", err);
       alert(t("writePostPage.uploadFailed"));
@@ -322,19 +319,20 @@ export function WritePostPage() {
       };
 
       if (isEditMode) {
-        const response = await unwrap(getVexGoAPI().putPostsId(id!, postData));
-        navigate(`/post/${response.post?.slug}`);
+        const result = await sdk.posts.update(id!, postData);
+        navigate(`/post/${result.post?.slug}`);
       } else {
-        const response = await unwrap(getVexGoAPI().postPosts(postData));
-        navigate(`/post/${response.post?.slug}`);
+        const result = await sdk.posts.create(postData);
+        navigate(`/post/${result.post?.slug}`);
       }
     } catch (error: unknown) {
       console.error("Failed to save post:", error);
       // The backend error body is {"error": string} (409 also carries code: "slug_taken")
       let alertMessage = t("writePostPage.writePostFailed");
-      if (isAxiosError<{ error?: string }>(error)) {
-        const status = error.response?.status;
-        const serverError = error.response?.data?.error;
+      if (isVexGoError(error)) {
+        const status = error.status;
+        const serverError = (error.data as { error?: string } | undefined)
+          ?.error;
         if (status === 409) {
           alertMessage = t("writePostPage.slugTaken");
         } else if (status === 400 && serverError) {
@@ -356,22 +354,21 @@ export function WritePostPage() {
     setCreatingCategory(true);
 
     try {
-      const res = await unwrap(
-        getVexGoAPI().postCategories({ name, description: "" }),
-      );
-      const created = res.category!;
+      const result = await sdk.posts.createCategory({ name, description: "" });
+      const created = result.category!;
       const normalized = { ...created, id: String(created.id) };
       setCategories((prev) => [...prev, normalized]);
       setCategory(normalized.name || "");
       setNewCategoryName("");
     } catch (err) {
-      if (isAxiosError<{ error?: string; code?: string }>(err)) {
-        if (err.response?.status === 409) {
+      if (isVexGoError(err)) {
+        const body = err.data as { error?: string; code?: string } | undefined;
+        if (err.status === 409) {
           alert(t("writePostPage.categoryDuplicate"));
-        } else if (err.response?.status === 403) {
+        } else if (err.status === 403) {
           alert(t("writePostPage.categoryCreateForbidden"));
-        } else if (err.response?.status === 400 && err.response?.data?.error) {
-          alert(err.response.data.error);
+        } else if (err.status === 400 && body?.error) {
+          alert(body.error);
         } else {
           alert(t("writePostPage.categoryCreateError"));
         }
@@ -395,19 +392,18 @@ export function WritePostPage() {
     }
     setDeletingCategory(true);
     try {
-      await unwrap(
-        getVexGoAPI().deleteCategoriesId(Number(selectedCategory.id)),
-      );
+      await sdk.posts.deleteCategory(Number(selectedCategory.id));
       setCategories((prev) =>
         prev.filter((cat) => cat.id !== selectedCategory.id),
       );
       setCategory("");
     } catch (err) {
-      if (isAxiosError<{ error?: string }>(err)) {
-        if (err.response?.status === 403) {
+      if (isVexGoError(err)) {
+        const body = err.data as { error?: string } | undefined;
+        if (err.status === 403) {
           alert(t("writePostPage.categoryDeleteForbidden"));
-        } else if (err.response?.status === 400 && err.response?.data?.error) {
-          alert(err.response.data.error);
+        } else if (err.status === 400 && body?.error) {
+          alert(body.error);
         } else {
           alert(t("writePostPage.categoryDeleteError"));
         }

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
-import { getVexGoAPI } from "@/api/generated/endpoints";
-import { unwrap } from "@/lib/api";
+import { getErrorMessage, sdk } from "@/lib/sdk";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,17 +54,16 @@ export function CreatorApplicationButton({
   const handleApply = async () => {
     setIsLoading(true);
     try {
-      const response = await unwrap(
-        getVexGoAPI().postUsersApplyCreator({ reason: reason || undefined }),
-      );
-      toast.success(response.message);
+      const result = await sdk.users.applyCreator({
+        reason: reason || undefined,
+      });
+      toast.success(result.message);
       setIsDialogOpen(false);
       setIsConfirmOpen(false);
       setReason("");
     } catch (error: unknown) {
       console.error("Failed to apply for role upgrade:", error);
-      const apiError = error as { response?: { data?: { error?: string } } };
-      toast.error(apiError.response?.data?.error || t("errors.networkError"));
+      toast.error(getErrorMessage(error, t("errors.networkError")));
     } finally {
       setIsLoading(false);
     }
