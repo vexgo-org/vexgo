@@ -44,7 +44,6 @@ jobs:
         run: |
           npm install prettier@3.9.6
           go install mvdan.cc/gofumpt@latest
-          go install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5
 
       - name: Install just
         uses: extractions/setup-just@v3
