@@ -7,7 +7,12 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["dist", "src/api/generated/**"],
+  "ignorePatterns": [
+    "dist",
+    "src/api/generated/**",
+    "packages/sdk/src/generated/**",
+    "**/node_modules/**"
+  ],
   "options": {
     "denyWarnings": true,
     "typeAware": true,

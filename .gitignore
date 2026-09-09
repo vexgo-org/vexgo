@@ -3,8 +3,9 @@
 .direnv/
 .vscode/
 
-frontend/node_modules
+node_modules/
 frontend/dist
+frontend/packages/sdk/dist
 backend/blog.exe
 backend/vexgo
 backend/blog.db
