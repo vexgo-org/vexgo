@@ -50,7 +50,6 @@
               gopls
               gotools
               just
-              nodejs
               oxlint
               prettier
             ];
