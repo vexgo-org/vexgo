@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -195,6 +196,30 @@ func IsPathInside(basePath, targetPath string) bool {
 	return !strings.HasPrefix(rel, "..") && rel != ".."
 }
 
+// legacyAdminRedirect maps a top-level route that moved under /admin/ to its
+// new location, preserving the trailing path and query string (emailed links
+// such as /verify-email?token=... must keep their query). It returns ok false
+// for paths that never were SPA routes.
+func legacyAdminRedirect(u *url.URL) (string, bool) {
+	path := u.Path
+	if !strings.HasPrefix(path, "/") {
+		return "", false
+	}
+	// Segment 1 is the old top-level route name ("login", "edit-post", ...).
+	segments := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
+	switch segments[0] {
+	case "login", "register", "reset-password", "verify-email", "write",
+		"profile", "my-posts", "notifications", "settings", "edit-post":
+		target := "/admin" + path
+		if u.RawQuery != "" {
+			target += "?" + u.RawQuery
+		}
+		return target, true
+	default:
+		return "", false
+	}
+}
+
 // getRequestedTheme determines which theme should be used for this request.
 // It checks the 'theme' query parameter first (for admin preview), then falls back
 // to the globally active theme stored in the database.
@@ -219,8 +244,10 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 		e.Static("/uploads", mediaDir)
 	}
 
-	// Admin SPA assets (login, write, /admin/* until those move under /admin)
-	e.GET("/assets/*filepath", func(c *gin.Context) {
+	// Admin SPA assets. The SPA is built with base /admin/, so its HTML
+	// references /admin/assets/... and everything non-public lives under
+	// /admin/.
+	e.GET("/admin/assets/*filepath", func(c *gin.Context) {
 		file := strings.TrimPrefix(c.Param("filepath"), "/")
 		content, err := ReadAsset("assets/" + file)
 		if err != nil {
@@ -312,18 +339,28 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 		c.Data(http.StatusOK, mimeType, content)
 	})
 
-	// SPA fallback for every non-public route: serve the admin SPA so it can
-	// render login, write, profile and /admin/* pages. Public routes are
-	// handled above and never reach here.
+	// SPA fallback: the admin SPA is the only non-public surface and lives
+	// under /admin/. Everything else that used to be an SPA route is
+	// redirected to its /admin/ equivalent so old bookmarks and emailed links
+	// keep working; unknown paths are 404s.
 	e.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/api/") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
-		if strings.HasPrefix(c.Request.URL.Path, "/theme-assets/") {
+		if strings.HasPrefix(path, "/theme-assets/") {
 			c.Status(http.StatusNotFound)
 			return
 		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
+		if path == "/admin" || strings.HasPrefix(path, "/admin/") {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
+			return
+		}
+		if target, ok := legacyAdminRedirect(c.Request.URL); ok {
+			c.Redirect(http.StatusMovedPermanently, target)
+			return
+		}
+		c.Status(http.StatusNotFound)
 	})
 }

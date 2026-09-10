@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTranslation } from "@/lib/I18nContext";
@@ -13,12 +13,9 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
-  Search,
   PenLine,
   Menu,
   X,
-  Home,
-  User,
   Settings,
   LogOut,
   FileText,
@@ -36,13 +33,10 @@ export function Layout({ children }: LayoutProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [siteName, setSiteName] = useState("VexGo");
   const [siteIcon, setSiteIcon] = useState("");
-  const [allowGuestView, setAllowGuestView] = useState(true);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -64,78 +58,66 @@ export function Layout({ children }: LayoutProps) {
           }
           link.href = response.data.siteIcon;
         }
-        setAllowGuestView(response.data.allowGuestViewPosts !== false);
       } catch (error) {
         console.error(t("common.error"), error);
-      } finally {
-        setLoading(false);
       }
     };
     loadSettings();
   }, [t]);
 
-  // Check whether we need to redirect to the login page
-  useEffect(() => {
-    if (!loading && !isAuthenticated && !allowGuestView) {
-      // Only redirect on non-login pages when login is required
-      if (location.pathname !== "/login" && location.pathname !== "/register") {
-        navigate("/login");
-      }
-    }
-  }, [loading, isAuthenticated, allowGuestView, navigate, location.pathname]);
-
   const handleSearch = (e: React.SubmitEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      if (isAuthenticated) {
-        navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
-      } else {
-        navigate("/login");
-      }
+      // Search lives on the public (theme) home page, outside this SPA.
+      window.location.href = `/?search=${encodeURIComponent(searchQuery.trim())}`;
     }
   };
 
   const handleLogout = () => {
     logout();
-    navigate("/");
+    navigate("/admin/login");
   };
 
   const navItems = [
-    { path: "/", label: t("layout.home"), icon: Home },
     ...(isAuthenticated && user?.role !== "guest"
-      ? [{ path: "/write", label: t("layout.writePost"), icon: PenLine }]
+      ? [{ path: "/admin/write", label: t("layout.writePost"), icon: PenLine }]
       : []),
     ...(isAuthenticated && user?.role !== "guest"
-      ? [{ path: "/my-posts", label: t("layout.myPosts"), icon: FileText }]
+      ? [
+          {
+            path: "/admin/my-posts",
+            label: t("layout.myPosts"),
+            icon: FileText,
+          },
+        ]
       : []),
     ...(isAuthenticated
       ? [
           {
-            path: "/notifications",
+            path: "/admin/notifications",
             label: t("layout.notifications"),
             icon: Bell,
           },
         ]
       : []),
     ...(user?.role === "admin" || user?.role === "super_admin"
-      ? [{ path: "/admin", label: t("layout.adminPanel"), icon: BarChart3 }]
+      ? [
+          {
+            path: "/admin",
+            label: t("layout.adminPanel"),
+            icon: BarChart3,
+          },
+        ]
       : []),
   ];
 
   const isActive = (path: string) => {
-    if (path === "/") {
-      return location.pathname === "/";
-    }
     // Admin routes need exact matching
     if (path === "/admin") {
       return location.pathname === "/admin";
     }
     return location.pathname.startsWith(path);
   };
-
-  if (loading) {
-    return null; // or render a loading state
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -144,18 +126,18 @@ export function Layout({ children }: LayoutProps) {
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between gap-4">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 shrink-0">
+            <Link to="/admin" className="flex items-center gap-2 shrink-0">
               {siteIcon ? (
                 <img src={siteIcon} alt="Logo" className="w-8 h-8" />
               ) : (
                 <>
                   <img
-                    src="/assets/vexgo-light.ico"
+                    src="/admin/assets/vexgo-light.ico"
                     alt="Logo"
                     className="w-8 h-8 dark:hidden"
                   />
                   <img
-                    src="/assets/vexgo-dark.ico"
+                    src="/admin/assets/vexgo-dark.ico"
                     alt="Logo"
                     className="w-8 h-8 hidden dark:block"
                   />
@@ -172,11 +154,10 @@ export function Layout({ children }: LayoutProps) {
               className="hidden md:flex flex-1 max-w-md"
             >
               <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder={t("layout.searchPlaceholder")}
-                  className="pl-10 w-full"
+                  className="pl-4 w-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -191,16 +172,19 @@ export function Layout({ children }: LayoutProps) {
                   variant={isActive(item.path) ? "default" : "ghost"}
                   size="sm"
                   asChild
-                  className={item.path === "/notifications" ? "relative" : ""}
+                  className={
+                    item.path === "/admin/notifications" ? "relative" : ""
+                  }
                 >
                   <Link to={item.path} className="flex items-center gap-2">
                     <item.icon className="w-4 h-4" />
                     {item.label}
-                    {item.path === "/notifications" && unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                        {unreadCount}
-                      </span>
-                    )}
+                    {item.path === "/admin/notifications" &&
+                      unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                          {unreadCount}
+                        </span>
+                      )}
                   </Link>
                 </Button>
               ))}
@@ -253,11 +237,15 @@ export function Layout({ children }: LayoutProps) {
                       </div>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate("/profile")}>
-                      <User className="mr-2 h-4 w-4" />
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin/profile")}
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
                       {t("layout.profile")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin/settings")}
+                    >
                       <Settings className="mr-2 h-4 w-4" />
                       {t("layout.settings")}
                     </DropdownMenuItem>
@@ -274,10 +262,10 @@ export function Layout({ children }: LayoutProps) {
               ) : (
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to="/login">{t("layout.login")}</Link>
+                    <Link to="/admin/login">{t("layout.login")}</Link>
                   </Button>
                   <Button size="sm" asChild>
-                    <Link to="/register">{t("layout.registerText")}</Link>
+                    <Link to="/admin/register">{t("layout.registerText")}</Link>
                   </Button>
                 </div>
               )}
@@ -304,11 +292,10 @@ export function Layout({ children }: LayoutProps) {
               {/* Search box */}
               <form onSubmit={handleSearch}>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     type="search"
                     placeholder={t("layout.searchPlaceholder")}
-                    className="pl-10 w-full"
+                    className="pl-4 w-full"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -350,12 +337,12 @@ export function Layout({ children }: LayoutProps) {
               ) : (
                 <>
                   <img
-                    src="/assets/vexgo-light.ico"
+                    src="/admin/assets/vexgo-light.ico"
                     alt="Logo"
                     className="w-6 h-6 dark:hidden"
                   />
                   <img
-                    src="/assets/vexgo-dark.ico"
+                    src="/admin/assets/vexgo-dark.ico"
                     alt="Logo"
                     className="w-6 h-6 hidden dark:block"
                   />
@@ -368,17 +355,17 @@ export function Layout({ children }: LayoutProps) {
             </p>
             <div className="flex gap-4">
               <Link
-                to="/"
+                to="/admin"
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
                 {t("layout.home")}
               </Link>
-              <Link
-                to="/about"
+              <a
+                href="/"
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
-                {t("layout.about")}
-              </Link>
+                {t("layout.viewSite")}
+              </a>
             </div>
           </div>
         </div>

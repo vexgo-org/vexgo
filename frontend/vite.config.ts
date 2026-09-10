@@ -5,7 +5,9 @@ import { inspectAttr } from "kimi-plugin-inspect-react";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/",
+  // The admin SPA lives entirely under /admin/; public pages are served by
+  // the active theme (frontend-public build) so the SPA must not claim root.
+  base: "/admin/",
   plugins: [inspectAttr(), react()],
   resolve: {
     alias: {

@@ -76,7 +76,7 @@ export function ThemePage() {
     window.scrollTo(0, 0);
 
     if (user && user.role !== "admin" && user.role !== "super_admin") {
-      navigate("/");
+      navigate("/admin/my-posts");
       return;
     }
 

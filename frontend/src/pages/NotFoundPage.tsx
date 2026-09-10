@@ -10,7 +10,7 @@ export function NotFoundPage() {
       <h1 className="text-6xl font-bold text-muted-foreground/30 mb-4">404</h1>
       <p className="text-muted-foreground mb-8">{t("errors.notFound")}</p>
       <Button asChild>
-        <Link to="/">{t("postDetailPage.backToHome")}</Link>
+        <Link to="/admin">{t("postDetailPage.backToHome")}</Link>
       </Button>
     </div>
   );

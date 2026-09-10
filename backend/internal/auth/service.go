@@ -68,8 +68,10 @@ var (
 )
 
 const (
-	verificationLinkPath string = "/verify-email"
-	resetLinkPath        string = "/reset-password"
+	// Account-action pages moved under /admin when the admin SPA became the
+	// only non-public surface; emailed links must point there.
+	verificationLinkPath string = "/admin/verify-email"
+	resetLinkPath        string = "/admin/reset-password"
 
 	// dummyPasswordSource is the plaintext hashed into dummyPasswordHash. Its
 	// value is arbitrary; only its cost matters.

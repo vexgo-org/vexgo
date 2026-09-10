@@ -659,7 +659,7 @@ export const enUS = {
     profile: "Profile",
     settings: "Settings",
     logout: "Logout",
-    about: "About",
+    viewSite: "View Site",
     allRightsReserved: "© 2026 {siteName}. All rights reserved.",
   },
 

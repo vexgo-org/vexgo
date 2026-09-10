@@ -630,7 +630,7 @@ export const zhCN = {
     profile: "个人中心",
     settings: "设置",
     logout: "退出登录",
-    about: "关于",
+    viewSite: "查看站点",
     allRightsReserved: "© 2026 {siteName}. All rights reserved.",
   },
 

@@ -146,7 +146,7 @@ func TestEmailLinkOrigin_NotPoisonedByRequestHeaders(t *testing.T) {
 			_, _, db := newTestService(t)
 			body := registerAndGetEmailedLink(t, db, tt.baseURL, tt.behindProxy)
 
-			wantPrefix := tt.wantScheme + "://" + tt.wantHost + "/verify-email?token="
+			wantPrefix := tt.wantScheme + "://" + tt.wantHost + "/admin/verify-email?token="
 			if !strings.Contains(body, wantPrefix) {
 				t.Errorf("email link should start with %q, got:\n%s", wantPrefix, body)
 			}

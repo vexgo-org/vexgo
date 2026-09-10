@@ -60,7 +60,7 @@ export function AdminPage() {
   useEffect(() => {
     // Check if user is admin or super admin
     if (user && user.role !== "admin" && user.role !== "super_admin") {
-      navigate("/");
+      navigate("/admin/my-posts");
       return;
     }
 
@@ -160,7 +160,7 @@ export function AdminPage() {
   };
 
   const handleEditPost = (postId: string) => {
-    navigate(`/edit-post/${postId}`);
+    navigate(`/admin/edit-post/${postId}`);
   };
 
   const formatDate = (dateString: string) => {

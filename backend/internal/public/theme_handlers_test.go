@@ -172,17 +172,48 @@ func TestPublicRoutes_ThemeAssetsServed(t *testing.T) {
 
 func TestPublicRoutes_SpaFallbackForAdminPaths(t *testing.T) {
 	r, _, _ := newPublicRouter(t)
-	// Non-public routes still serve the admin SPA until they move under /admin.
-	w := doPublicRequest(t, r, "/login")
-	if w.Code != http.StatusOK {
-		t.Fatalf("GET /login status = %d", w.Code)
+	// The admin SPA serves every /admin/* path, including /admin itself.
+	for _, path := range []string{"/admin", "/admin/login", "/admin/write"} {
+		w := doPublicRequest(t, r, path)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d", path, w.Code)
+		}
+		if !strings.Contains(w.Body.String(), "<div id=\"root\"></div>") {
+			t.Errorf("GET %s should serve the SPA index, got:\n%.200s", path, w.Body.String())
+		}
 	}
-	w = doPublicRequest(t, r, "/admin")
-	if w.Code != http.StatusOK {
-		t.Fatalf("GET /admin status = %d", w.Code)
-	}
-	w = doPublicRequest(t, r, "/api/nope")
+	w := doPublicRequest(t, r, "/api/nope")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("unknown api route status = %d", w.Code)
+	}
+}
+
+func TestPublicRoutes_LegacyPathsRedirectUnderAdmin(t *testing.T) {
+	r, _, _ := newPublicRouter(t)
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"/login", "/admin/login"},
+		{"/register", "/admin/register"},
+		{"/reset-password", "/admin/reset-password"},
+		{"/write", "/admin/write"},
+		{"/edit-post/42", "/admin/edit-post/42"},
+		{"/verify-email?token=abc-123", "/admin/verify-email?token=abc-123"},
+	}
+	for _, tt := range tests {
+		w := doPublicRequest(t, r, tt.path)
+		if w.Code != http.StatusMovedPermanently {
+			t.Fatalf("GET %s status = %d, want 301", tt.path, w.Code)
+		}
+		if loc := w.Header().Get("Location"); loc != tt.want {
+			t.Errorf("GET %s Location = %q, want %q", tt.path, loc, tt.want)
+		}
+	}
+
+	// Unknown non-public paths are plain 404s, not SPA fallbacks.
+	w := doPublicRequest(t, r, "/about")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("GET /about status = %d, want 404", w.Code)
 	}
 }
