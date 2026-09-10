@@ -43,7 +43,7 @@ The repository follows a lightweight engineering discipline:
 ### Requirements
 
 - Go 1.25+
-- Node.js and bun 1.4
+- Node.js and bun 1.3
 - golangci-lint (v2), gofumpt, prettier, oxlint, and `just` (recommended, used by the `justfile`)
 
 The Nix flake provides a ready-made development shell with all tools (`go`, `gofumpt`, `golangci-lint`, `just`, `nodejs`, `oxlint`, `bun`, `prettier`):
