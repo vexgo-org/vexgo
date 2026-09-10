@@ -62,14 +62,13 @@ func (r *Renderer) handleIndex(c *gin.Context) {
 	}
 
 	r.servePage(c, theme, IndexTemplate, IndexData{
-		Site:       site,
-		Posts:      posts,
-		Pagination: pagination,
-		Query: IndexQueryData{
-			Search:   search,
-			Category: category,
-		},
-		Categories: categories,
+		Site:         site,
+		Posts:        posts,
+		Pagination:   pagination,
+		Query:        IndexQueryData{Search: search, Category: category},
+		Categories:   categories,
+		PopularPosts: r.popularPostsData(c.Request.Context(), 5),
+		PopularTags:  r.popularTagsData(c.Request.Context(), 10),
 	}, http.StatusOK)
 }
 

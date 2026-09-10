@@ -54,9 +54,15 @@ export function PostTemplate() {
             <div className="prose prose-lg max-w-none">
               {go(".Post.ContentHTML")}
             </div>
+
+            {/* Comment section: rendered by the built-in widget (see
+                widget/comments.js). The widget reads the post id from this
+                container and styles itself with inline styles, so any theme
+                can adopt it with the same two lines. */}
+            <div id="vexgo-comments" data-post-id={go(".Post.ID")}></div>
           </article>
         </main>
-        <SiteFooter />
+        <SiteFooter /> <script src="/theme-assets/comments.js" defer></script>
       </body>
     </html>
   );

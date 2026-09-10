@@ -136,6 +136,51 @@ export function HomeTemplate() {
                 </p>
                 {go("end")}
               </div>
+
+              {/* Hot posts */}
+              <div className="rounded-xl border bg-card text-card-foreground p-6">
+                <h3 className="text-lg font-semibold mb-3">Popular Posts</h3>
+                {go("if .PopularPosts")}
+                <ol className="space-y-3">
+                  {go("range .PopularPosts")}
+                  <li className="text-sm">
+                    <a
+                      href={go(".URL")}
+                      className="font-medium hover:text-primary transition-colors line-clamp-2"
+                    >
+                      {go(".Title")}
+                    </a>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {go(".CommentsCount")} comments · {go(".ViewCount")} views
+                    </div>
+                  </li>
+                  {go("end")}
+                </ol>
+                {go("else")}
+                <p className="text-sm text-muted-foreground">
+                  No popular posts yet.
+                </p>
+                {go("end")}
+              </div>
+
+              {/* Hot tags */}
+              <div className="rounded-xl border bg-card text-card-foreground p-6">
+                <h3 className="text-lg font-semibold mb-3">Popular Tags</h3>
+                {go("if .PopularTags")}
+                <div className="flex flex-wrap gap-2">
+                  {go("range .PopularTags")}
+                  <span className="inline-flex items-center rounded-md border border-transparent bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+                    {go(".Name")}
+                    <span className="ml-1 opacity-70">({go(".Count")})</span>
+                  </span>
+                  {go("end")}
+                </div>
+                {go("else")}
+                <p className="text-sm text-muted-foreground">
+                  No popular tags yet.
+                </p>
+                {go("end")}
+              </div>
             </aside>
           </div>
         </main>

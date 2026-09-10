@@ -8,7 +8,7 @@
  *   3. write index.html / post.html / user.html / 404.html into
  *      backend/internal/public/defaulttheme (embedded into the binary).
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderToString } from "react-dom/server";
@@ -55,5 +55,14 @@ emit("index.html", HomeTemplate());
 emit("post.html", PostTemplate());
 emit("user.html", UserTemplate());
 emit("404.html", NotFoundTemplate());
+
+// Static widget assets ship inside the theme so /theme-assets/... can serve
+// them with the same prefix as style.css.
+const assetsDir = resolve(outDir, "assets");
+mkdirSync(assetsDir, { recursive: true });
+copyFileSync(
+  resolve(here, "../widget/comments.js"),
+  resolve(assetsDir, "comments.js"),
+);
 
 console.log(`default theme templates written to ${outDir}`);

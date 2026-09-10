@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,13 +100,22 @@ type IndexQueryData struct {
 	Category string
 }
 
+// PopularTagData is one entry of the hot-tags sidebar: a tag name and how
+// many published posts carry it.
+type PopularTagData struct {
+	Name  string
+	Count int64
+}
+
 // IndexData is the context of the home page template.
 type IndexData struct {
-	Site       *SiteData
-	Posts      []PostCardData
-	Pagination *PaginationData
-	Query      IndexQueryData
-	Categories []string
+	Site         *SiteData
+	Posts        []PostCardData
+	Pagination   *PaginationData
+	Query        IndexQueryData
+	Categories   []string
+	PopularPosts []PostCardData
+	PopularTags  []PopularTagData
 }
 
 // PostData is the context of the post detail template.
@@ -238,6 +248,111 @@ func toPostCard(post model.Post) PostCardData {
 		card.AuthorAvatar = post.Author.Avatar
 	}
 	return card
+}
+
+// countLikesBatch returns the like count per post id in a single query.
+func (r *Renderer) countLikesBatch(ctx context.Context, postIDs []uint) map[uint]int64 {
+	counts := make(map[uint]int64, len(postIDs))
+	if len(postIDs) == 0 {
+		return counts
+	}
+	type result struct {
+		PostID uint
+		Count  int64
+	}
+	var rows []result
+	if err := r.db.WithContext(ctx).Model(&model.Like{}).
+		Select("post_id, COUNT(*) as count").
+		Where("post_id IN ?", postIDs).
+		Group("post_id").
+		Find(&rows).Error; err != nil {
+		return counts
+	}
+	for _, row := range rows {
+		counts[row.PostID] = row.Count
+	}
+	return counts
+}
+
+// popularPoolLimit bounds the pool of posts considered for the hot-posts and
+// hot-tags sidebars. The SSR path must stay cheap: only the most recent
+// published posts compete for the sidebar slots, matching the old client-side
+// sidebar which tallied the latest 200 posts.
+const popularPoolLimit = 200
+
+// popularPostsData returns the top published posts by likes*5 + views,
+// matching the public /stats/popular-posts endpoint. Like and comment counts
+// are batch-fetched; on query failure an empty list is returned so the home
+// page still renders.
+func (r *Renderer) popularPostsData(ctx context.Context, limit int) []PostCardData {
+	if limit < 1 {
+		limit = 5
+	}
+	var posts []model.Post
+	if err := r.db.WithContext(ctx).Model(&model.Post{}).
+		Preload("Author").
+		Preload("Tags").
+		Where("status = ?", model.PostStatusPublished).
+		Order("created_at DESC").
+		Limit(popularPoolLimit).
+		Find(&posts).Error; err != nil {
+		return nil
+	}
+
+	ids := make([]uint, 0, len(posts))
+	for _, p := range posts {
+		ids = append(ids, p.ID)
+	}
+	likes := r.countLikesBatch(ctx, ids)
+	comments := r.countCommentsBatch(ctx, ids)
+
+	// Score by likes*5 + views, exactly like the public API's Popular.
+	sort.SliceStable(posts, func(i, j int) bool {
+		scoreI := int(likes[posts[i].ID])*5 + posts[i].ViewCount
+		scoreJ := int(likes[posts[j].ID])*5 + posts[j].ViewCount
+		return scoreI > scoreJ
+	})
+
+	cards := make([]PostCardData, 0, min(len(posts), limit))
+	for i := range posts {
+		if len(cards) >= limit {
+			break
+		}
+		card := toPostCard(posts[i])
+		card.CommentsCount = comments[posts[i].ID]
+		cards = append(cards, card)
+	}
+	return cards
+}
+
+// popularTagsData returns the tags most used by published posts, ordered by
+// usage count, via a single grouped join query. On failure an empty list is
+// returned so the home page still renders.
+func (r *Renderer) popularTagsData(ctx context.Context, limit int) []PopularTagData {
+	if limit < 1 {
+		limit = 10
+	}
+	type row struct {
+		Name  string
+		Count int64
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).Table("tags").
+		Select("tags.name, COUNT(*) AS count").
+		Joins("JOIN post_tags ON post_tags.tag_id = tags.id").
+		Joins("JOIN posts ON posts.id = post_tags.post_id").
+		Where("posts.status = ?", model.PostStatusPublished).
+		Group("tags.id").
+		Order("count DESC").
+		Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return nil
+	}
+	tags := make([]PopularTagData, 0, len(rows))
+	for _, row := range rows {
+		tags = append(tags, PopularTagData(row))
+	}
+	return tags
 }
 
 // countCommentsBatch returns the comment count per post id in a single query.
