@@ -43,16 +43,16 @@ The repository follows a lightweight engineering discipline:
 ### Requirements
 
 - Go 1.26+
-- Node.js and bun 1.3
+- bun 1.3
 - golangci-lint (v2), gofumpt, prettier, oxlint, and `just` (recommended, used by the `justfile`)
 
-The Nix flake provides a ready-made development shell with all tools (`go`, `gofumpt`, `golangci-lint`, `just`, `nodejs`, `oxlint`, `bun`, `prettier`):
+The Nix flake provides a ready-made development shell with all tools (`go`, `gofumpt`, `golangci-lint`, `just`, `oxlint`, `bun`, `prettier`):
 
 ```bash
 nix develop
 ```
 
-If you use direnv, the checked-in `.envrc` (`use flake`) activates the shell automatically. A `devbox.json` with the same core tools (`go`, `nodejs`, `bun`) is also available.
+If you use direnv, the checked-in `.envrc` (`use flake`) activates the shell automatically. A `devbox.json` with the same core tools (`go`, `bun`) is also available.
 
 > **Nix build note:** the Nix package builds the frontend with `bun install --frozen-lockfile` at build time (matching the Docker and CI build), so the build needs network access — allow it with `sandbox = false` on NixOS, or use the default (non-sandboxed) build on other systems.
 

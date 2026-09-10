@@ -530,7 +530,7 @@ go run ./cmd/vexgo -c ../examples/config-mysql.yml
 
 - Linux/macOS
 - Go 1.26+
-- Node.js and bun 1.3
+- bun 1.3
 - `just`, `gofumpt`, `golangci-lint`, `prettier`, `oxlint` (recommended; a Nix dev shell with all of them is available via `nix develop`)
 
 ### Common commands

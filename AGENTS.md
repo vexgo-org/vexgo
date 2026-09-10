@@ -12,7 +12,7 @@ Key architectural fact: **the frontend build output is written to `backend/inter
 
 ## Setup
 
-Requirements: Go, Node.js + bun, and project tools. A Nix development shell is available via `nix develop`.
+Requirements: Go, bun, and project tools. A Nix development shell is available via `nix develop`.
 
 Install dependencies:
 

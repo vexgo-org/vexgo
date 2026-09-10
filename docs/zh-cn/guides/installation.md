@@ -15,7 +15,7 @@
 | [Docker Compose](#方式-3docker-compose-安装) | Docker + Docker Compose | 多服务场景（含数据库） |
 | [Nix](#方式-4nix-安装)                       | Nix 包管理器            | 即时试用、可复现配置   |
 | [NixOS Flake](#方式-5nixos-flake-安装)       | 启用 flakes 的 NixOS    | NixOS 系统             |
-| [源码编译](#方式-6源码编译)                  | Go 1.26+、Node.js、bun  | 开发、定制构建         |
+| [源码编译](#方式-6源码编译)                  | Go 1.26+、bun           | 开发、定制构建         |
 
 ---
 
@@ -367,7 +367,7 @@ sudo journalctl -u vexgo -f
 ### 第 1 步：安装构建依赖
 
 - **Go 1.26+**
-- **Node.js** 和 **bun 1.3**
+- **bun 1.3**
 - 可选（推荐）：`just`、`gofumpt`、`golangci-lint`、`prettier`、`oxlint` —— 可通过 `nix develop` 获得包含全部工具的 Nix 开发环境
 
 ### 第 2 步：克隆并构建

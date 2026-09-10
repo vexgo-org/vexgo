@@ -15,7 +15,7 @@
 | [Docker Compose](#method-3-docker-compose-installation) | Docker + Docker Compose   | Multi-service setups (DB, etc.)       |
 | [Nix](#method-4-nix-installation)                       | Nix package manager       | Trying instantly, reproducible setups |
 | [NixOS Flake](#method-5-nixos-flake-installation)       | NixOS with flakes enabled | NixOS systems                         |
-| [From Source](#method-6-building-from-source)           | Go 1.26+, Node.js, bun    | Development, custom builds            |
+| [From Source](#method-6-building-from-source)           | Go 1.26+, bun             | Development, custom builds            |
 
 ---
 
@@ -367,7 +367,7 @@ Use this when you want the latest development version or need to customize the c
 ### Step 1: Install Build Dependencies
 
 - **Go 1.26+**
-- **Node.js** and **bun 1.3**
+- **bun 1.3**
 - Optional (recommended): `just`, `gofumpt`, `golangci-lint`, `prettier`, `oxlint` — a Nix dev shell with all of them is available via `nix develop`
 
 ### Step 2: Clone and Build

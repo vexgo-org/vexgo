@@ -528,7 +528,7 @@ go run ./cmd/vexgo -c ../examples/config-mysql.yml
 
 - Linux / macOS
 - Go 1.26+
-- Node.js 和 bun 1.3
+- bun 1.3
 - `just`、`gofumpt`、`golangci-lint`、`prettier`、`oxlint`（推荐；也可通过 `nix develop` 进入包含全部工具的 Nix 开发环境）
 
 ### 常用命令
