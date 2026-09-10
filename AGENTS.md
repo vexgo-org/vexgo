@@ -8,17 +8,17 @@ VexGo is a self-hosted blog CMS. The repository is a full-stack app:
 - **Frontend**: React + TypeScript SPA built with Vite and Tailwind CSS, using shadcn/ui-style components.
 - Go module path: `github.com/vexgo-org/vexgo`
 
-Key architectural fact: **the frontend build output is written to `backend/internal/public/dist` and embedded into the backend binary**. After changing frontend code you must rebuild the frontend (`pnpm run build` in `frontend/`) for the backend to serve it. The dev server (`pnpm run dev`) proxies/points at the backend API at `http://localhost:3001/api` (configurable via `VITE_API_URL`).
+Key architectural fact: **the frontend build output is written to `backend/internal/public/dist` and embedded into the backend binary**. After changing frontend code you must rebuild the frontend (`bun run build` in `frontend/`) for the backend to serve it. The dev server (`bun run dev`) proxies/points at the backend API at `http://localhost:3001/api` (configurable via `VITE_API_URL`).
 
 ## Setup
 
-Requirements: Go, Node.js + pnpm, and project tools. A Nix development shell is available via `nix develop`.
+Requirements: Go, bun, and project tools. A Nix development shell is available via `nix develop`.
 
 Install dependencies:
 
 ```bash
 go mod download
-cd frontend && pnpm install
+cd frontend && bun install
 ```
 
 Configuration priority: command-line flags > config file (`-c path/to/config.yml`, see `examples/`) > environment variables (see `.env.example`) > defaults. Data (SQLite DB, uploads) lives under `./data` by default.
@@ -33,7 +33,7 @@ just lint             # golangci-lint + prettier --check + gofumpt diff check + 
 just test             # go test -v ./...
 just run              # ensure dist exists, then go run backend/cmd/vexgo/main.go
 just build            # build frontend, then build backend
-just build-frontend   # pnpm --dir frontend run build
+just build-frontend   # bun run --cwd frontend build
 just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main.go
 ```
 
@@ -43,7 +43,7 @@ just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main
 - Add tests for new behavior, bugs, and permission boundaries.
 - Services should be tested through Repository interfaces with fakes.
 - Services are database-agnostic behind a `Repository` interface — unit-test them with fakes (existing `service_test.go` files follow this pattern).
-- The frontend has no unit test framework; the `pnpm run build` step (which runs `tsc -b`) is the type check gate. Verify behavior changes in the dev server.
+- The frontend has no unit test framework; the `bun run build` step (which runs `tsc -b`) is the type check gate. Verify behavior changes in the dev server.
 - Tests are required for new user-visible behavior, bug fixes, and boundary conditions (empty input, invalid input, permission boundaries: guest / user / admin).
 
 ## Code Style

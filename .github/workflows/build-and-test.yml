@@ -19,16 +19,16 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Set up pnpm
-        uses: pnpm/setup@v1
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 11
+          bun-version: 1.3.13
 
       - name: Build frontend
         run: |
           cd frontend/
-          pnpm install
-          pnpm run build
+          bun install --frozen-lockfile
+          bun run build
           cd ..
 
       - name: Build backend

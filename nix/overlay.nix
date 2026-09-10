@@ -1,3 +1,3 @@
 final: prev: {
-  vexgo = final.callPackage ./package.nix {};
+  vexgo = final.callPackage ./package.nix { };
 }

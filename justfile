@@ -33,7 +33,7 @@ build:
 
 build-frontend:
     # Build frontend.
-    pnpm --dir frontend run build
+    bun run --cwd frontend build
 
 build-backend:
     # Build backend.
@@ -47,7 +47,7 @@ build-backend:
 generate:
     # Codegen using swag and orval.
     go tool swag init -g backend/cmd/vexgo/main.go --dir . --v3.1 -o ./docs --ot json
-    pnpm --dir frontend exec orval --config orval.config.ts
+    bun run --cwd frontend orval --config orval.config.ts
 
 check-openapi-fresh:
     #!/usr/bin/env bash

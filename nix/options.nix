@@ -3,14 +3,16 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   cfg = config.services.vexgo;
-  settingsFormat = pkgs.formats.yaml {};
+  settingsFormat = pkgs.formats.yaml { };
   configFile = settingsFormat.generate "vexgo-config.yml" cfg.settings;
-in {
+in
+{
   options.services.vexgo = {
     enable = lib.mkEnableOption "VexGo blog CMS";
-    package = lib.mkPackageOption pkgs "vexgo" {};
+    package = lib.mkPackageOption pkgs "vexgo" { };
 
     openFirewall = lib.mkOption {
       type = lib.types.bool;
@@ -26,7 +28,7 @@ in {
 
     settings = lib.mkOption {
       type = settingsFormat.type;
-      default = {};
+      default = { };
       description = "VexGo configuration in YAML format. See https://github.com/vexgo-org/vexgo for all options.";
       example = lib.literalExpression ''
         {
@@ -40,7 +42,7 @@ in {
 
     environment = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
-      default = {};
+      default = { };
       description = "Environment variables to pass to the VexGo service.";
       example = lib.literalExpression ''
         {
@@ -69,7 +71,7 @@ in {
       db_type = "sqlite";
       allow_local_login = true;
       behind_reverse_proxy = false;
-      trusted_proxies = [];
+      trusted_proxies = [ ];
       s3_enabled = false;
       oidc_enabled = false;
       oidc_scopes = "openid profile email";
@@ -82,8 +84,8 @@ in {
 
     systemd.services.vexgo = {
       description = "VexGo Blog CMS";
-      wantedBy = ["multi-user.target"];
-      after = ["network.target"];
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
       serviceConfig = {
         Type = "simple";
         User = "vexgo";
@@ -110,6 +112,6 @@ in {
       description = "VexGo service user";
     };
 
-    users.groups.vexgo = {};
+    users.groups.vexgo = { };
   };
 }

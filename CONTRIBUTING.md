@@ -42,17 +42,19 @@ The repository follows a lightweight engineering discipline:
 
 ### Requirements
 
-- Go 1.25+
-- Node.js and pnpm 11
+- Go 1.26+
+- bun 1.3
 - golangci-lint (v2), gofumpt, prettier, oxlint, and `just` (recommended, used by the `justfile`)
 
-The Nix flake provides a ready-made development shell with all tools (`go`, `gofumpt`, `golangci-lint`, `just`, `nodejs`, `oxlint`, `pnpm`, `prettier`):
+The Nix flake provides a ready-made development shell with all tools (`go`, `gofumpt`, `golangci-lint`, `just`, `oxlint`, `bun`, `prettier`):
 
 ```bash
 nix develop
 ```
 
-If you use direnv, the checked-in `.envrc` (`use flake`) activates the shell automatically. A `devbox.json` with the same core tools (`go`, `nodejs`, `pnpm`) is also available.
+If you use direnv, the checked-in `.envrc` (`use flake`) activates the shell automatically. A `devbox.json` with the same core tools (`go`, `bun`) is also available.
+
+> **Nix build note:** the Nix package builds the frontend with `bun install --frozen-lockfile` at build time (matching the Docker and CI build), so the build needs network access — allow it with `sandbox = false` on NixOS, or use the default (non-sandboxed) build on other systems.
 
 ### Typical commands
 
@@ -64,10 +66,10 @@ go build -v ./...      # build the backend
 go test -v ./...       # run backend tests
 
 cd frontend
-pnpm install
-pnpm run dev           # frontend dev server with HMR
-pnpm run build         # typecheck (tsc -b) + vite build + copy theme manifest
-pnpm run lint          # oxlint
+bun install
+bun run dev            # frontend dev server with HMR
+bun run build          # typecheck (tsc -b) + vite build + copy theme manifest
+bun run lint           # oxlint
 ```
 
 A contribution is expected to pass at least:
@@ -75,7 +77,7 @@ A contribution is expected to pass at least:
 ```bash
 just format
 just lint
-pnpm run build # frontend
+bun run build # frontend
 go build -v ./...
 go test -v ./...
 ```
@@ -88,8 +90,8 @@ Build the frontend once, then start the backend:
 
 ```bash
 cd frontend
-pnpm install
-pnpm run build
+bun install
+bun run build
 cd ../backend
 go run ./cmd/vexgo
 ```
@@ -230,7 +232,7 @@ Tests are required for:
 - boundary conditions
 - regressions that could reappear
 
-Backend tests use Go's standard `testing` package and run with `go test -v ./...`. For frontend changes, run `pnpm run build` (which includes the `tsc -b` typecheck) and verify behavior in the dev server.
+Backend tests use Go's standard `testing` package and run with `go test -v ./...`. For frontend changes, run `bun run build` (which includes the `tsc -b` typecheck) and verify behavior in the dev server.
 
 Testing expectations:
 
@@ -256,7 +258,7 @@ Before opening a pull request, also run:
 
 ```bash
 just lint
-pnpm run build # frontend
+bun run build # frontend
 go build -v ./...
 go test -v ./...
 ```
@@ -394,7 +396,7 @@ Suggested PR checklist:
 - [ ] The change is scoped to one clear objective
 - [ ] Code is formatted (`just format`)
 - [ ] `just lint` passes
-- [ ] `pnpm run build` passes
+- [ ] `bun run build` passes
 - [ ] `go build -v ./...` passes
 - [ ] `go test -v ./...` passes
 - [ ] Tests were added or updated where needed

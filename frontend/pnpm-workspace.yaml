@@ -1,7 +1,0 @@
-allowBuilds:
-  es5-ext: true
-  esbuild: true
-
-onlyBuiltDependencies:
-  - es5-ext
-  - esbuild

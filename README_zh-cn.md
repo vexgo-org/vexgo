@@ -527,8 +527,8 @@ go run ./cmd/vexgo -c ../examples/config-mysql.yml
 ### 环境要求
 
 - Linux / macOS
-- Go 1.25+
-- Node.js 和 pnpm 10
+- Go 1.26+
+- bun 1.3
 - `just`、`gofumpt`、`golangci-lint`、`prettier`、`oxlint`（推荐；也可通过 `nix develop` 进入包含全部工具的 Nix 开发环境）
 
 ### 常用命令
@@ -540,10 +540,10 @@ go build -v ./...      # 构建后端
 go test -v ./...       # 运行后端测试
 
 cd frontend
-pnpm install
-pnpm run dev           # 前端开发服务器（HMR）
-pnpm run build         # 类型检查（tsc -b）+ vite 构建 + 拷贝 manifest
-pnpm run lint          # oxlint
+bun install
+bun run dev            # 前端开发服务器（HMR）
+bun run build          # 类型检查（tsc -b）+ vite 构建 + 拷贝 manifest
+bun run lint           # oxlint
 ```
 
 前端构建产物会输出到 `backend/internal/public/dist` 并嵌入后端二进制，修改前端后需要重新构建。
@@ -554,8 +554,8 @@ pnpm run lint          # oxlint
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 cd frontend
-pnpm install
-pnpm run build
+bun install
+bun run build
 cd ../backend
 go run ./cmd/vexgo
 ```

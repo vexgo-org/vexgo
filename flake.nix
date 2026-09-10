@@ -1,7 +1,9 @@
 {
   description = "VexGo — blog CMS built on React, Go, Gin, JWT, and SQLite";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  };
 
   outputs =
     {
@@ -21,7 +23,9 @@
         nixpkgs.lib.genAttrs supportedSystems (
           system:
           f {
-            pkgs = import nixpkgs { inherit system; };
+            pkgs = import nixpkgs {
+              inherit system;
+            };
           }
         );
     in
@@ -39,15 +43,14 @@
         { pkgs }: {
           default = pkgs.mkShell {
             packages = with pkgs; [
+              bun
               go_1_26
               gofumpt
               golangci-lint
               gopls
               gotools
               just
-              nodejs
               oxlint
-              pnpm
               prettier
             ];
           };

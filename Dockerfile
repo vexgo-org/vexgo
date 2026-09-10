@@ -1,18 +1,16 @@
 # Phase 1: Building the front end
-FROM node:25-alpine AS frontend-builder
-
-RUN npm install -g pnpm
+FROM oven/bun:1.3.13-alpine AS frontend-builder
 
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
-RUN pnpm install
+COPY frontend/package.json frontend/bun.lock frontend/bunfig.toml ./
+RUN bun install --frozen-lockfile
 
 COPY frontend/ ./
-RUN pnpm run build
+RUN bun run build
 # output: /app/backend/internal/public/dist
 
 # Phase 2: Compiling the backend
-FROM golang:1.25-alpine AS backend-builder
+FROM golang:1.26-alpine AS backend-builder
 
 WORKDIR /app
 
