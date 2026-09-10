@@ -10,7 +10,7 @@ RUN bun run build
 # output: /app/backend/internal/public/dist
 
 # Phase 2: Compiling the backend
-FROM golang:1.25-alpine AS backend-builder
+FROM golang:1.26-alpine AS backend-builder
 
 WORKDIR /app
 
