@@ -81,10 +81,21 @@ type PostCardData struct {
 	CreatedAt     time.Time
 	ViewCount     int
 	CommentsCount int64
+	LikesCount    int64
 	URL           string
 }
 
-// PaginationData drives the prev/next navigation of list pages.
+// PageLinkData is one numbered pagination entry. Ellipsis entries carry no
+// number or URL; they render as a literal "..." separator.
+type PageLinkData struct {
+	Number    int
+	URL       string
+	IsCurrent bool
+	Ellipsis  bool
+}
+
+// PaginationData drives the navigation of list pages: prev/next links plus
+// the windowed list of numbered page links (first, last, current ± 1).
 type PaginationData struct {
 	CurrentPage int
 	TotalPages  int
@@ -92,6 +103,7 @@ type PaginationData struct {
 	HasNext     bool
 	PrevURL     string
 	NextURL     string
+	Pages       []PageLinkData
 }
 
 // IndexQueryData carries the active filters of the home page.
@@ -136,6 +148,7 @@ type PostData struct {
 		UpdatedAt     time.Time
 		ViewCount     int
 		CommentsCount int64
+		LikesCount    int64
 		ContentHTML   template.HTML
 		URL           string
 	}
@@ -167,6 +180,18 @@ var templateFuncs = template.FuncMap{
 	"date": func(t time.Time, layout string) string {
 		return t.Format(layout)
 	},
+	// add sums two integers; used to render 1-based list positions.
+	"add": func(a, b int) int {
+		return a + b
+	},
+	// first clamps a slice to at most n items; unlike the builtin slice it
+	// tolerates short/empty inputs (used to cap the tag pills on cards).
+	"first": func(items []string, n int) []string {
+		if n < 1 || len(items) <= n {
+			return items
+		}
+		return items[:n]
+	},
 	"truncate": func(s string, max int) string {
 		s = strings.TrimSpace(s)
 		if len(s) <= max {
@@ -183,6 +208,10 @@ var templateFuncs = template.FuncMap{
 	// categoryURL builds the home page category filter URL.
 	"categoryURL": func(name string) string {
 		return "/?category=" + url.QueryEscape(name)
+	},
+	// searchURL builds the home page search URL for a tag or keyword.
+	"searchURL": func(name string) string {
+		return "/?search=" + url.QueryEscape(name)
 	},
 }
 
@@ -320,6 +349,7 @@ func (r *Renderer) popularPostsData(ctx context.Context, limit int) []PostCardDa
 		}
 		card := toPostCard(posts[i])
 		card.CommentsCount = comments[posts[i].ID]
+		card.LikesCount = likes[posts[i].ID]
 		cards = append(cards, card)
 	}
 	return cards
@@ -423,12 +453,16 @@ func (r *Renderer) listPageData(ctx context.Context, base string, page, limit in
 		postIDs = append(postIDs, p.ID)
 	}
 	commentCounts := r.countCommentsBatch(ctx, postIDs)
+	likes := r.countLikesBatch(ctx, postIDs)
 
 	cards := make([]PostCardData, 0, len(posts))
 	for _, p := range posts {
 		card := toPostCard(p)
 		if n, ok := commentCounts[p.ID]; ok {
 			card.CommentsCount = n
+		}
+		if n, ok := likes[p.ID]; ok {
+			card.LikesCount = n
 		}
 		cards = append(cards, card)
 	}
@@ -445,7 +479,42 @@ func (r *Renderer) listPageData(ctx context.Context, base string, page, limit in
 	if pagination.HasNext {
 		pagination.NextURL = pageURL(base, page+1, search, category)
 	}
+	pagination.Pages = buildPageLinks(page, totalPages, func(p int) string {
+		return pageURL(base, p, search, category)
+	})
 	return cards, pagination, total, nil
+}
+
+// buildPageLinks returns the windowed page links shown by list templates:
+// always the first and last page plus the pages around the current one, with
+// ellipsis markers between the gaps. This mirrors the client-side pagination
+// of the previous SPA home page.
+func buildPageLinks(current, total int, urlFor func(int) string) []PageLinkData {
+	if total <= 1 {
+		return nil
+	}
+	pages := make([]PageLinkData, 0, min(total, 7))
+	for i := 1; i <= total; i++ {
+		switch {
+		case i == 1 || i == total || abs(i-current) <= 1:
+			pages = append(pages, PageLinkData{
+				Number:    i,
+				URL:       urlFor(i),
+				IsCurrent: i == current,
+			})
+		case len(pages) > 0 && !pages[len(pages)-1].Ellipsis:
+			pages = append(pages, PageLinkData{Ellipsis: true})
+		}
+	}
+	return pages
+}
+
+// abs returns the absolute value of n.
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 // pageURL builds a paginated list URL, preserving the active filters.

@@ -125,6 +125,17 @@
         @apply bg-muted font-semibold;
     }
 
+    /* Like button on the post page: filled heart when liked (toggled by the
+       comment widget's like handler). */
+    .like-btn[aria-pressed="true"] {
+        color: hsl(var(--destructive));
+        border-color: hsl(var(--destructive) / 0.4);
+    }
+
+    .like-btn[aria-pressed="true"] svg {
+        fill: currentColor;
+    }
+
     /* Line clamp utilities */
     .line-clamp-2 {
         display: -webkit-box;

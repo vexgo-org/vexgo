@@ -91,6 +91,7 @@ func (r *Renderer) handlePost(c *gin.Context) {
 	}
 
 	commentCounts := r.countCommentsBatch(c.Request.Context(), []uint{post.ID})
+	likeCounts := r.countLikesBatch(c.Request.Context(), []uint{post.ID})
 
 	data := PostData{Site: site}
 	data.Post.ID = post.ID
@@ -103,6 +104,7 @@ func (r *Renderer) handlePost(c *gin.Context) {
 	data.Post.UpdatedAt = post.UpdatedAt
 	data.Post.ViewCount = post.ViewCount
 	data.Post.CommentsCount = commentCounts[post.ID]
+	data.Post.LikesCount = likeCounts[post.ID]
 	data.Post.ContentHTML = RenderMarkdown(post.Content)
 	data.Post.URL = "/post/" + post.Slug
 	if post.Author.ID != 0 {

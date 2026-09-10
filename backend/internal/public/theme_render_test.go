@@ -3,6 +3,7 @@ package public
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -212,6 +213,57 @@ func TestToPostCard(t *testing.T) {
 	})
 	if card.URL != "/post/t" || card.AuthorName != "alice" || len(card.Tags) != 2 {
 		t.Errorf("card mapping wrong: %+v", card)
+	}
+}
+
+// TestBuildPageLinks builds the windowed page-link list: first/last pages
+// always present, current ± 1, with ellipsis markers between the gaps.
+func TestBuildPageLinks(t *testing.T) {
+	urlFor := func(p int) string { return "/?page=" + strconv.Itoa(p) }
+
+	// Single page: no links at all.
+	if pages := buildPageLinks(1, 1, urlFor); len(pages) != 0 {
+		t.Errorf("single page should have no links, got %+v", pages)
+	}
+
+	// Two pages: both linked, current marked.
+	pages := buildPageLinks(1, 2, urlFor)
+	if len(pages) != 2 || pages[0].Number != 1 || !pages[0].IsCurrent || pages[1].Number != 2 {
+		t.Errorf("two-page window wrong: %+v", pages)
+	}
+
+	// Middle of a long range: 1 ... 4 5 6 ... 10
+	pages = buildPageLinks(5, 10, urlFor)
+	want := []struct {
+		Number   int
+		Ellipsis bool
+		IsCur    bool
+	}{
+		{1, false, false},
+		{0, true, false},
+		{4, false, false},
+		{5, false, true},
+		{6, false, false},
+		{0, true, false},
+		{10, false, false},
+	}
+	if len(pages) != len(want) {
+		t.Fatalf("middle window = %d links, want %d: %+v", len(pages), len(want), pages)
+	}
+	for i, w := range want {
+		if pages[i].Number != w.Number || pages[i].Ellipsis != w.Ellipsis || pages[i].IsCurrent != w.IsCur {
+			t.Errorf("link %d = %+v, want %+v", i, pages[i], w)
+		}
+		if !pages[i].Ellipsis && pages[i].URL != urlFor(pages[i].Number) {
+			t.Errorf("link %d url = %q, want %q", i, pages[i].URL, urlFor(pages[i].Number))
+		}
+	}
+
+	// Early page: 1 2 3 ... 10 (no leading ellipsis)
+	pages = buildPageLinks(2, 10, urlFor)
+	if len(pages) != 5 || pages[0].Number != 1 || pages[2].Number != 3 ||
+		!pages[3].Ellipsis || pages[4].Number != 10 {
+		t.Errorf("early window wrong: %+v", pages)
 	}
 }
 

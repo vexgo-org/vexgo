@@ -267,6 +267,9 @@ func TestPopularDataHelpers(t *testing.T) {
 	if posts[0].CommentsCount != 0 || posts[2].CommentsCount != 1 {
 		t.Errorf("popularPostsData comment counts wrong: %+v", posts)
 	}
+	if posts[0].LikesCount != 3 || posts[1].LikesCount != 0 {
+		t.Errorf("popularPostsData like counts wrong: %+v", posts)
+	}
 
 	tags := renderer.popularTagsData(ctx, 10)
 	if len(tags) != 3 {

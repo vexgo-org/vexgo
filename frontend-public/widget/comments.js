@@ -43,7 +43,7 @@
     avatar:
       "width:2.25rem;height:2.25rem;border-radius:9999px;object-fit:cover;flex-shrink:0;",
     name: "font-weight:600;",
-    time: "font-size:.8rem;opacity:.7;",
+    time: "font-size:.8rem;opacity:.7;margin-left:.25rem;",
     body: "margin:0;white-space:pre-wrap;word-break:break-word;",
     empty: "text-align:center;padding:2rem 0;opacity:.7;",
     error: "color:#b91c1c;font-size:.85rem;margin:.5rem 0 0;",
@@ -139,6 +139,11 @@
           text: (comment.author && comment.author.username) || "anonymous",
         }),
       );
+      if (comment.createdAt) {
+        author.appendChild(
+          el("span", { style: styles.time, text: fmtDate(comment.createdAt) }),
+        );
+      }
       meta.appendChild(author);
       if (canDelete(comment)) {
         meta.appendChild(
@@ -273,6 +278,78 @@
     );
   }
 
+  // Wire the like button the theme places on the post page
+  // (<button data-like-post-id="...">). Guest clicks send the user to the
+  // login page; authenticated clicks toggle the like through the public API
+  // and update the count and filled-heart state in place.
+  function initLikeButton() {
+    var btn = document.querySelector("[data-like-post-id]");
+    if (!btn) return;
+    var postId = btn.getAttribute("data-like-post-id");
+    var countEl = btn.querySelector("[data-like-count]");
+    // For signed-in readers, reflect the user's current like state on load.
+    if (localStorage.getItem("token")) {
+      fetch(API + "/likes/" + encodeURIComponent(postId))
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .then(function (data) {
+          if (!data) return;
+          if (countEl) countEl.textContent = String(data.likesCount || 0);
+          btn.setAttribute("aria-pressed", data.isLiked ? "true" : "false");
+        })
+        .catch(function () {});
+    }
+    btn.addEventListener("click", function () {
+      if (!localStorage.getItem("token")) {
+        window.location.href = "/admin/login";
+        return;
+      }
+      fetch(API + "/likes/" + encodeURIComponent(postId), {
+        method: "POST",
+        headers: { Authorization: "Bearer " + localStorage.getItem("token") },
+      })
+        .then(function (res) {
+          return res.json().then(function (data) {
+            return { ok: res.ok, data: data };
+          });
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.data.error || "Failed to update like");
+          if (countEl) countEl.textContent = String(r.data.likesCount || 0);
+          btn.setAttribute("aria-pressed", r.data.isLiked ? "true" : "false");
+        })
+        .catch(function (err) {
+          window.alert(err.message || "Failed to update like");
+        });
+    });
+  }
+
+  // Wire the share button the theme places on the post page
+  // (<button data-share-url="/post/...">): copying the absolute post URL to
+  // the clipboard and briefly revealing the "Link copied" hint.
+  function initShareButton() {
+    var btn = document.querySelector("[data-share-url]");
+    if (!btn) return;
+    var path = btn.getAttribute("data-share-url") || "/";
+    var hint = document.querySelector("[data-share-hint]");
+    var showHint = function () {
+      if (!hint) return;
+      hint.hidden = false;
+      setTimeout(function () {
+        hint.hidden = true;
+      }, 3000);
+    };
+    btn.addEventListener("click", function () {
+      var url = window.location.origin + path;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(showHint).catch(showHint);
+      } else {
+        showHint();
+      }
+    });
+  }
+
   // Build the static section skeleton once; the list and form refresh in place.
   var section = el("section", { style: "margin-top:2rem;" });
   var title = el("h2", { style: styles.title, text: "Comments " });
@@ -287,4 +364,6 @@
 
   loadComments(renderList);
   renderForm();
+  initLikeButton();
+  initShareButton();
 })();
