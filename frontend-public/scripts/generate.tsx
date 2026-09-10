@@ -1,0 +1,59 @@
+/**
+ * Generates the built-in theme's Go-template HTML pages from the React
+ * templates in src/templates. Run with bun (`bun scripts/generate.tsx`):
+ *
+ *   1. renderToString each page component — dynamic parts are literal
+ *      {{...}} Go template actions emitted via the go() helper,
+ *   2. strip React's <!-- --> separator comment nodes,
+ *   3. write index.html / post.html / user.html / 404.html into
+ *      backend/internal/public/defaulttheme (embedded into the binary).
+ */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { renderToString } from "react-dom/server";
+
+import { HomeTemplate } from "../src/templates/HomeTemplate";
+import { NotFoundTemplate } from "../src/templates/NotFoundTemplate";
+import { PostTemplate } from "../src/templates/PostTemplate";
+import { UserTemplate } from "../src/templates/UserTemplate";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const outDir = resolve(here, "../../backend/internal/public/defaulttheme");
+mkdirSync(outDir, { recursive: true });
+
+function emit(name: string, element: React.ReactNode) {
+  let html = renderToString(element);
+
+  // React 19 hoists <link rel="preload" as="image"> for every <img> src into
+  // <head>. The template data there is out of scope (e.g. {{.CoverImage}} sits
+  // outside any {{range}}), so drop these injected preloads entirely.
+  html = html.replace(/<link rel="preload" as="image"[^>]*\/>/g, "");
+
+  // Strip React's separator comment nodes between adjacent text/elements.
+  html = html.replace(/<!-- -->/g, "");
+
+  // React HTML-escapes quotes and ampersands even in text nodes. Decode them
+  // inside Go template actions only, so {{date .CreatedAt "2006-01-02"}}
+  // stays valid Go template syntax. Static HTML entities outside actions are
+  // left untouched.
+  html = html.replace(
+    /\{\{([\s\S]*?)\}\}/g,
+    (_, inner: string) =>
+      "{{" +
+      inner
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, "&") +
+      "}}",
+  );
+
+  writeFileSync(resolve(outDir, name), `<!DOCTYPE html>\n${html}\n`);
+}
+
+emit("index.html", HomeTemplate());
+emit("post.html", PostTemplate());
+emit("user.html", UserTemplate());
+emit("404.html", NotFoundTemplate());
+
+console.log(`default theme templates written to ${outDir}`);

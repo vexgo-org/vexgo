@@ -2,7 +2,6 @@
 package model
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -40,6 +39,18 @@ type Post struct {
 	CommentsCount int `json:"commentsCount" gorm:"-"`
 }
 
+// Like model
+// Each record represents a user's like for a post
+
+type Like struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	PostID    uint      `json:"postId" gorm:"uniqueIndex:idx_likes_post_user"`
+	Post      Post      `json:"-" gorm:"foreignKey:PostID"`
+	UserID    uint      `json:"userId" gorm:"uniqueIndex:idx_likes_post_user"`
+	User      User      `json:"-" gorm:"foreignKey:UserID"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 // Tag is a label attached to posts via a many-to-many association.
 type Tag struct {
 	ID   uint   `json:"id" gorm:"primaryKey"`
@@ -55,25 +66,4 @@ type Category struct {
 	Description string `json:"description"`
 	// Non-database field: number of posts referencing the category by name
 	PostCount int64 `json:"postCount" gorm:"-"`
-}
-
-// Like model
-// Each record represents a user's like for a post
-
-type Like struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	PostID    uint      `json:"postId" gorm:"uniqueIndex:idx_likes_post_user"`
-	Post      Post      `json:"-" gorm:"foreignKey:PostID"`
-	UserID    uint      `json:"userId" gorm:"uniqueIndex:idx_likes_post_user"`
-	User      User      `json:"-" gorm:"foreignKey:UserID"`
-	CreatedAt time.Time `json:"createdAt"`
-}
-
-// ToJSON converts a slice of Post to JSON string
-func ToJSON(v any) (string, error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }

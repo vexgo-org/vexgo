@@ -1,4 +1,4 @@
-# Phase 1: Building the front end
+# Phase 1: Building the front ends (admin SPA + built-in public theme)
 FROM oven/bun:1.3.13-alpine AS frontend-builder
 
 WORKDIR /app/frontend
@@ -8,6 +8,14 @@ RUN bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build
 # output: /app/backend/internal/public/dist
+
+WORKDIR /app/frontend-public
+COPY frontend-public/package.json frontend-public/bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY frontend-public/ ./
+RUN bun run build
+# output: /app/backend/internal/public/defaulttheme
 
 # Phase 2: Compiling the backend
 FROM golang:1.26-alpine AS backend-builder
@@ -19,6 +27,7 @@ RUN go mod download
 
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/backend/internal/public/dist ./backend/internal/public/dist
+COPY --from=frontend-builder /app/backend/internal/public/defaulttheme ./backend/internal/public/defaulttheme
 
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build \

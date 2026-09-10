@@ -12,7 +12,7 @@ lint:
     output=$(deadcode -test ./...); test -z "$output" || { echo "$output"; exit 1;}
     prettier --check "**/*.{js,jsx,ts,tsx,html,md}" "frontend/*.json" "./*.{json,yml,yaml}"
     diffs="$(gofumpt -d .)"; test -z "$diffs" || { echo "$diffs"; exit 1; }
-    oxlint -c frontend/.oxlintrc.json frontend/
+    oxlint -c frontend/.oxlintrc.json frontend/ frontend-public/
     output=$(gopls check -severity=hint ./**/*.go); test -z "$output" || { echo "$output"; exit 1;}
     just check-swag-fmt
     just check-openapi-fresh
@@ -32,8 +32,9 @@ build:
     just build-backend
 
 build-frontend:
-    # Build frontend.
+    # Build frontend (admin SPA) and the public theme (default theme).
     bun run --cwd frontend build
+    bun run --cwd frontend-public build
 
 build-backend:
     # Build backend.
@@ -41,8 +42,9 @@ build-backend:
     go build backend/cmd/vexgo/main.go
 
 @ensure-dist:
-    # Ensure `backend/internal/public/dist` directory exists.
+    # Ensure the embedded frontend builds exist (go:embed requires them).
     test -d backend/internal/public/dist || just build-frontend
+    test -d backend/internal/public/defaulttheme || just build-frontend
 
 generate:
     # Codegen using swag and orval.

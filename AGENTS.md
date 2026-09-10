@@ -8,7 +8,10 @@ VexGo is a self-hosted blog CMS. The repository is a full-stack app:
 - **Frontend**: React + TypeScript SPA built with Vite and Tailwind CSS, using shadcn/ui-style components.
 - Go module path: `github.com/vexgo-org/vexgo`
 
-Key architectural fact: **the frontend build output is written to `backend/internal/public/dist` and embedded into the backend binary**. After changing frontend code you must rebuild the frontend (`bun run build` in `frontend/`) for the backend to serve it. The dev server (`bun run dev`) proxies/points at the backend API at `http://localhost:3001/api` (configurable via `VITE_API_URL`).
+Key architectural facts:
+
+- **The admin SPA build is written to `backend/internal/public/dist` and embedded into the backend binary**. After changing frontend code you must rebuild the frontend (`bun run build` in `frontend/`) for the backend to serve it. The dev server (`bun run dev`) proxies/points at the backend API at `http://localhost:3001/api` (configurable via `VITE_API_URL`).
+- **Public pages are server-side rendered from themes** (`/`, `/post/:slug`, `/posts/:slug`, `/user/:id`). A theme is a directory of Go-template HTML files (`index.html`, `post.html`, `user.html`, optional `404.html`) plus static assets served under `/theme-assets/...`. The built-in default theme lives in `frontend-public/`: React (TSX) components emit the Go-template HTML at build time via `renderToString` (`scripts/generate.tsx`), the output is written to `backend/internal/public/defaulttheme` and embedded. Third-party themes are uploaded ZIPs extracted to `data/theme/<id>/`. The engine lives in `backend/internal/public/theme_render.go` (+ `theme_handlers.go`); it renders markdown with goldmark (safe mode, GFM). Template data context: `.Site`, `.Posts`, `.Post`, `.User`, `.Pagination`, `.Query`, plus helpers `date`/`truncate`/`userURL`/`categoryURL`. `go()` expressions inside HTML attributes must not contain double quotes (React escapes them to `&quot;`, breaking template parse) — use the helper funcs instead.
 
 ## Setup
 
@@ -32,8 +35,8 @@ just format           # gofumpt -w -extra . && prettier --write "**/*.{js,jsx,ts
 just lint             # golangci-lint + prettier --check + gofumpt diff check + oxlint + gopls check
 just test             # go test -v ./...
 just run              # ensure dist exists, then go run backend/cmd/vexgo/main.go
-just build            # build frontend, then build backend
-just build-frontend   # bun run --cwd frontend build
+just build            # build frontends (admin SPA + public theme), then backend
+just build-frontend   # bun run --cwd frontend build && bun run --cwd frontend-public build
 just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main.go
 ```
 

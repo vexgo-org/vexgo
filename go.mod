@@ -56,6 +56,7 @@ require (
 	github.com/swaggo/swag/v2 v2.0.0-rc5.0.20260818180417-e73d7485ffea // indirect
 	github.com/urfave/cli/v2 v2.27.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
+	github.com/yuin/goldmark v1.8.6 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect

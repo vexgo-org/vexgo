@@ -1,0 +1,23 @@
+{
+  "name": "vexgo-public-theme",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Builds the VexGo built-in public theme: React components rendered to Go-template HTML pages (index.html / post.html / user.html / 404.html) plus their Tailwind assets.",
+  "scripts": {
+    "build": "tsc --noEmit && tailwindcss -i src/styles.css -o ../backend/internal/public/defaulttheme/assets/style.css --minify && bun scripts/generate.tsx",
+    "generate": "bun scripts/generate.tsx"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "~5.9.3"
+  }
+}
