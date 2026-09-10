@@ -31,11 +31,11 @@ const viteManifestFixture = `{
     "imports": ["_ui-vendor-CEsCEvQe.js", "_react-vendor-BmqGXi6J.js", "_utils-vendor-42ANG6Sg.js"],
     "css": ["assets/index-BCv7Z314.css"]
   },
-  "node_modules/.pnpm/@codemirror+lang-python@6.2.1/node_modules/@codemirror/lang-python/dist/index.js": {
+  "node_modules/@codemirror/lang-python/dist/index.js": {
     "file": "assets/index-JCx2MGp4.js",
     "name": "index"
   },
-  "node_modules/.pnpm/@codemirror+lang-vue@0.1.3/node_modules/@codemirror/lang-vue/dist/index.js": {
+  "node_modules/@codemirror/lang-vue/dist/index.js": {
     "file": "assets/index-CMEKYH0O.js",
     "name": "index"
   }

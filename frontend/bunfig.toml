@@ -1,0 +1,4 @@
+# Bun configuration for the frontend.
+# Replaces the pnpm-specific `pnpm-workspace.yaml` allowBuilds/onlyBuiltDependencies.
+[install]
+trustedDependencies = ["es5-ext", "esbuild"]

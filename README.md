@@ -530,7 +530,7 @@ go run ./cmd/vexgo -c ../examples/config-mysql.yml
 
 - Linux/macOS
 - Go 1.25+
-- Node.js and pnpm 10
+- Node.js and bun 1.3
 - `just`, `gofumpt`, `golangci-lint`, `prettier`, `oxlint` (recommended; a Nix dev shell with all of them is available via `nix develop`)
 
 ### Common commands
@@ -542,10 +542,10 @@ go build -v ./...      # build the backend
 go test -v ./...       # run backend tests
 
 cd frontend
-pnpm install
-pnpm run dev           # frontend dev server with HMR
-pnpm run build         # typecheck (tsc -b) + vite build + copy manifest
-pnpm run lint          # oxlint
+bun install
+bun run dev            # frontend dev server with HMR
+bun run build          # typecheck (tsc -b) + vite build + copy manifest
+bun run lint           # oxlint
 ```
 
 The frontend build output is written to `backend/internal/public/dist` and embedded into the backend binary, so rebuild the frontend after changing it.
@@ -556,8 +556,8 @@ The frontend build output is written to `backend/internal/public/dist` and embed
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 cd frontend
-pnpm install
-pnpm run build
+bun install
+bun run build
 cd ../backend
 go run ./cmd/vexgo
 ```

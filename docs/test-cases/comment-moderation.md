@@ -63,7 +63,7 @@ enabled manual gate. Any LLM failure results in `pending`, never publish.
 | TC-CMOD-025 | `POST /comments` returns `requiresModeration=true` when final status is `pending`                                                                       | Commenter-facing behavior unchanged                |
 | TC-CMOD-026 | Moderation config endpoints reject non-admin roles                                                                                                      | 401/403 as before                                  |
 
-## Frontend (manual, `pnpm run build` is the type gate)
+## Frontend (manual, `bun run build` is the type gate)
 
 | ID          | Scenario                                                                                                                           | Expected                                               |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |

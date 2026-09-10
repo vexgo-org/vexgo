@@ -2,10 +2,7 @@
   lib,
   buildGoModule,
   stdenv,
-  nodejs,
-  pnpm,
-  fetchPnpmDeps,
-  pnpmConfigHook,
+  bun,
   fetchFromGitHub,
   makeWrapper,
   version ? "0.5.0",
@@ -17,31 +14,23 @@
     hash = "sha256-4V1f6g/rnVVmvoqE5bL7V/1uiu0T+aLvf/Xgm04ylyg=";
   };
 
-  vexgoFrontendDeps = fetchPnpmDeps {
-    pname = "vexgo-frontend";
-    inherit version src;
-    sourceRoot = "${src.name}/frontend";
-    fetcherVersion = 1;
-    hash = "sha256-4SuyZcMhDYChxsvkHl2lxyO8U6tR39ibOK0mtFpD9UE=";
-  };
-
+  # The frontend is built with `bun install --frozen-lockfile` at build time,
+  # which requires network access during the build (the Nix sandbox must allow
+  # it, e.g. `sandbox = false` on non-NixOS). This matches how the Docker
+  # image and CI build the frontend.
   vexgoFrontend = stdenv.mkDerivation {
     pname = "vexgo-frontend";
     inherit version src;
     sourceRoot = "${src.name}/frontend";
 
-    nativeBuildInputs = [nodejs pnpm pnpmConfigHook];
-    pnpmDeps = vexgoFrontendDeps;
-
-    preBuild = ''
-      chmod -R u+w $NIX_BUILD_TOP/source/backend
-      mkdir -p $NIX_BUILD_TOP/source/backend/public/dist
-    '';
+    nativeBuildInputs = [bun];
 
     buildPhase = ''
       runHook preBuild
+      chmod -R u+w $NIX_BUILD_TOP/source/backend
       mkdir -p $NIX_BUILD_TOP/source/backend/public/dist
-      pnpm run build
+      bun install --frozen-lockfile
+      bun run build
       runHook postBuild
     '';
 
