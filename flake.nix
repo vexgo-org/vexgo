@@ -43,6 +43,7 @@
         { pkgs }: {
           default = pkgs.mkShell {
             packages = with pkgs; [
+              bun
               go_1_26
               gofumpt
               golangci-lint
@@ -51,7 +52,6 @@
               just
               nodejs
               oxlint
-              bun
               prettier
             ];
           };

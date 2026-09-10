@@ -6,7 +6,8 @@
   fetchFromGitHub,
   makeWrapper,
   version ? "0.5.0",
-}: let
+}:
+let
   src = fetchFromGitHub {
     owner = "vexgo-org";
     repo = "vexgo";
@@ -23,7 +24,7 @@
     inherit version src;
     sourceRoot = "${src.name}/frontend";
 
-    nativeBuildInputs = [bun];
+    nativeBuildInputs = [ bun ];
 
     buildPhase = ''
       runHook preBuild
@@ -41,28 +42,32 @@
     '';
   };
 in
-  buildGoModule {
-    pname = "vexgo";
-    inherit version src;
+buildGoModule {
+  pname = "vexgo";
+  inherit version src;
 
-    vendorHash = "sha256-Ea+Zh21mkmjv2jmAHwiqxa4/bLWMLwcgzU2Tz3gvUIA=";
+  vendorHash = "sha256-Ea+Zh21mkmjv2jmAHwiqxa4/bLWMLwcgzU2Tz3gvUIA=";
 
-    ldflags = ["-s" "-w" "-X main.Version=${version}"];
-    preBuild = ''
-      mkdir -p backend/public/dist
-      cp -r ${vexgoFrontend}/. backend/public/dist/
-    '';
-    postInstall = ''
-      mv $out/bin/backend $out/bin/vexgo
-    '';
-    nativeBuildInputs = [makeWrapper];
+  ldflags = [
+    "-s"
+    "-w"
+    "-X main.Version=${version}"
+  ];
+  preBuild = ''
+    mkdir -p backend/public/dist
+    cp -r ${vexgoFrontend}/. backend/public/dist/
+  '';
+  postInstall = ''
+    mv $out/bin/backend $out/bin/vexgo
+  '';
+  nativeBuildInputs = [ makeWrapper ];
 
-    meta = with lib; {
-      description = "A blog CMS built on React, Go, Gin, JWT, and SQLite";
-      homepage = "https://github.com/vexgo-org/vexgo";
-      license = licenses.agpl3Only;
-      mainProgram = "vexgo";
-      platforms = platforms.linux ++ platforms.darwin;
-      maintainers = [antipeth];
-    };
-  }
+  meta = with lib; {
+    description = "A blog CMS built on React, Go, Gin, JWT, and SQLite";
+    homepage = "https://github.com/vexgo-org/vexgo";
+    license = licenses.agpl3Only;
+    mainProgram = "vexgo";
+    platforms = platforms.linux ++ platforms.darwin;
+    maintainers = [ antipeth ];
+  };
+}
