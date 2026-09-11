@@ -1,5 +1,35 @@
 import { go } from "../lib/go";
-import { Search } from "./icons";
+import { Moon, Search, Sun } from "./icons";
+
+/** ThemeToggle renders a dark/light switch for the public pages.
+ *
+ * Public pages are server-side rendered with no client framework, so this is
+ * a plain button wired by the inline vanilla-JS handler below. It shares the
+ * admin SPA's localStorage `theme` key (light | dark | system, defaulting to
+ * light) so the preference carries over to /admin. The two icons swap via
+ * Tailwind's `dark:` variant — the moon shows in light mode, the sun in dark.
+ */
+export function ThemeToggle() {
+  return (
+    <>
+      <button
+        id="vexgo-theme-toggle"
+        type="button"
+        aria-label="Toggle dark mode"
+        title="Toggle dark mode"
+        className="inline-flex items-center justify-center rounded-md h-9 w-9 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground text-muted-foreground"
+      >
+        <Moon className="w-4 h-4 dark:hidden" />
+        <Sun className="w-4 h-4 hidden dark:block" />
+      </button>
+      <script>
+        {
+          "(function(){var b=document.getElementById('vexgo-theme-toggle');if(!b)return;b.addEventListener('click',function(){var r=document.documentElement;var d=!r.classList.contains('dark');r.classList.remove('light','dark');r.classList.add(d?'dark':'light');r.style.colorScheme=d?'dark':'light';try{localStorage.setItem('theme',d?'dark':'light')}catch(e){}});})();"
+        }
+      </script>
+    </>
+  );
+}
 
 /** SiteHeader is the top navigation bar shared by every public page. */
 export function SiteHeader() {
@@ -46,19 +76,22 @@ export function SiteHeader() {
 
           {/* Auth entry: Login/Register for guests, Profile when a session
               exists (the SPA stores its session in localStorage). */}
-          <div id="vexgo-auth" className="flex items-center gap-2">
-            <a
-              href="/admin/login"
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-4 py-2 text-muted-foreground"
-            >
-              Login
-            </a>
-            <a
-              href="/admin/register"
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
-            >
-              Register
-            </a>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <div id="vexgo-auth" className="flex items-center gap-2">
+              <a
+                href="/admin/login"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-4 py-2 text-muted-foreground"
+              >
+                Login
+              </a>
+              <a
+                href="/admin/register"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
+              >
+                Register
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -121,6 +154,11 @@ export function DocHead({
       <title>{title}</title>
       <meta name="description" content={description} />
       <link rel="stylesheet" href="/theme-assets/style.css" />
+      <script>
+        {
+          "(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.remove('light','dark');r.classList.add(d?'dark':'light');r.style.colorScheme=d?'dark':'light';}catch(e){}})();"
+        }
+      </script>
     </head>
   );
 }
