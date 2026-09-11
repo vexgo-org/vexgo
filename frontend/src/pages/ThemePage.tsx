@@ -304,7 +304,7 @@ export function ThemePage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
           {themes.length === 0 ? (
             <Card className="col-span-full">
               <CardContent className="pt-6">
@@ -366,7 +366,7 @@ export function ThemePage() {
                             </p>
                           )}
                         </div>
-                        <div className="flex justify-between items-center gap-2">
+                        <div className="flex flex-wrap justify-between items-center gap-2">
                           <Button
                             variant="secondary"
                             size="sm"
@@ -375,7 +375,7 @@ export function ThemePage() {
                             <Eye className="w-3 h-3" />
                             {t("themePage.viewDetails")}
                           </Button>
-                          <div className="flex items-center gap-1">
+                          <div className="flex flex-wrap items-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
