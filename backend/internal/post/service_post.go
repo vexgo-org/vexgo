@@ -161,6 +161,26 @@ type CreateRequest struct {
 	Status     model.PostStatus
 }
 
+// validateAuthorStatus validates a client-supplied status for the
+// author-facing create/update endpoints. The status field is untrusted input:
+// without this check any role could publish past the moderation queue by
+// simply sending `"status":"published"`, which is what the role-derived
+// default exists to prevent.
+//
+// It returns ErrInvalidStatus for a value these endpoints never accept (an
+// unknown string, or `rejected`, which only the moderation endpoints may
+// assign), and ErrForbidden when a role below author-level attempts to
+// publish.
+func validateAuthorStatus(role string, status model.PostStatus) error {
+	if !model.ValidPostStatus(status) || status == model.PostStatusRejected {
+		return ErrInvalidStatus
+	}
+	if status == model.PostStatusPublished && !model.IsAuthor(role) {
+		return ErrForbidden
+	}
+	return nil
+}
+
 // Create creates a post, deriving the initial status from the user's role.
 func (s *Service) Create(ctx context.Context, userRole string, userID uint, req CreateRequest) (*model.Post, error) {
 	// Check if user has permission to create posts
@@ -183,6 +203,15 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 	if exists {
 		return nil, fmt.Errorf("%w", model.ErrSlugTaken)
+	}
+
+	// An explicitly requested status must be one the acting role may set;
+	// otherwise it would override the role-derived default below and defeat
+	// the moderation queue.
+	if req.Status != "" {
+		if err := validateAuthorStatus(userRole, req.Status); err != nil {
+			return nil, err
+		}
 	}
 
 	// Determine initial post status based on user role
@@ -297,6 +326,17 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 		post.CoverImage = req.CoverImage
 	}
 	if req.Status != "" {
+		if err := validateAuthorStatus(user.Role, req.Status); err != nil {
+			return nil, err
+		}
+		// A rejected post must not be republished by a non-admin author: the
+		// rejection is a moderation decision, and overriding it here would
+		// bypass the approve endpoint. Admins keep the ability (they are the
+		// moderation authority) so an explicit override still has one path.
+		if req.Status == model.PostStatusPublished &&
+			post.Status == model.PostStatusRejected && !model.IsAdmin(user.Role) {
+			return nil, ErrForbidden
+		}
 		post.Status = model.PostStatus(req.Status)
 	}
 

@@ -15,6 +15,20 @@ const (
 	PostStatusRejected  PostStatus = "rejected"
 )
 
+// ValidPostStatus reports whether status is a lifecycle state the database may
+// store. It guards the author-facing create/update endpoints so a
+// client-supplied value cannot introduce an unknown state. It says nothing
+// about which roles may set it: `rejected` is valid in storage but only the
+// moderation endpoints may assign it.
+func ValidPostStatus(status PostStatus) bool {
+	switch status {
+	case PostStatusDraft, PostStatusPending, PostStatusPublished, PostStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Post is a blog article with its author, category, tags and moderation state.
 type Post struct {
 	ID              uint       `json:"id" gorm:"primaryKey"`

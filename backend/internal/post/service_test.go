@@ -68,10 +68,24 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 	return u
 }
 
-func TestCreate_SavesDraftAndPublished(t *testing.T) {
+// reloadPostStatus re-reads a post's status from the database so a test can
+// assert that a rejected update left the row untouched.
+func reloadPostStatus(t *testing.T, db *gorm.DB, id uint) model.PostStatus {
+	t.Helper()
+	var post model.Post
+	if err := db.First(&post, id).Error; err != nil {
+		t.Fatalf("reload post %d: %v", id, err)
+	}
+	return post.Status
+}
+
+// TestCreate_SavesFieldsAsAuthor covers the author-level happy path: the
+// requested fields persist and an author may publish directly. Contributors
+// are covered by TestCreate_PublishRequiresAuthorRole.
+func TestCreate_SavesFieldsAsAuthor(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
-	user := seedUser(t, db, "tester", model.RoleContributor)
+	user := seedUser(t, db, "tester", model.RoleAuthor)
 
 	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
 		Slug:       "hello-world",
@@ -138,7 +152,7 @@ func TestCreate_ForbidsGuest(t *testing.T) {
 func TestUpdate_ModifiesFields(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
-	user := seedUser(t, db, "tester", model.RoleContributor)
+	user := seedUser(t, db, "tester", model.RoleAuthor)
 
 	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{Slug: "alpha", Title: "A", Content: "B", Category: "1", Status: model.PostStatusDraft})
 	if err != nil {
@@ -166,6 +180,194 @@ func TestUpdate_ModifiesFields(t *testing.T) {
 	other := seedUser(t, db, "other", model.RoleGuest)
 	if _, err := svc.Update(ctx, idString(post.ID), other.ID, UpdateRequest{Title: "hack"}); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
+	}
+}
+
+// TestCreate_PublishRequiresAuthorRole is the permission-boundary guard for
+// the status field on create: a client-supplied "published" must not let a
+// role below author level bypass the moderation queue, while author level and
+// above keep publishing directly.
+func TestCreate_PublishRequiresAuthorRole(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+
+	denied := []struct {
+		name string
+		role string
+	}{
+		{"anonymous", ""},
+		{"guest", model.RoleGuest},
+		{"contributor", model.RoleContributor},
+	}
+	for _, tc := range denied {
+		t.Run(tc.name, func(t *testing.T) {
+			slug := "denied-" + tc.name
+			user := seedUser(t, db, slug, tc.role)
+
+			if _, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
+				Slug: slug, Title: "t", Content: "c", Category: "1",
+				Status: model.PostStatusPublished,
+			}); !errors.Is(err, ErrForbidden) {
+				t.Fatalf("Create(published) = %v, want ErrForbidden", err)
+			}
+
+			// A rejected request must not persist a row.
+			var count int64
+			db.Model(&model.Post{}).Where("slug = ?", slug).Count(&count)
+			if count != 0 {
+				t.Fatalf("post persisted despite rejection")
+			}
+		})
+	}
+
+	// Author level and above publish directly.
+	for _, role := range []string{model.RoleAuthor, model.RoleAdmin, model.RoleSuperAdmin} {
+		t.Run(role, func(t *testing.T) {
+			slug := "allowed-" + strings.ReplaceAll(role, "_", "-")
+			user := seedUser(t, db, slug, role)
+			post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
+				Slug: slug, Title: "t", Content: "c", Category: "1",
+				Status: model.PostStatusPublished,
+			})
+			if err != nil {
+				t.Fatalf("Create(published) error = %v", err)
+			}
+			if post.Status != model.PostStatusPublished {
+				t.Fatalf("status = %s, want published", post.Status)
+			}
+		})
+	}
+}
+
+// TestCreate_RejectsInvalidStatus guards the enum: an unknown string and the
+// moderation-only `rejected` state are rejected and never persisted, for every
+// role.
+func TestCreate_RejectsInvalidStatus(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "author", model.RoleAuthor)
+
+	for _, status := range []model.PostStatus{"garbage", "PUBLISHED", model.PostStatusRejected} {
+		slug := "bad-" + strings.ToLower(string(status))
+		_, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
+			Slug: slug, Title: "t", Content: "c", Category: "1", Status: status,
+		})
+		if !errors.Is(err, ErrInvalidStatus) {
+			t.Errorf("Create(status=%q) error = %v, want ErrInvalidStatus", status, err)
+		}
+		var count int64
+		db.Model(&model.Post{}).Where("slug = ?", slug).Count(&count)
+		if count != 0 {
+			t.Errorf("status %q persisted despite rejection", status)
+		}
+	}
+}
+
+// TestUpdate_PublishRequiresAuthorRole verifies the update path enforces the
+// same boundary as create: a contributor cannot move their own post into the
+// published state, while an admin may publish any post and an author may
+// publish their own.
+func TestUpdate_PublishRequiresAuthorRole(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	contributor := seedUser(t, db, "contrib", model.RoleContributor)
+
+	post, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{
+		Slug: "pending-post", Title: "t", Content: "c", Category: "1",
+		Status: model.PostStatusPending,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if _, err := svc.Update(ctx, idString(post.ID), contributor.ID, UpdateRequest{Status: model.PostStatusPublished}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("contributor self-publish error = %v, want ErrForbidden", err)
+	}
+	if got := reloadPostStatus(t, db, post.ID); got != model.PostStatusPending {
+		t.Fatalf("status = %s after rejected publish, want pending", got)
+	}
+
+	// An admin may publish it; afterwards the contributor editing content
+	// without a status change stays allowed.
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+	if _, err := svc.Update(ctx, idString(post.ID), admin.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
+		t.Fatalf("admin publish error = %v", err)
+	}
+	if got := reloadPostStatus(t, db, post.ID); got != model.PostStatusPublished {
+		t.Fatalf("status = %s, want published", got)
+	}
+	if _, err := svc.Update(ctx, idString(post.ID), contributor.ID, UpdateRequest{Title: "edited"}); err != nil {
+		t.Fatalf("contributor edit of published post error = %v", err)
+	}
+
+	// An author publishes their own draft directly.
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	own, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug: "author-draft", Title: "t", Content: "c", Category: "1", Status: model.PostStatusDraft,
+	})
+	if err != nil {
+		t.Fatalf("Create author draft error: %v", err)
+	}
+	if _, err := svc.Update(ctx, idString(own.ID), author.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
+		t.Fatalf("author publish error = %v", err)
+	}
+	if got := reloadPostStatus(t, db, own.ID); got != model.PostStatusPublished {
+		t.Fatalf("author post status = %s, want published", got)
+	}
+}
+
+// TestUpdate_RejectedPostStatusRules covers the guards around a rejected post:
+// its author may requeue it (pending) but not republish it, and the
+// moderation-only `rejected` value cannot be set through Update by anyone.
+func TestUpdate_RejectedPostStatusRules(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+
+	// Rejection is a moderation outcome, so seed the rejected rows directly.
+	rejected := model.Post{
+		Slug: "rejected-post", Title: "t", Content: "c", Category: "1",
+		Status: model.PostStatusRejected, AuthorID: author.ID,
+	}
+	if err := db.Create(&rejected).Error; err != nil {
+		t.Fatalf("seed rejected post: %v", err)
+	}
+
+	// The author cannot override the rejection by publishing.
+	if _, err := svc.Update(ctx, idString(rejected.ID), author.ID, UpdateRequest{Status: model.PostStatusPublished}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("author republish error = %v, want ErrForbidden", err)
+	}
+	if got := reloadPostStatus(t, db, rejected.ID); got != model.PostStatusRejected {
+		t.Fatalf("status = %s, want rejected", got)
+	}
+
+	// `rejected` is never settable through Update.
+	if _, err := svc.Update(ctx, idString(rejected.ID), author.ID, UpdateRequest{Status: model.PostStatusRejected}); !errors.Is(err, ErrInvalidStatus) {
+		t.Fatalf("Update(status=rejected) error = %v, want ErrInvalidStatus", err)
+	}
+
+	// Requeueing for review stays allowed for the author.
+	if _, err := svc.Update(ctx, idString(rejected.ID), author.ID, UpdateRequest{Status: model.PostStatusPending}); err != nil {
+		t.Fatalf("author requeue error = %v", err)
+	}
+	if got := reloadPostStatus(t, db, rejected.ID); got != model.PostStatusPending {
+		t.Fatalf("status = %s, want pending", got)
+	}
+
+	// An admin keeps the override path for a post they own.
+	adminPost := model.Post{
+		Slug: "admin-rejected", Title: "t", Content: "c", Category: "1",
+		Status: model.PostStatusRejected, AuthorID: admin.ID,
+	}
+	if err := db.Create(&adminPost).Error; err != nil {
+		t.Fatalf("seed admin post: %v", err)
+	}
+	if _, err := svc.Update(ctx, idString(adminPost.ID), admin.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
+		t.Fatalf("admin republish error = %v", err)
+	}
+	if got := reloadPostStatus(t, db, adminPost.ID); got != model.PostStatusPublished {
+		t.Fatalf("admin status = %s, want published", got)
 	}
 }
 
@@ -334,9 +536,12 @@ func TestList_RoleVisibility(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
 	contributor := seedUser(t, db, "contrib", model.RoleContributor)
+	// Publishing needs author level or above; the contributor only contributes
+	// the pending post below.
+	author := seedUser(t, db, "pubauthor", model.RoleAuthor)
 	db.Create(&model.GeneralSettings{AllowGuestViewPosts: true})
 
-	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "pub-post", Title: "pub", Content: "c", Category: "1", Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "pub-post", Title: "pub", Content: "c", Category: "1", Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 	if _, err := svc.Create(ctx, contributor.Role, contributor.ID, CreateRequest{Slug: "pend-post", Title: "pend", Content: "c", Category: "1", Status: model.PostStatusPending}); err != nil {
@@ -504,11 +709,15 @@ func TestGet_UnpublishedPostsArePrivate(t *testing.T) {
 	}
 	for _, status := range unpublished {
 		slug := "secret-" + string(status)
-		post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
-			Slug: slug, Title: "Secret", Content: "x", Category: "1", Status: status,
-		})
-		if err != nil {
-			t.Fatalf("create %s: %v", status, err)
+		// Seed directly: `rejected` is a moderation outcome the author-facing
+		// Create endpoint deliberately refuses (see validateAuthorStatus), and
+		// this test exercises the read paths for every unpublished state.
+		post := model.Post{
+			Slug: slug, Title: "Secret", Content: "x", Category: "1",
+			Status: status, AuthorID: author.ID,
+		}
+		if err := db.Create(&post).Error; err != nil {
+			t.Fatalf("seed %s: %v", status, err)
 		}
 		id := strconv.Itoa(int(post.ID))
 

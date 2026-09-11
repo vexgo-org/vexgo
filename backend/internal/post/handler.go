@@ -197,6 +197,10 @@ func (h *Handler) CreatePost(c *gin.Context) {
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to create a post"})
 			return
 		}
+		if errors.Is(err, ErrInvalidStatus) {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post status"})
+			return
+		}
 		if errors.Is(err, model.ErrSlugTaken) {
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 			return
@@ -257,6 +261,8 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to modify this post"})
+		case errors.Is(err, ErrInvalidStatus):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post status"})
 		case errors.Is(err, model.ErrSlugTaken):
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 		case errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
