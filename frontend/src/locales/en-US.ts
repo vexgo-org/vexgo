@@ -283,20 +283,31 @@ export const enUS = {
       "Refresh this page to see new themes. After application, changes take effect immediately for all users",
     uploadTheme: "Upload Theme",
     uploadSuccess: "Theme uploaded successfully",
+    uploadOverwritten:
+      'Theme "{themeName}" has been overwritten with the new package',
     uploadFailed: "Failed to upload theme",
     uploadError: "Upload error: {message}",
     uploadInvalidType: "Please upload a zip file",
     viewDetails: "View Details",
+    previewTheme: "Preview",
+    deleteTheme: "Delete",
+    deleteConfirm: 'Delete theme "{themeName}"? This cannot be undone.',
+    deleteSuccess: 'Theme "{themeName}" has been deleted',
+    deleteFailed: "Failed to delete theme",
+    noPreview: "No cover",
+    previewCover: "Cover",
     method1: {
       title: "Method 1: Upload Theme Package",
       step1: '1. Click the "Upload Theme" button above',
-      step2: "2. Select a zip file containing the theme",
+      step2: "2. Select a zip file containing the theme (max 32MB)",
       step3:
         "3. Wait for the upload to complete, the system will automatically extract and load the theme",
     },
     method2: {
       title: "Method 2: Manual Installation",
     },
+    metaRequirements:
+      "vexgo-theme.json requires id, name and version (id must match the folder name); the optional preview cover must be an http(s) URL.",
   },
 
   // General Settings Page

@@ -138,8 +138,8 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"DELETE /api/pages/:id",
 		// settings
 		"GET /api/config/themes",
-		"GET /api/config/themes/:id/preview",
 		"GET /api/config/themes/:id/languages",
+		"DELETE /api/config/themes/:id",
 		"GET /api/config/smtp",
 		"PUT /api/config/smtp",
 		"POST /api/config/smtp/test",

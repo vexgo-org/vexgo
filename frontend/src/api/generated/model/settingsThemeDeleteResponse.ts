@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface SettingsThemeUploadResponse {
+export interface SettingsThemeDeleteResponse {
+  deleted?: string;
   message?: string;
-  overwritten?: boolean;
 }

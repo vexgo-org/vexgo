@@ -36,7 +36,8 @@ var indexHTML []byte
 //go:embed default-theme
 var defaultThemeFS embed.FS
 
-// ThemeInfo represents metadata for a theme
+// ThemeInfo represents metadata for a theme. Preview is the cover image and
+// must be an http(s) URL when set; local paths are rejected at upload time.
 type ThemeInfo struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -165,6 +166,26 @@ func (r *Renderer) ThemeExists(themeID string) bool {
 	return err == nil
 }
 
+// ValidateThemeTemplates parses every template the theme provides and
+// returns an error when the theme ships no templates or any template fails
+// to parse. Activation requires this to succeed so a broken theme can never
+// become the site-wide active theme.
+func (r *Renderer) ValidateThemeTemplates(themeID string) error {
+	_, err := r.parseThemeTemplates(themeID)
+	return err
+}
+
+// InvalidateThemeCache drops the parsed-template caches for one theme so the
+// next request re-reads it from disk (used after upload/overwrite/delete).
+func (r *Renderer) InvalidateThemeCache(themeID string) {
+	themeCache.Lock()
+	delete(themeCache.themes, themeID)
+	themeCache.Unlock()
+	themeSourcesCache.Lock()
+	delete(themeSourcesCache.themes, themeID)
+	themeSourcesCache.Unlock()
+}
+
 // activeTheme returns the currently active theme from the database, falling
 // back to the default theme.
 func (r *Renderer) activeTheme() string {
@@ -178,9 +199,8 @@ func (r *Renderer) activeTheme() string {
 	return config.ActiveTheme
 }
 
-// IsPathInside verifies that targetPath is within basePath. Exported because
-// other domains resolve untrusted paths against theme directories too (e.g.
-// settings theme previews) and must apply the same containment check.
+// IsPathInside verifies that targetPath is within basePath. It is a general
+// containment helper for untrusted relative paths.
 func IsPathInside(basePath, targetPath string) bool {
 	absBase, err := filepath.Abs(basePath)
 	if err != nil {

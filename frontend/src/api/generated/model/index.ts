@@ -141,6 +141,7 @@ export * from "./settingsTestSMTPResponse";
 export * from "./settingsThemeConfigResponse";
 export * from "./settingsThemeConfigUpdateRequest";
 export * from "./settingsThemeConfigUpdateResponse";
+export * from "./settingsThemeDeleteResponse";
 export * from "./settingsThemeLanguagesResponse";
 export * from "./settingsThemesListResponse";
 export * from "./settingsThemeUploadResponse";

@@ -2148,6 +2148,19 @@
                 },
                 "type": "object"
             },
+            "settings.ThemeDeleteResponse": {
+                "properties": {
+                    "deleted": {
+                        "example": "my-theme",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "Theme deleted successfully",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "settings.ThemeLanguagesResponse": {
                 "properties": {
                     "languages": {
@@ -2173,6 +2186,10 @@
                     "message": {
                         "example": "Theme uploaded successfully",
                         "type": "string"
+                    },
+                    "overwritten": {
+                        "example": false,
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -4333,7 +4350,7 @@
         },
         "/config/theme/upload": {
             "post": {
-                "description": "Accepts a multipart/form-data body with a single\n'theme' part. The zip must contain a vexgo-theme.json\nmetadata file (either at the root or inside a single\nsubdirectory). Existing themes with the same id are\noverwritten.",
+                "description": "Accepts a multipart/form-data body with a single\n'theme' part. The zip must contain a vexgo-theme.json\nmetadata file (either at the root or inside a single\nsubdirectory) with required id, name and version fields;\nthe id must match the theme directory name. The optional\npreview cover must be an http(s) URL when set. Archives\nare limited to 32MB zip / 100MB unpacked / 2000 files /\n10MB per file. Existing themes with the same id are\noverwritten atomically.",
                 "requestBody": {
                     "content": {
                         "multipart/form-data": {
@@ -4374,7 +4391,7 @@
                                 }
                             }
                         },
-                        "description": "invalid zip / missing metadata / zip-slip entry"
+                        "description": "invalid zip / missing metadata / zip-slip entry / archive too large"
                     },
                     "401": {
                         "content": {
@@ -4428,6 +4445,83 @@
                 ]
             }
         },
+        "/config/themes/{id}": {
+            "delete": {
+                "description": "Removes an installed theme directory. The built-in default\ntheme and the currently active theme cannot be deleted.",
+                "parameters": [
+                    {
+                        "description": "theme id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/settings.ThemeDeleteResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "default / active theme protected"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "theme not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a theme",
+                "tags": [
+                    "config"
+                ]
+            }
+        },
         "/config/themes/{id}/languages": {
             "get": {
                 "description": "Lists the language codes a theme ships under i18n/.",
@@ -4465,59 +4559,6 @@
                     }
                 },
                 "summary": "Theme i18n languages",
-                "tags": [
-                    "config"
-                ]
-            }
-        },
-        "/config/themes/{id}/preview": {
-            "get": {
-                "description": "Streams the preview.png from the theme directory.\nReturns 404 if the theme, or its preview file,\ndoes not exist.",
-                "parameters": [
-                    {
-                        "description": "theme id",
-                        "in": "path",
-                        "name": "id",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "image/png": {
-                                "schema": {
-                                    "format": "binary",
-                                    "type": "string"
-                                }
-                            }
-                        },
-                        "description": "preview image bytes"
-                    },
-                    "404": {
-                        "content": {
-                            "image/png": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "theme or preview not found"
-                    },
-                    "500": {
-                        "content": {
-                            "image/png": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.ErrorResponse"
-                                }
-                            }
-                        },
-                        "description": "Internal Server Error"
-                    }
-                },
-                "summary": "Theme preview image",
                 "tags": [
                     "config"
                 ]

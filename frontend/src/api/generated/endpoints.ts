@@ -100,6 +100,7 @@ import type {
   SettingsThemeConfigResponse,
   SettingsThemeConfigUpdateRequest,
   SettingsThemeConfigUpdateResponse,
+  SettingsThemeDeleteResponse,
   SettingsThemeLanguagesResponse,
   SettingsThemeUploadResponse,
   SettingsThemesListResponse,
@@ -584,8 +585,12 @@ export const getVexGoAPI = () => {
    * Accepts a multipart/form-data body with a single
    * 'theme' part. The zip must contain a vexgo-theme.json
    * metadata file (either at the root or inside a single
-   * subdirectory). Existing themes with the same id are
-   * overwritten.
+   * subdirectory) with required id, name and version fields;
+   * the id must match the theme directory name. The optional
+   * preview cover must be an http(s) URL when set. Archives
+   * are limited to 32MB zip / 100MB unpacked / 2000 files /
+   * 10MB per file. Existing themes with the same id are
+   * overwritten atomically.
    * @summary Upload a theme zip
    */
   const postConfigThemeUpload = (
@@ -613,6 +618,18 @@ export const getVexGoAPI = () => {
   };
 
   /**
+   * Removes an installed theme directory. The built-in default
+   * theme and the currently active theme cannot be deleted.
+   * @summary Delete a theme
+   */
+  const deleteConfigThemesId = (id: string) => {
+    return customInstance<SettingsThemeDeleteResponse>({
+      url: `/config/themes/${id}`,
+      method: "DELETE",
+    });
+  };
+
+  /**
    * Lists the language codes a theme ships under i18n/.
    * @summary Theme i18n languages
    */
@@ -620,20 +637,6 @@ export const getVexGoAPI = () => {
     return customInstance<SettingsThemeLanguagesResponse>({
       url: `/config/themes/${id}/languages`,
       method: "GET",
-    });
-  };
-
-  /**
-   * Streams the preview.png from the theme directory.
-   * Returns 404 if the theme, or its preview file,
-   * does not exist.
-   * @summary Theme preview image
-   */
-  const getConfigThemesIdPreview = (id: string) => {
-    return customInstance<Blob>({
-      url: `/config/themes/${id}/preview`,
-      method: "GET",
-      responseType: "blob",
     });
   };
 
@@ -1394,8 +1397,8 @@ export const getVexGoAPI = () => {
     putConfigTheme,
     postConfigThemeUpload,
     getConfigThemes,
+    deleteConfigThemesId,
     getConfigThemesIdLanguages,
-    getConfigThemesIdPreview,
     getLikesPostId,
     postLikesPostId,
     putModerationApproveId,
@@ -1557,14 +1560,12 @@ export type PostConfigThemeUploadResult = NonNullable<
 export type GetConfigThemesResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemes"]>>
 >;
+export type DeleteConfigThemesIdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["deleteConfigThemesId"]>>
+>;
 export type GetConfigThemesIdLanguagesResult = NonNullable<
   Awaited<
     ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdLanguages"]>
-  >
->;
-export type GetConfigThemesIdPreviewResult = NonNullable<
-  Awaited<
-    ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdPreview"]>
   >
 >;
 export type GetLikesPostIdResult = NonNullable<

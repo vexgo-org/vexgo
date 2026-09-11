@@ -264,19 +264,29 @@ export const zhCN = {
     instruction7: "刷新此页面以查看新主题，应用后对所有用户即时生效",
     uploadTheme: "上传主题",
     uploadSuccess: "主题上传成功",
+    uploadOverwritten: "主题“{themeName}”已用新压缩包覆盖更新",
     uploadFailed: "上传主题失败",
     uploadError: "上传错误: {message}",
     uploadInvalidType: "请上传 zip 格式的文件",
     viewDetails: "查看详情",
+    previewTheme: "预览",
+    deleteTheme: "删除",
+    deleteConfirm: "确定删除主题“{themeName}”吗？删除后不可恢复。",
+    deleteSuccess: "主题“{themeName}”已删除",
+    deleteFailed: "删除主题失败",
+    noPreview: "无封面",
+    previewCover: "封面",
     method1: {
       title: "方法一：上传主题包",
       step1: "1. 点击上方的「上传主题」按钮",
-      step2: "2. 选择包含主题的 zip 压缩包",
+      step2: "2. 选择包含主题的 zip 压缩包（最大 32MB）",
       step3: "3. 等待上传完成，系统会自动解压并加载主题",
     },
     method2: {
       title: "方法二：手动安装",
     },
+    metaRequirements:
+      "vexgo-theme.json 必须包含 id、name、version（id 须与文件夹同名）；可选 preview 封面仅接受 http(s) URL。",
   },
 
   // 通用设置页面

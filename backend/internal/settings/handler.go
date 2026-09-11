@@ -24,6 +24,14 @@ import (
 // value can never traverse out of the themes directory.
 var themeIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
+// Theme archive limits (Q9): reject zip bombs before they touch disk.
+const (
+	maxThemeZipBytes        = 32 << 20
+	maxThemeUnpackedBytes   = 100 << 20
+	maxThemeFiles           = 2000
+	maxThemeSingleFileBytes = 10 << 20
+)
+
 // Handler exposes the settings domain over HTTP.
 type Handler struct {
 	svc    *Service
@@ -372,40 +380,48 @@ func (h *Handler) GetThemes(c *gin.Context) {
 	c.JSON(http.StatusOK, ThemesListResponse{Themes: themes})
 }
 
-// GetThemePreview godoc
+// DeleteTheme godoc
 //
-//	@Summary		Theme preview image
-//	@Description	Streams the preview.png from the theme directory.
-//	@Description	Returns 404 if the theme, or its preview file,
-//	@Description	does not exist.
+//	@Summary		Delete a theme
+//	@Description	Removes an installed theme directory. The built-in default
+//	@Description	theme and the currently active theme cannot be deleted.
 //	@Tags			config
-//	@Produce		png
-//	@Param			id	path	string	true	"theme id"
-//	@Success		200	"preview image bytes"
-//	@Failure		404	{object}	api.ErrorResponse	"theme or preview not found"
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"theme id"
+//	@Success		200	{object}	ThemeDeleteResponse
+//	@Failure		400	{object}	api.ErrorResponse	"default / active theme protected"
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		404	{object}	api.ErrorResponse	"theme not found"
 //	@Failure		500	{object}	api.ErrorResponse
-//	@Router			/config/themes/{id}/preview [get]
-func (h *Handler) GetThemePreview(c *gin.Context) {
+//	@Router			/config/themes/{id} [delete]
+func (h *Handler) DeleteTheme(c *gin.Context) {
 	themeID := c.Param("id")
+	if themeID == "" || themeID == public.DefaultTheme || !themeIDPattern.MatchString(themeID) {
+		if themeID == public.DefaultTheme {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: ErrCannotDeleteDefault.Error()})
+			return
+		}
+		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: ErrThemeNotFound.Error()})
+		return
+	}
 
-	previewPath, err := h.svc.ThemePreview(themeID)
-	if err != nil {
+	if err := h.svc.DeleteTheme(c.Request.Context(), themeID); err != nil {
 		switch {
+		case errors.Is(err, ErrCannotDeleteDefault):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
+		case errors.Is(err, ErrThemeIsActive):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		case errors.Is(err, ErrThemeNotFound):
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
-		case errors.Is(err, ErrPreviewNotSpecified):
-			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
-		case errors.Is(err, ErrPreviewNotFound):
-			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 		default:
-			slog.Error("failed to load theme preview", "err", err)
-			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to load theme preview"})
+			slog.Error("failed to delete theme", "err", err)
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete theme"})
 		}
 		return
 	}
 
-	// Serve the preview image
-	c.File(previewPath)
+	c.JSON(http.StatusOK, ThemeDeleteResponse{Message: "Theme deleted successfully", Deleted: themeID})
 }
 
 // GetThemeLanguages godoc
@@ -473,7 +489,7 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 
 	activeTheme, err := h.svc.UpdateThemeConfig(c.Request.Context(), req.ActiveTheme)
 	if err != nil {
-		if errors.Is(err, ErrThemeNotFound) {
+		if errors.Is(err, ErrThemeNotFound) || errors.Is(err, ErrThemeTemplatesInvalid) || errors.Is(err, ErrInvalidPreviewURL) || errors.Is(err, ErrInvalidThemeMeta) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
@@ -494,15 +510,19 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 //	@Description	Accepts a multipart/form-data body with a single
 //	@Description	'theme' part. The zip must contain a vexgo-theme.json
 //	@Description	metadata file (either at the root or inside a single
-//	@Description	subdirectory). Existing themes with the same id are
-//	@Description	overwritten.
+//	@Description	subdirectory) with required id, name and version fields;
+//	@Description	the id must match the theme directory name. The optional
+//	@Description	preview cover must be an http(s) URL when set. Archives
+//	@Description	are limited to 32MB zip / 100MB unpacked / 2000 files /
+//	@Description	10MB per file. Existing themes with the same id are
+//	@Description	overwritten atomically.
 //	@Tags			config
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			theme	formData	file	true	"theme zip archive"
 //	@Success		200		{object}	ThemeUploadResponse
-//	@Failure		400		{object}	api.ErrorResponse	"invalid zip / missing metadata / zip-slip entry"
+//	@Failure		400		{object}	api.ErrorResponse	"invalid zip / missing metadata / zip-slip entry / archive too large"
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/config/theme/upload [post]
@@ -518,6 +538,11 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 	// Check if the file is a zip
 	if !strings.HasSuffix(header.Filename, ".zip") {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "File must be a zip archive"})
+		return
+	}
+
+	if header.Size > maxThemeZipBytes {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme archive too large"})
 		return
 	}
 
@@ -539,6 +564,28 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		return
 	}
 
+	if len(zipReader.File) > maxThemeFiles {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme archive too large"})
+		return
+	}
+
+	// Pre-check declared sizes to fail fast on zip bombs.
+	var declaredTotal uint64
+	for _, f := range zipReader.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		if f.UncompressedSize64 > maxThemeSingleFileBytes {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme archive too large"})
+			return
+		}
+		declaredTotal += f.UncompressedSize64
+		if declaredTotal > maxThemeUnpackedBytes {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme archive too large"})
+			return
+		}
+	}
+
 	// Extract the zip file. Entry names are untrusted input: os.Root confines
 	// every created file to the extraction directory at the OS level, so
 	// absolute paths, ".." segments or volume names in entries cannot escape
@@ -550,6 +597,8 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		return
 	}
 	defer func() { _ = zipRoot.Close() }()
+
+	var totalUnpacked int64
 
 	for _, f := range zipReader.File {
 		if f.FileInfo().IsDir() {
@@ -571,7 +620,8 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 			}
 		}
 
-		// Extract the file
+		// Extract the file, enforcing per-file and total unpacked limits
+		// (declared sizes can lie, so count actual bytes).
 		dstFile, err := zipRoot.Create(clean)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid file path in zip"})
@@ -585,12 +635,21 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 			return
 		}
 
-		_, err = io.Copy(dstFile, srcFile)
+		written, err := io.Copy(dstFile, io.LimitReader(srcFile, maxThemeSingleFileBytes+1))
 		srcFile.Close()
 		dstFile.Close()
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to extract file"})
+			return
+		}
+		if written > maxThemeSingleFileBytes {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme archive too large"})
+			return
+		}
+		totalUnpacked += written
+		if totalUnpacked > maxThemeUnpackedBytes {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme archive too large"})
 			return
 		}
 	}
@@ -646,24 +705,28 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 				return
 			}
 
-			// Use the theme ID from metadata or generate one
-			if themeInfo.ID == "" {
-				// Generate a theme ID from the filename
-				themeDir = strings.TrimSuffix(header.Filename, ".zip")
-				// Remove any non-alphanumeric characters
-				themeDir = strings.Map(func(r rune) rune {
-					if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-						return r
-					}
-					return '_'
-				}, themeDir)
-			} else {
-				themeDir = themeInfo.ID
-			}
+			// The id is required and doubles as the install directory.
+			themeDir = themeInfo.ID
 		} else {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "No vexgo-theme.json found in the zip file"})
 			return
 		}
+	}
+
+	// Strict metadata validation (Q13): id/name/version are required, the id
+	// must equal the theme directory, and the optional preview cover must be
+	// an http(s) URL (local paths rejected to shrink the attack surface).
+	if themeInfo.ID == "" || themeInfo.Name == "" || themeInfo.Version == "" {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid theme metadata"})
+		return
+	}
+	if themeInfo.ID != themeDir {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Theme ID mismatch"})
+		return
+	}
+	if !ValidatePreviewURL(themeInfo.Preview) {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid preview URL"})
+		return
 	}
 
 	// Ensure the theme ID is valid. The ID may come from the uploaded
@@ -675,31 +738,29 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		return
 	}
 
-	// Create the theme directory in data/theme
-	targetThemeDir := filepath.Join(h.themes.DataDir(), public.ThemesDir, themeDir)
+	// Resolve install locations.
+	themesBase := filepath.Join(h.themes.DataDir(), public.ThemesDir)
+	targetThemeDir := filepath.Join(themesBase, themeDir)
 
-	// Remove existing theme directory if it exists
-	if err := os.RemoveAll(targetThemeDir); err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to remove existing theme directory"})
-		return
-	}
-
-	// Create the target directory
-	if err := os.MkdirAll(targetThemeDir, 0o755); err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create theme directory"})
-		return
-	}
-
-	// Copy files from temporary directory to target
-	sourceDir := tempDir
-	if themeDir != "" {
-		sourceDir = filepath.Join(tempDir, themeDir)
-	}
-
-	// Check if source directory exists
+	// Copy files from temporary directory to a staging directory inside the
+	// themes directory (same filesystem, so the final rename is atomic).
+	sourceDir := filepath.Join(tempDir, themeDir)
 	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
 		sourceDir = tempDir // Use root if themeDir doesn't exist
 	}
+
+	stagingDir, err := os.MkdirTemp(themesBase, ".staging-")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to prepare theme directory"})
+		return
+	}
+	// Remove the staging directory on any failure path below.
+	stagingOK := false
+	defer func() {
+		if !stagingOK {
+			_ = os.RemoveAll(stagingDir)
+		}
+	}()
 
 	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -711,7 +772,7 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 			return err
 		}
 
-		targetPath := filepath.Join(targetThemeDir, relPath)
+		targetPath := filepath.Join(stagingDir, relPath)
 
 		if info.IsDir() {
 			return os.MkdirAll(targetPath, 0o755)
@@ -721,27 +782,40 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		if err != nil {
 			return err
 		}
-		defer srcFile.Close()
 
 		dstFile, err := os.Create(targetPath)
 		if err != nil {
+			_ = srcFile.Close()
 			return err
 		}
-		defer dstFile.Close()
-
-		_, err = io.Copy(dstFile, srcFile)
-		return err
+		_, copyErr := io.Copy(dstFile, srcFile)
+		_ = dstFile.Close()
+		_ = srcFile.Close()
+		return copyErr
 	})
 	if err != nil {
-		// Clean up partial installation
-		if err := os.RemoveAll(targetThemeDir); err != nil {
-			slog.Warn("failed to clean up partial theme installation", "err", err)
-		}
+		slog.Warn("failed to stage theme files", "err", err)
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to copy theme files"})
 		return
 	}
 
-	c.JSON(http.StatusOK, ThemeUploadResponse{Message: "Theme uploaded successfully"})
+	_, statErr := os.Stat(targetThemeDir)
+	overwritten := statErr == nil
+	if overwritten {
+		if err := os.RemoveAll(targetThemeDir); err != nil {
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to remove existing theme directory"})
+			return
+		}
+	}
+	if err := os.Rename(stagingDir, targetThemeDir); err != nil {
+		slog.Warn("failed to install staged theme", "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to install theme"})
+		return
+	}
+	stagingOK = true
+	h.themes.InvalidateThemeCache(themeDir)
+
+	c.JSON(http.StatusOK, ThemeUploadResponse{Message: "Theme uploaded successfully", Overwritten: overwritten})
 }
 
 // unmarshalThemeMeta decodes theme metadata JSON.

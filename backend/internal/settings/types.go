@@ -148,5 +148,12 @@ type ThemeConfigUpdateResponse struct {
 
 // ThemeUploadResponse is the body of POST /api/config/theme/upload.
 type ThemeUploadResponse struct {
-	Message string `json:"message" example:"Theme uploaded successfully"`
+	Message     string `json:"message" example:"Theme uploaded successfully"`
+	Overwritten bool   `json:"overwritten" example:"false"`
+}
+
+// ThemeDeleteResponse is the body of DELETE /api/config/themes/{id}.
+type ThemeDeleteResponse struct {
+	Message string `json:"message" example:"Theme deleted successfully"`
+	Deleted string `json:"deleted" example:"my-theme"`
 }

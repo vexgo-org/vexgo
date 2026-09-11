@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,9 +40,12 @@ var (
 	ErrAIIncompleteModels = errors.New("please fill in all AI configuration fields (endpoint, API key)")
 
 	// Theme errors.
-	ErrThemeNotFound       = errors.New("theme not found")
-	ErrPreviewNotSpecified = errors.New("preview not specified")
-	ErrPreviewNotFound     = errors.New("preview image not found")
+	ErrThemeNotFound         = errors.New("theme not found")
+	ErrInvalidThemeMeta      = errors.New("invalid theme metadata")
+	ErrInvalidPreviewURL     = errors.New("invalid preview URL")
+	ErrThemeTemplatesInvalid = errors.New("theme templates are invalid")
+	ErrThemeIsActive         = errors.New("active theme cannot be deleted")
+	ErrCannotDeleteDefault   = errors.New("default theme cannot be deleted")
 )
 
 // SecretCipher is the seam for encrypting secrets at rest. It is implemented
@@ -709,46 +713,48 @@ func (s *Service) ThemeLanguages(themeID string) ([]string, error) {
 	return langs, nil
 }
 
-// ThemePreview resolves the preview image path for a theme.
-func (s *Service) ThemePreview(themeID string) (string, error) {
-	// Check if theme exists
+// ValidatePreviewURL reports whether a theme preview/cover value is allowed.
+// Empty means no cover. Otherwise it must be an http(s) URL of at most
+// 2048 characters. Local paths are rejected to shrink the attack surface.
+func ValidatePreviewURL(preview string) bool {
+	if preview == "" {
+		return true
+	}
+	if len(preview) > 2048 {
+		return false
+	}
+	u, err := url.Parse(preview)
+	if err != nil || u == nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	return u.Host != ""
+}
+
+// DeleteTheme removes an installed theme from disk. The built-in default
+// theme and the currently active theme are protected.
+func (s *Service) DeleteTheme(ctx context.Context, themeID string) error {
+	if themeID == "" || themeID == public.DefaultTheme {
+		return ErrCannotDeleteDefault
+	}
 	if !s.themes.ThemeExists(themeID) {
-		return "", ErrThemeNotFound
+		return ErrThemeNotFound
 	}
-
-	// Read theme metadata
-	metaPath := filepath.Join(s.themes.DataDir(), public.ThemesDir, themeID, public.ThemeMetaFile)
-	content, err := os.ReadFile(metaPath)
+	active, err := s.GetThemeConfig(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to read theme metadata: %w", err)
+		return err
 	}
-
-	var themeInfo public.ThemeInfo
-	if err := json.Unmarshal(content, &themeInfo); err != nil {
-		return "", fmt.Errorf("invalid theme metadata: %w", err)
+	if active == themeID {
+		return ErrThemeIsActive
 	}
-
-	// Check if preview is specified
-	if themeInfo.Preview == "" {
-		return "", ErrPreviewNotSpecified
+	themeDir := filepath.Join(s.themes.DataDir(), public.ThemesDir, themeID)
+	if err := os.RemoveAll(themeDir); err != nil {
+		return fmt.Errorf("failed to delete theme directory: %w", err)
 	}
-
-	// Build preview image path. Preview comes from the theme's own metadata,
-	// so treat it as untrusted: reject anything that escapes the theme
-	// directory ("../../etc/passwd" would otherwise be served verbatim).
-	themeBasePath := filepath.Join(s.themes.DataDir(), public.ThemesDir, themeID)
-	cleanPreview := filepath.Clean(themeInfo.Preview)
-	if !public.IsPathInside(themeBasePath, cleanPreview) {
-		return "", ErrPreviewNotFound
-	}
-	previewPath := filepath.Join(themeBasePath, cleanPreview)
-
-	// Check if preview image exists
-	if _, err := os.Stat(previewPath); os.IsNotExist(err) {
-		return "", ErrPreviewNotFound
-	}
-
-	return previewPath, nil
+	s.themes.InvalidateThemeCache(themeID)
+	return nil
 }
 
 // GetThemeConfig returns the currently active theme stored in the database,
@@ -768,11 +774,18 @@ func (s *Service) GetThemeConfig(ctx context.Context) (string, error) {
 	return activeTheme, nil
 }
 
-// UpdateThemeConfig sets the globally active theme in the database.
+// UpdateThemeConfig sets the globally active theme in the database. The
+// theme must exist and its templates must parse; a broken theme is rejected
+// so activation can never take the public site down.
 func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (string, error) {
 	// Validate that the requested theme actually exists
 	if !s.themes.ThemeExists(activeTheme) {
 		return "", ErrThemeNotFound
+	}
+
+	// Strong validation: every template must parse before activation.
+	if err := s.themes.ValidateThemeTemplates(activeTheme); err != nil {
+		return "", fmt.Errorf("%w: %v", ErrThemeTemplatesInvalid, err)
 	}
 
 	config, err := s.repo.GetThemeConfig(ctx)
