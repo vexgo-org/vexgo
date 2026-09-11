@@ -2,7 +2,7 @@ package upload
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -120,7 +120,10 @@ func (h *Handler) UploadFile(c *gin.Context) {
 
 	media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: fmt.Sprintf("Failed to upload: %v", err)})
+		// The storage error may carry paths or backend details, so it is logged
+		// server-side and never echoed to the client.
+		slog.Error("failed to upload file", "user_id", userID, "filename", filename, "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to upload"})
 		return
 	}
 

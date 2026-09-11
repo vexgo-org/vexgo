@@ -661,14 +661,14 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 
 	req, err := http.NewRequest("GET", modelsURL, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to create request: %v", err)
+		return false, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("failed to connect to models endpoint: %v", err)
+		return false, fmt.Errorf("failed to connect to models endpoint: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -679,7 +679,7 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 
 	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return false, fmt.Errorf("failed to parse models response: %v", err)
+		return false, fmt.Errorf("failed to parse models response: %w", err)
 	}
 
 	// Check models list

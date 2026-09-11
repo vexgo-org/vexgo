@@ -114,13 +114,12 @@ func (h *Handler) Login(c *gin.Context) {
 
 	var req LoginRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Warn("failed to bind login request JSON", "err", err)
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
 
-	slog.Debug("login request parsed successfully", "email", req.Email)
+	slog.Debug("login request parsed successfully")
 
 	token, user, err := h.svc.Login(c.Request.Context(), LoginRequest(req))
 	if err != nil {
@@ -189,7 +188,6 @@ func (h *Handler) Register(c *gin.Context) {
 
 	var req RegisterRequestWire
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Error("failed to bind registration request JSON", "err", err)
 		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return

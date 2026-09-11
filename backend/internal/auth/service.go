@@ -293,7 +293,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	}
 
 	// Encrypt password
-	slog.Debug("starting password hashing", "email", req.Email)
+	slog.Debug("starting password hashing")
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		slog.Error(
@@ -303,7 +303,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		)
 		return nil, ErrHashPassword
 	}
-	slog.Debug("password hashed successfully", "email", req.Email)
+	slog.Debug("password hashed successfully")
 
 	// Create new user
 	newUser := model.User{
