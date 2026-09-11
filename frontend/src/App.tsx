@@ -23,6 +23,8 @@ import { CommentConfigPage } from "@/pages/CommentConfigPage";
 import { AISettingsPage } from "@/pages/AISettingsPage";
 import { NotificationCenterPage } from "@/pages/NotificationCenterPage";
 import { CreatorApplicationReviewPage } from "@/pages/CreatorApplicationReviewPage";
+import { PagesPage } from "@/pages/PagesPage";
+import { PageEditorPage } from "@/pages/PageEditorPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
@@ -200,6 +202,30 @@ function App() {
                   element={
                     <ProtectedRoute requireAdmin>
                       <CreatorApplicationReviewPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pages"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PagesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pages/new"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PageEditorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pages/:id"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PageEditorPage />
                     </ProtectedRoute>
                   }
                 />

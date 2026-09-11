@@ -8,6 +8,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
+	"github.com/vexgo-org/vexgo/backend/internal/page"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
@@ -25,6 +26,7 @@ type Deps struct {
 	Notification notification.Deps
 	Comment      comment.Deps
 	Post         post.Deps
+	Page         page.Deps
 	Upload       upload.Deps
 	User         user.Deps
 	Captcha      captcha.Deps
@@ -42,6 +44,7 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	notification.NewHandler(deps.Notification).RegisterRoutes(api)
 	comment.NewHandler(deps.Comment).RegisterRoutes(api)
 	post.NewHandler(deps.Post).RegisterRoutes(api)
+	page.NewHandler(deps.Page).RegisterRoutes(api)
 	upload.NewHandler(deps.Upload).RegisterRoutes(api)
 	user.NewHandler(deps.User).RegisterRoutes(api)
 	captcha.NewHandler(deps.Captcha).RegisterRoutes(api)

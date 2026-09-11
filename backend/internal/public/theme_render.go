@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,16 +26,21 @@ import (
 
 // Template file names a theme may provide. Every template is a complete HTML
 // document; shared fragments use Go's {{define}}/{{template}} mechanism.
+// PageTemplate is the generic fallback for custom pages; any <slug>.html file
+// in the theme is additionally usable as the dedicated template of the page
+// with that slug (discovered dynamically, not listed here).
 const (
 	IndexTemplate    = "index.html"
 	PostTemplate     = "post.html"
+	PageTemplate     = "page.html"
 	UserTemplate     = "user.html"
 	NotFoundTemplate = "404.html"
 )
 
-// ThemeTemplateNames lists every template a theme may provide, in the order
-// they are parsed into the shared template set.
-var ThemeTemplateNames = []string{IndexTemplate, PostTemplate, UserTemplate, NotFoundTemplate}
+// ThemeTemplateNames lists the base templates a theme may provide, in the
+// order they are parsed into the shared template set. Extra <slug>.html
+// files are discovered dynamically by parseThemeTemplates.
+var ThemeTemplateNames = []string{IndexTemplate, PostTemplate, PageTemplate, UserTemplate, NotFoundTemplate}
 
 // ErrNoThemeTemplates reports a theme that provides no template files at all.
 var ErrNoThemeTemplates = errors.New("theme has no template files")
@@ -64,6 +70,14 @@ type SiteData struct {
 	Icon         string
 	URL          string
 	ItemsPerPage int
+}
+
+// NavPageData is one custom page shown in the theme navigation.
+type NavPageData struct {
+	Title     string
+	Slug      string
+	URL       string
+	SortOrder int
 }
 
 // PostCardData is the public summary of a post for list pages (home, user).
@@ -123,6 +137,7 @@ type PopularTagData struct {
 type IndexData struct {
 	Site         *SiteData
 	Posts        []PostCardData
+	Pages        []NavPageData
 	Pagination   *PaginationData
 	Query        IndexQueryData
 	Categories   []string
@@ -132,8 +147,9 @@ type IndexData struct {
 
 // PostData is the context of the post detail template.
 type PostData struct {
-	Site *SiteData
-	Post struct {
+	Site  *SiteData
+	Pages []NavPageData
+	Post  struct {
 		ID            uint
 		Title         string
 		Slug          string
@@ -156,8 +172,9 @@ type PostData struct {
 
 // UserData is the context of the user profile template.
 type UserData struct {
-	Site *SiteData
-	User struct {
+	Site  *SiteData
+	Pages []NavPageData
+	User  struct {
 		ID         uint
 		Username   string
 		Avatar     string
@@ -171,7 +188,24 @@ type UserData struct {
 
 // NotFoundData is the context of the optional 404 template.
 type NotFoundData struct {
-	Site *SiteData
+	Site  *SiteData
+	Pages []NavPageData
+}
+
+// PageData is the context of custom page templates (page.html and any
+// <slug>.html dedicated template).
+type PageData struct {
+	Site  *SiteData
+	Pages []NavPageData
+	Page  struct {
+		ID          uint
+		Title       string
+		Slug        string
+		CreatedAt   time.Time
+		UpdatedAt   time.Time
+		ContentHTML template.HTML
+		URL         string
+	}
 }
 
 // templateFuncs exposes formatting helpers to theme templates. The Go
@@ -535,6 +569,125 @@ func pageURL(base string, page int, search, category string) string {
 	return base + "?" + q.Encode()
 }
 
+// buildNavPages loads published pages flagged for navigation, ordered by
+// sortOrder. On query failure an empty list is returned so pages still render.
+func (r *Renderer) buildNavPages(ctx context.Context) []NavPageData {
+	if r.db == nil {
+		return nil
+	}
+	var pages []model.Page
+	if err := r.db.WithContext(ctx).
+		Where("status = ? AND show_in_nav = ?", model.PageStatusPublished, true).
+		Order("sort_order ASC, id ASC").
+		Find(&pages).Error; err != nil {
+		return nil
+	}
+	nav := make([]NavPageData, 0, len(pages))
+	for _, p := range pages {
+		nav = append(nav, NavPageData{
+			Title: p.Title, Slug: p.Slug, URL: "/" + p.Slug, SortOrder: p.SortOrder,
+		})
+	}
+	return nav
+}
+
+// friendsBlockRe matches a fenced ```friends code block in page markdown.
+// Each non-empty line inside is "name | url | avatar | description".
+var friendsBlockRe = regexp.MustCompile("(?m)^```friends[ \t]*\n([\r\\s\\S]*?)^```[ \t]*$")
+
+// renderFriendsCards converts the body of a friends block into card HTML.
+// Fields are HTML-escaped; rows without a name or a valid http(s) URL are
+// skipped so one bad line cannot break the whole block.
+func renderFriendsCards(body string) string {
+	type friend struct {
+		name, url, avatar, desc string
+	}
+	var friends []friend
+	for line := range strings.Lines(strings.TrimSpace(body)) {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
+		for len(parts) < 4 {
+			parts = append(parts, "")
+		}
+		name, rawURL, avatar, desc := parts[0], parts[1], parts[2], parts[3]
+		u, err := url.ParseRequestURI(rawURL)
+		if name == "" || err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			continue
+		}
+		friends = append(friends, friend{name: name, url: rawURL, avatar: avatar, desc: desc})
+	}
+	if len(friends) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString(`<div class="vexgo-friends">`)
+	for _, f := range friends {
+		sb.WriteString(`<a class="vexgo-friend-card" href="`)
+		sb.WriteString(template.HTMLEscapeString(f.url))
+		sb.WriteString(`" target="_blank" rel="noopener">`)
+		if f.avatar != "" {
+			sb.WriteString(`<img class="vexgo-friend-avatar" src="`)
+			sb.WriteString(template.HTMLEscapeString(f.avatar))
+			sb.WriteString(`" alt="`)
+			sb.WriteString(template.HTMLEscapeString(f.name))
+			sb.WriteString(`" loading="lazy">`)
+		} else {
+			sb.WriteString(`<span class="vexgo-friend-avatar vexgo-friend-initial">`)
+			name := []rune(f.name)
+			sb.WriteString(template.HTMLEscapeString(string(name[:1])))
+			sb.WriteString(`</span>`)
+		}
+		sb.WriteString(`<span class="vexgo-friend-meta"><span class="vexgo-friend-name">`)
+		sb.WriteString(template.HTMLEscapeString(f.name))
+		sb.WriteString(`</span>`)
+		if f.desc != "" {
+			sb.WriteString(`<span class="vexgo-friend-desc">`)
+			sb.WriteString(template.HTMLEscapeString(f.desc))
+			sb.WriteString(`</span>`)
+		}
+		sb.WriteString(`</span></a>`)
+	}
+	sb.WriteString(`</div>`)
+	return sb.String()
+}
+
+// RenderPageContent converts page markdown into safe HTML, expanding fenced
+// ```friends blocks into link-card HTML shared by all themes (themes only
+// provide the .vexgo-friends CSS). Placeholders survive the markdown pass
+// and are swapped for the card HTML afterwards so goldmark never escapes it.
+func RenderPageContent(src string) template.HTML {
+	cards := []string{}
+	withPlaceholders := friendsBlockRe.ReplaceAllStringFunc(src, func(block string) string {
+		m := friendsBlockRe.FindStringSubmatch(block)
+		body := ""
+		if len(m) == 2 {
+			body = m[1]
+		}
+		html := renderFriendsCards(body)
+		if html == "" {
+			return ""
+		}
+		cards = append(cards, html)
+		return "\n\nVEXGOFRIENDS" + strconv.Itoa(len(cards)-1) + "\n\n"
+	})
+	var buf bytes.Buffer
+	if err := gold.Convert([]byte(withPlaceholders), &buf); err != nil {
+		return template.HTML(template.HTMLEscapeString(src))
+	}
+	out := buf.String()
+	for i, html := range cards {
+		out = strings.ReplaceAll(out, "<p>VEXGOFRIENDS"+strconv.Itoa(i)+"</p>", html)
+		out = strings.ReplaceAll(out, "VEXGOFRIENDS"+strconv.Itoa(i), html)
+	}
+	return template.HTML(out)
+}
+
 // themeFS resolves a theme id to its file system root: the embedded default
 // theme for the built-in id, a directory under data/theme for uploaded ones.
 // Untrusted ids are rejected before touching the file system.
@@ -568,7 +721,9 @@ func (r *Renderer) readThemeFile(themeID, relPath string) ([]byte, bool) {
 }
 
 // parseThemeTemplates reads every template file the theme provides into one
-// parsed set, so {{define}} fragments can be shared across pages.
+// parsed set, so {{define}} fragments can be shared across pages. Besides the
+// base ThemeTemplateNames, any extra <slug>.html file at the theme root is
+// parsed as a dedicated custom-page template.
 func (r *Renderer) parseThemeTemplates(themeID string) (*template.Template, error) {
 	base, err := r.themeFS(themeID)
 	if err != nil {
@@ -576,7 +731,18 @@ func (r *Renderer) parseThemeTemplates(themeID string) (*template.Template, erro
 	}
 
 	tmpl := template.New("theme").Funcs(templateFuncs)
+	known := map[string]struct{}{}
 	for _, name := range ThemeTemplateNames {
+		known[name] = struct{}{}
+		content, err := fs.ReadFile(base, name)
+		if err != nil {
+			continue
+		}
+		if _, err := tmpl.New(name).Parse(string(content)); err != nil {
+			return nil, fmt.Errorf("parse theme %q template %s: %w", themeID, name, err)
+		}
+	}
+	for _, name := range listExtraPageTemplates(base, known) {
 		content, err := fs.ReadFile(base, name)
 		if err != nil {
 			continue
@@ -588,11 +754,51 @@ func (r *Renderer) parseThemeTemplates(themeID string) (*template.Template, erro
 
 	if tmpl.Lookup(IndexTemplate) == nil &&
 		tmpl.Lookup(PostTemplate) == nil &&
+		tmpl.Lookup(PageTemplate) == nil &&
 		tmpl.Lookup(UserTemplate) == nil &&
 		tmpl.Lookup(NotFoundTemplate) == nil {
 		return nil, ErrNoThemeTemplates
 	}
 	return tmpl, nil
+}
+
+// listExtraPageTemplates returns theme-root *.html files beyond the known
+// base set (e.g. timeline.html, links.html, about.html). Names with slashes,
+// dot segments or uppercase are ignored so only safe <slug>.html files qualify.
+func listExtraPageTemplates(base fs.FS, known map[string]struct{}) []string {
+	entries, err := fs.ReadDir(base, ".")
+	if err != nil {
+		return nil
+	}
+	var extra []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if _, ok := known[name]; ok {
+			continue
+		}
+		if !strings.HasSuffix(name, ".html") || strings.Contains(name, "/") || strings.HasPrefix(name, ".") {
+			continue
+		}
+		slug := strings.TrimSuffix(name, ".html")
+		if slug == "" || slug != strings.ToLower(slug) {
+			continue
+		}
+		extra = append(extra, name)
+	}
+	sort.Strings(extra)
+	return extra
+}
+
+// themeProvides reports whether the theme supplies the named template.
+func (r *Renderer) themeProvides(themeID, name string) bool {
+	tmpl, err := r.loadTheme(themeID)
+	if err != nil {
+		return false
+	}
+	return tmpl.Lookup(name) != nil
 }
 
 // templateModSum returns the newest modification time of the theme's template
@@ -602,8 +808,14 @@ func (r *Renderer) templateModSum(themeID string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	var newest time.Time
+	known := map[string]struct{}{}
 	for _, name := range ThemeTemplateNames {
+		known[name] = struct{}{}
+	}
+	names := append([]string{}, ThemeTemplateNames...)
+	names = append(names, listExtraPageTemplates(base, known)...)
+	var newest time.Time
+	for _, name := range names {
 		info, err := fs.Stat(base, name)
 		if err != nil {
 			continue

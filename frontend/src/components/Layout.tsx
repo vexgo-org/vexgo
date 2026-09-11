@@ -103,6 +103,11 @@ export function Layout({ children }: LayoutProps) {
     ...(user?.role === "admin" || user?.role === "super_admin"
       ? [
           {
+            path: "/admin/pages",
+            label: t("layout.pages"),
+            icon: FileText,
+          },
+          {
             path: "/admin",
             label: t("layout.adminPanel"),
             icon: BarChart3,

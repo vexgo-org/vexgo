@@ -64,7 +64,7 @@ export function SiteHeader() {
             </div>
           </form>
 
-          {/* Nav links - desktop */}
+          {/* Nav links - desktop: Home plus custom pages */}
           <nav className="hidden md:flex items-center gap-1">
             <a
               href="/"
@@ -72,6 +72,14 @@ export function SiteHeader() {
             >
               Home
             </a>
+            {go("range .Pages")}
+            <a
+              href={go(".URL")}
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-4 py-2 text-muted-foreground"
+            >
+              {go(".Title")}
+            </a>
+            {go("end")}
           </nav>
 
           {/* Auth entry: Login/Register for guests, Profile when a session
@@ -126,6 +134,14 @@ export function SiteFooter() {
             >
               Home
             </a>
+            {go("range .Pages")}
+            <a
+              href={go(".URL")}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {go(".Title")}
+            </a>
+            {go("end")}
             <a
               href="/admin/login"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"

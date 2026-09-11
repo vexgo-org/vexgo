@@ -44,6 +44,7 @@ import type {
   GetModerationPendingParams,
   GetModerationRejectedParams,
   GetNotificationsParams,
+  GetPagesParams,
   GetPostsDraftsParams,
   GetPostsParams,
   GetPostsUserIdParams,
@@ -59,6 +60,12 @@ import type {
   NotificationMessageResponse,
   NotificationNotificationListResponse,
   NotificationUnreadCountResponse,
+  PageCreatePageRequest,
+  PagePageDeleteResponse,
+  PagePageListResponse,
+  PagePageMessageResponse,
+  PagePageSingleResponse,
+  PageUpdatePageRequest,
   PostCategoriesListResponse,
   PostConfigThemeUploadBody,
   PostCreateCategoryRequest,
@@ -874,6 +881,69 @@ export const getVexGoAPI = () => {
   };
 
   /**
+   * Public callers see published pages; admins may filter by status.
+   * @summary List pages
+   */
+  const getPages = (params?: GetPagesParams) => {
+    return customInstance<PagePageListResponse>({
+      url: `/pages`,
+      method: "GET",
+      params,
+    });
+  };
+
+  /**
+   * Admins only. Slug must be lowercase a-z0-9- and not reserved.
+   * @summary Create a page
+   */
+  const postPages = (pageCreatePageRequest: PageCreatePageRequest) => {
+    return customInstance<PagePageMessageResponse>({
+      url: `/pages`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: pageCreatePageRequest,
+    });
+  };
+
+  /**
+   * Admins only.
+   * @summary Delete a page
+   */
+  const deletePagesId = (id: number) => {
+    return customInstance<PagePageDeleteResponse>({
+      url: `/pages/${id}`,
+      method: "DELETE",
+    });
+  };
+
+  /**
+   * Admins only. Only the supplied fields are updated.
+   * @summary Update a page
+   */
+  const putPagesId = (
+    id: string,
+    pageUpdatePageRequest: PageUpdatePageRequest,
+  ) => {
+    return customInstance<PagePageMessageResponse>({
+      url: `/pages/${id}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: pageUpdatePageRequest,
+    });
+  };
+
+  /**
+   * Published pages are public; drafts require an admin session.
+   * @summary Look up a page by slug
+   */
+  const getPagesSlug = (slug: string) => {
+    return customInstance<PagePageSingleResponse>({
+      url: `/pages/${slug}`,
+      method: "GET",
+    });
+  };
+
+  /**
    * Returns the published post list, paginated and
    * optionally filtered by category or free-text search.
    * Anonymous callers see a reduced view (no
@@ -1334,6 +1404,11 @@ export const getVexGoAPI = () => {
     getNotificationsUnreadCount,
     deleteNotificationsId,
     putNotificationsIdRead,
+    getPages,
+    postPages,
+    deletePagesId,
+    putPagesId,
+    getPagesSlug,
     getPosts,
     postPosts,
     getPostsByIdId,
@@ -1556,6 +1631,21 @@ export type DeleteNotificationsIdResult = NonNullable<
 >;
 export type PutNotificationsIdReadResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putNotificationsIdRead"]>>
+>;
+export type GetPagesResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getPages"]>>
+>;
+export type PostPagesResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postPages"]>>
+>;
+export type DeletePagesIdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["deletePagesId"]>>
+>;
+export type PutPagesIdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putPagesId"]>>
+>;
+export type GetPagesSlugResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getPagesSlug"]>>
 >;
 export type GetPostsResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getPosts"]>>

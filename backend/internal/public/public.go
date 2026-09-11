@@ -58,9 +58,10 @@ const (
 // Renderer serves static files and themes using the injected database, base
 // URL and data directory.
 type Renderer struct {
-	db      *gorm.DB
-	baseURL string
-	dataDir string
+	db        *gorm.DB
+	baseURL   string
+	dataDir   string
+	jwtSecret []byte
 }
 
 // NewRenderer creates a Renderer with the given dependencies.
@@ -68,6 +69,11 @@ func NewRenderer(db *gorm.DB, baseURL, dataDir string) *Renderer {
 	// Ensure the themes directory exists
 	_ = os.MkdirAll(filepath.Join(dataDir, ThemesDir), 0o755)
 	return &Renderer{db: db, baseURL: baseURL, dataDir: dataDir}
+}
+
+// SetJWTSecret configures the JWT secret used for draft page previews.
+func (r *Renderer) SetJWTSecret(secret []byte) {
+	r.jwtSecret = secret
 }
 
 // BaseURL returns the configured site base URL used for SSR links.
@@ -360,6 +366,18 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 		if target, ok := legacyAdminRedirect(c.Request.URL); ok {
 			c.Redirect(http.StatusMovedPermanently, target)
 			return
+		}
+		// Custom pages live at /:slug as the last match. Only single-segment
+		// GET paths reach this point (multi-segment and system prefixes have
+		// returned above), so delegate to the page handler; unknown slugs
+		// render the theme 404.
+		if c.Request.Method == http.MethodGet {
+			slug := strings.TrimPrefix(path, "/")
+			if slug != "" && !strings.Contains(slug, "/") {
+				c.Params = append(c.Params, gin.Param{Key: "slug", Value: slug})
+				r.handlePage(c)
+				return
+			}
 		}
 		c.Status(http.StatusNotFound)
 	})

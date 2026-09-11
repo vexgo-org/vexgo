@@ -20,6 +20,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
+	"github.com/vexgo-org/vexgo/backend/internal/page"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 	"github.com/vexgo-org/vexgo/backend/internal/router"
@@ -106,6 +107,7 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.SecurityHeaders())
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
+	renderer.SetJWTSecret(cfg.JWTSecret)
 	slog.Info("base url set for server-side rendering", "baseURL", renderer.BaseURL())
 
 	configureProxies(r, cfg)
@@ -135,6 +137,10 @@ func New(cfg *config.Config) (*App, error) {
 			Notifier:  notificationSvc,
 			Files:     storage,
 			Cache:     contentCache,
+		},
+		Page: page.Deps{
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
 		},
 		Upload: upload.Deps{
 			DB:        db,

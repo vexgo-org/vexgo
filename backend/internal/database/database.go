@@ -187,6 +187,7 @@ func AutoMigrate(db *gorm.DB) error {
 
 	if err := db.AutoMigrate(
 		&model.Post{},
+		&model.Page{},
 		&model.User{},
 		&model.Tag{},
 		&model.Category{},
@@ -313,6 +314,10 @@ func Seed(db *gorm.DB) error {
 	if err := seedCategory(db); err != nil {
 		return err
 	}
+	// Create default custom pages (timeline, links) if missing.
+	if err := seedPages(db); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -375,6 +380,36 @@ func seedThemeConfig(db *gorm.DB) error {
 			return fmt.Errorf("create default theme config: %w", err)
 		}
 		slog.Info("default theme config created")
+	}
+	return nil
+}
+
+// seedPages inserts the default timeline and links pages when missing.
+func seedPages(db *gorm.DB) error {
+	var admin model.User
+	if err := db.Where("username = ?", defaultAdminUsername).First(&admin).Error; err != nil {
+		return nil
+	}
+	seeds := []model.Page{
+		{
+			Slug: "timeline", Title: "Timeline",
+			Content:   "Posts in chronological order.",
+			ShowInNav: true, SortOrder: 100, Status: model.PageStatusPublished, AuthorID: admin.ID,
+		},
+		{
+			Slug: "links", Title: "Links",
+			Content:   "My friends.\n\n```friends\nVexGo | https://github.com/vexgo-org/vexgo |  | A self-hosted blog CMS\nExample | https://example.com |  | Example friend link\n```\n",
+			ShowInNav: true, SortOrder: 101, Status: model.PageStatusPublished, AuthorID: admin.ID,
+		},
+	}
+	for _, seed := range seeds {
+		var existing model.Page
+		if err := db.Where("slug = ?", seed.Slug).First(&existing).Error; err == gorm.ErrRecordNotFound {
+			if err := db.Create(&seed).Error; err != nil {
+				return fmt.Errorf("create default page %q: %w", seed.Slug, err)
+			}
+			slog.Info("default page created", "slug", seed.Slug)
+		}
 	}
 	return nil
 }

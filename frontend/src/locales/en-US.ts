@@ -651,6 +651,7 @@ export const enUS = {
     home: "Home",
     writePost: "Write Post",
     myPosts: "My Posts",
+    pages: "Pages",
     notifications: "Notifications",
     adminPanel: "Admin Panel",
     searchPlaceholder: "Search articles...",
@@ -1023,6 +1024,50 @@ export const enUS = {
       approved: "Approved",
       rejected: "Rejected",
     },
+  },
+
+  // Pages
+  pagesPage: {
+    title: "Pages",
+    newPage: "New Page",
+    searchPlaceholder: "Search pages...",
+    all: "All",
+    published: "Published",
+    draft: "Draft",
+    inNav: "In nav",
+    noPages: "No pages yet",
+    confirmDelete: "Confirm delete page?",
+    cannotUndo:
+      "This action cannot be undone. The page will be permanently deleted.",
+    cancel: "Cancel",
+    delete: "Delete",
+  },
+
+  // Page Editor
+  pageEditorPage: {
+    newPage: "New Page",
+    editPage: "Edit Page",
+    goBack: "Go Back",
+    title: "Title",
+    titlePlaceholder: "Enter page title...",
+    titleRequired: "Please enter page title",
+    slug: "URL Slug",
+    slugRequired: "Please enter a URL slug",
+    slugInvalid:
+      "Slug must be lowercase letters, numbers and hyphens, and not reserved",
+    slugReserved: "This slug is reserved by the system",
+    slugTaken: "This slug is already taken by another page",
+    generateSlug: "Generate from title",
+    status: "Status",
+    draft: "Draft",
+    published: "Published",
+    sortOrder: "Sort Order",
+    showInNav: "Show in navigation",
+    content: "Content",
+    contentPlaceholder: "Start writing...",
+    contentRequired: "Please enter page content",
+    save: "Save",
+    saveFailed: "Failed to save page, please try again",
   },
 
   // Image Cropper

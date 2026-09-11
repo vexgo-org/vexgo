@@ -14,8 +14,11 @@ import { fileURLToPath } from "node:url";
 import { renderToString } from "react-dom/server";
 
 import { HomeTemplate } from "../src/templates/HomeTemplate";
+import { LinksTemplate } from "../src/templates/LinksTemplate";
 import { NotFoundTemplate } from "../src/templates/NotFoundTemplate";
+import { PageTemplate } from "../src/templates/PageTemplate";
 import { PostTemplate } from "../src/templates/PostTemplate";
+import { TimelineTemplate } from "../src/templates/TimelineTemplate";
 import { UserTemplate } from "../src/templates/UserTemplate";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -53,6 +56,9 @@ function emit(name: string, element: React.ReactNode) {
 
 emit("index.html", HomeTemplate());
 emit("post.html", PostTemplate());
+emit("page.html", PageTemplate());
+emit("timeline.html", TimelineTemplate());
+emit("links.html", LinksTemplate());
 emit("user.html", UserTemplate());
 emit("404.html", NotFoundTemplate());
 
