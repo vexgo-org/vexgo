@@ -614,7 +614,7 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 
 		// Create the directory structure inside the extraction root
 		if dir := filepath.Dir(clean); dir != "." {
-			if err := zipRoot.MkdirAll(dir, 0o755); err != nil {
+			if err := zipRoot.MkdirAll(dir, 0o750); err != nil {
 				c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid file path in zip"})
 				return
 			}
@@ -630,16 +630,18 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 
 		srcFile, err := f.Open()
 		if err != nil {
-			dstFile.Close()
+			_ = dstFile.Close()
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to open zip file"})
 			return
 		}
 
-		written, err := io.Copy(dstFile, io.LimitReader(srcFile, maxThemeSingleFileBytes+1))
-		srcFile.Close()
-		dstFile.Close()
+		written, copyErr := io.Copy(dstFile, io.LimitReader(srcFile, maxThemeSingleFileBytes+1))
+		_ = srcFile.Close()
+		// The destination Close is where buffered data is flushed; treating it
+		// as best-effort would silently stage a truncated theme file.
+		closeErr := dstFile.Close()
 
-		if err != nil {
+		if copyErr != nil || closeErr != nil {
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to extract file"})
 			return
 		}
@@ -775,7 +777,7 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 		targetPath := filepath.Join(stagingDir, relPath)
 
 		if info.IsDir() {
-			return os.MkdirAll(targetPath, 0o755)
+			return os.MkdirAll(targetPath, 0o750)
 		}
 
 		srcFile, err := os.Open(path)
@@ -789,9 +791,13 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 			return err
 		}
 		_, copyErr := io.Copy(dstFile, srcFile)
-		_ = dstFile.Close()
+		// A Close failure means the staged file may be incomplete; surface it.
+		closeErr := dstFile.Close()
 		_ = srcFile.Close()
-		return copyErr
+		if copyErr != nil {
+			return copyErr
+		}
+		return closeErr
 	})
 	if err != nil {
 		slog.Warn("failed to stage theme files", "err", err)

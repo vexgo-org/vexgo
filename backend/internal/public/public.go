@@ -6,10 +6,12 @@ package public
 import (
 	"embed"
 	"encoding/json"
+	"io/fs"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -68,7 +70,7 @@ type Renderer struct {
 // NewRenderer creates a Renderer with the given dependencies.
 func NewRenderer(db *gorm.DB, baseURL, dataDir string) *Renderer {
 	// Ensure the themes directory exists
-	_ = os.MkdirAll(filepath.Join(dataDir, ThemesDir), 0o755)
+	_ = os.MkdirAll(filepath.Join(dataDir, ThemesDir), 0o750)
 	return &Renderer{db: db, baseURL: baseURL, dataDir: dataDir}
 }
 
@@ -238,13 +240,86 @@ func (r *Renderer) getRequestedTheme(c *gin.Context) string {
 	return DefaultTheme
 }
 
+// uploadContentTypes maps stored-media extensions to the content type served
+// for them. It never maps to a type a browser executes as a document
+// (html/svg/xml/js are absent), and any unlisted extension falls back to
+// application/octet-stream. Because the type is set explicitly before
+// http.ServeContent runs, the file server never sniffs the bytes, so an
+// uploaded file cannot be rendered as a document on this origin. The upload
+// domain keeps its own filename allowlist; an extension it allows but this map
+// omits is simply served as an opaque byte stream.
+var uploadContentTypes = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".avif": "image/avif",
+	".bmp":  "image/bmp",
+	".ico":  "image/x-icon",
+	".tif":  "image/tiff",
+	".tiff": "image/tiff",
+	".mp4":  "video/mp4",
+	".webm": "video/webm",
+	".mov":  "video/quicktime",
+	".mp3":  "audio/mpeg",
+	".wav":  "audio/wav",
+	".ogg":  "audio/ogg",
+	".m4a":  "audio/mp4",
+	".pdf":  "application/pdf",
+	".txt":  "text/plain; charset=utf-8",
+	".csv":  "text/csv; charset=utf-8",
+	".md":   "text/plain; charset=utf-8",
+}
+
+// uploadHandler serves one local media file. The path is confined to mediaDir
+// with os.Root, and the content type comes from uploadContentTypes (never from
+// sniffing), so a hostile upload can never be served as an executable document.
+func (r *Renderer) uploadHandler(mediaDir string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clean := path.Clean(strings.TrimPrefix(c.Param("filepath"), "/"))
+		if clean == "." || !fs.ValidPath(clean) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		root, err := os.OpenRoot(mediaDir)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		defer func() { _ = root.Close() }()
+
+		file, err := root.Open(clean)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		defer func() { _ = file.Close() }()
+
+		info, err := file.Stat()
+		if err != nil || info.IsDir() {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		contentType, ok := uploadContentTypes[strings.ToLower(path.Ext(clean))]
+		if !ok {
+			contentType = "application/octet-stream"
+		}
+		c.Header("Content-Type", contentType)
+		http.ServeContent(c.Writer, c.Request, clean, info.ModTime(), file)
+	}
+}
+
 // RegisterStaticRoutes registers all static file routes, theme support and the
 // server-side-rendered public pages.
 func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	// Serve local uploads if S3 is not enabled
 	if !s3Enabled {
-		mediaDir := filepath.Join(r.dataDir, "media")
-		e.Static("/uploads", mediaDir)
+		serveUpload := r.uploadHandler(filepath.Join(r.dataDir, "media"))
+		e.GET("/uploads/*filepath", serveUpload)
+		e.HEAD("/uploads/*filepath", serveUpload)
 	}
 
 	// Admin SPA assets. The SPA is built with base /admin/, so its HTML

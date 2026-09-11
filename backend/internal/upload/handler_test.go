@@ -11,10 +11,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestGenerateFilename_SanitizesExtension ensures the client-supplied
-// extension survives only as a short alphanumeric suffix; anything else
-// (separators, HTML, colons, overlong tails) yields a bare UUID name.
-func TestGenerateFilename_SanitizesExtension(t *testing.T) {
+// TestGenerateFilename_LimitsExtensionToAllowlist ensures the client-supplied
+// extension survives only when it is an allowlisted (non-executable) media
+// type; anything else — separators, HTML/SVG documents, colons, overlong
+// tails — yields a bare UUID name served as application/octet-stream.
+func TestGenerateFilename_LimitsExtensionToAllowlist(t *testing.T) {
 	cases := []struct {
 		name     string
 		original string
@@ -22,9 +23,15 @@ func TestGenerateFilename_SanitizesExtension(t *testing.T) {
 	}{
 		{"plain jpg", "photo.jpg", ".jpg"},
 		{"uppercase normalized", "PHOTO.JPG", ".jpg"},
-		{"multi-dot takes last", "archive.tar.gz", ".gz"},
+		{"multi-dot takes last", "archive.tar.png", ".png"},
+		{"disallowed gz stripped", "archive.tar.gz", ""},
 		{"no extension", "noext", ""},
 		{"dot only", "x.", ""},
+		{"html stripped", "evil.html", ""},
+		{"htm stripped", "evil.htm", ""},
+		{"svg stripped", "evil.svg", ""},
+		{"xhtml stripped", "evil.xhtml", ""},
+		{"js stripped", "evil.js", ""},
 		{"html injection", "x.<script>", ""},
 		{"windows ADS colon", "x.jpg:b", ""},
 		{"backslash traversal", `x.\evil.jpg`, ".jpg"},

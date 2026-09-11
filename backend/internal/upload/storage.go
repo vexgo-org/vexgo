@@ -145,7 +145,7 @@ func NewLocalStorage(dataDir string) *LocalStorage {
 // segment, volume name) can never resolve outside the media tree — the
 // containment is enforced at the OS level, not by string checks.
 func (s *LocalStorage) mediaRoot() (*os.Root, error) {
-	if err := os.MkdirAll(s.dataDir, 0o755); err != nil {
+	if err := os.MkdirAll(s.dataDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 	root, err := os.OpenRoot(s.dataDir)
@@ -169,7 +169,7 @@ func (s *LocalStorage) Upload(_ context.Context, reader io.Reader, filename, con
 		return "", fmt.Errorf("invalid filename: %s", filename)
 	}
 
-	if err := root.MkdirAll("media", 0o755); err != nil {
+	if err := root.MkdirAll("media", 0o750); err != nil {
 		return "", fmt.Errorf("failed to create upload directory: %w", err)
 	}
 

@@ -94,12 +94,33 @@ func (s *Service) GetBySlug(ctx context.Context, slug, currentUserRole string, c
 	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
 }
 
+// canViewPost reports whether the acting user may read this post. Admins see
+// every post, an author sees their own posts, and everyone else (including
+// guests) sees published posts only. It mirrors applyUserPostsVisibility in
+// repository.go so the single-post read path cannot expose an unpublished post
+// through a guessable slug or id.
+func canViewPost(post *model.Post, role string, userID uint) bool {
+	if model.IsAdmin(role) {
+		return true
+	}
+	if userID != 0 && post.AuthorID == userID {
+		return true
+	}
+	return post.Status == model.PostStatusPublished
+}
+
 // enrichPost fills like/comment counts, view count and privacy filtering on a
 // post that was just loaded from the database.
 func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	// If not logged in and guest viewing is not allowed, return 403
 	if currentUserRole == "" && !s.allowGuestView(ctx) {
 		return nil, ErrGuestViewDenied
+	}
+
+	// Unpublished posts are private to their author and to admins. Report a
+	// denial as "not found" so the API never confirms that the post exists.
+	if !canViewPost(post, currentUserRole, currentUserID) {
+		return nil, ErrPostNotFound
 	}
 
 	if !model.IsAdmin(currentUserRole) && post.AuthorID != currentUserID {

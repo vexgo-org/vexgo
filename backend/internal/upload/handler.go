@@ -40,33 +40,34 @@ func getFileExtension(filename string) string {
 	return ext
 }
 
-// maxExtensionLength caps the client-supplied extension length so a hostile
-// filename cannot push the stored name past filesystem limits.
-const maxExtensionLength = 9
-
-// sanitizeExtension extracts the client-supplied extension and keeps it only
-// if it is 1-9 lowercase ASCII letters/digits. It is the only client-controlled
-// part of the stored filename, so anything else (separators, spaces, control
-// bytes, Windows ADS colons, overlong tails) means no extension at all.
-func sanitizeExtension(filename string) string {
-	ext := strings.TrimPrefix(getFileExtension(filename), ".")
-	if ext == "" || len(ext) > maxExtensionLength {
-		return ""
-	}
-	ext = strings.ToLower(ext)
-	for i := 0; i < len(ext); i++ {
-		c := ext[i]
-		if (c < 'a' || c > 'z') && (c < '0' || c > '9') {
-			return ""
-		}
-	}
-	return "." + ext
+// allowedUploadExtensions is the allowlist of extensions kept on the stored
+// file. Local uploads are served from this origin, so a file the browser would
+// render as a document is a stored XSS vector: html, svg, xhtml, xml and js are
+// therefore deliberately absent. Any other extension is dropped; the /uploads
+// handler then serves the resulting extensionless file as
+// application/octet-stream, which cannot execute.
+var allowedUploadExtensions = map[string]struct{}{
+	".jpg": {}, ".jpeg": {}, ".png": {}, ".gif": {}, ".webp": {}, ".avif": {},
+	".bmp": {}, ".ico": {}, ".tif": {}, ".tiff": {},
+	".mp4": {}, ".webm": {}, ".mov": {}, ".mp3": {}, ".wav": {}, ".ogg": {}, ".m4a": {},
+	".pdf": {}, ".txt": {}, ".md": {}, ".csv": {},
 }
 
-// generateFilename generates a unique filename with extension
+// Upload size limits. maxUploadBytes caps one file; the request cap adds
+// multipart framing headroom so a single request cannot stream unbounded data
+// into the server (memory or disk exhaustion).
+const (
+	maxUploadBytes        = 25 << 20
+	maxUploadRequestBytes = maxUploadBytes + (1 << 20)
+)
+
+// generateFilename generates a unique filename, keeping the client-supplied
+// extension only when it is on the allowlist. The name the client sent is
+// otherwise never trusted.
 func generateFilename(originalName string) string {
 	uid := uuid.New().String()
-	if ext := sanitizeExtension(originalName); ext != "" {
+	ext := strings.ToLower(getFileExtension(originalName))
+	if _, ok := allowedUploadExtensions[ext]; ok {
 		return uid + ext
 	}
 	return uid
@@ -93,9 +94,17 @@ func generateFilename(originalName string) string {
 func (h *Handler) UploadFile(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
+	// Cap the request body before multipart parsing so an oversized upload
+	// cannot exhaust memory or disk.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadRequestBytes)
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "File upload failed"})
+		return
+	}
+	if file.Size > maxUploadBytes {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "File is too large"})
 		return
 	}
 
@@ -140,6 +149,10 @@ func (h *Handler) UploadFile(c *gin.Context) {
 func (h *Handler) UploadFiles(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
 
+	// Cap the request body before multipart parsing so an oversized upload
+	// cannot exhaust memory or disk.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadRequestBytes)
+
 	form, err := c.MultipartForm()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "File upload failed"})
@@ -150,6 +163,9 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 	uploadedFiles := make([]model.MediaFile, 0, len(files))
 
 	for _, file := range files {
+		if file.Size > maxUploadBytes {
+			continue
+		}
 		filename := generateFilename(file.Filename)
 
 		src, err := file.Open()
@@ -158,7 +174,7 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 		}
 
 		media, err := h.svc.Upload(c.Request.Context(), userID, filename, file.Size, src)
-		src.Close()
+		_ = src.Close()
 		if err != nil {
 			continue
 		}

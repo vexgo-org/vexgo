@@ -437,6 +437,67 @@ func TestThemePreview_NoOverrideUnchanged(t *testing.T) {
 	}
 }
 
+// TestPublicRoutes_UploadsNeverRenderAsDocuments is the regression guard for
+// stored XSS through /uploads: a hostile HTML payload must be served as an
+// opaque byte stream (or a safe non-document type), never as text/html, and
+// path traversal must not escape the media directory.
+func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	dataDir := t.TempDir()
+	mediaDir := filepath.Join(dataDir, "media")
+	if err := os.MkdirAll(mediaDir, 0o750); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+
+	evil := `<script>alert(document.domain)</script>`
+	for name, content := range map[string]string{
+		"evil.html": evil,
+		"evil.svg":  `<svg onload="alert(1)"></svg>`,
+		"deadbeef":  evil, // extensionless file, as a stripped upload becomes
+		"pic.png":   "not-really-a-png",
+	} {
+		if err := os.WriteFile(filepath.Join(mediaDir, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "secret.txt"), []byte("secret"), 0o600); err != nil {
+		t.Fatalf("seed decoy: %v", err)
+	}
+
+	renderer := NewRenderer(db, "http://localhost", dataDir)
+	e := gin.New()
+	renderer.RegisterStaticRoutes(e, false)
+
+	for _, tc := range []struct {
+		path string
+		want string
+	}{
+		{"/uploads/evil.html", "application/octet-stream"},
+		{"/uploads/evil.svg", "application/octet-stream"},
+		{"/uploads/deadbeef", "application/octet-stream"},
+		{"/uploads/pic.png", "image/png"},
+	} {
+		w := doPublicRequest(t, e, tc.path)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d", tc.path, w.Code)
+		}
+		if ct := w.Header().Get("Content-Type"); ct != tc.want {
+			t.Errorf("GET %s Content-Type = %q, want %q", tc.path, ct, tc.want)
+		}
+	}
+
+	// Traversal must not escape the media directory.
+	for _, path := range []string{"/uploads/../secret.txt", "/uploads/..%2fsecret.txt"} {
+		if w := doPublicRequest(t, e, path); w.Code == http.StatusOK {
+			t.Errorf("GET %s served a file outside media (status 200)", path)
+		}
+	}
+}
+
 func TestPublicRoutes_ThemeAssetsServed(t *testing.T) {
 	r, _, _ := newPublicRouter(t)
 	w := doPublicRequest(t, r, "/theme-assets/style.css")

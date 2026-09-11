@@ -483,6 +483,126 @@ func TestUpdate_RejectsDuplicateSlug(t *testing.T) {
 	}
 }
 
+// TestGet_UnpublishedPostsArePrivate is the regression guard for the single
+// post read paths: a draft, pending or rejected post must not be readable by a
+// guest or by another user through a guessed slug or id, while its author and
+// admins keep full access.
+func TestGet_UnpublishedPostsArePrivate(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	other := seedUser(t, db, "other", model.RoleAuthor)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+	if err := db.Create(&model.GeneralSettings{AllowGuestViewPosts: true}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	unpublished := []model.PostStatus{
+		model.PostStatusDraft,
+		model.PostStatusPending,
+		model.PostStatusRejected,
+	}
+	for _, status := range unpublished {
+		slug := "secret-" + string(status)
+		post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+			Slug: slug, Title: "Secret", Content: "x", Category: "1", Status: status,
+		})
+		if err != nil {
+			t.Fatalf("create %s: %v", status, err)
+		}
+		id := strconv.Itoa(int(post.ID))
+
+		// Guest and an unrelated logged-in user must see "not found".
+		for _, tc := range []struct {
+			name string
+			role string
+			uid  uint
+		}{
+			{"guest", "", 0},
+			{"other user", other.Role, other.ID},
+		} {
+			if _, err := svc.GetBySlug(ctx, slug, tc.role, tc.uid); !errors.Is(err, ErrPostNotFound) {
+				t.Errorf("%s GetBySlug(%s) error = %v, want ErrPostNotFound", tc.name, status, err)
+			}
+			if _, err := svc.Get(ctx, id, tc.role, tc.uid); !errors.Is(err, ErrPostNotFound) {
+				t.Errorf("%s Get(%s) error = %v, want ErrPostNotFound", tc.name, status, err)
+			}
+		}
+
+		// The author and an admin keep access (editing, moderation).
+		if _, err := svc.GetBySlug(ctx, slug, author.Role, author.ID); err != nil {
+			t.Errorf("author GetBySlug(%s) error = %v, want nil", status, err)
+		}
+		if _, err := svc.Get(ctx, id, admin.Role, admin.ID); err != nil {
+			t.Errorf("admin Get(%s) error = %v, want nil", status, err)
+		}
+	}
+
+	// Published posts stay readable by everyone.
+	if _, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug: "public", Title: "Public", Content: "x", Category: "1", Status: model.PostStatusPublished,
+	}); err != nil {
+		t.Fatalf("create published: %v", err)
+	}
+	if _, err := svc.GetBySlug(ctx, "public", "", 0); err != nil {
+		t.Errorf("guest GetBySlug(published) error = %v, want nil", err)
+	}
+}
+
+// TestUserPosts_HidesOtherUsersUnpublished covers the profile listing path: a
+// logged-in author browsing another user must not see that user's drafts or
+// pending posts.
+func TestUserPosts_HidesOtherUsersUnpublished(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	viewer := seedUser(t, db, "viewer", model.RoleAuthor)
+
+	for _, spec := range []struct {
+		slug   string
+		status model.PostStatus
+	}{
+		{"pub", model.PostStatusPublished},
+		{"draft", model.PostStatusDraft},
+		{"pend", model.PostStatusPending},
+	} {
+		if _, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+			Slug: spec.slug, Title: spec.slug, Content: "x", Category: "1", Status: spec.status,
+		}); err != nil {
+			t.Fatalf("create %s: %v", spec.slug, err)
+		}
+	}
+
+	posts, _, err := svc.UserPosts(ctx, UserPostsQuery{
+		UserIDStr:       strconv.FormatUint(uint64(author.ID), 10),
+		CurrentUserRole: viewer.Role,
+		CurrentUserID:   viewer.ID,
+		Page:            1,
+		Limit:           10,
+	})
+	if err != nil {
+		t.Fatalf("UserPosts error: %v", err)
+	}
+	if len(posts) != 1 || posts[0].Slug != "pub" {
+		t.Errorf("other user must see only published posts, got %+v", posts)
+	}
+
+	// The author still sees their own draft and pending posts.
+	own, _, err := svc.UserPosts(ctx, UserPostsQuery{
+		UserIDStr:       strconv.FormatUint(uint64(author.ID), 10),
+		CurrentUserRole: author.Role,
+		CurrentUserID:   author.ID,
+		Page:            1,
+		Limit:           10,
+	})
+	if err != nil {
+		t.Fatalf("own UserPosts error: %v", err)
+	}
+	if len(own) != 3 {
+		t.Errorf("author must see all own non-rejected posts, got %d", len(own))
+	}
+}
+
 func TestFindBySlug_ReturnsPost(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
