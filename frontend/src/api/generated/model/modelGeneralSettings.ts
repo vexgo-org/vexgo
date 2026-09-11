@@ -22,6 +22,8 @@ export interface ModelGeneralSettings {
   siteDescription?: string;
   /** Site icon URL */
   siteIcon?: string;
+  /** Default public theme language (e.g. en, zh) */
+  siteLanguage?: string;
   /** Site name */
   siteName?: string;
   /** Update time */

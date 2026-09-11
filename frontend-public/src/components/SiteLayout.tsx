@@ -15,8 +15,8 @@ export function ThemeToggle() {
       <button
         id="vexgo-theme-toggle"
         type="button"
-        aria-label="Toggle dark mode"
-        title="Toggle dark mode"
+        aria-label={go('t "a11y.themeToggle"')}
+        title={go('t "a11y.themeToggle"')}
         className="inline-flex items-center justify-center rounded-md h-9 w-9 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground text-muted-foreground"
       >
         <Moon className="w-4 h-4 dark:hidden" />
@@ -58,7 +58,7 @@ export function SiteHeader() {
               <input
                 type="search"
                 name="search"
-                placeholder="Search articles..."
+                placeholder={go('t "search.placeholder"')}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 pl-10 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
@@ -70,7 +70,7 @@ export function SiteHeader() {
               href="/"
               className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-4 py-2 text-muted-foreground"
             >
-              Home
+              {go('t "nav.home"')}
             </a>
             {go("range .Pages")}
             <a
@@ -86,18 +86,33 @@ export function SiteHeader() {
               exists (the SPA stores its session in localStorage). */}
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <div id="vexgo-auth" className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+              <a href="?lang=zh" className="px-1 hover:text-foreground">
+                中文
+              </a>
+              <span aria-hidden="true">/</span>
+              <a href="?lang=en" className="px-1 hover:text-foreground">
+                EN
+              </a>
+            </span>
+            <div
+              id="vexgo-auth"
+              className="flex items-center gap-2"
+              data-login={go('t "auth.login"')}
+              data-register={go('t "auth.register"')}
+              data-profile={go('t "auth.profile"')}
+            >
               <a
                 href="/admin/login"
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-4 py-2 text-muted-foreground"
               >
-                Login
+                {go('t "auth.login"')}
               </a>
               <a
                 href="/admin/register"
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
               >
-                Register
+                {go('t "auth.register"')}
               </a>
             </div>
           </div>
@@ -105,7 +120,7 @@ export function SiteHeader() {
       </div>
       <script>
         {
-          "(function(){var h=document.getElementById('vexgo-auth');if(!h||!localStorage.getItem('token'))return;var a=document.createElement('a');a.href='/admin/profile';a.className='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2';a.textContent='Profile';h.textContent='';h.appendChild(a);})();"
+          "(function(){var h=document.getElementById('vexgo-auth');if(!h||!localStorage.getItem('token'))return;var login=h.getAttribute('data-login')||'Login';var register=h.getAttribute('data-register')||'Register';var profile=h.getAttribute('data-profile')||'Profile';var a=document.createElement('a');a.href='/admin/profile';a.className='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2';a.textContent=profile;h.textContent='';h.appendChild(a);void login;void register;})();"
         }
       </script>
     </header>
@@ -125,14 +140,14 @@ export function SiteFooter() {
             <span className="font-semibold">{go(".Site.Name")}</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © 2026 {go(".Site.Name")}. All rights reserved.
+            © 2026 {go(".Site.Name")}. {go('t "footer.rights"')}
           </p>
           <div className="flex gap-4">
             <a
               href="/"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Home
+              {go('t "nav.home"')}
             </a>
             {go("range .Pages")}
             <a
@@ -146,7 +161,7 @@ export function SiteFooter() {
               href="/admin/login"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Login
+              {go('t "auth.login"')}
             </a>
           </div>
         </div>

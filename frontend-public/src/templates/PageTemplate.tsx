@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar } from "../components/icons";
 /** Generic custom page template (page.html): title plus rendered content. */
 export function PageTemplate() {
   return (
-    <html lang="en">
+    <html lang={go(".Site.Language")}>
       <DocHead
         title={go('printf "%s - %s" .Page.Title .Site.Name')}
         description={go(".Page.Title")}
@@ -18,7 +18,7 @@ export function PageTemplate() {
             className="inline-flex items-center gap-2 rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-3 mb-6 text-muted-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to home
+            {go('t "back.home"')}
           </a>
           <h1 className="text-3xl md:text-4xl font-bold mb-4">
             {go(".Page.Title")}

@@ -14,6 +14,12 @@
  * itself with inline styles so it renders correctly in any theme regardless
  * of the theme's CSS framework. All user content is rendered via textContent,
  * never innerHTML.
+ *
+ * i18n: the post template passes the resolved language via
+ * <div id="vexgo-comments" data-post-id="..." data-lang="zh">. The widget
+ * carries a built-in copy of the comments.* strings for the languages the
+ * default theme ships; third-party themes replacing this file own their copy.
+ * Unknown languages fall back to English per key.
  */
 (function () {
   "use strict";
@@ -22,6 +28,49 @@
   if (!container) return;
   var postId = container.getAttribute("data-post-id");
   if (!postId) return;
+
+  var STRINGS = {
+    en: {
+      title: "Comments ",
+      empty: "No comments yet.",
+      loginPrompt: "Please log in to comment.",
+      loginBtn: "Log in",
+      placeholder: "Write a comment...",
+      submit: "Submit",
+      moderationNote: "Thanks! Your comment is awaiting moderation.",
+      deleteBtn: "Delete",
+      deleteConfirm: "Delete this comment?",
+      loadError: "Failed to load comments.",
+      postError: "Failed to post comment",
+      deleteError: "Failed to delete comment",
+      likeError: "Failed to update like",
+    },
+    zh: {
+      title: "评论 ",
+      empty: "暂无评论。",
+      loginPrompt: "请先登录再评论。",
+      loginBtn: "登录",
+      placeholder: "写下你的评论...",
+      submit: "提交",
+      moderationNote: "感谢！你的评论正在等待审核。",
+      deleteBtn: "删除",
+      deleteConfirm: "删除这条评论？",
+      loadError: "评论加载失败。",
+      postError: "评论发布失败",
+      deleteError: "评论删除失败",
+      likeError: "点赞更新失败",
+    },
+  };
+
+  var lang = (container.getAttribute("data-lang") || "en").toLowerCase();
+  if (lang.indexOf("-") >= 0) lang = lang.slice(0, lang.indexOf("-"));
+  if (lang.indexOf("_") >= 0) lang = lang.slice(0, lang.indexOf("_"));
+  var dict = STRINGS[lang] || STRINGS.en;
+  function t(key) {
+    if (dict[key] != null && dict[key] !== "") return dict[key];
+    if (STRINGS.en[key] != null) return STRINGS.en[key];
+    return key;
+  }
 
   var API = "/api";
 
@@ -116,9 +165,7 @@
     list.textContent = "";
     count.textContent = "(" + comments.length + ")";
     if (comments.length === 0) {
-      list.appendChild(
-        el("li", { style: styles.empty, text: "No comments yet." }),
-      );
+      list.appendChild(el("li", { style: styles.empty, text: t("empty") }));
       return;
     }
     comments.forEach(function (comment) {
@@ -150,7 +197,7 @@
           el("button", {
             style: styles.deleteBtn,
             type: "button",
-            text: "Delete",
+            text: t("deleteBtn"),
             onclick: function () {
               deleteComment(comment);
             },
@@ -175,12 +222,12 @@
         el("div", { style: styles.login }, [
           el("p", {
             style: "margin:0 0 .75rem;",
-            text: "Please log in to comment.",
+            text: t("loginPrompt"),
           }),
           el("a", {
             style: styles.button + "display:inline-block;text-decoration:none;",
             href: "/admin/login",
-            text: "Log in",
+            text: t("loginBtn"),
           }),
         ]),
       );
@@ -190,7 +237,7 @@
     var form = el("form", { style: styles.form });
     var textarea = el("textarea", {
       style: styles.textarea,
-      placeholder: "Write a comment...",
+      placeholder: t("placeholder"),
       maxlength: "100",
     });
     var counter = el("span", { style: styles.counter, text: "0/100" });
@@ -202,7 +249,11 @@
     form.appendChild(
       el("div", { style: styles.row }, [
         counter,
-        el("button", { style: styles.button, type: "submit", text: "Submit" }),
+        el("button", {
+          style: styles.button,
+          type: "submit",
+          text: t("submit"),
+        }),
       ]),
     );
     form.appendChild(note);
@@ -230,18 +281,18 @@
         })
         .then(function (r) {
           if (!r.ok) {
-            throw new Error(r.data.error || "Failed to post comment");
+            throw new Error(r.data.error || t("postError"));
           }
           textarea.value = "";
           counter.textContent = "0/100";
           if (r.data.requiresModeration) {
-            note.textContent = "Thanks! Your comment is awaiting moderation.";
+            note.textContent = t("moderationNote");
           }
           loadComments(renderList);
         })
         .catch(function (err) {
           note.style.color = "#b91c1c";
-          note.textContent = err.message || "Failed to post comment";
+          note.textContent = err.message || t("postError");
         })
         .finally(function () {
           btn.disabled = false;
@@ -250,7 +301,7 @@
   }
 
   function deleteComment(comment) {
-    if (!window.confirm("Delete this comment?")) return;
+    if (!window.confirm(t("deleteConfirm"))) return;
     fetch(API + "/comments/" + comment.id, {
       method: "DELETE",
       headers: { Authorization: "Bearer " + localStorage.getItem("token") },
@@ -258,7 +309,7 @@
       .then(function (res) {
         if (!res.ok) {
           return res.json().then(function (data) {
-            throw new Error(data.error || "Failed to delete comment");
+            throw new Error(data.error || t("deleteError"));
           });
         }
         return res.json();
@@ -267,15 +318,13 @@
         loadComments(renderList);
       })
       .catch(function (err) {
-        window.alert(err.message || "Failed to delete comment");
+        window.alert(err.message || t("deleteError"));
       });
   }
 
   function renderError() {
     list.textContent = "";
-    list.appendChild(
-      el("li", { style: styles.error, text: "Failed to load comments." }),
-    );
+    list.appendChild(el("li", { style: styles.error, text: t("loadError") }));
   }
 
   // Wire the like button the theme places on the post page
@@ -315,12 +364,12 @@
           });
         })
         .then(function (r) {
-          if (!r.ok) throw new Error(r.data.error || "Failed to update like");
+          if (!r.ok) throw new Error(r.data.error || t("likeError"));
           if (countEl) countEl.textContent = String(r.data.likesCount || 0);
           btn.setAttribute("aria-pressed", r.data.isLiked ? "true" : "false");
         })
         .catch(function (err) {
-          window.alert(err.message || "Failed to update like");
+          window.alert(err.message || t("likeError"));
         });
     });
   }
@@ -352,7 +401,7 @@
 
   // Build the static section skeleton once; the list and form refresh in place.
   var section = el("section", { style: "margin-top:2rem;" });
-  var title = el("h2", { style: styles.title, text: "Comments " });
+  var title = el("h2", { style: styles.title, text: t("title") });
   var count = el("span", { style: styles.count, text: "" });
   title.appendChild(count);
   section.appendChild(title);

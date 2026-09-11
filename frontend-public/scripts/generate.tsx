@@ -71,6 +71,13 @@ copyFileSync(
   resolve(assetsDir, "comments.js"),
 );
 
+// Theme-owned i18n dictionaries (i18n/<lang>.json) ship inside the theme so
+// the backend loader can serve any language the theme provides. The backend
+// never hardcodes languages; adding a file here is enough to support one.
+cpSync(resolve(here, "../i18n"), resolve(outDir, "i18n"), {
+  recursive: true,
+});
+
 // Theme seed pages (seed/*.md) ship inside the theme so the backend can
 // create the theme's default pages on activation. Third-party themes follow
 // the same layout: seed/<slug>.md with YAML frontmatter.

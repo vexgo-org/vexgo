@@ -320,6 +320,13 @@ export const enUS = {
     itemsPerPage: "Items Per Page",
     itemsPerPagePlaceholder: "Number of items to display per page",
     itemsPerPageDesc: "Number of items to display per page (1-100)",
+    siteLanguage: "Site Language",
+    siteLanguageDesc:
+      "Default language of the public theme. Visitors can still override it with ?lang=.",
+    siteLanguageEn: "English",
+    siteLanguageZh: "简体中文",
+    siteLanguageMissing:
+      "The active theme does not ship this language and will fall back to English for missing texts.",
     captcha: "Slider Captcha",
     captchaDesc: "Enable sliding puzzle captcha for enhanced security",
     registration: "Allow Registration",

@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, Heart, MessageCircle } from "../components/icons";
 /** User profile page template: profile card plus paginated published posts. */
 export function UserTemplate() {
   return (
-    <html lang="en">
+    <html lang={go(".Site.Language")}>
       <DocHead
         title={go('printf "%s - %s" .User.Username .Site.Name')}
         description={go(".User.Bio")}
@@ -19,7 +19,7 @@ export function UserTemplate() {
             className="inline-flex items-center gap-2 rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-3 mb-6 text-muted-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to home
+            {go('t "back.home"')}
           </a>
 
           <div className="flex flex-col md:flex-row gap-6">
@@ -46,12 +46,13 @@ export function UserTemplate() {
                 </p>
                 {go("end")}
                 <p className="text-sm text-muted-foreground mb-2">
-                  Joined {go('date .User.CreatedAt "2006-01-02"')}
+                  {go('t "user.joined"')}{" "}
+                  {go('date .User.CreatedAt "2006-01-02"')}
                 </p>
                 <div className="w-full border-t my-4" />
                 <div className="w-full">
                   <p className="text-sm text-muted-foreground mb-2">
-                    Total Posts
+                    {go('t "user.totalPosts"')}
                   </p>
                   <p className="text-2xl font-bold">{go(".User.PostsCount")}</p>
                 </div>
@@ -61,7 +62,8 @@ export function UserTemplate() {
             {/* Post list */}
             <div className="flex-1">
               <h1 className="text-2xl font-bold mb-6">
-                {go(".User.Username")}'s Posts
+                {go(".User.Username")}
+                {go('t "user.postsSuffix"')}
               </h1>
 
               {go("if .Posts")}
@@ -121,9 +123,11 @@ export function UserTemplate() {
               </div>
               {go("else")}
               <div className="rounded-xl border bg-card text-card-foreground p-12 text-center">
-                <h3 className="text-lg font-semibold mb-2">No posts yet</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {go('t "user.noPostsTitle"')}
+                </h3>
                 <p className="text-muted-foreground">
-                  This user has not published anything.
+                  {go('t "user.noPostsDesc"')}
                 </p>
               </div>
               {go("end")}
@@ -132,8 +136,9 @@ export function UserTemplate() {
               {go("if gt .Pagination.TotalPages 1")}
               <div className="flex items-center justify-between mt-6">
                 <div className="text-sm text-muted-foreground">
-                  Page {go(".Pagination.CurrentPage")} of{" "}
-                  {go(".Pagination.TotalPages")}
+                  {go(
+                    'printf (t "pagination.pageOf") .Pagination.CurrentPage .Pagination.TotalPages',
+                  )}
                 </div>
                 <div className="flex gap-2">
                   {go("if .Pagination.HasPrev")}
@@ -141,7 +146,7 @@ export function UserTemplate() {
                     href={go(".Pagination.PrevURL")}
                     className="inline-flex items-center justify-center rounded-md border px-3 h-9 text-sm font-medium hover:bg-secondary transition-colors"
                   >
-                    ← Previous
+                    ← {go('t "pagination.previous"')}
                   </a>
                   {go("end")}
                   {go("if .Pagination.HasNext")}
@@ -149,7 +154,7 @@ export function UserTemplate() {
                     href={go(".Pagination.NextURL")}
                     className="inline-flex items-center justify-center rounded-md border px-3 h-9 text-sm font-medium hover:bg-secondary transition-colors"
                   >
-                    Next →
+                    {go('t "pagination.next"')} →
                   </a>
                   {go("end")}
                 </div>

@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"maps"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,6 +72,13 @@ type SiteData struct {
 	Icon         string
 	URL          string
 	ItemsPerPage int
+	// Language is the resolved visitor language for this request
+	// (e.g. "en", "zh"), after the ?lang=/cookie/Accept-Language/site
+	// default chain. Templates emit it as <html lang> and the t function
+	// uses it implicitly.
+	Language string
+	// DefaultLanguage is the configured site default from settings.
+	DefaultLanguage string
 }
 
 // NavPageData is one custom page shown in the theme navigation.
@@ -208,45 +217,104 @@ type PageData struct {
 	}
 }
 
-// templateFuncs exposes formatting helpers to theme templates. The Go
-// built-ins (printf, len, eq, ...) are available as well.
-var templateFuncs = template.FuncMap{
-	"date": func(t time.Time, layout string) string {
-		return t.Format(layout)
-	},
-	// add sums two integers; used to render 1-based list positions.
-	"add": func(a, b int) int {
-		return a + b
-	},
-	// first clamps a slice to at most n items; unlike the builtin slice it
-	// tolerates short/empty inputs (used to cap the tag pills on cards).
-	"first": func(items []string, n int) []string {
-		if n < 1 || len(items) <= n {
-			return items
+// baseTemplateFuncs holds the language-independent helpers. The translatable
+// t function is bound per request (see boundTemplateFuncs) so themes declare
+// {{t "key"}} without naming a language; the backend resolves it.
+func baseTemplateFuncs() template.FuncMap {
+	return template.FuncMap{
+		"date": func(t time.Time, layout string) string {
+			return t.Format(layout)
+		},
+		// add sums two integers; used to render 1-based list positions.
+		"add": func(a, b int) int {
+			return a + b
+		},
+		// first clamps a slice to at most n items; unlike the builtin slice it
+		// tolerates short/empty inputs (used to cap the tag pills on cards).
+		"first": func(items []string, n int) []string {
+			if n < 1 || len(items) <= n {
+				return items
+			}
+			return items[:n]
+		},
+		"truncate": func(s string, max int) string {
+			s = strings.TrimSpace(s)
+			if len(s) <= max {
+				return s
+			}
+			return s[:max] + "..."
+		},
+		// userURL builds the public user profile URL. Helper funcs keep attribute
+		// actions free of double quotes, which React would escape to &quot; and
+		// break Go template parsing.
+		"userURL": func(id uint) string {
+			return "/user/" + strconv.FormatUint(uint64(id), 10)
+		},
+		// categoryURL builds the home page category filter URL.
+		"categoryURL": func(name string) string {
+			return "/?category=" + url.QueryEscape(name)
+		},
+		// searchURL builds the home page search URL for a tag or keyword.
+		"searchURL": func(name string) string {
+			return "/?search=" + url.QueryEscape(name)
+		},
+	}
+}
+
+// boundTemplateFuncs copies the base helpers and binds t to one request's
+// merged dictionary. Unknown keys fall back to the key itself so
+// third-party themes with incomplete translations degrade per key.
+func boundTemplateFuncs(dict Dict) template.FuncMap {
+	funcs := baseTemplateFuncs()
+	funcs["t"] = func(key string) string {
+		return dict.translate(key)
+	}
+	return funcs
+}
+
+// languageOf extracts the requested language from template data, defaulting
+// to en for data assembled without i18n (tests, legacy callers).
+func languageOf(data any) string {
+	var site *SiteData
+	switch d := data.(type) {
+	case IndexData:
+		site = d.Site
+	case *IndexData:
+		if d != nil {
+			site = d.Site
 		}
-		return items[:n]
-	},
-	"truncate": func(s string, max int) string {
-		s = strings.TrimSpace(s)
-		if len(s) <= max {
-			return s
+	case PostData:
+		site = d.Site
+	case *PostData:
+		if d != nil {
+			site = d.Site
 		}
-		return s[:max] + "..."
-	},
-	// userURL builds the public user profile URL. Helper funcs keep attribute
-	// actions free of double quotes, which React would escape to &quot; and
-	// break Go template parsing.
-	"userURL": func(id uint) string {
-		return "/user/" + strconv.FormatUint(uint64(id), 10)
-	},
-	// categoryURL builds the home page category filter URL.
-	"categoryURL": func(name string) string {
-		return "/?category=" + url.QueryEscape(name)
-	},
-	// searchURL builds the home page search URL for a tag or keyword.
-	"searchURL": func(name string) string {
-		return "/?search=" + url.QueryEscape(name)
-	},
+	case UserData:
+		site = d.Site
+	case *UserData:
+		if d != nil {
+			site = d.Site
+		}
+	case NotFoundData:
+		site = d.Site
+	case *NotFoundData:
+		if d != nil {
+			site = d.Site
+		}
+	case PageData:
+		site = d.Site
+	case *PageData:
+		if d != nil {
+			site = d.Site
+		}
+	}
+	if site == nil {
+		return DefaultLanguage
+	}
+	if lang := NormalizeLanguage(site.Language); lang != "" {
+		return lang
+	}
+	return DefaultLanguage
 }
 
 // cachedTheme is a parsed template set plus the newest file mtime it was
@@ -266,24 +334,37 @@ func init() {
 }
 
 // buildSiteData loads the site-wide settings for theme rendering, falling
-// back to safe defaults when no settings row exists.
-func (r *Renderer) buildSiteData(ctx context.Context) *SiteData {
+// back to safe defaults when no settings row exists. lang is the already
+// resolved visitor language; empty means "use the site default".
+func (r *Renderer) buildSiteData(ctx context.Context, lang string) *SiteData {
 	site := &SiteData{
-		Name:         "VexGo",
-		Description:  "",
-		URL:          r.baseURL,
-		ItemsPerPage: 20,
+		Name:            "VexGo",
+		Description:     "",
+		URL:             r.baseURL,
+		ItemsPerPage:    20,
+		Language:        DefaultLanguage,
+		DefaultLanguage: DefaultLanguage,
 	}
 	var settings model.GeneralSettings
-	if err := r.db.WithContext(ctx).First(&settings).Error; err == nil {
-		if settings.SiteName != "" {
-			site.Name = settings.SiteName
+	if r.db != nil {
+		if err := r.db.WithContext(ctx).First(&settings).Error; err == nil {
+			if settings.SiteName != "" {
+				site.Name = settings.SiteName
+			}
+			site.Description = settings.SiteDescription
+			site.Icon = settings.SiteIcon
+			if settings.ItemsPerPage > 0 {
+				site.ItemsPerPage = settings.ItemsPerPage
+			}
+			if normalized := NormalizeLanguage(settings.SiteLanguage); normalized != "" {
+				site.DefaultLanguage = normalized
+			}
 		}
-		site.Description = settings.SiteDescription
-		site.Icon = settings.SiteIcon
-		if settings.ItemsPerPage > 0 {
-			site.ItemsPerPage = settings.ItemsPerPage
-		}
+	}
+	if normalized := NormalizeLanguage(lang); normalized != "" {
+		site.Language = normalized
+	} else {
+		site.Language = site.DefaultLanguage
 	}
 	return site
 }
@@ -720,38 +801,79 @@ func (r *Renderer) readThemeFile(themeID, relPath string) ([]byte, bool) {
 	return content, true
 }
 
-// parseThemeTemplates reads every template file the theme provides into one
-// parsed set, so {{define}} fragments can be shared across pages. Besides the
-// base ThemeTemplateNames, any extra <slug>.html file at the theme root is
-// parsed as a dedicated custom-page template.
-func (r *Renderer) parseThemeTemplates(themeID string) (*template.Template, error) {
+// themeSources is the raw template text of a theme, cached so per-request
+// parsing (needed to bind t to the visitor language) never touches disk.
+type themeSources struct {
+	files  map[string]string
+	modSum time.Time
+}
+
+var themeSourcesCache struct {
+	sync.Mutex
+	themes map[string]themeSources
+}
+
+func init() {
+	themeCache.themes = make(map[string]cachedTheme)
+	themeSourcesCache.themes = make(map[string]themeSources)
+}
+
+// loadThemeSources reads every template file the theme provides into memory.
+// Besides the base ThemeTemplateNames, any extra <slug>.html file at the
+// theme root is a dedicated custom-page template. Custom themes are re-read
+// when a template changes on disk; the embedded default theme is read once.
+//
+// The returned map is the cache's copy: callers must only read it, never
+// mutate it, or every subsequent request sees the corruption.
+func (r *Renderer) loadThemeSources(themeID string) (map[string]string, error) {
+	themeSourcesCache.Lock()
+	defer themeSourcesCache.Unlock()
+
+	if cached, ok := themeSourcesCache.themes[themeID]; ok {
+		if themeID == DefaultTheme {
+			return cached.files, nil
+		}
+		if modSum, err := r.templateModSum(themeID); err == nil && modSum.Equal(cached.modSum) {
+			return cached.files, nil
+		}
+	}
+
 	base, err := r.themeFS(themeID)
 	if err != nil {
 		return nil, err
 	}
-
-	tmpl := template.New("theme").Funcs(templateFuncs)
 	known := map[string]struct{}{}
+	names := append([]string{}, ThemeTemplateNames...)
 	for _, name := range ThemeTemplateNames {
 		known[name] = struct{}{}
+	}
+	names = append(names, listExtraPageTemplates(base, known)...)
+	files := make(map[string]string, len(names))
+	for _, name := range names {
 		content, err := fs.ReadFile(base, name)
 		if err != nil {
 			continue
 		}
-		if _, err := tmpl.New(name).Parse(string(content)); err != nil {
-			return nil, fmt.Errorf("parse theme %q template %s: %w", themeID, name, err)
-		}
+		files[name] = string(content)
 	}
-	for _, name := range listExtraPageTemplates(base, known) {
-		content, err := fs.ReadFile(base, name)
-		if err != nil {
-			continue
-		}
-		if _, err := tmpl.New(name).Parse(string(content)); err != nil {
-			return nil, fmt.Errorf("parse theme %q template %s: %w", themeID, name, err)
-		}
+	if len(files) == 0 {
+		return nil, ErrNoThemeTemplates
 	}
+	modSum, _ := r.templateModSum(themeID)
+	themeSourcesCache.themes[themeID] = themeSources{files: files, modSum: modSum}
+	return files, nil
+}
 
+// parseThemeSources parses cached sources with one FuncMap so {{define}}
+// fragments stay shared across pages. Names are parsed in sorted order so a
+// theme's cross-file {{define}} overrides resolve deterministically.
+func parseThemeSources(themeID string, files map[string]string, funcs template.FuncMap) (*template.Template, error) {
+	tmpl := template.New("theme").Funcs(funcs)
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		if _, err := tmpl.New(name).Parse(files[name]); err != nil {
+			return nil, fmt.Errorf("parse theme %q template %s: %w", themeID, name, err)
+		}
+	}
 	if tmpl.Lookup(IndexTemplate) == nil &&
 		tmpl.Lookup(PostTemplate) == nil &&
 		tmpl.Lookup(PageTemplate) == nil &&
@@ -760,6 +882,33 @@ func (r *Renderer) parseThemeTemplates(themeID string) (*template.Template, erro
 		return nil, ErrNoThemeTemplates
 	}
 	return tmpl, nil
+}
+
+// parseThemeTemplates reads every template file the theme provides into one
+// parsed set, so {{define}} fragments can be shared across pages. Besides the
+// base ThemeTemplateNames, any extra <slug>.html file at the theme root is
+// parsed as a dedicated custom-page template.
+//
+// The fallback t returns the key itself so legacy cached renders never fail
+// on translatable templates; request renders re-parse with the bound dict.
+func (r *Renderer) parseThemeTemplates(themeID string) (*template.Template, error) {
+	files, err := r.loadThemeSources(themeID)
+	if err != nil {
+		return nil, err
+	}
+	funcs := baseTemplateFuncs()
+	funcs["t"] = func(key string) string { return key }
+	return parseThemeSources(themeID, files, funcs)
+}
+
+// parseThemeWithDict parses a theme with t bound to one request's merged
+// dictionary.
+func (r *Renderer) parseThemeWithDict(themeID string, dict Dict) (*template.Template, error) {
+	files, err := r.loadThemeSources(themeID)
+	if err != nil {
+		return nil, err
+	}
+	return parseThemeSources(themeID, files, boundTemplateFuncs(dict))
 }
 
 // listExtraPageTemplates returns theme-root *.html files beyond the known
@@ -794,11 +943,12 @@ func listExtraPageTemplates(base fs.FS, known map[string]struct{}) []string {
 
 // themeProvides reports whether the theme supplies the named template.
 func (r *Renderer) themeProvides(themeID, name string) bool {
-	tmpl, err := r.loadTheme(themeID)
+	files, err := r.loadThemeSources(themeID)
 	if err != nil {
 		return false
 	}
-	return tmpl.Lookup(name) != nil
+	_, ok := files[name]
+	return ok
 }
 
 // templateModSum returns the newest modification time of the theme's template
@@ -854,9 +1004,19 @@ func (r *Renderer) loadTheme(themeID string) (*template.Template, error) {
 }
 
 // renderTheme renders one page of a theme with the given data. The page name
-// is one of the ThemeTemplateNames constants.
+// is one of the ThemeTemplateNames constants. The language comes from
+// data's Site.Language (defaulting to en); t is bound to the theme's merged
+// dictionary so translatable templates render without extra plumbing.
 func (r *Renderer) renderTheme(themeID, page string, data any) ([]byte, error) {
-	tmpl, err := r.loadTheme(themeID)
+	lang := languageOf(data)
+	dict := r.loadMergedDict(themeID, lang, lang)
+	return r.renderThemeWithDict(themeID, page, data, dict)
+}
+
+// renderThemeWithDict renders with an explicitly merged dictionary (used by
+// request handlers that resolve the full visitor > site-default > en chain).
+func (r *Renderer) renderThemeWithDict(themeID, page string, data any, dict Dict) ([]byte, error) {
+	tmpl, err := r.parseThemeWithDict(themeID, dict)
 	if err != nil {
 		return nil, err
 	}

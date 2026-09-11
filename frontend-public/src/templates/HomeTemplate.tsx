@@ -19,7 +19,7 @@ import {
  */
 export function HomeTemplate() {
   return (
-    <html lang="en">
+    <html lang={go(".Site.Language")}>
       <DocHead title={go(".Site.Name")} description={go(".Site.Description")} />
       <body className="min-h-screen bg-background text-foreground antialiased">
         <SiteHeader />
@@ -29,13 +29,13 @@ export function HomeTemplate() {
           <div className="mb-6 flex items-center gap-2">
             <SearchX className="w-5 h-5 text-muted-foreground" />
             <span className="text-muted-foreground">
-              Search results for <strong>{go(".Query.Search")}</strong>
+              {go('t "search.results"')} <strong>{go(".Query.Search")}</strong>
             </span>
             <a
               href="/"
               className="underline hover:text-foreground transition-colors"
             >
-              Clear
+              {go('t "search.clear"')}
             </a>
           </div>
           {go("end")}
@@ -137,12 +137,14 @@ export function HomeTemplate() {
                 <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                   <SearchX className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">No posts found</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {go('t "posts.emptyTitle"')}
+                </h3>
                 <p className="text-muted-foreground">
                   {go("if .Query.Search")}
-                  Try different keywords or clear the search.
+                  {go('t "posts.emptySearch"')}
                   {go("else")}
-                  No posts have been published yet.
+                  {go('t "posts.emptyNone"')}
                   {go("end")}
                 </p>
               </div>
@@ -157,7 +159,7 @@ export function HomeTemplate() {
                   className="inline-flex items-center justify-center gap-1 rounded-md border px-3 h-9 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  Previous
+                  {go('t "pagination.previous"')}
                 </a>
                 {go("end")}
                 {go("range .Pagination.Pages")}
@@ -184,7 +186,7 @@ export function HomeTemplate() {
                   href={go(".Pagination.NextURL")}
                   className="inline-flex items-center justify-center gap-1 rounded-md border px-3 h-9 text-sm font-medium hover:bg-secondary transition-colors"
                 >
-                  Next
+                  {go('t "pagination.next"')}
                   <ChevronRight className="w-4 h-4" />
                 </a>
                 {go("end")}
@@ -198,7 +200,9 @@ export function HomeTemplate() {
               <div className="rounded-xl border bg-card text-card-foreground">
                 <div className="p-6 pb-3 flex items-center gap-2">
                   <Tag className="w-4 h-4" />
-                  <h3 className="text-lg font-semibold">Categories</h3>
+                  <h3 className="text-lg font-semibold">
+                    {go('t "sidebar.categories"')}
+                  </h3>
                 </div>
                 <div className="p-6 pt-3">
                   {go("if .Categories")}
@@ -214,7 +218,7 @@ export function HomeTemplate() {
                   </div>
                   {go("else")}
                   <p className="text-sm text-muted-foreground">
-                    No categories yet.
+                    {go('t "sidebar.noCategories"')}
                   </p>
                   {go("end")}
                 </div>
@@ -224,7 +228,9 @@ export function HomeTemplate() {
               <div className="rounded-xl border bg-card text-card-foreground">
                 <div className="p-6 pb-3 flex items-center gap-2">
                   <Tag className="w-4 h-4" />
-                  <h3 className="text-lg font-semibold">Popular Tags</h3>
+                  <h3 className="text-lg font-semibold">
+                    {go('t "sidebar.popularTags"')}
+                  </h3>
                 </div>
                 <div className="p-6 pt-3">
                   {go("if .PopularTags")}
@@ -241,7 +247,7 @@ export function HomeTemplate() {
                   </div>
                   {go("else")}
                   <p className="text-sm text-muted-foreground">
-                    No popular tags yet.
+                    {go('t "sidebar.noPopularTags"')}
                   </p>
                   {go("end")}
                 </div>
@@ -251,7 +257,9 @@ export function HomeTemplate() {
               <div className="rounded-xl border bg-card text-card-foreground">
                 <div className="p-6 pb-3 flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" />
-                  <h3 className="text-lg font-semibold">Popular Posts</h3>
+                  <h3 className="text-lg font-semibold">
+                    {go('t "sidebar.popularPosts"')}
+                  </h3>
                 </div>
                 <div className="p-6 pt-3">
                   {go("if .PopularPosts")}
@@ -284,7 +292,7 @@ export function HomeTemplate() {
                   </div>
                   {go("else")}
                   <p className="text-sm text-muted-foreground">
-                    No popular posts yet.
+                    {go('t "sidebar.noPopularPosts"')}
                   </p>
                   {go("end")}
                 </div>
@@ -294,7 +302,9 @@ export function HomeTemplate() {
               <div className="rounded-xl border bg-card text-card-foreground">
                 <div className="p-6 pb-3 flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  <h3 className="text-lg font-semibold">About</h3>
+                  <h3 className="text-lg font-semibold">
+                    {go('t "sidebar.about"')}
+                  </h3>
                 </div>
                 <div className="p-6 pt-3">
                   {go("if .Site.Description")}
@@ -303,7 +313,7 @@ export function HomeTemplate() {
                   </p>
                   {go("else")}
                   <p className="text-sm text-muted-foreground">
-                    A self-hosted blog CMS.
+                    {go('t "sidebar.aboutDefault"')}
                   </p>
                   {go("end")}
                 </div>

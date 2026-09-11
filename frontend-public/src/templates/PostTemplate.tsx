@@ -18,7 +18,7 @@ import {
  */
 export function PostTemplate() {
   return (
-    <html lang="en">
+    <html lang={go(".Site.Language")}>
       <DocHead
         title={go('printf "%s - %s" .Post.Title .Site.Name')}
         description={go(".Post.Excerpt")}
@@ -32,7 +32,7 @@ export function PostTemplate() {
             className="inline-flex items-center gap-2 rounded-md text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground h-9 px-3 mb-6 text-muted-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to home
+            {go('t "back.home"')}
           </a>
 
           {/* Post header */}
@@ -85,7 +85,8 @@ export function PostTemplate() {
                     {go("if ne .Post.UpdatedAt .Post.CreatedAt")}
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      Updated {go('date .Post.UpdatedAt "2006-01-02"')}
+                      {go('t "post.updated"')}{" "}
+                      {go('date .Post.UpdatedAt "2006-01-02"')}
                     </span>
                     {go("end")}
                   </div>
@@ -128,7 +129,9 @@ export function PostTemplate() {
                 className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 h-10 text-sm font-medium shadow-sm transition-colors hover:bg-secondary"
               >
                 <MessageCircle className="w-5 h-5" />
-                <span>Comments ({go(".Post.CommentsCount")})</span>
+                <span>
+                  {go('t "post.comments"')} ({go(".Post.CommentsCount")})
+                </span>
               </a>
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Eye className="w-5 h-5" />
@@ -140,7 +143,7 @@ export function PostTemplate() {
                 type="button"
                 data-share-url={go(".Post.URL")}
                 className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-secondary h-9 w-9"
-                aria-label="Share"
+                aria-label={go('t "post.share"')}
               >
                 <Share2 className="w-5 h-5" />
               </button>
@@ -149,7 +152,7 @@ export function PostTemplate() {
                 hidden
                 className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded whitespace-nowrap"
               >
-                Link copied
+                {go('t "post.shareCopied"')}
               </span>
             </div>
           </div>
@@ -159,7 +162,11 @@ export function PostTemplate() {
               container and styles itself with inline styles, so any theme
               can adopt it with the same two lines. */}
           <div className="mt-12">
-            <div id="vexgo-comments" data-post-id={go(".Post.ID")}></div>
+            <div
+              id="vexgo-comments"
+              data-post-id={go(".Post.ID")}
+              data-lang={go(".Site.Language")}
+            ></div>
           </div>
         </main>
         <SiteFooter /> <script src="/theme-assets/comments.js" defer></script>

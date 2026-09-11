@@ -100,6 +100,7 @@ import type {
   SettingsThemeConfigResponse,
   SettingsThemeConfigUpdateRequest,
   SettingsThemeConfigUpdateResponse,
+  SettingsThemeLanguagesResponse,
   SettingsThemeUploadResponse,
   SettingsThemesListResponse,
   SsoSSOProvidersResponse,
@@ -607,6 +608,17 @@ export const getVexGoAPI = () => {
   const getConfigThemes = () => {
     return customInstance<SettingsThemesListResponse>({
       url: `/config/themes`,
+      method: "GET",
+    });
+  };
+
+  /**
+   * Lists the language codes a theme ships under i18n/.
+   * @summary Theme i18n languages
+   */
+  const getConfigThemesIdLanguages = (id: string) => {
+    return customInstance<SettingsThemeLanguagesResponse>({
+      url: `/config/themes/${id}/languages`,
       method: "GET",
     });
   };
@@ -1382,6 +1394,7 @@ export const getVexGoAPI = () => {
     putConfigTheme,
     postConfigThemeUpload,
     getConfigThemes,
+    getConfigThemesIdLanguages,
     getConfigThemesIdPreview,
     getLikesPostId,
     postLikesPostId,
@@ -1543,6 +1556,11 @@ export type PostConfigThemeUploadResult = NonNullable<
 >;
 export type GetConfigThemesResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemes"]>>
+>;
+export type GetConfigThemesIdLanguagesResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdLanguages"]>
+  >
 >;
 export type GetConfigThemesIdPreviewResult = NonNullable<
   Awaited<

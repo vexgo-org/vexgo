@@ -14,6 +14,7 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 
 	api.GET("/config/themes", h.GetThemes)
 	api.GET("/config/themes/:id/preview", h.GetThemePreview)
+	api.GET("/config/themes/:id/languages", h.GetThemeLanguages)
 
 	api.GET("/config/smtp", h.mw.JWTAuth(), admin, h.GetSMTPConfig)
 	api.PUT("/config/smtp", h.mw.JWTAuth(), admin, h.UpdateSMTPConfig)

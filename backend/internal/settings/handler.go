@@ -181,6 +181,7 @@ func (h *Handler) GetGeneralSettings(c *gin.Context) {
 		SiteDescription:     config.SiteDescription,
 		SiteIcon:            config.SiteIcon,
 		ItemsPerPage:        config.ItemsPerPage,
+		SiteLanguage:        normalizeSiteLanguage(config.SiteLanguage),
 	})
 }
 
@@ -405,6 +406,31 @@ func (h *Handler) GetThemePreview(c *gin.Context) {
 
 	// Serve the preview image
 	c.File(previewPath)
+}
+
+// GetThemeLanguages godoc
+//
+//	@Summary		Theme i18n languages
+//	@Description	Lists the language codes a theme ships under i18n/.
+//	@Tags			config
+//	@Produce		json
+//	@Param			id	path		string	true	"theme id"
+//	@Success		200	{object}	ThemeLanguagesResponse
+//	@Failure		404	{object}	api.ErrorResponse	"theme not found"
+//	@Router			/config/themes/{id}/languages [get]
+func (h *Handler) GetThemeLanguages(c *gin.Context) {
+	themeID := c.Param("id")
+	langs, err := h.svc.ThemeLanguages(themeID)
+	if err != nil {
+		if errors.Is(err, ErrThemeNotFound) {
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
+			return
+		}
+		slog.Error("failed to list theme languages", "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to list theme languages"})
+		return
+	}
+	c.JSON(http.StatusOK, ThemeLanguagesResponse{Theme: themeID, Languages: langs})
 }
 
 // GetThemeConfig godoc

@@ -253,6 +253,16 @@ type GeneralSettingsRequest struct {
 	SiteDescription     string
 	SiteIcon            string
 	ItemsPerPage        int
+	SiteLanguage        string
+}
+
+// normalizeSiteLanguage maps admin input to the stored language code,
+// defaulting to en for empty/invalid values.
+func normalizeSiteLanguage(lang string) string {
+	if normalized := public.NormalizeLanguage(lang); normalized != "" {
+		return normalized
+	}
+	return public.DefaultLanguage
 }
 
 // GetGeneralSettings returns the stored general settings, or the defaults
@@ -270,6 +280,7 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 				SiteDescription:     "",
 				SiteIcon:            "",
 				ItemsPerPage:        20,
+				SiteLanguage:        public.DefaultLanguage,
 			}, nil
 		}
 		return config, err
@@ -291,6 +302,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 				SiteDescription:     req.SiteDescription,
 				SiteIcon:            req.SiteIcon,
 				ItemsPerPage:        req.ItemsPerPage,
+				SiteLanguage:        normalizeSiteLanguage(req.SiteLanguage),
 			}
 			if err := s.repo.CreateGeneralSettings(ctx, &config); err != nil {
 				return config, fmt.Errorf("failed to create general settings: %w", err)
@@ -307,6 +319,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		config.SiteDescription = req.SiteDescription
 		config.SiteIcon = req.SiteIcon
 		config.ItemsPerPage = req.ItemsPerPage
+		config.SiteLanguage = normalizeSiteLanguage(req.SiteLanguage)
 
 		if err := s.repo.SaveGeneralSettings(ctx, &config); err != nil {
 			return config, fmt.Errorf("failed to update general settings: %w", err)
@@ -682,6 +695,18 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 // GetThemes returns all available themes.
 func (s *Service) GetThemes() []public.ThemeInfo {
 	return s.themes.GetAvailableThemes()
+}
+
+// ThemeLanguages lists the i18n language codes shipped by one theme.
+func (s *Service) ThemeLanguages(themeID string) ([]string, error) {
+	if !s.themes.ThemeExists(themeID) {
+		return nil, ErrThemeNotFound
+	}
+	langs := s.themes.AvailableLanguages(themeID)
+	if langs == nil {
+		langs = []string{}
+	}
+	return langs, nil
 }
 
 // ThemePreview resolves the preview image path for a theme.

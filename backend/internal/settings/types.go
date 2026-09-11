@@ -51,6 +51,7 @@ type GeneralSettingsResponse struct {
 	SiteDescription     string `json:"siteDescription"`
 	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
 	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
+	SiteLanguage        string `json:"siteLanguage" example:"en"`
 }
 
 // GeneralSettingsUpdateRequest is the body of PUT
@@ -63,6 +64,7 @@ type GeneralSettingsUpdateRequest struct {
 	SiteDescription     string `json:"siteDescription"`
 	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
 	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
+	SiteLanguage        string `json:"siteLanguage" example:"en"`
 }
 
 // GeneralSettingsUpdateResponse is the body of PUT
@@ -109,6 +111,14 @@ type AITestResponse struct {
 type AIModelsResponse struct {
 	Message string   `json:"message"`
 	Models  []string `json:"models" example:"gpt-4o,gpt-4o-mini,gpt-3.5-turbo"`
+}
+
+// ThemeLanguagesResponse is the body of GET
+// /api/config/themes/{id}/languages. Lists the language codes a theme ships
+// under i18n/; empty means the theme predates i18n.
+type ThemeLanguagesResponse struct {
+	Theme     string   `json:"theme" example:"default"`
+	Languages []string `json:"languages" example:"en,zh"`
 }
 
 // ThemesListResponse is the body of GET /api/config/themes.

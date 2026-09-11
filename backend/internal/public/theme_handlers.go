@@ -16,11 +16,21 @@ import (
 
 const htmlContentType = "text/html; charset=utf-8"
 
+// requestContext resolves one SSR request's site data and merged theme
+// dictionary with a single settings query: site default first, then the
+// ?lang=/cookie/Accept-Language chain, then the merged dict.
+func (r *Renderer) requestContext(c *gin.Context, theme string) (*SiteData, Dict) {
+	site := r.buildSiteData(c.Request.Context(), "")
+	lang := r.resolveRequestLanguage(c, site.DefaultLanguage)
+	site.Language = lang
+	return site, r.loadMergedDict(theme, lang, site.DefaultLanguage)
+}
+
 // servePage renders one page of the requested theme and writes it as HTML.
 // When rendering fails (theme missing a template, template syntax error) it
 // falls back to a plain 404 so public routes never crash.
-func (r *Renderer) servePage(c *gin.Context, theme, page string, data any, status int) {
-	out, err := r.renderTheme(theme, page, data)
+func (r *Renderer) servePage(c *gin.Context, theme, page string, data any, status int, dict Dict) {
+	out, err := r.renderThemeWithDict(theme, page, data, dict)
 	if err != nil {
 		c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
 		return
@@ -30,8 +40,8 @@ func (r *Renderer) servePage(c *gin.Context, theme, page string, data any, statu
 
 // renderNotFound renders the theme's 404 template (when present) with a plain
 // fallback otherwise.
-func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData) {
-	if out, err := r.renderTheme(theme, NotFoundTemplate, NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}); err == nil {
+func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, dict Dict) {
+	if out, err := r.renderThemeWithDict(theme, NotFoundTemplate, NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}, dict); err == nil {
 		c.Data(http.StatusNotFound, htmlContentType, out)
 		return
 	}
@@ -70,14 +80,14 @@ func (r *Renderer) isPreviewAdmin(c *gin.Context) bool {
 // optional ?search= / ?category= / ?page= filters.
 func (r *Renderer) handleIndex(c *gin.Context) {
 	theme := r.getRequestedTheme(c)
-	site := r.buildSiteData(c.Request.Context())
+	site, dict := r.requestContext(c, theme)
 	page := parsePageParam(c)
 	search := c.Query("search")
 	category := c.Query("category")
 
 	posts, pagination, _, err := r.listPageData(c.Request.Context(), "/", page, site.ItemsPerPage, search, category, 0)
 	if err != nil {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -100,7 +110,7 @@ func (r *Renderer) handleIndex(c *gin.Context) {
 		Categories:   categories,
 		PopularPosts: r.popularPostsData(c.Request.Context(), 5),
 		PopularTags:  r.popularTagsData(c.Request.Context(), 10),
-	}, http.StatusOK)
+	}, http.StatusOK, dict)
 }
 
 // handlePost renders a published post by slug. Drafts, pending and rejected
@@ -108,7 +118,7 @@ func (r *Renderer) handleIndex(c *gin.Context) {
 // when the API filters them out.
 func (r *Renderer) handlePost(c *gin.Context) {
 	theme := r.getRequestedTheme(c)
-	site := r.buildSiteData(c.Request.Context())
+	site, dict := r.requestContext(c, theme)
 	slug := c.Param("slug")
 
 	var post model.Post
@@ -117,7 +127,7 @@ func (r *Renderer) handlePost(c *gin.Context) {
 		Preload("Tags").
 		Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
 		First(&post).Error; err != nil {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -147,17 +157,17 @@ func (r *Renderer) handlePost(c *gin.Context) {
 		data.Post.Tags = append(data.Post.Tags, tag.Name)
 	}
 
-	r.servePage(c, theme, PostTemplate, data, http.StatusOK)
+	r.servePage(c, theme, PostTemplate, data, http.StatusOK, dict)
 }
 
 // handleUser renders a user's public profile and their published posts.
 func (r *Renderer) handleUser(c *gin.Context) {
 	theme := r.getRequestedTheme(c)
-	site := r.buildSiteData(c.Request.Context())
+	site, dict := r.requestContext(c, theme)
 
 	userID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil || userID == 0 {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -166,7 +176,7 @@ func (r *Renderer) handleUser(c *gin.Context) {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.Error("failed to load user for public page", "err", err)
 		}
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -181,7 +191,7 @@ func (r *Renderer) handleUser(c *gin.Context) {
 		uint(userID),
 	)
 	if err != nil {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -197,7 +207,7 @@ func (r *Renderer) handleUser(c *gin.Context) {
 	data.Posts = posts
 	data.Pagination = pagination
 
-	r.servePage(c, theme, UserTemplate, data, http.StatusOK)
+	r.servePage(c, theme, UserTemplate, data, http.StatusOK, dict)
 }
 
 // handlePage renders a custom page at /:slug. Template resolution is
@@ -206,10 +216,10 @@ func (r *Renderer) handleUser(c *gin.Context) {
 // request carries ?preview=1 with an admin JWT.
 func (r *Renderer) handlePage(c *gin.Context) {
 	theme := r.getRequestedTheme(c)
-	site := r.buildSiteData(c.Request.Context())
+	site, dict := r.requestContext(c, theme)
 	slug := c.Param("slug")
 	if slug == "" || strings.Contains(slug, "/") {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -221,11 +231,11 @@ func (r *Renderer) handlePage(c *gin.Context) {
 		query = query.Where("status = ?", model.PageStatusPublished)
 	}
 	if err := query.First(&page).Error; err != nil {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 	if page.Status != model.PageStatusPublished && !preview {
-		r.renderNotFound(c, theme, site)
+		r.renderNotFound(c, theme, site, dict)
 		return
 	}
 
@@ -239,14 +249,14 @@ func (r *Renderer) handlePage(c *gin.Context) {
 	data.Page.URL = "/" + page.Slug
 
 	if dedicated := page.Slug + ".html"; r.themeProvides(theme, dedicated) {
-		r.servePage(c, theme, dedicated, data, http.StatusOK)
+		r.servePage(c, theme, dedicated, data, http.StatusOK, dict)
 		return
 	}
 	if r.themeProvides(theme, PageTemplate) {
-		r.servePage(c, theme, PageTemplate, data, http.StatusOK)
+		r.servePage(c, theme, PageTemplate, data, http.StatusOK, dict)
 		return
 	}
-	r.renderNotFound(c, theme, site)
+	r.renderNotFound(c, theme, site, dict)
 }
 
 // parsePageParam reads the 1-based ?page= query parameter, defaulting to 1.

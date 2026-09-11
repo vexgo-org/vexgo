@@ -152,6 +152,9 @@ func TestGetGeneralSettings_Default(t *testing.T) {
 	if !config.RegistrationEnabled || !config.AllowGuestViewPosts || config.SiteName != "VexGo" || config.ItemsPerPage != 20 {
 		t.Errorf("expected default settings, got %+v", config)
 	}
+	if config.SiteLanguage != "en" {
+		t.Errorf("expected default site language en, got %q", config.SiteLanguage)
+	}
 }
 
 func TestUpdateGeneralSettings(t *testing.T) {
@@ -181,6 +184,49 @@ func TestUpdateGeneralSettings(t *testing.T) {
 	}
 	if got.RegistrationEnabled {
 		t.Errorf("expected RegistrationEnabled=false persisted, got %+v", got)
+	}
+}
+
+func TestUpdateGeneralSettings_SiteLanguage(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+
+	// zh-CN normalizes to zh and persists.
+	config, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "B", SiteLanguage: "zh-CN"})
+	if err != nil {
+		t.Fatalf("UpdateGeneralSettings error: %v", err)
+	}
+	if config.SiteLanguage != "zh" {
+		t.Errorf("expected normalized zh, got %q", config.SiteLanguage)
+	}
+
+	// Empty/invalid input falls back to en instead of storing garbage.
+	for _, in := range []string{"", "!!", "toolonglanguagecode"} {
+		config, err = svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "B", SiteLanguage: in})
+		if err != nil {
+			t.Fatalf("UpdateGeneralSettings(%q) error: %v", in, err)
+		}
+		if config.SiteLanguage != "en" {
+			t.Errorf("UpdateGeneralSettings(%q) = %q, want en", in, config.SiteLanguage)
+		}
+	}
+}
+
+func TestThemeLanguages(t *testing.T) {
+	svc, _ := newTestService(t)
+	langs, err := svc.ThemeLanguages("default")
+	if err != nil {
+		t.Fatalf("ThemeLanguages error: %v", err)
+	}
+	found := map[string]bool{}
+	for _, l := range langs {
+		found[l] = true
+	}
+	if !found["en"] || !found["zh"] {
+		t.Errorf("default theme should list en and zh, got %v", langs)
+	}
+	if _, err := svc.ThemeLanguages("no-such-theme"); err == nil {
+		t.Error("expected error for unknown theme")
 	}
 }
 
