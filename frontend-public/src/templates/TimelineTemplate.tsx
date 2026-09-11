@@ -33,13 +33,13 @@ export function TimelineTemplate() {
             </div>
           </div>
           <div id="vexgo-timeline" className="vexgo-timeline">
-            <p className="text-sm text-muted-foreground">Loading timeline…</p>
+            <p className="vexgo-timeline-empty">Loading timeline…</p>
           </div>
         </main>
         <SiteFooter />
         <script>
           {
-            "(function(){var el=document.getElementById('vexgo-timeline');if(!el)return;fetch('/api/stats/latest-posts?limit=200').then(function(r){return r.json()}).then(function(d){var posts=(d&&d.posts)||[];if(!posts.length){el.innerHTML='<p class=text-sm text-muted-foreground>No posts yet.</p>';return}var byYear={};posts.forEach(function(p){var y=(p.createdAt||'').slice(0,4)||'Unknown';(byYear[y]=byYear[y]||[]).push(p)});var years=Object.keys(byYear).sort().reverse();el.innerHTML=years.map(function(y){var items=byYear[y].map(function(p){var s=document.createElement('div');var a=document.createElement('a');a.href='/post/'+p.slug;a.textContent=p.title;a.className='vexgo-timeline-link';var t=document.createElement('span');t.textContent=(p.createdAt||'').slice(0,10);t.className='vexgo-timeline-date';s.className='vexgo-timeline-item';s.appendChild(t);s.appendChild(a);return s.outerHTML}).join('');return '<section class=vexgo-timeline-year><h2>'+y+'</h2>'+items+'</section>'}).join('')}).catch(function(){el.innerHTML='<p class=text-sm text-muted-foreground>Failed to load timeline.</p>'})})();"
+            "(function(){var el=document.getElementById('vexgo-timeline');if(!el)return;function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML}fetch('/api/stats/latest-posts?limit=200').then(function(r){return r.json()}).then(function(d){var posts=(d&&d.posts)||[];if(!posts.length){el.innerHTML='<p class=\"vexgo-timeline-empty\">No posts yet.</p>';return}var byYear={};posts.forEach(function(p){var y=(p.createdAt||'').slice(0,4)||'Unknown';(byYear[y]=byYear[y]||[]).push(p)});var years=Object.keys(byYear).sort().reverse();var html='<p class=\"vexgo-timeline-total\">'+posts.length+(posts.length===1?' post':' posts')+' in total</p>';years.forEach(function(y){var items=byYear[y];html+='<section class=\"vexgo-timeline-year\"><div class=\"vexgo-timeline-year-badge\"><span class=\"vexgo-timeline-year-name\">'+esc(y)+'</span><span class=\"vexgo-timeline-year-count\">'+items.length+'</span></div><ol class=\"vexgo-timeline-list\">';items.forEach(function(p,i){html+='<li class=\"vexgo-timeline-item\" style=\"animation-delay:'+Math.min(i*50,500)+'ms\"><div class=\"vexgo-timeline-body\"><a class=\"vexgo-timeline-link\" href=\"/post/'+esc(p.slug)+'\">'+esc(p.title)+'</a><div class=\"vexgo-timeline-meta\"><span class=\"vexgo-timeline-date\">'+esc((p.createdAt||'').slice(0,10))+'</span>';if(p.excerpt){html+='<span class=\"vexgo-timeline-excerpt\">'+esc(p.excerpt)+'</span>'}html+='</div></div></li>'});html+='</ol></section>'});el.innerHTML=html}).catch(function(){el.innerHTML='<p class=\"vexgo-timeline-empty\">Failed to load timeline.</p>'})})();"
           }
         </script>
       </body>
