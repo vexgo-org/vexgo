@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -44,6 +45,10 @@ type Deps struct {
 	JWTSecret []byte
 	Notifier  Notifier
 	Cipher    SecretCipher
+	// RateLimit stores the per-client request budget for comment creation.
+	// nil keeps the budget in-process; a distributed store shares one budget
+	// across instances.
+	RateLimit middleware.RateLimitStore
 }
 
 // Notifier is the seam for creating notifications. It is implemented by the

@@ -75,7 +75,8 @@ func (r *Renderer) isPreviewAdmin(c *gin.Context) bool {
 		return false
 	}
 	token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		// Pin the algorithm to HS256, the only one this server issues.
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, jwt.ErrTokenUnverifiable
 		}
 		return r.jwtSecret, nil

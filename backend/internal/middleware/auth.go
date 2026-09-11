@@ -108,8 +108,10 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 		}
 
 		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
-			// Ensure using HS256 signing method
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			// Pin the signing method: only tokens this server signed with
+			// HS256 are accepted, so a token using another HMAC variant (or an
+			// asymmetric algorithm) is rejected instead of verified.
+			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, jwt.ErrTokenUnverifiable
 			}
 			return a.jwtSecret, nil
@@ -200,7 +202,8 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 		}
 
 		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			// Same pin as JWTAuth: only this server's HS256 tokens are valid.
+			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, jwt.ErrTokenUnverifiable
 			}
 			return a.jwtSecret, nil

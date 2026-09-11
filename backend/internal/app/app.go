@@ -137,6 +137,7 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
 			Cipher:    cipher,
+			RateLimit: distributedRateLimit,
 		},
 		Post: post.Deps{
 			DB:        db,

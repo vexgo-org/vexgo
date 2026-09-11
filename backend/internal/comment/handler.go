@@ -13,15 +13,25 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
+// commentRateLimitPerMinute caps comment creation per client per minute so an
+// authenticated account cannot flood a post's comment thread.
+const commentRateLimitPerMinute = 30
+
 // Handler exposes the comment domain over HTTP.
 type Handler struct {
 	svc *Service
 	mw  *middleware.Auth
+	// rateLimit stores the per-client request budget; nil keeps it in-process.
+	rateLimit middleware.RateLimitStore
 }
 
 // NewHandler creates a comment HTTP handler with the given dependencies.
 func NewHandler(deps Deps) *Handler {
-	return &Handler{svc: NewService(deps), mw: middleware.NewAuth(deps.DB, deps.JWTSecret)}
+	return &Handler{
+		svc:       NewService(deps),
+		mw:        middleware.NewAuth(deps.DB, deps.JWTSecret),
+		rateLimit: deps.RateLimit,
+	}
 }
 
 // GetComments godoc
