@@ -6,7 +6,7 @@
  *      {{...}} Go template actions emitted via the go() helper,
  *   2. strip React's <!-- --> separator comment nodes,
  *   3. write index.html / post.html / user.html / 404.html into
- *      backend/internal/public/defaulttheme (embedded into the binary).
+ *      backend/internal/public/default-theme (embedded into the binary).
  */
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -19,7 +19,7 @@ import { PostTemplate } from "../src/templates/PostTemplate";
 import { UserTemplate } from "../src/templates/UserTemplate";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outDir = resolve(here, "../../backend/internal/public/defaulttheme");
+const outDir = resolve(here, "../../backend/internal/public/default-theme");
 mkdirSync(outDir, { recursive: true });
 
 function emit(name: string, element: React.ReactNode) {

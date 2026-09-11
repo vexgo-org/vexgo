@@ -33,7 +33,7 @@ var indexHTML []byte
 // post.html, user.html, 404.html) plus their static assets under assets/.
 // It is produced by the frontend-public build.
 //
-//go:embed defaulttheme
+//go:embed default-theme
 var defaultThemeFS embed.FS
 
 // ThemeInfo represents metadata for a theme

@@ -11,7 +11,7 @@ backend/vexgo
 backend/blog.db
 backend/data/
 backend/internal/public/dist/
-backend/internal/public/defaulttheme/
+backend/internal/public/default-theme/
 data/
 .env
 result

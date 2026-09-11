@@ -44,7 +44,7 @@ build-backend:
 @ensure-dist:
     # Ensure the embedded frontend builds exist (go:embed requires them).
     test -d backend/internal/public/dist || just build-frontend
-    test -d backend/internal/public/defaulttheme || just build-frontend
+    test -d backend/internal/public/default-theme || just build-frontend
 
 generate:
     # Codegen using swag and orval.

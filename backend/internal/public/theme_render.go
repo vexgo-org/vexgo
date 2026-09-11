@@ -542,7 +542,7 @@ func (r *Renderer) themeFS(themeID string) (fs.FS, error) {
 	if themeID == DefaultTheme {
 		// The embed keeps the defaulttheme/ directory prefix; expose the
 		// theme root so all paths are relative to it.
-		return fs.Sub(defaultThemeFS, "defaulttheme")
+		return fs.Sub(defaultThemeFS, "default-theme")
 	}
 	if strings.ContainsAny(themeID, `/\`) || themeID == "." || themeID == ".." {
 		return nil, fmt.Errorf("invalid theme id %q", themeID)

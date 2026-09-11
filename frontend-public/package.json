@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Builds the VexGo built-in public theme: React components rendered to Go-template HTML pages (index.html / post.html / user.html / 404.html) plus their Tailwind assets.",
   "scripts": {
-    "build": "tsc --noEmit && tailwindcss -i src/styles.css -o ../backend/internal/public/defaulttheme/assets/style.css --minify && bun scripts/generate.tsx",
+    "build": "tsc --noEmit && tailwindcss -i src/styles.css -o ../backend/internal/public/default-theme/assets/style.css --minify && bun scripts/generate.tsx",
     "generate": "bun scripts/generate.tsx"
   },
   "dependencies": {

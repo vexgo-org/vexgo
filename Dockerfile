@@ -15,7 +15,7 @@ RUN bun install --frozen-lockfile
 
 COPY frontend-public/ ./
 RUN bun run build
-# output: /app/backend/internal/public/defaulttheme
+# output: /app/backend/internal/public/default-theme
 
 # Phase 2: Compiling the backend
 FROM golang:1.26-alpine AS backend-builder
@@ -27,7 +27,7 @@ RUN go mod download
 
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/backend/internal/public/dist ./backend/internal/public/dist
-COPY --from=frontend-builder /app/backend/internal/public/defaulttheme ./backend/internal/public/defaulttheme
+COPY --from=frontend-builder /app/backend/internal/public/default-theme ./backend/internal/public/default-theme
 
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build \
