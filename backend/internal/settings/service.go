@@ -767,5 +767,10 @@ func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (st
 		}
 	}
 
+	// Seed the newly activated theme's default pages (missing slugs only).
+	if _, err := s.themes.EnsureThemeSeeds(ctx, config.ActiveTheme); err != nil {
+		slog.Warn("failed to ensure theme seed pages", "theme", config.ActiveTheme, "err", err)
+	}
+
 	return config.ActiveTheme, nil
 }

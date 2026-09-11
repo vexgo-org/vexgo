@@ -108,6 +108,13 @@ func New(cfg *config.Config) (*App, error) {
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
 	renderer.SetJWTSecret(cfg.JWTSecret)
+	// Theme-owned seed pages (e.g. the default theme's timeline/links) are
+	// created for missing slugs only; user edits are never overwritten.
+	if n, err := renderer.EnsureThemeSeeds(context.Background(), renderer.ActiveThemeID()); err != nil {
+		slog.Warn("failed to ensure theme seed pages", "err", err)
+	} else if n > 0 {
+		slog.Info("created theme seed pages", "count", n)
+	}
 	slog.Info("base url set for server-side rendering", "baseURL", renderer.BaseURL())
 
 	configureProxies(r, cfg)

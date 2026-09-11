@@ -8,7 +8,7 @@
  *   3. write index.html / post.html / user.html / 404.html into
  *      backend/internal/public/default-theme (embedded into the binary).
  */
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderToString } from "react-dom/server";
@@ -70,5 +70,10 @@ copyFileSync(
   resolve(here, "../widget/comments.js"),
   resolve(assetsDir, "comments.js"),
 );
+
+// Theme seed pages (seed/*.md) ship inside the theme so the backend can
+// create the theme's default pages on activation. Third-party themes follow
+// the same layout: seed/<slug>.md with YAML frontmatter.
+cpSync(resolve(here, "../seed"), resolve(outDir, "seed"), { recursive: true });
 
 console.log(`default theme templates written to ${outDir}`);
