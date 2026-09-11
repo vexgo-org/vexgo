@@ -1,4 +1,4 @@
-import { SiteFooter, SiteHeader, DocHead } from "../components/SiteChrome";
+import { SiteFooter, SiteHeader, DocHead } from "../components/SiteLayout";
 import { go } from "../lib/go";
 import {
   ArrowLeft,
