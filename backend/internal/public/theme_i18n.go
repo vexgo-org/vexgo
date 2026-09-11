@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"io/fs"
+	"maps"
 	"sort"
 	"strings"
 
@@ -135,9 +136,7 @@ func (r *Renderer) loadMergedDict(themeID, lang, siteDefault string) Dict {
 			continue
 		}
 		if dict, ok := r.loadLangDict(themeID, candidate); ok {
-			for k, v := range dict {
-				merged[k] = v
-			}
+			maps.Copy(merged, dict)
 		}
 	}
 	return merged

@@ -26,11 +26,26 @@ func (r *Renderer) requestContext(c *gin.Context, theme string) (*SiteData, Dict
 	return site, r.loadMergedDict(theme, lang, site.DefaultLanguage)
 }
 
+// renderRequestPage renders one SSR page and scopes it to the previewed theme
+// when the request selected a theme via ?theme= (the admin preview switch).
+// Plain requests and non-request callers use renderThemeWithDict directly so
+// no rewriting leaks into the site-wide render path.
+func (r *Renderer) renderRequestPage(c *gin.Context, themeID, page string, data any, dict Dict) ([]byte, error) {
+	out, err := r.renderThemeWithDict(themeID, page, data, dict)
+	if err != nil {
+		return nil, err
+	}
+	if override := c.Query("theme"); override != "" && override == themeID {
+		out = rewriteThemePreview(out, themeID)
+	}
+	return out, nil
+}
+
 // servePage renders one page of the requested theme and writes it as HTML.
 // When rendering fails (theme missing a template, template syntax error) it
 // falls back to a plain 404 so public routes never crash.
 func (r *Renderer) servePage(c *gin.Context, theme, page string, data any, status int, dict Dict) {
-	out, err := r.renderThemeWithDict(theme, page, data, dict)
+	out, err := r.renderRequestPage(c, theme, page, data, dict)
 	if err != nil {
 		c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
 		return
@@ -41,7 +56,7 @@ func (r *Renderer) servePage(c *gin.Context, theme, page string, data any, statu
 // renderNotFound renders the theme's 404 template (when present) with a plain
 // fallback otherwise.
 func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, dict Dict) {
-	if out, err := r.renderThemeWithDict(theme, NotFoundTemplate, NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}, dict); err == nil {
+	if out, err := r.renderRequestPage(c, theme, NotFoundTemplate, NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}, dict); err == nil {
 		c.Data(http.StatusNotFound, htmlContentType, out)
 		return
 	}

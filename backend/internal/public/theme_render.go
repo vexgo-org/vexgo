@@ -1030,3 +1030,56 @@ func (r *Renderer) renderThemeWithDict(themeID, page string, data any, dict Dict
 	}
 	return buf.Bytes(), nil
 }
+
+// themeAssetsPrefix is the stable asset prefix every theme template uses to
+// reference its own assets; the server resolves it against the active theme.
+const themeAssetsPrefix = "/theme-assets/"
+
+// previewHrefRe matches absolute same-origin hyperlinks in rendered HTML so a
+// theme preview can keep the previewed theme across navigation.
+var previewHrefRe = regexp.MustCompile(`href="(/[^"]*)"`)
+
+// rewriteThemePreview scopes a rendered page to the theme being previewed.
+// Themes hardcode the /theme-assets/ prefix, which the server resolves against
+// the *active* theme; subresource requests (CSS, JS, images) carry no ?theme=
+// parameter, so without rewriting a preview of a non-active theme would load
+// the active theme's assets. Preview pages therefore point at the theme's own
+// /themes/<id>/assets/ files and carry ?theme=<id> on their same-origin links
+// so navigation inside the preview stays on that theme.
+func rewriteThemePreview(out []byte, themeID string) []byte {
+	assetPrefix := "/themes/" + url.PathEscape(themeID) + "/assets/"
+	if bytes.Contains(out, []byte(themeAssetsPrefix)) {
+		out = bytes.ReplaceAll(out, []byte(themeAssetsPrefix), []byte(assetPrefix))
+	}
+	return previewHrefRe.ReplaceAllFunc(out, func(match []byte) []byte {
+		href := string(match[len(`href="`) : len(match)-1])
+		rewritten, ok := withThemeParam(href, themeID)
+		if !ok {
+			return match
+		}
+		return []byte(`href="` + rewritten + `"`)
+	})
+}
+
+// withThemeParam appends ?theme=<themeID> to a same-origin page link,
+// preserving any existing query and fragment. It reports ok false for links
+// that must not be rewritten: relative links, protocol-relative URLs and
+// non-page prefixes (API, admin SPA, raw theme files).
+func withThemeParam(href, themeID string) (string, bool) {
+	if !strings.HasPrefix(href, "/") || strings.HasPrefix(href, "//") {
+		return "", false
+	}
+	for _, prefix := range []string{"/api/", "/admin", "/themes/", themeAssetsPrefix} {
+		if strings.HasPrefix(href, prefix) {
+			return "", false
+		}
+	}
+	u, err := url.Parse(href)
+	if err != nil {
+		return "", false
+	}
+	q := u.Query()
+	q.Set("theme", themeID)
+	u.RawQuery = q.Encode()
+	return u.String(), true
+}

@@ -199,29 +199,6 @@ func (r *Renderer) activeTheme() string {
 	return config.ActiveTheme
 }
 
-// IsPathInside verifies that targetPath is within basePath. It is a general
-// containment helper for untrusted relative paths.
-func IsPathInside(basePath, targetPath string) bool {
-	absBase, err := filepath.Abs(basePath)
-	if err != nil {
-		return false
-	}
-
-	cleanTarget := filepath.Clean(targetPath)
-	fullPath := filepath.Join(absBase, cleanTarget)
-	absTarget, err := filepath.Abs(fullPath)
-	if err != nil {
-		return false
-	}
-
-	rel, err := filepath.Rel(absBase, absTarget)
-	if err != nil {
-		return false
-	}
-
-	return !strings.HasPrefix(rel, "..") && rel != ".."
-}
-
 // legacyAdminRedirect maps a top-level route that moved under /admin/ to its
 // new location, preserving the trailing path and query string (emailed links
 // such as /verify-email?token=... must keep their query). It returns ok false

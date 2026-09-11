@@ -3,6 +3,8 @@ package public
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -316,6 +318,122 @@ func TestPublicRoutes_SearchFilter(t *testing.T) {
 	w = doPublicRequest(t, r, "/?search=nomatch")
 	if !strings.Contains(w.Body.String(), "No posts found") {
 		t.Errorf("empty search should render the empty state:\n%s", w.Body.String())
+	}
+}
+
+// installPreviewTheme writes a minimal theme to the renderer's data dir so
+// preview tests can request a theme that is not the active one.
+func installPreviewTheme(t *testing.T, r *Renderer, themeID string) {
+	t.Helper()
+	themeDir := filepath.Join(r.DataDir(), ThemesDir, themeID)
+	if err := os.MkdirAll(filepath.Join(themeDir, "assets"), 0o755); err != nil {
+		t.Fatalf("mkdir theme: %v", err)
+	}
+	files := map[string]string{
+		ThemeMetaFile: `{"id": "` + themeID + `", "name": "Alt", "version": "1.0.0"}`,
+		"index.html": `<!doctype html><html><head>` +
+			`<link rel="stylesheet" href="/theme-assets/style.css"></head><body>` +
+			`<h1>ALT HOME</h1><a href="/">home</a>` +
+			`<a href="/post/hello-world">post</a><a href="/?category=Go">cat</a></body></html>`,
+		"post.html": `<!doctype html><html><head>` +
+			`<link rel="stylesheet" href="/theme-assets/style.css"></head><body>` +
+			`<h1>ALT POST</h1><p>{{.Post.Title}}</p></body></html>`,
+		filepath.Join("assets", "style.css"): `body{background:#123456} /* alt-theme-css */`,
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(themeDir, name), []byte(content), 0o600); err != nil {
+			t.Fatalf("write theme file %s: %v", name, err)
+		}
+	}
+	r.InvalidateThemeCache(themeID)
+}
+
+// TestThemePreview_NonActiveThemeScopesAssets reproduces the preview bug: with
+// the default theme active, previewing another theme must load that theme's
+// CSS (subresource requests carry no ?theme=), not the active theme's.
+func TestThemePreview_NonActiveThemeScopesAssets(t *testing.T) {
+	r, renderer, _ := newPublicRouter(t)
+	installPreviewTheme(t, renderer, "alt")
+
+	w := doPublicRequest(t, r, "/?theme=alt")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /?theme=alt status = %d, body: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ALT HOME") {
+		t.Errorf("preview did not render the alt theme template:\n%s", body)
+	}
+	if !strings.Contains(body, `href="/themes/alt/assets/style.css"`) {
+		t.Errorf("preview assets not scoped to the previewed theme:\n%s", body)
+	}
+	if strings.Contains(body, `href="/theme-assets/style.css"`) {
+		t.Errorf("preview still points at the active-theme asset prefix:\n%s", body)
+	}
+
+	// The scoped asset URL resolves to the previewed theme's file.
+	w = doPublicRequest(t, r, "/themes/alt/assets/style.css")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /themes/alt/assets/style.css status = %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "alt-theme-css") {
+		t.Errorf("alt asset content unexpected:\n%s", w.Body.String())
+	}
+
+	// The unscoped prefix still resolves to the active theme, unchanged.
+	w = doPublicRequest(t, r, "/theme-assets/style.css")
+	if w.Code != http.StatusOK || strings.Contains(w.Body.String(), "alt-theme-css") {
+		t.Errorf("active theme asset resolution changed: status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+// TestThemePreview_KeepsThemeAcrossNavigation verifies links inside a preview
+// keep the previewed theme when followed.
+func TestThemePreview_KeepsThemeAcrossNavigation(t *testing.T) {
+	r, renderer, _ := newPublicRouter(t)
+	installPreviewTheme(t, renderer, "alt")
+
+	w := doPublicRequest(t, r, "/?theme=alt")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /?theme=alt status = %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		`href="/post/hello-world?theme=alt"`,
+		`href="/?theme=alt"`,
+		`href="/?category=Go&theme=alt"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("preview link %s missing:\n%s", want, body)
+		}
+	}
+
+	// Following a previewed link renders the alt theme again.
+	w = doPublicRequest(t, r, "/post/hello-world?theme=alt")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /post/hello-world?theme=alt status = %d, body: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "ALT POST") ||
+		!strings.Contains(w.Body.String(), `href="/themes/alt/assets/style.css"`) {
+		t.Errorf("navigated preview did not stay on the alt theme:\n%s", w.Body.String())
+	}
+}
+
+// TestThemePreview_NoOverrideUnchanged ensures normal requests keep the stable
+// /theme-assets/ prefix and do not gain a theme query parameter.
+func TestThemePreview_NoOverrideUnchanged(t *testing.T) {
+	r, renderer, _ := newPublicRouter(t)
+	installPreviewTheme(t, renderer, "alt")
+
+	w := doPublicRequest(t, r, "/")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET / status = %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `href="/theme-assets/style.css"`) {
+		t.Errorf("normal page lost the stable asset prefix:\n%s", body)
+	}
+	if strings.Contains(body, "/themes/alt/") || strings.Contains(body, "?theme=") {
+		t.Errorf("normal page was rewritten for preview:\n%s", body)
 	}
 }
 
