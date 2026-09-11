@@ -580,6 +580,52 @@ func TestSecurityHeaders(t *testing.T) {
 	}
 }
 
+// TestSanitizeQuery_RedactsCredentials guards the access log against logging
+// credential-bearing query parameters, including the OAuth callback values.
+func TestSanitizeQuery_RedactsCredentials(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{"email token", "token=secret-token"},
+		{"oauth code", "method=sso_get_token&code=abc123&state=nonce"},
+		{"api key", "api_key=sk-live-123"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeQuery(tc.query)
+			for _, secret := range []string{"secret-token", "abc123", "nonce", "sk-live-123"} {
+				if strings.Contains(got, secret) {
+					t.Errorf("sanitizeQuery(%q) leaked %q: %q", tc.query, secret, got)
+				}
+			}
+			if !strings.Contains(got, "REDACTED") {
+				t.Errorf("sanitizeQuery(%q) = %q, want a redaction marker", tc.query, got)
+			}
+		})
+	}
+
+	// Non-sensitive queries pass through unchanged.
+	if got := sanitizeQuery("page=2&search=go"); got != "page=2&search=go" {
+		t.Errorf("sanitizeQuery dropped a safe query: %q", got)
+	}
+}
+
+// TestSanitizeReferer_DropsQuery ensures a token in the page URL cannot leak
+// into logs through the Referer of a subresource request.
+func TestSanitizeReferer_DropsQuery(t *testing.T) {
+	got := sanitizeReferer("https://blog.example.com/admin/verify-email?token=abc123")
+	if strings.Contains(got, "abc123") {
+		t.Errorf("sanitizeReferer leaked the token: %q", got)
+	}
+	if got != "https://blog.example.com/admin/verify-email" {
+		t.Errorf("sanitizeReferer = %q, want the URL without its query", got)
+	}
+	if sanitizeReferer("") != "" {
+		t.Error("empty referer must stay empty")
+	}
+}
+
 func TestRequestLogger_LogsRequest(t *testing.T) {
 	var buf bytes.Buffer
 

@@ -25,7 +25,7 @@ var (
 // layer as well as in the frontend form validation.
 var ReservedSlugs = map[string]struct{}{
 	"post": {}, "posts": {}, "user": {}, "users": {},
-	"admin": {}, "api": {}, "theme-assets": {}, "themes": {},
+	"admin": {}, "api": {}, "theme-assets": {}, "themes": {}, "uploads": {},
 	"assets": {}, "favicon.ico": {},
 	"login": {}, "register": {}, "reset-password": {}, "verify-email": {},
 	"write": {}, "edit-post": {}, "profile": {}, "my-posts": {},

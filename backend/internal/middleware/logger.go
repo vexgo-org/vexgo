@@ -10,9 +10,18 @@ import (
 )
 
 // redactedQueryParams are query parameters whose values are credentials and
-// must not end up in access logs.
+// must not end up in access logs. Besides the emailed account tokens this
+// covers the OAuth/OIDC callback parameters (authorization code and state
+// nonce) and the common credential field names.
 var redactedQueryParams = map[string]struct{}{
-	"token": {},
+	"token":         {},
+	"code":          {},
+	"state":         {},
+	"access_token":  {},
+	"refresh_token": {},
+	"id_token":      {},
+	"api_key":       {},
+	"password":      {},
 }
 
 // sanitizeQuery strips credential-bearing query parameters (e.g. the emailed
@@ -37,6 +46,24 @@ func sanitizeQuery(rawQuery string) string {
 		return rawQuery
 	}
 	return values.Encode()
+}
+
+// sanitizeReferer drops the query and fragment from a Referer URL before it is
+// logged. A page that carries a credential in its query (the emailed
+// ?token=... link, an OAuth ?code=... callback) leaks it into the Referer of
+// every same-origin subresource it loads, so the query is never logged.
+func sanitizeReferer(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		// Unparseable referer: drop it rather than risk logging a credential.
+		return ""
+	}
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }
 
 // RequestLogger is a Gin middleware that logs HTTP requests and responses
@@ -80,7 +107,7 @@ func RequestLogger() gin.HandlerFunc {
 			slog.String("duration", duration.String()),
 			slog.String("ip", c.ClientIP()),
 			slog.String("userAgent", c.Request.UserAgent()),
-			slog.String("referer", c.Request.Referer()),
+			slog.String("referer", sanitizeReferer(c.Request.Referer())),
 		}
 
 		// Add user ID if available
