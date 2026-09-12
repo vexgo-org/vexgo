@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 )
 
@@ -63,33 +63,22 @@ func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, 
 	c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
 }
 
-// isPreviewAdmin reports whether the request carries an admin JWT, granting
-// draft-page previews (?preview=1). Without a configured secret it is false.
+// isPreviewAdmin reports whether the request carries a still-valid admin JWT,
+// granting draft-page previews (?preview=1).
+//
+// The token is resolved against the database through middleware.TokenUser — the
+// same rules the API applies — so the role comes from the stored account, not
+// from the token claim. Trusting the claim alone would let a demoted admin (or
+// a token invalidated by a password change or a later login) keep previewing
+// unpublished pages until it expires.
 func (r *Renderer) isPreviewAdmin(c *gin.Context) bool {
-	if len(r.jwtSecret) == 0 {
-		return false
-	}
 	header := c.GetHeader("Authorization")
 	parts := strings.SplitN(header, " ", 2)
 	if len(parts) != 2 || parts[0] != "Bearer" || parts[1] == "" {
 		return false
 	}
-	token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
-		// Pin the algorithm to HS256, the only one this server issues.
-		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
-			return nil, jwt.ErrTokenUnverifiable
-		}
-		return r.jwtSecret, nil
-	})
-	if err != nil || !token.Valid {
-		return false
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return false
-	}
-	role, _ := claims["role"].(string)
-	return model.IsAdmin(role)
+	user, ok := middleware.TokenUser(r.db, r.jwtSecret, parts[1])
+	return ok && model.IsAdmin(user.Role)
 }
 
 // handleIndex renders the home page: published posts, paginated, with the

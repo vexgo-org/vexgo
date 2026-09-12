@@ -274,3 +274,59 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// TokenUser validates a raw bearer token and resolves it to the current
+// database user, applying every rule JWTAuth applies to a request: the token
+// must be HS256-signed with this server's secret, carry a usable user_id, and
+// name an account that still exists with a matching password version and a last
+// login no later than the token's iat.
+//
+// It is the shared entry point for callers outside the middleware chain (the
+// public renderer's draft-page preview) so they cannot re-derive authorization
+// from the token's role claim. The returned role is read from the database, and
+// the absence of a database fails closed rather than trusting the signature
+// alone.
+func TokenUser(db *gorm.DB, secret []byte, rawToken string) (model.User, bool) {
+	if db == nil || rawToken == "" || len(secret) == 0 {
+		return model.User{}, false
+	}
+
+	token, err := jwt.Parse(rawToken, func(token *jwt.Token) (any, error) {
+		// Same pin as JWTAuth: only this server's HS256 tokens are verified.
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, jwt.ErrTokenUnverifiable
+		}
+		return secret, nil
+	})
+	if err != nil || !token.Valid {
+		return model.User{}, false
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return model.User{}, false
+	}
+	userID := claimsUserID(claims)
+	if userID == 0 {
+		return model.User{}, false
+	}
+
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		// The token names an account that no longer exists; never fall back
+		// to its role claim.
+		return model.User{}, false
+	}
+	if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
+		if int(tokenPasswordVersion) != user.PasswordVersion {
+			return model.User{}, false
+		}
+	}
+	if tokenIat, ok := claims["iat"].(float64); ok {
+		if int64(tokenIat) < user.LastLoginAt.Unix() {
+			return model.User{}, false
+		}
+	}
+
+	return user, true
+}
