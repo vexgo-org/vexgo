@@ -132,8 +132,13 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 		slog.Warn("failed to increment view count", "err", err)
 	}
 
-	// Fill likes count and current logged-in user's like status
-	count, _ := s.repo.CountLikes(ctx, post.ID)
+	// Fill likes count and current logged-in user's like status. Counts are
+	// enrichment, so a failed count must not fail the read — but reporting the
+	// zero value as if it were real would show the reader a wrong number.
+	count, countErr := s.repo.CountLikes(ctx, post.ID)
+	if countErr != nil {
+		slog.Warn("failed to count post likes", "postID", post.ID, "err", countErr)
+	}
 	post.LikesCount = int(count)
 	post.IsLiked = false
 	if currentUserID != 0 {
@@ -143,7 +148,10 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 	}
 
 	// Fill comments count
-	ccount, _ := s.repo.CountComments(ctx, post.ID)
+	ccount, ccErr := s.repo.CountComments(ctx, post.ID)
+	if ccErr != nil {
+		slog.Warn("failed to count post comments", "postID", post.ID, "err", ccErr)
+	}
 	post.CommentsCount = int(ccount)
 
 	return post, nil
@@ -562,11 +570,24 @@ func (s *Service) populateCounts(ctx context.Context, posts []model.Post, userID
 		postIDs[i] = posts[i].ID
 	}
 
-	likesCounts, _ := s.repo.BatchCountLikesByPostIDs(ctx, postIDs)
-	commentsCounts, _ := s.repo.BatchCountCommentsByPostIDs(ctx, postIDs)
+	// Counts are enrichment: a failed batch must not fail the whole list, but
+	// silently substituting zero would report wrong numbers for every row. A
+	// nil likedPosts would likewise mark every post as unliked for a reader who
+	// has liked some of them.
+	likesCounts, err := s.repo.BatchCountLikesByPostIDs(ctx, postIDs)
+	if err != nil {
+		slog.Warn("failed to count likes for post list", "posts", len(postIDs), "err", err)
+	}
+	commentsCounts, err := s.repo.BatchCountCommentsByPostIDs(ctx, postIDs)
+	if err != nil {
+		slog.Warn("failed to count comments for post list", "posts", len(postIDs), "err", err)
+	}
 	var likedPosts map[uint]bool
 	if userID != 0 {
-		likedPosts, _ = s.repo.BatchFindLikedPostIDs(ctx, postIDs, userID)
+		likedPosts, err = s.repo.BatchFindLikedPostIDs(ctx, postIDs, userID)
+		if err != nil {
+			slog.Warn("failed to load liked posts for post list", "posts", len(postIDs), "err", err)
+		}
 	}
 
 	for i := range posts {

@@ -67,6 +67,40 @@ func (h *capturingHandler) find(t *testing.T, msg string) (slog.Record, bool) {
 	return slog.Record{}, false
 }
 
+// statLogged reports whether a failed-count record was emitted for the named
+// counter.
+func statLogged(t *testing.T, h *capturingHandler, stat string) bool {
+	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.records {
+		if r.Message == "failed to count site stat" && attr(t, r, "stat").String() == stat {
+			return true
+		}
+	}
+	return false
+}
+
+// A failing counter must not blank the dashboard, but it must not be reported
+// as a plain zero either: a permanently zeroed stat would otherwise be
+// indistinguishable from a site with no content.
+func TestStats_CounterFailuresAreLogged(t *testing.T) {
+	logs := captureLogs(t)
+	repo := &fakeRepo{countsErr: errors.New("db down")}
+	svc := &Service{repo: repo}
+
+	stats := svc.Stats(context.Background(), "user")
+	if stats != (Stats{}) {
+		t.Errorf("expected every counter to fall back to zero, got %+v", stats)
+	}
+
+	for _, stat := range []string{"posts", "users", "categories", "tags", "comments"} {
+		if !statLogged(t, logs, stat) {
+			t.Errorf("expected the failed %s count to be logged", stat)
+		}
+	}
+}
+
 func TestCachedRepository_SettingsDecodeFailureIsLogged(t *testing.T) {
 	ctx := context.Background()
 	logs := captureLogs(t)

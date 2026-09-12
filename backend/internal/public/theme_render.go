@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"maps"
 	"net/url"
 	"os"
@@ -858,7 +859,14 @@ func (r *Renderer) loadThemeSources(themeID string) (map[string]string, error) {
 	if len(files) == 0 {
 		return nil, ErrNoThemeTemplates
 	}
-	modSum, _ := r.templateModSum(themeID)
+	// A failed mod sum leaves the cache entry unable to match on the next
+	// lookup, so the theme is re-parsed every request. That is correct output at
+	// a large cost, which is why it is recorded — at debug level, since the
+	// signal is cache effectiveness and this sits on the render path.
+	modSum, err := r.templateModSum(themeID)
+	if err != nil {
+		slog.Debug("failed to compute theme mod sum; caching disabled", "theme", themeID, "err", err)
+	}
 	themeSourcesCache.themes[themeID] = themeSources{files: files, modSum: modSum}
 	return files, nil
 }
@@ -997,7 +1005,12 @@ func (r *Renderer) loadTheme(themeID string) (*template.Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	modSum, _ := r.templateModSum(themeID)
+	// See loadThemeSources: a failed mod sum costs a re-parse per request
+	// rather than serving a stale template, so it degrades performance only.
+	modSum, err := r.templateModSum(themeID)
+	if err != nil {
+		slog.Debug("failed to compute theme mod sum; caching disabled", "theme", themeID, "err", err)
+	}
 	themeCache.themes[themeID] = cachedTheme{tmpl: tmpl, modSum: modSum}
 	return tmpl, nil
 }

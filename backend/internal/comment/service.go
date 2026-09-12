@@ -219,7 +219,13 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment
 		}
 	}
 
-	count, _ := s.repo.CountByPostID(ctx, req.PostID)
+	// The count is returned so the client can sync its counter. It is not worth
+	// failing a successful post over, but a fabricated zero would silently
+	// resync the client to the wrong number.
+	count, err := s.repo.CountByPostID(ctx, req.PostID)
+	if err != nil {
+		slog.Warn("failed to count comments for post", "postID", req.PostID, "err", err)
+	}
 	return &comment, count, nil
 }
 
@@ -378,8 +384,12 @@ func (s *Service) Delete(ctx context.Context, commentID string, userID uint) (in
 		return 0, err
 	}
 
-	// Return comment count after deletion for frontend sync
-	count, _ := s.repo.CountByPostID(ctx, comment.PostID)
+	// Return comment count after deletion for frontend sync. The delete already
+	// succeeded, so a failed count is logged rather than reported as zero.
+	count, err := s.repo.CountByPostID(ctx, comment.PostID)
+	if err != nil {
+		slog.Warn("failed to count comments for post", "postID", comment.PostID, "err", err)
+	}
 	return count, nil
 }
 
