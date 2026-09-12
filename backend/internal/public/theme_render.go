@@ -333,14 +333,24 @@ type cachedTheme struct {
 	modSum time.Time
 }
 
-var themeCache struct {
+// themeCacheStore guards the parsed-template cache. Its map is created lazily
+// on the first write, so the zero value is usable and no init() function
+// ordering is involved.
+type themeCacheStore struct {
 	sync.Mutex
 	themes map[string]cachedTheme
 }
 
-func init() {
-	themeCache.themes = make(map[string]cachedTheme)
+// store records a parsed template set, creating the map on first use. Callers
+// must hold the mutex.
+func (s *themeCacheStore) store(themeID string, entry cachedTheme) {
+	if s.themes == nil {
+		s.themes = make(map[string]cachedTheme)
+	}
+	s.themes[themeID] = entry
 }
+
+var themeCache themeCacheStore
 
 // buildSiteData loads the site-wide settings for theme rendering, falling
 // back to safe defaults when no settings row exists. lang is the already
@@ -817,14 +827,23 @@ type themeSources struct {
 	modSum time.Time
 }
 
-var themeSourcesCache struct {
+// themeSourcesStore guards the raw template text cache. Like themeCacheStore,
+// it creates its map lazily so the zero value is usable.
+type themeSourcesStore struct {
 	sync.Mutex
 	themes map[string]themeSources
 }
 
-func init() {
-	themeSourcesCache.themes = make(map[string]themeSources)
+// store records the sources of a theme, creating the map on first use. Callers
+// must hold the mutex.
+func (s *themeSourcesStore) store(themeID string, sources themeSources) {
+	if s.themes == nil {
+		s.themes = make(map[string]themeSources)
+	}
+	s.themes[themeID] = sources
 }
+
+var themeSourcesCache themeSourcesStore
 
 // loadThemeSources reads every template file the theme provides into memory.
 // Besides the base ThemeTemplateNames, any extra <slug>.html file at the
@@ -875,7 +894,7 @@ func (r *Renderer) loadThemeSources(themeID string) (map[string]string, error) {
 	if err != nil {
 		slog.Debug("failed to compute theme mod sum; caching disabled", "theme", themeID, "err", err)
 	}
-	themeSourcesCache.themes[themeID] = themeSources{files: files, modSum: modSum}
+	themeSourcesCache.store(themeID, themeSources{files: files, modSum: modSum})
 	return files, nil
 }
 
@@ -1019,7 +1038,7 @@ func (r *Renderer) loadTheme(themeID string) (*template.Template, error) {
 	if err != nil {
 		slog.Debug("failed to compute theme mod sum; caching disabled", "theme", themeID, "err", err)
 	}
-	themeCache.themes[themeID] = cachedTheme{tmpl: tmpl, modSum: modSum}
+	themeCache.store(themeID, cachedTheme{tmpl: tmpl, modSum: modSum})
 	return tmpl, nil
 }
 

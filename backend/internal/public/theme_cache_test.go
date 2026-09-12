@@ -2,28 +2,53 @@ package public
 
 import "testing"
 
-// TestThemeCachesAreInitialized pins the package-level caches to a usable zero
-// state. themeCache and themeSourcesCache are each filled by their own init
-// function, and a nil map panics on its first write — so a refactor that drops
-// one of the initializers (or merges the two incorrectly) turns the first theme
-// render into a panic instead of a parse. Both must therefore start non-nil and
-// writable.
-func TestThemeCachesAreInitialized(t *testing.T) {
-	if themeCache.themes == nil {
-		t.Fatal("themeCache.themes is nil: the first loadTheme write would panic")
-	}
-	if themeSourcesCache.themes == nil {
-		t.Fatal("themeSourcesCache.themes is nil: the first loadThemeSources write would panic")
-	}
-
-	// Non-nil is not enough: each map must accept a write under its lock.
+// TestThemeCachesAreUsableWithoutInitialization pins the zero-value contract of
+// the two package-level theme caches. Each map is created lazily on its first
+// write, so a process that never runs an initializer still renders a theme
+// instead of panicking on a nil map write. The maps are reset to nil here to
+// exercise exactly that path.
+func TestThemeCachesAreUsableWithoutInitialization(t *testing.T) {
 	themeCache.Lock()
-	themeCache.themes["__init_test__"] = cachedTheme{}
-	delete(themeCache.themes, "__init_test__")
+	savedThemes := themeCache.themes
+	themeCache.themes = nil
 	themeCache.Unlock()
 
 	themeSourcesCache.Lock()
-	themeSourcesCache.themes["__init_test__"] = themeSources{}
-	delete(themeSourcesCache.themes, "__init_test__")
+	savedSources := themeSourcesCache.themes
+	themeSourcesCache.themes = nil
 	themeSourcesCache.Unlock()
+
+	t.Cleanup(func() {
+		themeCache.Lock()
+		themeCache.themes = savedThemes
+		themeCache.Unlock()
+
+		themeSourcesCache.Lock()
+		themeSourcesCache.themes = savedSources
+		themeSourcesCache.Unlock()
+	})
+
+	r := newTestRenderer(t)
+	if _, err := r.loadTheme(DefaultTheme); err != nil {
+		t.Fatalf("loadTheme on an uninitialized cache: %v", err)
+	}
+	if _, err := r.loadThemeSources(DefaultTheme); err != nil {
+		t.Fatalf("loadThemeSources on an uninitialized cache: %v", err)
+	}
+
+	// The first write must not only avoid panicking but also populate the map,
+	// or every request re-parses the theme.
+	themeCache.Lock()
+	_, cachedTemplate := themeCache.themes[DefaultTheme]
+	themeCache.Unlock()
+	if !cachedTemplate {
+		t.Error("loadTheme did not cache the parsed template set")
+	}
+
+	themeSourcesCache.Lock()
+	_, cachedSources := themeSourcesCache.themes[DefaultTheme]
+	themeSourcesCache.Unlock()
+	if !cachedSources {
+		t.Error("loadThemeSources did not cache the theme sources")
+	}
 }
