@@ -82,13 +82,13 @@ const (
 // does not exist. It costs one bcrypt evaluation at DefaultCost — the same
 // work as a real comparison — so response timing cannot reveal which
 // addresses are registered.
-var dummyPasswordHash = func() []byte {
-	hash, err := bcrypt.GenerateFromPassword([]byte(dummyPasswordSource), bcrypt.DefaultCost)
-	if err != nil {
-		panic("auth: failed to generate dummy password hash: " + err.Error())
-	}
-	return hash
-}()
+//
+// The literal is a hash of dummyPasswordSource at bcrypt.DefaultCost. Since
+// both inputs are fixed the result is too, so there is nothing to compute at
+// startup — and deriving it at runtime could only fail, in package
+// initialisation, before the logger exists. TestDummyPasswordHashMatchesSource
+// keeps the literal in step with dummyPasswordSource and DefaultCost.
+const dummyPasswordHash = "$2a$10$hmu1R6rZHBXkDRgiC38cdeGmpATYlujC3EghVel5waX47kFlpcljK"
 
 // Deps holds the dependencies required by the auth domain.
 type Deps struct {
@@ -172,7 +172,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 		// costs about as much as the real comparison below; otherwise the
 		// timing gap would allow enumerating registered emails.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
+			_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(req.Password))
 		}
 		return "", nil, ErrInvalidCredentials
 	}
