@@ -291,23 +291,11 @@ const maxModerationReason = 500
 // notification body.
 const notificationExcerptRunes = 50
 
-// truncateRunes shortens s to at most n runes without splitting one. Slicing
-// by byte length instead would cut a multi-byte character in half and carry
-// invalid UTF-8 into the database, which strict backends (MySQL/PostgreSQL)
-// reject outright.
-func truncateRunes(s string, n int) string {
-	runes := []rune(s)
-	if len(runes) <= n {
-		return s
-	}
-	return string(runes[:n])
-}
-
 // truncateReason caps a moderation reason at the column limit, counting
 // runes, so an oversized model reply or keyword cannot break comment
 // persistence on strict databases (MySQL/PostgreSQL).
 func truncateReason(reason string) string {
-	return truncateRunes(reason, maxModerationReason)
+	return model.TruncateRunes(reason, maxModerationReason)
 }
 
 // excerptForNotification quotes at most notificationExcerptRunes runes of a
@@ -317,7 +305,7 @@ func truncateReason(reason string) string {
 // UTF-8 and the insert failed on MySQL/PostgreSQL — silently losing the
 // notification.
 func excerptForNotification(content string) string {
-	excerpt := truncateRunes(content, notificationExcerptRunes)
+	excerpt := model.TruncateRunes(content, notificationExcerptRunes)
 	if excerpt == content {
 		return content
 	}

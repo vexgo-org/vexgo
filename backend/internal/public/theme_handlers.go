@@ -26,41 +26,55 @@ func (r *Renderer) requestContext(c *gin.Context, theme string) (*SiteData, Dict
 	return site, r.loadMergedDict(theme, lang, site.DefaultLanguage)
 }
 
+// pageRender is one SSR page to render: which theme and template file to use,
+// the data handed to the template, and the theme's language dictionary.
+// Keeping the coordinates in one value keeps the render helpers at two
+// parameters as they grow.
+type pageRender struct {
+	Theme string
+	Page  string
+	Data  any
+	Dict  Dict
+}
+
 // renderRequestPage renders one SSR page and scopes it to the previewed theme
 // when the request is entitled to the ?theme= admin preview switch. Plain
 // requests and non-request callers use renderThemeWithDict directly so no
 // rewriting leaks into the site-wide render path.
-func (r *Renderer) renderRequestPage(c *gin.Context, themeID, page string, data any, dict Dict) ([]byte, error) {
-	out, err := r.renderThemeWithDict(themeID, page, data, dict)
+func (r *Renderer) renderRequestPage(c *gin.Context, p pageRender) ([]byte, error) {
+	out, err := r.renderThemeWithDict(p.Theme, p.Page, p.Data, p.Dict)
 	if err != nil {
 		return nil, err
 	}
-	if preview, token, ok := r.previewThemeOverride(c); ok && preview == themeID {
-		out = rewriteThemePreview(out, themeID, token)
+	if preview, token, ok := r.previewThemeOverride(c); ok && preview == p.Theme {
+		out = rewriteThemePreview(out, p.Theme, token)
 	}
 	return out, nil
 }
 
-// servePage renders one page of the requested theme and writes it as HTML.
-// When rendering fails (theme missing a template, template syntax error) it
-// falls back to a plain 404 so public routes never crash.
-func (r *Renderer) servePage(c *gin.Context, theme, page string, data any, status int, dict Dict) {
-	out, err := r.renderRequestPage(c, theme, page, data, dict)
+// servePage renders one page of the requested theme and writes it as HTML with
+// a 200 status. When rendering fails (theme missing a template, template syntax
+// error) it falls back to a plain 404 so public routes never crash.
+func (r *Renderer) servePage(c *gin.Context, p pageRender) {
+	out, err := r.renderRequestPage(c, p)
 	if err != nil {
 		c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
 		return
 	}
-	c.Data(status, htmlContentType, out)
+	c.Data(http.StatusOK, htmlContentType, out)
 }
 
 // renderNotFound renders the theme's 404 template (when present) with a plain
-// fallback otherwise.
+// fallback otherwise. Both outcomes are a 404, so the body is the only thing
+// the render decides.
 func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, dict Dict) {
-	if out, err := r.renderRequestPage(c, theme, NotFoundTemplate, NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}, dict); err == nil {
-		c.Data(http.StatusNotFound, htmlContentType, out)
+	data := NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}
+	out, err := r.renderRequestPage(c, pageRender{Theme: theme, Page: NotFoundTemplate, Data: data, Dict: dict})
+	if err != nil {
+		c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
 		return
 	}
-	c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
+	c.Data(http.StatusNotFound, htmlContentType, out)
 }
 
 // previewThemeOverride returns the theme selected by the ?theme= preview
@@ -108,12 +122,11 @@ func (r *Renderer) isPreviewAdmin(c *gin.Context) bool {
 
 // checkPreviewAdmin performs the uncached preview-admin check.
 func (r *Renderer) checkPreviewAdmin(c *gin.Context) bool {
-	header := c.GetHeader("Authorization")
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 || parts[0] != "Bearer" || parts[1] == "" {
+	token, ok := middleware.BearerToken(c.GetHeader("Authorization"))
+	if !ok {
 		return false
 	}
-	user, ok := middleware.TokenUser(r.db, r.jwtSecret, parts[1])
+	user, ok := middleware.TokenUser(c.Request.Context(), r.db, r.jwtSecret, token)
 	return ok && model.IsAdmin(user.Role)
 }
 
@@ -126,7 +139,13 @@ func (r *Renderer) handleIndex(c *gin.Context) {
 	search := c.Query("search")
 	category := c.Query("category")
 
-	posts, pagination, _, err := r.listPageData(c.Request.Context(), "/", page, site.ItemsPerPage, search, category, 0)
+	posts, pagination, _, err := r.listPageData(c.Request.Context(), postListQuery{
+		Base:     "/",
+		Page:     page,
+		Limit:    site.ItemsPerPage,
+		Search:   search,
+		Category: category,
+	})
 	if err != nil {
 		r.renderNotFound(c, theme, site, dict)
 		return
@@ -142,7 +161,7 @@ func (r *Renderer) handleIndex(c *gin.Context) {
 		categories = nil
 	}
 
-	r.servePage(c, theme, IndexTemplate, IndexData{
+	data := IndexData{
 		Site:         site,
 		Posts:        posts,
 		Pages:        r.buildNavPages(c.Request.Context()),
@@ -151,7 +170,8 @@ func (r *Renderer) handleIndex(c *gin.Context) {
 		Categories:   categories,
 		PopularPosts: r.popularPostsData(c.Request.Context(), 5),
 		PopularTags:  r.popularTagsData(c.Request.Context(), 10),
-	}, http.StatusOK, dict)
+	}
+	r.servePage(c, pageRender{Theme: theme, Page: IndexTemplate, Data: data, Dict: dict})
 }
 
 // handlePost renders a published post by slug. Drafts, pending and rejected
@@ -198,7 +218,7 @@ func (r *Renderer) handlePost(c *gin.Context) {
 		data.Post.Tags = append(data.Post.Tags, tag.Name)
 	}
 
-	r.servePage(c, theme, PostTemplate, data, http.StatusOK, dict)
+	r.servePage(c, pageRender{Theme: theme, Page: PostTemplate, Data: data, Dict: dict})
 }
 
 // handleUser renders a user's public profile and their published posts.
@@ -222,15 +242,12 @@ func (r *Renderer) handleUser(c *gin.Context) {
 	}
 
 	page := parsePageParam(c)
-	posts, pagination, total, err := r.listPageData(
-		c.Request.Context(),
-		"/user/"+strconv.FormatUint(userID, 10),
-		page,
-		site.ItemsPerPage,
-		"",
-		"",
-		uint(userID),
-	)
+	posts, pagination, total, err := r.listPageData(c.Request.Context(), postListQuery{
+		Base:     "/user/" + strconv.FormatUint(userID, 10),
+		Page:     page,
+		Limit:    site.ItemsPerPage,
+		AuthorID: uint(userID),
+	})
 	if err != nil {
 		r.renderNotFound(c, theme, site, dict)
 		return
@@ -248,7 +265,7 @@ func (r *Renderer) handleUser(c *gin.Context) {
 	data.Posts = posts
 	data.Pagination = pagination
 
-	r.servePage(c, theme, UserTemplate, data, http.StatusOK, dict)
+	r.servePage(c, pageRender{Theme: theme, Page: UserTemplate, Data: data, Dict: dict})
 }
 
 // handlePage renders a custom page at /:slug. Template resolution is
@@ -290,11 +307,11 @@ func (r *Renderer) handlePage(c *gin.Context) {
 	data.Page.URL = "/" + page.Slug
 
 	if dedicated := page.Slug + ".html"; r.themeProvides(theme, dedicated) {
-		r.servePage(c, theme, dedicated, data, http.StatusOK, dict)
+		r.servePage(c, pageRender{Theme: theme, Page: dedicated, Data: data, Dict: dict})
 		return
 	}
 	if r.themeProvides(theme, PageTemplate) {
-		r.servePage(c, theme, PageTemplate, data, http.StatusOK, dict)
+		r.servePage(c, pageRender{Theme: theme, Page: PageTemplate, Data: data, Dict: dict})
 		return
 	}
 	r.renderNotFound(c, theme, site, dict)

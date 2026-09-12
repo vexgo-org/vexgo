@@ -433,7 +433,9 @@ func (s *Service) callbackURI(c *gin.Context, provider string) string {
 	// mirroring auth's emailed-link handling — otherwise a client could steer
 	// the OAuth redirect_uri with a forged header.
 	scheme := "http"
-	if c.Request.TLS != nil || (s.honorForwardedProto && c.GetHeader("X-Forwarded-Proto") == "https") {
+	directTLS := c.Request.TLS != nil
+	forwardedHTTPS := s.honorForwardedProto && c.GetHeader("X-Forwarded-Proto") == "https"
+	if directTLS || forwardedHTTPS {
 		scheme = "https"
 	}
 

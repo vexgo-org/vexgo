@@ -17,7 +17,7 @@ type Repository interface {
 	Create(ctx context.Context, page *model.Page) error
 	Save(ctx context.Context, page *model.Page) error
 	Delete(ctx context.Context, page *model.Page) error
-	List(ctx context.Context, status, search string, page, limit int) ([]model.Page, int64, error)
+	List(ctx context.Context, q ListQuery) ([]model.Page, int64, error)
 	ListNav(ctx context.Context) ([]model.Page, error)
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
 }
@@ -49,7 +49,10 @@ func (r *gormRepository) FindBySlug(ctx context.Context, slug string) (*model.Pa
 
 func (r *gormRepository) SlugExists(ctx context.Context, slug string) (bool, error) {
 	var count int64
-	if err := r.db.WithContext(ctx).Model(&model.Page{}).Where("slug = ?", slug).Count(&count).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Model(&model.Page{}).
+		Where("slug = ?", slug).
+		Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -57,7 +60,10 @@ func (r *gormRepository) SlugExists(ctx context.Context, slug string) (bool, err
 
 func (r *gormRepository) SlugExistsExcludeID(ctx context.Context, slug string, excludeID uint) (bool, error) {
 	var count int64
-	if err := r.db.WithContext(ctx).Model(&model.Page{}).Where("slug = ? AND id != ?", slug, excludeID).Count(&count).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Model(&model.Page{}).
+		Where("slug = ? AND id != ?", slug, excludeID).
+		Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -75,20 +81,24 @@ func (r *gormRepository) Delete(ctx context.Context, page *model.Page) error {
 	return r.db.WithContext(ctx).Delete(page).Error
 }
 
-func (r *gormRepository) List(ctx context.Context, status, search string, page, limit int) ([]model.Page, int64, error) {
+func (r *gormRepository) List(ctx context.Context, q ListQuery) ([]model.Page, int64, error) {
 	query := r.db.WithContext(ctx).Model(&model.Page{}).Preload("Author")
-	if status != "" {
-		query = query.Where("status = ?", status)
+	if q.Status != "" {
+		query = query.Where("status = ?", q.Status)
 	}
-	if search != "" {
-		query = query.Where("title LIKE ? OR slug LIKE ?", "%"+search+"%", "%"+search+"%")
+	if q.Search != "" {
+		query = query.Where("title LIKE ? OR slug LIKE ?", "%"+q.Search+"%", "%"+q.Search+"%")
 	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var pages []model.Page
-	if err := query.Order("sort_order ASC, id ASC").Offset((page - 1) * limit).Limit(limit).Find(&pages).Error; err != nil {
+	if err := query.
+		Order("sort_order ASC, id ASC").
+		Offset((q.Page - 1) * q.Limit).
+		Limit(q.Limit).
+		Find(&pages).Error; err != nil {
 		return nil, 0, err
 	}
 	return pages, total, nil

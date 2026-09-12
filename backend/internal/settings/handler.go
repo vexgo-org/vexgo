@@ -24,6 +24,37 @@ import (
 // value can never traverse out of the themes directory.
 var themeIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
+// isSafeThemeID reports whether id is a usable theme directory name: an
+// allowlisted identifier that is not the built-in default theme. The empty
+// string fails the pattern, so it needs no separate check. Ids that may come
+// from an uploaded manifest must pass this before any filepath.Join.
+func isSafeThemeID(id string) bool {
+	isDefault := id == public.DefaultTheme
+	return !isDefault && themeIDPattern.MatchString(id)
+}
+
+// isThemeConfigError reports whether err is a caller-fixable theme
+// configuration problem (unknown theme, broken templates, invalid preview URL
+// or metadata). Those map to 400 with the error text echoed back, unlike
+// internal failures (500).
+func isThemeConfigError(err error) bool {
+	isUnknown := errors.Is(err, ErrThemeNotFound)
+	isBroken := errors.Is(err, ErrThemeTemplatesInvalid)
+	isBadPreview := errors.Is(err, ErrInvalidPreviewURL)
+	isBadMeta := errors.Is(err, ErrInvalidThemeMeta)
+	return isUnknown || isBroken || isBadPreview || isBadMeta
+}
+
+// hasRequiredThemeMeta reports whether an uploaded manifest carries every
+// required field. The id doubles as the install directory, so all three are
+// load-bearing.
+func hasRequiredThemeMeta(info public.ThemeInfo) bool {
+	isIDPresent := info.ID != ""
+	isNamePresent := info.Name != ""
+	isVersionPresent := info.Version != ""
+	return isIDPresent && isNamePresent && isVersionPresent
+}
+
 // Theme archive limits (Q9): reject zip bombs before they touch disk.
 const (
 	maxThemeZipBytes        = 32 << 20
@@ -397,11 +428,12 @@ func (h *Handler) GetThemes(c *gin.Context) {
 //	@Router			/config/themes/{id} [delete]
 func (h *Handler) DeleteTheme(c *gin.Context) {
 	themeID := c.Param("id")
-	if themeID == "" || themeID == public.DefaultTheme || !themeIDPattern.MatchString(themeID) {
-		if themeID == public.DefaultTheme {
-			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: ErrCannotDeleteDefault.Error()})
-			return
-		}
+	if themeID == public.DefaultTheme {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: ErrCannotDeleteDefault.Error()})
+		return
+	}
+	if !themeIDPattern.MatchString(themeID) {
+		// Empty, malformed and unknown ids all 404, matching the lookup below.
 		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: ErrThemeNotFound.Error()})
 		return
 	}
@@ -520,7 +552,7 @@ func (h *Handler) UpdateThemeConfig(c *gin.Context) {
 
 	activeTheme, err := h.svc.UpdateThemeConfig(c.Request.Context(), req.ActiveTheme)
 	if err != nil {
-		if errors.Is(err, ErrThemeNotFound) || errors.Is(err, ErrThemeTemplatesInvalid) || errors.Is(err, ErrInvalidPreviewURL) || errors.Is(err, ErrInvalidThemeMeta) {
+		if isThemeConfigError(err) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
@@ -749,7 +781,7 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 	// Strict metadata validation (Q13): id/name/version are required, the id
 	// must equal the theme directory, and the optional preview cover must be
 	// an http(s) URL (local paths rejected to shrink the attack surface).
-	if themeInfo.ID == "" || themeInfo.Name == "" || themeInfo.Version == "" {
+	if !hasRequiredThemeMeta(themeInfo) {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid theme metadata"})
 		return
 	}
@@ -766,7 +798,7 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 	// vexgo-theme.json, so it is treated as untrusted input: anything but a
 	// plain directory name would make filepath.Join below escape the themes
 	// directory (arbitrary RemoveAll/MkdirAll/write).
-	if themeDir == "" || themeDir == public.DefaultTheme || !themeIDPattern.MatchString(themeDir) {
+	if !isSafeThemeID(themeDir) {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid theme ID"})
 		return
 	}

@@ -20,6 +20,14 @@ import (
 // creates rows for slugs that do not exist yet and never overwrites them.
 const seedDir = "seed"
 
+const (
+	// frontmatterFence opens and closes a seed file's frontmatter block.
+	frontmatterFence = "---"
+	// closeFence terminates the block: the fence plus the newline that ends
+	// the last frontmatter line.
+	closeFence = "\n" + frontmatterFence
+)
+
 // seedSlugRe mirrors the locked page-slug rule (Q18): lowercase ASCII,
 // digits and hyphens. Files whose names do not qualify are skipped.
 var seedSlugRe = regexp.MustCompile(`^[a-z0-9-]{1,100}$`)
@@ -40,37 +48,48 @@ type SeedPage struct {
 func parseSeedFile(slug string, src []byte) SeedPage {
 	seed := SeedPage{Slug: slug, Title: slug, Status: model.PageStatusPublished}
 	text := string(src)
-	rest := text
-	if strings.HasPrefix(text, "---") {
-		if end := strings.Index(text[3:], "\n---"); end >= 0 {
-			for line := range strings.Lines(text[3 : 3+end]) {
-				key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
-				if !ok {
-					continue
-				}
-				value = strings.TrimSpace(value)
-				switch strings.ToLower(strings.TrimSpace(key)) {
-				case "title":
-					if value != "" {
-						seed.Title = value
-					}
-				case "showinnav":
-					seed.ShowInNav = value == "true" || value == "1"
-				case "sortorder":
-					if n, err := strconv.Atoi(value); err == nil {
-						seed.SortOrder = n
-					}
-				case "status":
-					if value == string(model.PageStatusDraft) {
-						seed.Status = model.PageStatusDraft
-					}
-				}
+	if !strings.HasPrefix(text, frontmatterFence) {
+		seed.Content = strings.TrimSpace(text)
+		return seed
+	}
+	bodyStart := len(frontmatterFence)
+	end := strings.Index(text[bodyStart:], closeFence)
+	if end < 0 {
+		// An unterminated block is treated as body text.
+		seed.Content = strings.TrimSpace(text)
+		return seed
+	}
+	applySeedFrontmatter(&seed, text[bodyStart:bodyStart+end])
+	seed.Content = strings.TrimSpace(text[bodyStart+end+len(closeFence):])
+	return seed
+}
+
+// applySeedFrontmatter fills seed from one frontmatter block. Unknown keys and
+// unparseable values are ignored so a single bad line cannot reject the file.
+func applySeedFrontmatter(seed *SeedPage, block string) {
+	for line := range strings.Lines(block) {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "title":
+			if value != "" {
+				seed.Title = value
 			}
-			rest = text[3+end+len("\n---"):]
+		case "showinnav":
+			seed.ShowInNav = value == "true" || value == "1"
+		case "sortorder":
+			if n, err := strconv.Atoi(value); err == nil {
+				seed.SortOrder = n
+			}
+		case "status":
+			if value == string(model.PageStatusDraft) {
+				seed.Status = model.PageStatusDraft
+			}
 		}
 	}
-	seed.Content = strings.TrimSpace(rest)
-	return seed
 }
 
 // LoadThemeSeeds reads a theme's seed pages in filename order. A missing
@@ -147,12 +166,14 @@ func (r *Renderer) EnsureThemeSeeds(ctx context.Context, themeID string) (int, e
 	svc := page.NewService(page.Deps{DB: r.db, JWTSecret: r.jwtSecret})
 	created := 0
 	for _, seed := range seeds {
-		if _, err := svc.GetBySlug(ctx, seed.Slug, model.RoleSuperAdmin); err == nil {
+		_, err := svc.GetBySlug(ctx, seed.Slug, model.RoleSuperAdmin)
+		if err == nil {
 			continue
-		} else if !errors.Is(err, page.ErrPageNotFound) {
+		}
+		if !errors.Is(err, page.ErrPageNotFound) {
 			return created, err
 		}
-		_, err := svc.Create(ctx, model.RoleSuperAdmin, author.ID, page.CreateRequest{
+		_, err = svc.Create(ctx, model.RoleSuperAdmin, author.ID, page.CreateRequest{
 			Slug: seed.Slug, Title: seed.Title, Content: seed.Content,
 			ShowInNav: seed.ShowInNav, SortOrder: seed.SortOrder, Status: seed.Status,
 		})

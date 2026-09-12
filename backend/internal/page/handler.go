@@ -12,6 +12,17 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
+// isPageValidationError reports whether err is a caller-fixable validation
+// failure. Those map to 400 with the error text echoed back, unlike the slug
+// conflicts (409) and repository failures (500).
+func isPageValidationError(err error) bool {
+	isBadRequest := errors.Is(err, ErrBadRequest)
+	isEmptySlug := errors.Is(err, model.ErrEmptySlug)
+	isInvalidSlug := errors.Is(err, model.ErrInvalidSlug)
+	isTooLong := errors.Is(err, model.ErrSlugTooLong)
+	return isBadRequest || isEmptySlug || isInvalidSlug || isTooLong
+}
+
 // Handler exposes the page domain over HTTP.
 type Handler struct {
 	svc *Service
@@ -128,8 +139,11 @@ func (h *Handler) CreatePage(c *gin.Context) {
 		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Admins only"})
 		case errors.Is(err, model.ErrSlugTaken):
-			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another page", Code: "slug_taken"})
-		case errors.Is(err, ErrBadRequest) || errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
+			c.JSON(http.StatusConflict, api.CodeErrorResponse{
+				Error: "Slug is already taken by another page",
+				Code:  "slug_taken",
+			})
+		case isPageValidationError(err):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create page"})
@@ -178,8 +192,11 @@ func (h *Handler) UpdatePage(c *gin.Context) {
 		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Admins only"})
 		case errors.Is(err, model.ErrSlugTaken):
-			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another page", Code: "slug_taken"})
-		case errors.Is(err, ErrBadRequest) || errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
+			c.JSON(http.StatusConflict, api.CodeErrorResponse{
+				Error: "Slug is already taken by another page",
+				Code:  "slug_taken",
+			})
+		case isPageValidationError(err):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update page"})

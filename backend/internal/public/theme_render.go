@@ -543,12 +543,23 @@ func (r *Renderer) countCommentsBatch(ctx context.Context, postIDs []uint) map[u
 	return counts
 }
 
-// listPageData fetches a published-post page with pagination and returns the
-// post cards, the total page count and the total post count. search filters
-// title/content, category filters the post category column exactly like the
-// public API does, and authorID (0 = any author) narrows to one user's posts.
-func (r *Renderer) listPageData(ctx context.Context, base string, page, limit int, search, category string, authorID uint) ([]PostCardData, *PaginationData, int64, error) {
-	page = max(page, 1)
+// postListQuery selects one page of published posts for a public listing page.
+// Base is the URL prefix pagination links are built from; Search and Category
+// filter like the public API does; AuthorID narrows to one author (0 = any).
+type postListQuery struct {
+	Base     string
+	Page     int
+	Limit    int
+	Search   string
+	Category string
+	AuthorID uint
+}
+
+// listPageData fetches a published-post page and returns the post cards, the
+// pagination links and the total post count.
+func (r *Renderer) listPageData(ctx context.Context, q postListQuery) ([]PostCardData, *PaginationData, int64, error) {
+	page := max(q.Page, 1)
+	limit := q.Limit
 	if limit < 1 {
 		limit = 20
 	}
@@ -557,14 +568,14 @@ func (r *Renderer) listPageData(ctx context.Context, base string, page, limit in
 		Preload("Author").
 		Preload("Tags").
 		Where("status = ?", model.PostStatusPublished)
-	if authorID != 0 {
-		query = query.Where("author_id = ?", authorID)
+	if q.AuthorID != 0 {
+		query = query.Where("author_id = ?", q.AuthorID)
 	}
-	if search != "" {
-		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
+	if q.Search != "" {
+		query = query.Where("title LIKE ? OR content LIKE ?", "%"+q.Search+"%", "%"+q.Search+"%")
 	}
-	if category != "" {
-		query = query.Where("category = ?", category)
+	if q.Category != "" {
+		query = query.Where("category = ?", q.Category)
 	}
 
 	var total int64
@@ -608,13 +619,13 @@ func (r *Renderer) listPageData(ctx context.Context, base string, page, limit in
 		HasNext:     page < totalPages,
 	}
 	if pagination.HasPrev {
-		pagination.PrevURL = pageURL(base, page-1, search, category)
+		pagination.PrevURL = pageURL(q.Base, page-1, q.Search, q.Category)
 	}
 	if pagination.HasNext {
-		pagination.NextURL = pageURL(base, page+1, search, category)
+		pagination.NextURL = pageURL(q.Base, page+1, q.Search, q.Category)
 	}
 	pagination.Pages = buildPageLinks(page, totalPages, func(p int) string {
-		return pageURL(base, p, search, category)
+		return pageURL(q.Base, p, q.Search, q.Category)
 	})
 	return cards, pagination, total, nil
 }
@@ -630,7 +641,7 @@ func buildPageLinks(current, total int, urlFor func(int) string) []PageLinkData 
 	pages := make([]PageLinkData, 0, min(total, 7))
 	for i := 1; i <= total; i++ {
 		switch {
-		case i == 1 || i == total || abs(i-current) <= 1:
+		case isPageLinkVisible(i, total, current):
 			pages = append(pages, PageLinkData{
 				Number:    i,
 				URL:       urlFor(i),
@@ -641,6 +652,15 @@ func buildPageLinks(current, total int, urlFor func(int) string) []PageLinkData 
 		}
 	}
 	return pages
+}
+
+// isPageLinkVisible reports whether page i earns an explicit link: the first
+// page, the last page, or a neighbour of the current page. Every other page
+// collapses into an ellipsis marker.
+func isPageLinkVisible(i, total, current int) bool {
+	isEdge := i == 1 || i == total
+	isNeighbour := abs(i-current) <= 1
+	return isEdge || isNeighbour
 }
 
 // abs returns the absolute value of n.
@@ -697,6 +717,17 @@ var friendsBlockRe = regexp.MustCompile("(?m)^```friends[ \t]*\n([\r\\s\\S]*?)^`
 
 // renderFriendsCards converts the body of a friends block into card HTML.
 // Fields are HTML-escaped; rows without a name or a valid http(s) URL are
+// isAbsoluteHTTPURL reports whether raw is a parseable absolute http(s) URL
+// with a host, so a friend link can never be a javascript: or relative URL.
+func isAbsoluteHTTPURL(raw string) bool {
+	u, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return false
+	}
+	isHTTP := u.Scheme == "http" || u.Scheme == "https"
+	return isHTTP && u.Host != ""
+}
+
 // skipped so one bad line cannot break the whole block.
 func renderFriendsCards(body string) string {
 	type friend struct {
@@ -716,8 +747,7 @@ func renderFriendsCards(body string) string {
 			parts = append(parts, "")
 		}
 		name, rawURL, avatar, desc := parts[0], parts[1], parts[2], parts[3]
-		u, err := url.ParseRequestURI(rawURL)
-		if name == "" || err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		if name == "" || !isAbsoluteHTTPURL(rawURL) {
 			continue
 		}
 		friends = append(friends, friend{name: name, url: rawURL, avatar: avatar, desc: desc})
@@ -797,10 +827,18 @@ func (r *Renderer) themeFS(themeID string) (fs.FS, error) {
 		// theme root so all paths are relative to it.
 		return fs.Sub(defaultThemeFS, "default-theme")
 	}
-	if strings.ContainsAny(themeID, `/\`) || themeID == "." || themeID == ".." {
+	if traversesPath(themeID) {
 		return nil, fmt.Errorf("invalid theme id %q", themeID)
 	}
 	return os.DirFS(filepath.Join(r.dataDir, ThemesDir, themeID)), nil
+}
+
+// traversesPath reports whether name could escape a directory root when
+// joined to it: it carries a path separator, or it is the "."/".." segment.
+func traversesPath(name string) bool {
+	hasSeparator := strings.ContainsAny(name, `/\`)
+	isDotSegment := name == "." || name == ".."
+	return hasSeparator || isDotSegment
 }
 
 // readThemeFile reads a single file from a theme, reporting whether it exists.
@@ -962,7 +1000,7 @@ func listExtraPageTemplates(base fs.FS, known map[string]struct{}) []string {
 		if _, ok := known[name]; ok {
 			continue
 		}
-		if !strings.HasSuffix(name, ".html") || strings.Contains(name, "/") || strings.HasPrefix(name, ".") {
+		if !isPageTemplateFile(name) {
 			continue
 		}
 		slug := strings.TrimSuffix(name, ".html")
@@ -973,6 +1011,14 @@ func listExtraPageTemplates(base fs.FS, known map[string]struct{}) []string {
 	}
 	sort.Strings(extra)
 	return extra
+}
+
+// isPageTemplateFile reports whether an entry name is a plain, visible .html
+// file that can act as a custom page template.
+func isPageTemplateFile(name string) bool {
+	isHTML := strings.HasSuffix(name, ".html")
+	isPlainName := !strings.Contains(name, "/") && !strings.HasPrefix(name, ".")
+	return isHTML && isPlainName
 }
 
 // themeProvides reports whether the theme supplies the named template.

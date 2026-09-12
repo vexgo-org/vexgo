@@ -97,15 +97,6 @@ func validatePageSlug(slug string) error {
 // parameter.
 const maxSearchRunes = 200
 
-// truncateRunes shortens s to at most n runes without splitting one.
-func truncateRunes(s string, n int) string {
-	runes := []rune(s)
-	if len(runes) <= n {
-		return s
-	}
-	return string(runes[:n])
-}
-
 // List returns pages ordered by sortOrder. Empty status means all statuses
 // (admin console); callers pass "published" for the public read path.
 func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Page, int64, error) {
@@ -115,8 +106,8 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Page, int64, e
 	if q.Limit < 1 {
 		q.Limit = 20
 	}
-	q.Search = truncateRunes(q.Search, maxSearchRunes)
-	return s.repo.List(ctx, q.Status, q.Search, q.Page, q.Limit)
+	q.Search = model.TruncateRunes(q.Search, maxSearchRunes)
+	return s.repo.List(ctx, q)
 }
 
 // GetBySlug returns one page by slug. Published pages are public; drafts are
@@ -204,21 +195,8 @@ func (s *Service) Update(ctx context.Context, id, role string, req UpdateRequest
 		}
 		return nil, err
 	}
-	if req.Slug != "" {
-		slug := normalizeSlug(req.Slug)
-		if slug != page.Slug {
-			if err := validatePageSlug(slug); err != nil {
-				return nil, err
-			}
-			exists, err := s.repo.SlugExistsExcludeID(ctx, slug, page.ID)
-			if err != nil {
-				return nil, err
-			}
-			if exists {
-				return nil, model.ErrSlugTaken
-			}
-			page.Slug = slug
-		}
+	if err := s.changeSlug(ctx, page, req.Slug); err != nil {
+		return nil, err
 	}
 	if req.Title != "" {
 		page.Title = req.Title
@@ -242,6 +220,32 @@ func (s *Service) Update(ctx context.Context, id, role string, req UpdateRequest
 		return nil, err
 	}
 	return page, nil
+}
+
+// changeSlug validates a requested slug change and applies it to page in
+// place. An empty request slug or an unchanged slug is a no-op; a change is
+// normalized, validated, and checked against the other pages (including the
+// unique-constraint race, which surfaces as ErrSlugTaken on save).
+func (s *Service) changeSlug(ctx context.Context, page *model.Page, requested string) error {
+	if requested == "" {
+		return nil
+	}
+	slug := normalizeSlug(requested)
+	if slug == page.Slug {
+		return nil
+	}
+	if err := validatePageSlug(slug); err != nil {
+		return err
+	}
+	exists, err := s.repo.SlugExistsExcludeID(ctx, slug, page.ID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return model.ErrSlugTaken
+	}
+	page.Slug = slug
+	return nil
 }
 
 // Delete removes a page; only admins may delete pages.

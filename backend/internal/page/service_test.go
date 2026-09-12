@@ -112,16 +112,16 @@ func (f *fakeRepo) Delete(_ context.Context, page *model.Page) error {
 	return nil
 }
 
-func (f *fakeRepo) List(_ context.Context, status, search string, page, limit int) ([]model.Page, int64, error) {
+func (f *fakeRepo) List(_ context.Context, q ListQuery) ([]model.Page, int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.lastSearch = search
+	f.lastSearch = q.Search
 	var out []model.Page
 	for _, p := range f.pages {
-		if status != "" && string(p.Status) != status {
+		if q.Status != "" && string(p.Status) != q.Status {
 			continue
 		}
-		if search != "" && !strings.Contains(p.Title, search) && !strings.Contains(p.Slug, search) {
+		if q.Search != "" && !strings.Contains(p.Title, q.Search) && !strings.Contains(p.Slug, q.Search) {
 			continue
 		}
 		out = append(out, *p)
