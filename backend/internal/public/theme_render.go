@@ -814,7 +814,6 @@ var themeSourcesCache struct {
 }
 
 func init() {
-	themeCache.themes = make(map[string]cachedTheme)
 	themeSourcesCache.themes = make(map[string]themeSources)
 }
 
