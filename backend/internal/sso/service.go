@@ -467,7 +467,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
-	body, err := apiGet("https://api.github.com/user", tok.AccessToken, "token")
+	body, err := apiGet(c.Request.Context(), "https://api.github.com/user", tok.AccessToken, "token")
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 	// endpoint alone does not prove ownership, so confirmation comes from
 	// /user/emails: either the address we got is flagged verified there, or
 	// the account's verified primary email replaces it.
-	if emails := fetchGitHubEmails(tok.AccessToken); emails != nil {
+	if emails := fetchGitHubEmails(c.Request.Context(), tok.AccessToken); emails != nil {
 		if isVerifiedGitHubEmail(emails, info.email) {
 			info.emailVerified = true
 		} else if primary := verifiedGitHubPrimaryEmail(emails); primary != "" {
@@ -501,7 +501,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 		}
 	}
 	if info.email == "" {
-		info.email = fetchGitHubPrimaryEmail(tok.AccessToken)
+		info.email = fetchGitHubPrimaryEmail(c.Request.Context(), tok.AccessToken)
 		info.emailVerified = info.email != ""
 	}
 	if info.providerID == "" {
@@ -517,7 +517,7 @@ func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*sso
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
-	body, err := apiGet("https://www.googleapis.com/oauth2/v2/userinfo", tok.AccessToken, "bearer")
+	body, err := apiGet(c.Request.Context(), "https://www.googleapis.com/oauth2/v2/userinfo", tok.AccessToken, "bearer")
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +569,7 @@ func (s *Service) exchangeOIDC(c *gin.Context, code, redirectURI string) (*ssoUs
 		if oidcCfg.UserInfoURL == "" {
 			return nil, errors.New("OIDC: id_token missing and OIDC_USERINFO_URL not configured")
 		}
-		body, err := apiGet(oidcCfg.UserInfoURL, tok.AccessToken, "bearer")
+		body, err := apiGet(c.Request.Context(), oidcCfg.UserInfoURL, tok.AccessToken, "bearer")
 		if err != nil {
 			return nil, err
 		}
@@ -799,8 +799,26 @@ func (s *Service) generateUsername(ctx context.Context, name, email string) stri
 // Utilities
 // ─────────────────────────────────────────────
 
-func apiGet(url, accessToken, scheme string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+const (
+	// ssoRequestTimeout bounds every outbound provider call. It covers the
+	// whole exchange including reading the body, so a hung or slow identity
+	// provider cannot pin a login handler (and its goroutine) open.
+	ssoRequestTimeout = 15 * time.Second
+	// maxSSOResponseBytes caps how much of a provider response is buffered in
+	// memory. Profile and email payloads are a few KB; anything larger means a
+	// misbehaving or hostile endpoint and is rejected instead of held.
+	maxSSOResponseBytes = 1 << 20 // 1 MiB
+)
+
+// ssoHTTPClient is the shared client for provider API calls. A dedicated
+// client with an explicit timeout replaces http.DefaultClient, which has none.
+var ssoHTTPClient = &http.Client{Timeout: ssoRequestTimeout}
+
+// apiGet performs an authenticated GET against a provider API and returns the
+// response body. The request is bound to ctx so an aborted login cancels the
+// call, and the body is capped so an unbounded response cannot exhaust memory.
+func apiGet(ctx context.Context, apiURL, accessToken, scheme string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -810,18 +828,28 @@ func apiGet(url, accessToken, scheme string) ([]byte, error) {
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 	}
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := ssoHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+
+	// Read one byte past the cap so an oversized body is detected rather than
+	// silently truncated.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSSOResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxSSOResponseBytes {
+		return nil, fmt.Errorf("provider response exceeds %d bytes", maxSSOResponseBytes)
+	}
+	return body, nil
 }
 
 // fetchGitHubEmails returns the account's email entries from GitHub's
 // /user/emails endpoint, or nil when unavailable.
-func fetchGitHubEmails(accessToken string) []map[string]any {
-	body, err := apiGet("https://api.github.com/user/emails", accessToken, "token")
+func fetchGitHubEmails(ctx context.Context, accessToken string) []map[string]any {
+	body, err := apiGet(ctx, "https://api.github.com/user/emails", accessToken, "token")
 	if err != nil {
 		return nil
 	}
@@ -865,8 +893,8 @@ func verifiedGitHubPrimaryEmail(emails []map[string]any) string {
 
 // fetchGitHubPrimaryEmail returns the primary, verified email address from
 // GitHub's /user/emails endpoint, or an empty string when unavailable.
-func fetchGitHubPrimaryEmail(accessToken string) string {
-	return verifiedGitHubPrimaryEmail(fetchGitHubEmails(accessToken))
+func fetchGitHubPrimaryEmail(ctx context.Context, accessToken string) string {
+	return verifiedGitHubPrimaryEmail(fetchGitHubEmails(ctx, accessToken))
 }
 
 // isValidMethod reports whether the SSO flow method is supported.
