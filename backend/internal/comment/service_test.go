@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/secrets"
@@ -15,13 +16,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// fakeNotifier records notification calls instead of touching the DB.
+// fakeNotifier records notification calls instead of touching the DB. calls
+// keeps the pre-existing type-only assertions working; inputs carries the full
+// payload for tests that assert on the rendered content.
 type fakeNotifier struct {
-	calls []model.NotificationType
+	calls  []model.NotificationType
+	inputs []model.NotificationInput
 }
 
 func (f *fakeNotifier) CreateNotification(_ context.Context, input model.NotificationInput) error {
 	f.calls = append(f.calls, input.Type)
+	f.inputs = append(f.inputs, input)
 	return nil
 }
 
@@ -214,6 +219,52 @@ func TestCreate_ReplyNotifiesParentAuthor(t *testing.T) {
 	}
 	if len(notifier.calls) != 2 {
 		t.Errorf("expected post + parent notifications, got %v", notifier.calls)
+	}
+}
+
+// Notification excerpts are capped by rune count, not byte length. The old
+// byte slice cut multi-byte content mid-character, so the stored notification
+// held invalid UTF-8 that MySQL/PostgreSQL reject at insert time, silently
+// dropping the notification.
+func TestCreate_NotificationExcerptIsRuneSafe(t *testing.T) {
+	ctx := context.Background()
+	svc, notifier, db := newTestService(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+
+	// 20 runes / 60 bytes: over the old 50-byte cap, well under the rune cap,
+	// so the excerpt must come through whole.
+	short := strings.Repeat("评", 20)
+	if _, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: short}); err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if len(notifier.inputs) != 1 {
+		t.Fatalf("expected one notification, got %d", len(notifier.inputs))
+	}
+	if !utf8.ValidString(notifier.inputs[0].Content) {
+		t.Errorf("notification content is not valid UTF-8: %q", notifier.inputs[0].Content)
+	}
+	if !strings.Contains(notifier.inputs[0].Content, short) {
+		t.Errorf("content within the rune cap should be kept whole, got %q", notifier.inputs[0].Content)
+	}
+
+	// 60 runes / 180 bytes: cut at exactly 50 runes plus an ellipsis.
+	notifier.inputs = nil
+	if _, _, err := svc.Create(ctx, CreateRequest{
+		PostID: post.ID, UserID: commenter.ID, Content: strings.Repeat("评", 60),
+	}); err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if len(notifier.inputs) != 1 {
+		t.Fatalf("expected one notification, got %d", len(notifier.inputs))
+	}
+	want := strings.Repeat("评", 50) + "..."
+	if !strings.Contains(notifier.inputs[0].Content, want) {
+		t.Errorf("expected excerpt %q in %q", want, notifier.inputs[0].Content)
+	}
+	if !utf8.ValidString(notifier.inputs[0].Content) {
+		t.Errorf("truncated notification content is not valid UTF-8: %q", notifier.inputs[0].Content)
 	}
 }
 

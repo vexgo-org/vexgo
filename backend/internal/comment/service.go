@@ -287,15 +287,41 @@ func matchBlockedKeyword(content, blockKeywords string) (string, bool) {
 // (model.Comment.ModerationReason, gorm size:500).
 const maxModerationReason = 500
 
+// notificationExcerptRunes caps how much comment content is quoted into a
+// notification body.
+const notificationExcerptRunes = 50
+
+// truncateRunes shortens s to at most n runes without splitting one. Slicing
+// by byte length instead would cut a multi-byte character in half and carry
+// invalid UTF-8 into the database, which strict backends (MySQL/PostgreSQL)
+// reject outright.
+func truncateRunes(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n])
+}
+
 // truncateReason caps a moderation reason at the column limit, counting
 // runes, so an oversized model reply or keyword cannot break comment
 // persistence on strict databases (MySQL/PostgreSQL).
 func truncateReason(reason string) string {
-	runes := []rune(reason)
-	if len(runes) <= maxModerationReason {
-		return reason
+	return truncateRunes(reason, maxModerationReason)
+}
+
+// excerptForNotification quotes at most notificationExcerptRunes runes of a
+// comment into a notification, appending an ellipsis when it had to cut. The
+// cap counts runes for the same reason as truncateReason: a byte cap split
+// multi-byte content mid-character, so the stored notification held invalid
+// UTF-8 and the insert failed on MySQL/PostgreSQL — silently losing the
+// notification.
+func excerptForNotification(content string) string {
+	excerpt := truncateRunes(content, notificationExcerptRunes)
+	if excerpt == content {
+		return content
 	}
-	return string(runes[:maxModerationReason])
+	return excerpt + "..."
 }
 
 // notifyPostAuthor notifies the post author unless they wrote the comment.
@@ -312,11 +338,7 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 	if err != nil {
 		return
 	}
-	// Truncate comment content to first 50 characters
-	commentContent := content
-	if len(commentContent) > 50 {
-		commentContent = commentContent[:50] + "..."
-	}
+	commentContent := excerptForNotification(content)
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:        post.AuthorID,
 		Type:          model.NotificationTypeComment,
@@ -344,11 +366,7 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 	if err != nil {
 		return
 	}
-	// Truncate reply content to first 50 characters
-	replyContent := content
-	if len(replyContent) > 50 {
-		replyContent = replyContent[:50] + "..."
-	}
+	replyContent := excerptForNotification(content)
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:        parentComment.UserID,
 		Type:          model.NotificationTypeReply,
