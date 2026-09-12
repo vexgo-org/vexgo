@@ -238,12 +238,20 @@ func baseTemplateFuncs() template.FuncMap {
 			}
 			return items[:n]
 		},
+		// truncate caps a string at max runes, appending an ellipsis when it
+		// cut. It counts runes so multi-byte text (CJK titles, excerpts) is
+		// never cut mid-character on the page. A non-positive max returns the
+		// string unchanged, like the sibling first helper.
 		"truncate": func(s string, max int) string {
 			s = strings.TrimSpace(s)
-			if len(s) <= max {
+			if max < 1 {
 				return s
 			}
-			return s[:max] + "..."
+			runes := []rune(s)
+			if len(runes) <= max {
+				return s
+			}
+			return string(runes[:max]) + "..."
 		},
 		// userURL builds the public user profile URL. Helper funcs keep attribute
 		// actions free of double quotes, which React would escape to &quot; and

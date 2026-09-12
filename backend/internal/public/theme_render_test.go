@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
@@ -24,6 +25,43 @@ func assertNoPlaceholders(t *testing.T, html string) {
 	t.Helper()
 	if strings.Contains(html, "{{") {
 		t.Errorf("rendered html contains unrendered placeholder:\n%s", html)
+	}
+}
+
+// The truncate template helper counts runes: a byte cap cut multi-byte text
+// mid-character and rendered a replacement character on the page.
+func TestBaseTemplateFuncs_TruncateCountsRunes(t *testing.T) {
+	truncate, ok := baseTemplateFuncs()["truncate"].(func(string, int) string)
+	if !ok {
+		t.Fatal("truncate helper missing or has an unexpected signature")
+	}
+
+	// ASCII behavior is unchanged from the byte-based version.
+	if got := truncate("abcdef", 3); got != "abc..." {
+		t.Errorf("truncate ASCII = %q, want %q", got, "abc...")
+	}
+	if got := truncate("abc", 3); got != "abc" {
+		t.Errorf("truncate at the cap = %q, want the string unchanged", got)
+	}
+	if got := truncate("  padded  ", 10); got != "padded" {
+		t.Errorf("truncate should trim space first, got %q", got)
+	}
+
+	// Multi-byte text is cut on a rune boundary, not a byte boundary.
+	got := truncate(strings.Repeat("评", 4), 2)
+	want := strings.Repeat("评", 2) + "..."
+	if got != want {
+		t.Errorf("truncate multi-byte = %q, want %q", got, want)
+	}
+	if !utf8.ValidString(got) {
+		t.Errorf("truncate produced invalid UTF-8: %q", got)
+	}
+
+	// A non-positive cap must not panic (the byte slice did).
+	for _, max := range []int{0, -1} {
+		if got := truncate("abc", max); got != "abc" {
+			t.Errorf("truncate(max=%d) = %q, want the string unchanged", max, got)
+		}
 	}
 }
 
