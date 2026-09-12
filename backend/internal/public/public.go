@@ -226,14 +226,13 @@ func legacyAdminRedirect(u *url.URL) (string, bool) {
 }
 
 // getRequestedTheme determines which theme should be used for this request.
-// It checks the 'theme' query parameter first (for admin preview), then falls back
-// to the globally active theme stored in the database.
+// The ?theme= preview switch is honored only for an authenticated admin (the
+// same check that gates draft previews); every other visitor gets the globally
+// active theme, so a visitor cannot render a theme that is not active.
 func (r *Renderer) getRequestedTheme(c *gin.Context) string {
-	// Query param takes precedence (allows admin to preview themes)
-	if theme := c.Query("theme"); theme != "" {
+	if theme, _, ok := r.previewThemeOverride(c); ok {
 		return theme
 	}
-	// Use the DB-stored active theme
 	if theme := r.activeTheme(); theme != "" {
 		return theme
 	}
@@ -400,17 +399,26 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 		c.Status(http.StatusNotFound)
 	})
 
-	// Theme file route: /themes/:id/*path serves any file of a theme
-	// (used by the admin console for previews and raw file access).
+	// Theme file route: /themes/:id/assets/*path serves a theme's static
+	// assets, which an admin theme preview needs because browser subresource
+	// requests (CSS, JS, images) cannot carry the bearer token. Everything else
+	// in a theme — templates, i18n files and the vexgo-theme.json manifest —
+	// stays private, so this is not a public read of arbitrary theme files.
 	e.GET("/themes/:id/*path", func(c *gin.Context) {
 		themeID := c.Param("id")
-		reqPath := c.Param("path")
-		content, ok := r.readThemeFile(themeID, reqPath)
+		// Clean before the prefix check so a `assets/../vexgo-theme.json`
+		// traversal collapses to the private path and is rejected.
+		clean := path.Clean(strings.TrimPrefix(c.Param("path"), "/"))
+		if !strings.HasPrefix(clean, "assets/") || !fs.ValidPath(clean) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		content, ok := r.readThemeFile(themeID, clean)
 		if !ok {
 			c.Status(http.StatusNotFound)
 			return
 		}
-		mimeType := mime.TypeByExtension(filepath.Ext(reqPath))
+		mimeType := mime.TypeByExtension(filepath.Ext(clean))
 		if mimeType == "" {
 			mimeType = "application/octet-stream"
 		}

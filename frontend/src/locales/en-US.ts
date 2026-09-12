@@ -290,6 +290,7 @@ export const enUS = {
     uploadInvalidType: "Please upload a zip file",
     viewDetails: "View Details",
     previewTheme: "Preview",
+    previewFailed: "Failed to open theme preview",
     deleteTheme: "Delete",
     deleteConfirm: 'Delete theme "{themeName}"? This cannot be undone.',
     deleteSuccess: 'Theme "{themeName}" has been deleted',

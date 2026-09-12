@@ -139,6 +139,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		// settings
 		"GET /api/config/themes",
 		"GET /api/config/themes/:id/languages",
+		"GET /api/config/themes/:id/preview-link",
 		"DELETE /api/config/themes/:id",
 		"GET /api/config/smtp",
 		"PUT /api/config/smtp",

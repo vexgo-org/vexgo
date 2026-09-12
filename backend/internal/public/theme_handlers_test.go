@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -348,14 +349,33 @@ func installPreviewTheme(t *testing.T, r *Renderer, themeID string) {
 	r.InvalidateThemeCache(themeID)
 }
 
+// seedPreviewAdmin inserts an admin account and enables preview authentication
+// on the renderer, returning a bearer token that authorizes the ?theme= and
+// ?preview= preview switches.
+func seedPreviewAdmin(t *testing.T, renderer *Renderer, db *gorm.DB) string {
+	t.Helper()
+	admin := model.User{
+		Username:        "previewadmin",
+		Email:           "previewadmin@example.com",
+		Role:            model.RoleAdmin,
+		PasswordVersion: 1,
+	}
+	if err := db.Create(&admin).Error; err != nil {
+		t.Fatalf("seed preview admin: %v", err)
+	}
+	renderer.SetJWTSecret(previewTestSecret)
+	return previewToken(t, admin.ID, model.RoleAdmin, 1, time.Now())
+}
+
 // TestThemePreview_NonActiveThemeScopesAssets reproduces the preview bug: with
 // the default theme active, previewing another theme must load that theme's
 // CSS (subresource requests carry no ?theme=), not the active theme's.
 func TestThemePreview_NonActiveThemeScopesAssets(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
+	r, renderer, db := newPublicRouter(t)
 	installPreviewTheme(t, renderer, "alt")
+	token := seedPreviewAdmin(t, renderer, db)
 
-	w := doPublicRequest(t, r, "/?theme=alt")
+	w := doAuthedGet(t, r, "/?theme=alt", token)
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET /?theme=alt status = %d, body: %s", w.Code, w.Body.String())
 	}
@@ -389,10 +409,11 @@ func TestThemePreview_NonActiveThemeScopesAssets(t *testing.T) {
 // TestThemePreview_KeepsThemeAcrossNavigation verifies links inside a preview
 // keep the previewed theme when followed.
 func TestThemePreview_KeepsThemeAcrossNavigation(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
+	r, renderer, db := newPublicRouter(t)
 	installPreviewTheme(t, renderer, "alt")
+	token := seedPreviewAdmin(t, renderer, db)
 
-	w := doPublicRequest(t, r, "/?theme=alt")
+	w := doAuthedGet(t, r, "/?theme=alt", token)
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET /?theme=alt status = %d", w.Code)
 	}
@@ -408,7 +429,7 @@ func TestThemePreview_KeepsThemeAcrossNavigation(t *testing.T) {
 	}
 
 	// Following a previewed link renders the alt theme again.
-	w = doPublicRequest(t, r, "/post/hello-world?theme=alt")
+	w = doAuthedGet(t, r, "/post/hello-world?theme=alt", token)
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET /post/hello-world?theme=alt status = %d, body: %s", w.Code, w.Body.String())
 	}
@@ -434,6 +455,88 @@ func TestThemePreview_NoOverrideUnchanged(t *testing.T) {
 	}
 	if strings.Contains(body, "/themes/alt/") || strings.Contains(body, "?theme=") {
 		t.Errorf("normal page was rewritten for preview:\n%s", body)
+	}
+}
+
+// TestThemePreview_RequiresAdmin is the regression guard for the ?theme=
+// switch: it exists for the admin console's preview, so a visitor — anonymous or
+// merely signed in — must not be able to render a theme that is not active.
+func TestThemePreview_RequiresAdmin(t *testing.T) {
+	r, renderer, db := newPublicRouter(t)
+	installPreviewTheme(t, renderer, "alt")
+
+	renderer.SetJWTSecret(previewTestSecret)
+	contributor := model.User{
+		Username:        "writer",
+		Email:           "writer@example.com",
+		Role:            model.RoleContributor,
+		PasswordVersion: 1,
+	}
+	if err := db.Create(&contributor).Error; err != nil {
+		t.Fatalf("seed contributor: %v", err)
+	}
+
+	cases := []struct {
+		name  string
+		token string
+	}{
+		{"anonymous", ""},
+		{"contributor", previewToken(t, contributor.ID, model.RoleContributor, 1, time.Now())},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := doAuthedGet(t, r, "/?theme=alt", tc.token)
+			if w.Code != http.StatusOK {
+				t.Fatalf("GET /?theme=alt status = %d", w.Code)
+			}
+			body := w.Body.String()
+			if strings.Contains(body, "ALT HOME") {
+				t.Errorf("non-admin rendered a non-active theme via ?theme=:\n%s", body)
+			}
+			if strings.Contains(body, "/themes/alt/") {
+				t.Errorf("non-admin preview leaked the alt theme asset prefix:\n%s", body)
+			}
+			if !strings.Contains(body, `href="/theme-assets/style.css"`) {
+				t.Errorf("the active theme did not render:\n%s", body)
+			}
+		})
+	}
+}
+
+// TestThemeFileRoute_ServesOnlyAssets pins the scope of the public theme file
+// route. A preview's subresource requests cannot carry the bearer token, so
+// assets stay public; the manifest and templates must not, since the route
+// would otherwise expose every theme's sources to anyone who knows its id.
+func TestThemeFileRoute_ServesOnlyAssets(t *testing.T) {
+	r, renderer, _ := newPublicRouter(t)
+	installPreviewTheme(t, renderer, "alt")
+
+	// Assets are served, including the embedded default theme's.
+	for _, path := range []string{"/themes/alt/assets/style.css", "/themes/default/assets/style.css"} {
+		if w := doPublicRequest(t, r, path); w.Code != http.StatusOK {
+			t.Errorf("GET %s status = %d, want 200", path, w.Code)
+		}
+	}
+
+	// Sources are not readable.
+	for _, path := range []string{"/themes/alt/" + ThemeMetaFile, "/themes/alt/index.html", "/themes/alt/"} {
+		if w := doPublicRequest(t, r, path); w.Code != http.StatusNotFound {
+			t.Errorf("GET %s status = %d, want 404", path, w.Code)
+		}
+	}
+
+	// Traversal out of assets/ collapses to the private path and is refused.
+	for _, path := range []string{
+		"/themes/alt/assets/../" + ThemeMetaFile,
+		"/themes/alt/assets/../../alt/index.html",
+	} {
+		w := doPublicRequest(t, r, path)
+		if w.Code == http.StatusOK && strings.Contains(w.Body.String(), "ALT HOME") {
+			t.Errorf("GET %s escaped assets/ and served a theme template", path)
+		}
+		if strings.Contains(w.Body.String(), `"name": "Alt"`) {
+			t.Errorf("GET %s exposed the theme manifest", path)
+		}
 	}
 }
 

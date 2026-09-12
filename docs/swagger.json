@@ -2181,6 +2181,19 @@
                 },
                 "type": "object"
             },
+            "settings.ThemePreviewLinkResponse": {
+                "properties": {
+                    "theme": {
+                        "example": "my-theme",
+                        "type": "string"
+                    },
+                    "url": {
+                        "example": "/?theme=my-theme\u0026theme_token=1234567890.abc",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "settings.ThemeUploadResponse": {
                 "properties": {
                     "message": {
@@ -4564,6 +4577,73 @@
                 ]
             }
         },
+        "/config/themes/{id}/preview-link": {
+            "get": {
+                "description": "Returns a same-origin URL that renders the theme in preview\nmode. The URL carries a short-lived signature because the\nconsole opens the preview in a new tab, which cannot send the\nAuthorization header.",
+                "parameters": [
+                    {
+                        "description": "theme id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/settings.ThemePreviewLinkResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "theme not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Mint a theme preview link",
+                "tags": [
+                    "config"
+                ]
+            }
+        },
         "/likes/{postId}": {
             "get": {
                 "description": "Public — anonymous callers see the count but always\nget `isLiked: false`. Authenticated callers see their\nown like state.",
@@ -4588,6 +4668,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
                     }
                 },
                 "summary": "Read the like status for a post",
@@ -4618,6 +4708,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
                     },
                     "401": {
                         "content": {

@@ -143,6 +143,7 @@ export * from "./settingsThemeConfigUpdateRequest";
 export * from "./settingsThemeConfigUpdateResponse";
 export * from "./settingsThemeDeleteResponse";
 export * from "./settingsThemeLanguagesResponse";
+export * from "./settingsThemePreviewLinkResponse";
 export * from "./settingsThemesListResponse";
 export * from "./settingsThemeUploadResponse";
 export * from "./ssoSSOProvidersResponse";

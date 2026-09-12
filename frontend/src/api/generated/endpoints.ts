@@ -102,6 +102,7 @@ import type {
   SettingsThemeConfigUpdateResponse,
   SettingsThemeDeleteResponse,
   SettingsThemeLanguagesResponse,
+  SettingsThemePreviewLinkResponse,
   SettingsThemeUploadResponse,
   SettingsThemesListResponse,
   SsoSSOProvidersResponse,
@@ -636,6 +637,20 @@ export const getVexGoAPI = () => {
   const getConfigThemesIdLanguages = (id: string) => {
     return customInstance<SettingsThemeLanguagesResponse>({
       url: `/config/themes/${id}/languages`,
+      method: "GET",
+    });
+  };
+
+  /**
+   * Returns a same-origin URL that renders the theme in preview
+   * mode. The URL carries a short-lived signature because the
+   * console opens the preview in a new tab, which cannot send the
+   * Authorization header.
+   * @summary Mint a theme preview link
+   */
+  const getConfigThemesIdPreviewLink = (id: string) => {
+    return customInstance<SettingsThemePreviewLinkResponse>({
+      url: `/config/themes/${id}/preview-link`,
       method: "GET",
     });
   };
@@ -1399,6 +1414,7 @@ export const getVexGoAPI = () => {
     getConfigThemes,
     deleteConfigThemesId,
     getConfigThemesIdLanguages,
+    getConfigThemesIdPreviewLink,
     getLikesPostId,
     postLikesPostId,
     putModerationApproveId,
@@ -1566,6 +1582,11 @@ export type DeleteConfigThemesIdResult = NonNullable<
 export type GetConfigThemesIdLanguagesResult = NonNullable<
   Awaited<
     ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdLanguages"]>
+  >
+>;
+export type GetConfigThemesIdPreviewLinkResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdPreviewLink"]>
   >
 >;
 export type GetLikesPostIdResult = NonNullable<

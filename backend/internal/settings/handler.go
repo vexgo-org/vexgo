@@ -449,6 +449,37 @@ func (h *Handler) GetThemeLanguages(c *gin.Context) {
 	c.JSON(http.StatusOK, ThemeLanguagesResponse{Theme: themeID, Languages: langs})
 }
 
+// GetThemePreviewLink godoc
+//
+//	@Summary		Mint a theme preview link
+//	@Description	Returns a same-origin URL that renders the theme in preview
+//	@Description	mode. The URL carries a short-lived signature because the
+//	@Description	console opens the preview in a new tab, which cannot send the
+//	@Description	Authorization header.
+//	@Tags			config
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"theme id"
+//	@Success		200	{object}	ThemePreviewLinkResponse
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		404	{object}	api.ErrorResponse	"theme not found"
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/config/themes/{id}/preview-link [get]
+func (h *Handler) GetThemePreviewLink(c *gin.Context) {
+	themeID := c.Param("id")
+	if !h.themes.ThemeExists(themeID) {
+		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: ErrThemeNotFound.Error()})
+		return
+	}
+	previewURL, err := h.themes.ThemePreviewURL(themeID)
+	if err != nil {
+		slog.Error("failed to mint theme preview link", "theme", themeID, "err", err)
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create theme preview link"})
+		return
+	}
+	c.JSON(http.StatusOK, ThemePreviewLinkResponse{Theme: themeID, URL: previewURL})
+}
+
 // GetThemeConfig godoc
 //
 //	@Summary	Get the active theme

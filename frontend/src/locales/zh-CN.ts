@@ -270,6 +270,7 @@ export const zhCN = {
     uploadInvalidType: "请上传 zip 格式的文件",
     viewDetails: "查看详情",
     previewTheme: "预览",
+    previewFailed: "打开主题预览失败",
     deleteTheme: "删除",
     deleteConfirm: "确定删除主题“{themeName}”吗？删除后不可恢复。",
     deleteSuccess: "主题“{themeName}”已删除",

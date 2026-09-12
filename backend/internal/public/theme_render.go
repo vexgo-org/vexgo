@@ -1043,16 +1043,17 @@ var previewHrefRe = regexp.MustCompile(`href="(/[^"]*)"`)
 // the *active* theme; subresource requests (CSS, JS, images) carry no ?theme=
 // parameter, so without rewriting a preview of a non-active theme would load
 // the active theme's assets. Preview pages therefore point at the theme's own
-// /themes/<id>/assets/ files and carry ?theme=<id> on their same-origin links
-// so navigation inside the preview stays on that theme.
-func rewriteThemePreview(out []byte, themeID string) []byte {
+// /themes/<id>/assets/ files and carry ?theme=<id> — plus the signature, when
+// the preview was opened from a signed link — on their same-origin links so
+// navigation inside the preview stays on that theme.
+func rewriteThemePreview(out []byte, themeID, previewToken string) []byte {
 	assetPrefix := "/themes/" + url.PathEscape(themeID) + "/assets/"
 	if bytes.Contains(out, []byte(themeAssetsPrefix)) {
 		out = bytes.ReplaceAll(out, []byte(themeAssetsPrefix), []byte(assetPrefix))
 	}
 	return previewHrefRe.ReplaceAllFunc(out, func(match []byte) []byte {
 		href := string(match[len(`href="`) : len(match)-1])
-		rewritten, ok := withThemeParam(href, themeID)
+		rewritten, ok := withThemeParam(href, themeID, previewToken)
 		if !ok {
 			return match
 		}
@@ -1060,11 +1061,12 @@ func rewriteThemePreview(out []byte, themeID string) []byte {
 	})
 }
 
-// withThemeParam appends ?theme=<themeID> to a same-origin page link,
-// preserving any existing query and fragment. It reports ok false for links
-// that must not be rewritten: relative links, protocol-relative URLs and
-// non-page prefixes (API, admin SPA, raw theme files).
-func withThemeParam(href, themeID string) (string, bool) {
+// withThemeParam appends ?theme=<themeID> (and the preview signature, when the
+// preview carries one) to a same-origin page link, preserving any existing
+// query and fragment. It reports ok false for links that must not be rewritten:
+// relative links, protocol-relative URLs and non-page prefixes (API, admin SPA,
+// raw theme files).
+func withThemeParam(href, themeID, previewToken string) (string, bool) {
 	if !strings.HasPrefix(href, "/") || strings.HasPrefix(href, "//") {
 		return "", false
 	}
@@ -1079,6 +1081,9 @@ func withThemeParam(href, themeID string) (string, bool) {
 	}
 	q := u.Query()
 	q.Set("theme", themeID)
+	if previewToken != "" {
+		q.Set(ThemePreviewParam, previewToken)
+	}
 	u.RawQuery = q.Encode()
 	return u.String(), true
 }

@@ -126,6 +126,16 @@ type ThemesListResponse struct {
 	Themes []public.ThemeInfo `json:"themes"`
 }
 
+// ThemePreviewLinkResponse is the body of GET
+// /api/config/themes/{id}/preview-link. The URL renders the theme in preview
+// mode and carries a short-lived signature, because the console opens it in a
+// new tab where no Authorization header is available. It expires after
+// public.ThemePreviewTTL.
+type ThemePreviewLinkResponse struct {
+	Theme string `json:"theme" example:"my-theme"`
+	URL   string `json:"url" example:"/?theme=my-theme&theme_token=1234567890.abc"`
+}
+
 // ThemeConfigResponse is the body of GET and PUT
 // /api/config/theme. The `activeTheme` field is the slug of
 // the currently active theme.

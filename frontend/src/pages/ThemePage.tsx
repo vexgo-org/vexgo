@@ -167,8 +167,30 @@ export function ThemePage() {
     fileInputRef.current?.click();
   };
 
-  const handlePreviewTheme = (themeId: string) => {
-    window.open(`/?theme=${encodeURIComponent(themeId)}`, "_blank", "noopener");
+  const handlePreviewTheme = async (themeId: string) => {
+    // The preview needs a short-lived signed link, which the API mints for an
+    // admin. Open the tab synchronously so the popup blocker still sees the
+    // click, then navigate it once the link arrives.
+    const tab = window.open("about:blank", "_blank");
+    if (tab) {
+      tab.opener = null;
+    }
+    try {
+      const res = await unwrap(
+        getVexGoAPI().getConfigThemesIdPreviewLink(themeId),
+      );
+      if (!res.url) {
+        throw new Error("theme preview link missing from response");
+      }
+      if (tab) {
+        tab.location.replace(res.url);
+      } else {
+        window.location.assign(res.url);
+      }
+    } catch {
+      tab?.close();
+      setMessage({ type: "error", text: t("themePage.previewFailed") });
+    }
   };
 
   const handleDeleteTheme = async (theme: ThemeInfo) => {

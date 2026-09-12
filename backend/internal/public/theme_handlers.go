@@ -27,16 +27,16 @@ func (r *Renderer) requestContext(c *gin.Context, theme string) (*SiteData, Dict
 }
 
 // renderRequestPage renders one SSR page and scopes it to the previewed theme
-// when the request selected a theme via ?theme= (the admin preview switch).
-// Plain requests and non-request callers use renderThemeWithDict directly so
-// no rewriting leaks into the site-wide render path.
+// when the request is entitled to the ?theme= admin preview switch. Plain
+// requests and non-request callers use renderThemeWithDict directly so no
+// rewriting leaks into the site-wide render path.
 func (r *Renderer) renderRequestPage(c *gin.Context, themeID, page string, data any, dict Dict) ([]byte, error) {
 	out, err := r.renderThemeWithDict(themeID, page, data, dict)
 	if err != nil {
 		return nil, err
 	}
-	if override := c.Query("theme"); override != "" && override == themeID {
-		out = rewriteThemePreview(out, themeID)
+	if preview, token, ok := r.previewThemeOverride(c); ok && preview == themeID {
+		out = rewriteThemePreview(out, themeID, token)
 	}
 	return out, nil
 }
@@ -63,8 +63,33 @@ func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, 
 	c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
 }
 
+// previewThemeOverride returns the theme selected by the ?theme= preview
+// switch, the signature to carry across the preview's own links, and whether
+// this request is entitled to use the switch. The switch exists for the admin
+// console's theme preview, so it is honored for an authenticated admin, or for
+// a request carrying a signed, short-lived preview link — the console opens the
+// preview in a new tab, where no Authorization header is available. Every other
+// visitor keeps the globally active theme and cannot render a theme that is not
+// active. The admin decision is memoized per request, so a page render validates
+// the token once rather than for selection and again for rewriting.
+func (r *Renderer) previewThemeOverride(c *gin.Context) (theme, token string, ok bool) {
+	theme = c.Query("theme")
+	if theme == "" {
+		return "", "", false
+	}
+	token = c.Query(ThemePreviewParam)
+	if r.isPreviewAdmin(c) || r.validThemePreviewToken(theme, token) {
+		return theme, token, true
+	}
+	return "", "", false
+}
+
+// previewAdminKey caches this request's preview-admin decision. Gin clears the
+// context keys between requests, so the cache never leaks to another caller.
+const previewAdminKey = "public.previewAdmin"
+
 // isPreviewAdmin reports whether the request carries a still-valid admin JWT,
-// granting draft-page previews (?preview=1).
+// granting draft-page previews (?preview=1) and the ?theme= preview switch.
 //
 // The token is resolved against the database through middleware.TokenUser — the
 // same rules the API applies — so the role comes from the stored account, not
@@ -72,6 +97,17 @@ func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, 
 // a token invalidated by a password change or a later login) keep previewing
 // unpublished pages until it expires.
 func (r *Renderer) isPreviewAdmin(c *gin.Context) bool {
+	if cached, ok := c.Get(previewAdminKey); ok {
+		admin, _ := cached.(bool)
+		return admin
+	}
+	admin := r.checkPreviewAdmin(c)
+	c.Set(previewAdminKey, admin)
+	return admin
+}
+
+// checkPreviewAdmin performs the uncached preview-admin check.
+func (r *Renderer) checkPreviewAdmin(c *gin.Context) bool {
 	header := c.GetHeader("Authorization")
 	parts := strings.SplitN(header, " ", 2)
 	if len(parts) != 2 || parts[0] != "Bearer" || parts[1] == "" {
