@@ -17,7 +17,7 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 - **🚀 高性能**：使用 Go 和 Gin 构建，实现快速高效的处理
 - **🔐 安全认证**：基于 JWT 的用户系统，具有基于角色的权限（user / admin / super_admin）
 - **📝 丰富内容**：Markdown 编辑器、分类、标签、草稿、点赞和评论
-- **🛡️ AI 内容审核**：可配置提示词、关键词拦截和评分阈值的自动评论审核
+- **🛡️ 可配置的评论审核**：人工审核、关键词过滤、LLM 审核相互独立的开关，LLM 失败时默认拦截
 - **🖼️ 媒体管理**：内置文件存储，支持 S3 兼容服务
 - **🎨 主题系统**：服务端渲染主题，可在管理面板切换和上传
 - **🔔 通知**：点赞、评论等事件的站内通知收件箱
@@ -122,6 +122,8 @@ sudo nixos-rebuild switch --flake .#your-host
 
 访问 http://127.0.0.1:3001
 
+管理面板位于 http://127.0.0.1:3001/admin/（登录 `/admin/login`，写文章 `/admin/write`）；旧版顶层 URL 会 301 重定向到对应的 `/admin/` 地址，并保留查询字符串。
+
 **默认超级管理员账号**：`admin@example.com`
 **默认超级管理员密码**：`password`
 
@@ -143,7 +145,7 @@ addr: "0.0.0.0"
 port: 3001
 
 # 数据目录（用于存储 SQLite 数据库和上传的媒体文件）
-data: "./data"
+data_dir: "./data"
 
 # JWT 密钥，用于签名 token
 # 重要：生产环境必须使用安全的随机字符串！
@@ -331,15 +333,15 @@ s3_disable_bucket_in_custom_url: false
 
 #### Database
 
-| 变量          | 默认值    | 说明                                                 |
-| ------------- | --------- | ---------------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | 数据库类型：`sqlite`、`mysql`、`postgres`、`mariadb` |
-| `DB_HOST`     | —         | 数据库主机（mysql/postgres 必填）                    |
-| `DB_PORT`     | —         | 数据库端口（mysql/postgres 必填）                    |
-| `DB_USER`     | —         | 数据库用户名（mysql/postgres 必填）                  |
-| `DB_PASSWORD` | —         | 数据库密码（mysql/postgres 必填）                    |
-| `DB_NAME`     | —         | 数据库名称（mysql/postgres 必填）                    |
-| `DB_SSL_MODE` | `disable` | Postgres SSL 模式                                    |
+| 变量          | 默认值    | 说明                                                                  |
+| ------------- | --------- | --------------------------------------------------------------------- |
+| `DB_TYPE`     | —         | 数据库类型：`sqlite`、`mysql`、`postgres`、`mariadb`（留空 = sqlite） |
+| `DB_HOST`     | —         | 数据库主机（mysql/postgres 必填）                                     |
+| `DB_PORT`     | —         | 数据库端口（mysql/postgres 必填）                                     |
+| `DB_USER`     | —         | 数据库用户名（mysql/postgres 必填）                                   |
+| `DB_PASSWORD` | —         | 数据库密码（mysql/postgres 必填）                                     |
+| `DB_NAME`     | —         | 数据库名称（mysql/postgres 必填）                                     |
+| `DB_SSL_MODE` | `disable` | Postgres SSL 模式                                                     |
 
 #### SSO / 单点登录
 
@@ -469,6 +471,10 @@ sudo docker run -d --name vexgo \
 
 > **注意：** `VALKEY_ENABLED=false` 时内容缓存运行在进程内内存中，限流与 OAuth state 也是每进程一份——仅适用于单实例。在负载均衡后运行多个实例必须设置 `VALKEY_ENABLED=true`。启用后服务器必须在启动时可达（fail-fast），并应保持私有、配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略。
 
+#### 邮件（SMTP）
+
+SMTP 默认禁用（已在数据库中预置），在管理面板设置中管理；设置 `settings_encryption_key` 后密码会被静态加密。
+
 ## 数据库
 
 ### Postgres
@@ -526,7 +532,7 @@ go run ./cmd/vexgo -c ../examples/config-mysql.yml
 
 ### 环境要求
 
-- Linux / macOS
+- Linux、macOS、Windows、FreeBSD
 - Go 1.26+
 - bun 1.3
 - `just`、`gofumpt`、`golangci-lint`、`prettier`、`oxlint`（推荐；也可通过 `nix develop` 进入包含全部工具的 Nix 开发环境）
@@ -553,11 +559,14 @@ bun run lint           # oxlint
 ```bash
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
-cd frontend
-bun install
-bun run build
-cd ../backend
-go run ./cmd/vexgo
+
+# 为两个前端安装依赖，然后构建管理面板 SPA 与默认主题
+#（构建产物嵌入后端二进制）
+cd frontend && bun install && cd ../frontend-public && bun install && cd ..
+just build-frontend
+
+# 启动服务
+just run
 ```
 
 然后访问 http://127.0.0.1:3001。默认超级管理员账号：`admin@example.com` / `password`——请在个人资料页面修改密码。
@@ -618,10 +627,10 @@ import (
 - **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`auth` 自身依赖 `verification`；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`、`mailer` 实现 `Mailer`。依赖图无环。
 - **接线** — `backend/cmd/vexgo/main.go` 是极简入口：解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根——打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
 
-### 贡献指南
+## 贡献指南
 
 请参阅 [CONTRIBUTING.md](CONTRIBUTING.md) 了解编码规范、测试要求以及 Issue、Pull Request 和提交信息规范。
 
-### 许可证
+## 许可证
 
 VexGo 使用 [GNU Affero General Public License v3.0](LICENSE) 许可证。

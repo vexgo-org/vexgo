@@ -86,14 +86,14 @@ If your change affects runtime behavior, also verify it by running the server an
 
 ### Running VexGo locally
 
-Build the frontend once, then start the backend:
+Build the frontends once, then start the backend:
 
 ```bash
-cd frontend
-bun install
-bun run build
-cd ../backend
-go run ./cmd/vexgo
+# Install dependencies for both frontends, then build the admin SPA and
+# the default theme (outputs are embedded into the backend binary)
+cd frontend && bun install && cd ../frontend-public && bun install && cd ..
+just build-frontend
+just run
 ```
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password` — change it on your profile page.

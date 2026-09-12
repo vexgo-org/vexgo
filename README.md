@@ -122,6 +122,8 @@ sudo nixos-rebuild switch --flake .#your-host
 
 Then, visit http://127.0.0.1:3001
 
+The admin panel is at http://127.0.0.1:3001/admin/ (login at `/admin/login`, write at `/admin/write`); legacy top-level URLs 301-redirect to their `/admin/` equivalent with the query string preserved.
+
 The Default super admin account: `admin@example.com`
 The Default super admin password: `password`
 
@@ -143,7 +145,7 @@ addr: "0.0.0.0"
 port: 3001
 
 # Data directory (for storing SQLite database and uploaded media files)
-data: "./data"
+data_dir: "./data"
 
 # JWT secret key for signing tokens
 # IMPORTANT: Generate a secure random string for production!
@@ -204,9 +206,9 @@ db_type: "sqlite"
 # ==================== Content Cache & Valkey ====================
 
 # Content cache for public read paths (post lists, post by slug, popular,
-# latest, home stats). Enabled (default) reads are served through a cache:
-# in-process memory unless valkey is enabled, in which case the configured
-# valkey server is used. Disabled, every read goes to the database directly.
+# latest, home stats). Disabled by default; when enabled, reads are served
+# through a cache (in-process memory, or the configured valkey server when
+# valkey is enabled). When disabled, every read goes to the database directly.
 cache_enabled: false
 
 # Enable Valkey (Redis-compatible) for the content cache above and for
@@ -333,15 +335,15 @@ You can also configure the application using environment variables.
 
 #### Database
 
-| Variable      | Default   | Description                                                |
-| ------------- | --------- | ---------------------------------------------------------- |
-| `DB_TYPE`     | `sqlite`  | Database type: `sqlite`, `mysql`, `postgres`, or `mariadb` |
-| `DB_HOST`     | —         | Database host (required for mysql/postgres)                |
-| `DB_PORT`     | —         | Database port (required for mysql/postgres)                |
-| `DB_USER`     | —         | Database username (required for mysql/postgres)            |
-| `DB_PASSWORD` | —         | Database password (required for mysql/postgres)            |
-| `DB_NAME`     | —         | Database name (required for mysql/postgres)                |
-| `DB_SSL_MODE` | `disable` | SSL mode for postgres                                      |
+| Variable      | Default   | Description                                                                 |
+| ------------- | --------- | --------------------------------------------------------------------------- |
+| `DB_TYPE`     | —         | Database type: `sqlite`, `mysql`, `postgres`, or `mariadb` (empty = sqlite) |
+| `DB_HOST`     | —         | Database host (required for mysql/postgres)                                 |
+| `DB_PORT`     | —         | Database port (required for mysql/postgres)                                 |
+| `DB_USER`     | —         | Database username (required for mysql/postgres)                             |
+| `DB_PASSWORD` | —         | Database password (required for mysql/postgres)                             |
+| `DB_NAME`     | —         | Database name (required for mysql/postgres)                                 |
+| `DB_SSL_MODE` | `disable` | SSL mode for postgres                                                       |
 
 #### SSO / Single Sign-On
 
@@ -471,6 +473,10 @@ sudo docker run -d --name vexgo \
 
 > **Notes:** with `VALKEY_ENABLED=false` the content cache runs on in-process memory and rate limiting/OAuth state are per-process — single-instance only. Running multiple instances behind a load balancer requires `VALKEY_ENABLED=true`. With `VALKEY_ENABLED=true` the server must be reachable at startup (fail-fast) and should be kept private, with a `maxmemory` limit and `allkeys-lru` eviction configured.
 
+#### Email (SMTP)
+
+SMTP is disabled by default (seeded in the database) and managed in Admin Settings; the password is encrypted at rest when `settings_encryption_key` is set.
+
 ## Database
 
 ### Postgres
@@ -528,7 +534,7 @@ go run ./cmd/vexgo -c ../examples/config-mysql.yml
 
 ### Requirements
 
-- Linux/macOS
+- Linux, macOS, Windows, FreeBSD
 - Go 1.26+
 - bun 1.3
 - `just`, `gofumpt`, `golangci-lint`, `prettier`, `oxlint` (recommended; a Nix dev shell with all of them is available via `nix develop`)
@@ -555,11 +561,14 @@ The frontend build output is written to `backend/internal/public/dist` and embed
 ```bash
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
-cd frontend
-bun install
-bun run build
-cd ../backend
-go run ./cmd/vexgo
+
+# Install dependencies for both frontends, then build the admin SPA and
+# the default theme (outputs are embedded into the backend binary)
+cd frontend && bun install && cd ../frontend-public && bun install && cd ..
+just build-frontend
+
+# Start the server
+just run
 ```
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` / `password` — change it on your profile page.
@@ -620,10 +629,10 @@ import (
 - **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` itself depends on `verification`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, `mailer` implements `Mailer`. The dependency graph is acyclic.
 - **Wiring** — `backend/cmd/vexgo/main.go` is the thin entry point: it parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root — it opens the database, creates storage and the `public.Renderer`, and wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
-### Contributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for coding standards, testing requirements, and the issue, pull request, and commit conventions.
 
-### License
+## License
 
 VexGo is licensed under the [GNU Affero General Public License v3.0](LICENSE).
