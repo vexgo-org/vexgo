@@ -40,7 +40,7 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		t.Fatalf("get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Tag{}, &model.Post{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Tag{}, &model.Post{}, &model.Like{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -848,5 +848,89 @@ func TestUpdatePost_StatusBoundary(t *testing.T) {
 	}
 	if stored.Status != model.PostStatusPending {
 		t.Errorf("status = %s, want pending", stored.Status)
+	}
+}
+
+// doLikeRequest issues a request against a like route with an optional bearer
+// token.
+func doLikeRequest(t *testing.T, r *gin.Engine, method, path, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// TestLikeRoutes_InvalidPostIDRejected pins that a non-numeric, zero or
+// out-of-range :postId is a client error instead of being parsed as 0 and acted
+// on. The parsed id used to be discarded with the error, so POST /likes/abc
+// reached the service with post_id 0 — writing an orphan like row where foreign
+// keys are unenforced — and GET reported the counts of row 0.
+func TestLikeRoutes_InvalidPostIDRejected(t *testing.T) {
+	paths := []string{
+		"/api/likes/not-a-number",
+		"/api/likes/0",
+		"/api/likes/99999999999999999999",
+	}
+
+	for _, path := range paths {
+		t.Run("get "+path, func(t *testing.T) {
+			r, _ := newTestRouter(t)
+			if w := doLikeRequest(t, r, http.MethodGet, path, ""); w.Code != http.StatusBadRequest {
+				t.Errorf("GET %s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("post "+path, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			u := seedRoleUser(t, db, model.RoleContributor)
+			w := doLikeRequest(t, r, http.MethodPost, path, mintToken(t, u.ID, u.Role))
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("POST %s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
+			}
+
+			var count int64
+			if err := db.Model(&model.Like{}).Count(&count).Error; err != nil {
+				t.Fatalf("count likes: %v", err)
+			}
+			if count != 0 {
+				t.Errorf("POST %s persisted %d like rows", path, count)
+			}
+		})
+	}
+}
+
+// TestLikeRoutes_ValidPostIDStillWorks guards against over-correcting: a real
+// post id still toggles and still reports its status.
+func TestLikeRoutes_ValidPostIDStillWorks(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, u.Role)
+
+	// The liker is also the author, so the toggle takes the plain like path and
+	// does not reach the notifier (the route harness wires none).
+	post := model.Post{Slug: "liked", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished, AuthorID: u.ID}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("seed post: %v", err)
+	}
+	path := "/api/likes/" + idString(post.ID)
+
+	w := doLikeRequest(t, r, http.MethodPost, path, token)
+	if w.Code != http.StatusOK {
+		t.Fatalf("valid like: expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"isLiked":true`) {
+		t.Errorf("expected the post to be liked, got %s", w.Body.String())
+	}
+
+	w = doLikeRequest(t, r, http.MethodGet, path, token)
+	if w.Code != http.StatusOK {
+		t.Fatalf("like status: expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"likesCount":1`) {
+		t.Errorf("expected like count 1, got %s", w.Body.String())
 	}
 }
