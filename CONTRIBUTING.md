@@ -89,10 +89,11 @@ If your change affects runtime behavior, also verify it by running the server an
 Build the frontends once, then start the backend:
 
 ```bash
-# Install dependencies for both frontends, then build the admin SPA and
-# the default theme (outputs are embedded into the backend binary)
-cd frontend && bun install && cd ../frontend-public && bun install && cd ..
+# Install the admin SPA dependencies and build it, then fetch and build the
+# standalone default theme (outputs are embedded into the backend binary)
+cd frontend && bun install && cd ..
 just build-frontend
+just build-theme
 just run
 ```
 

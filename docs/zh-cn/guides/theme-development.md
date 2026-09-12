@@ -10,7 +10,7 @@
 - 一个文本编辑器。不需要编译器、Node.js 或构建步骤——主题就是普通的 HTML、CSS 和 JavaScript。
 - 一个查询模板可用数据的地方：[主题模板参考](/zh-cn/reference/theme-templates)。
 
-最好的参考实现是内置的默认主题。它的源码在 `frontend-public/`（构建时由 React 组件生成模板），生成结果在 `backend/internal/public/default-theme/`。可以读它的写法找思路，但要注意生成的 `.html` 被压缩成了单行，并且是**构建产物**——不要直接改它，也不建议照搬，手写自己的模板更好。
+最好的参考实现是内置的默认主题。它的源码在独立的 [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) 仓库（构建时由 React 组件生成模板）；`scripts/fetch-default-theme.sh` 会把它的 `dist/` 构建产物复制到 `backend/internal/public/default-theme/` 以便嵌入。可以读它的写法找思路，但要注意生成的 `.html` 被压缩成了单行，并且是**构建产物**——不要直接改它，也不建议照搬，手写自己的模板更好。
 
 ## 第 1 步：创建最小主题
 

@@ -376,10 +376,11 @@ Use this when you want the latest development version or need to customize the c
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 
-# Install dependencies for both frontends, then build the admin SPA and
-# the default theme (outputs are embedded into the backend binary)
-cd frontend && bun install && cd ../frontend-public && bun install && cd ..
+# Install the admin SPA dependencies and build it, then fetch and build the
+# standalone default theme (outputs are embedded into the backend binary)
+cd frontend && bun install && cd ..
 just build-frontend
+just build-theme
 ```
 
 ### Step 3: Run

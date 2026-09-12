@@ -10,7 +10,7 @@ You need:
 - A text editor. No compiler, Node.js or build step is required — a theme is plain HTML, CSS and JavaScript.
 - Somewhere to look up what a template receives: the [Theme Templates reference](/reference/theme-templates).
 
-The best reference implementation is the built-in default theme. Its source lives in `frontend-public/` (React components that emit the templates at build time) and the generated result is in `backend/internal/public/default-theme/`. Read it for patterns, but note that the generated `.html` files are minified into a single line and are **build output** — do not edit them, and prefer writing your templates by hand.
+The best reference implementation is the built-in default theme. Its source lives in the standalone [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) repository (React components that emit the templates at build time); `scripts/fetch-default-theme.sh` copies its `dist/` build output to `backend/internal/public/default-theme/` for embedding. Read it for patterns, but note that the generated `.html` files are minified into a single line and are **build output** — do not edit them, and prefer writing your templates by hand.
 
 ## Step 1: Create a minimal theme
 

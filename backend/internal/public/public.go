@@ -34,7 +34,8 @@ var indexHTML []byte
 
 // defaultThemeFS embeds the built-in theme: Go-template pages (index.html,
 // post.html, user.html, 404.html) plus their static assets under assets/.
-// It is produced by the frontend-public build.
+// It is produced by the standalone vexgo-default-theme build; run
+// scripts/fetch-default-theme.sh (or `just build-theme`) before compiling.
 //
 //go:embed default-theme
 var defaultThemeFS embed.FS

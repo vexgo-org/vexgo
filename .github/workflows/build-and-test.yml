@@ -31,6 +31,9 @@ jobs:
           bun run build
           cd ..
 
+      - name: Build default theme
+        run: bash scripts/fetch-default-theme.sh --force
+
       - name: Build backend
         run: go build -v ./backend/cmd/vexgo
 

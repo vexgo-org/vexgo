@@ -560,10 +560,11 @@ bun run lint           # oxlint
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 
-# 为两个前端安装依赖，然后构建管理面板 SPA 与默认主题
+# 安装管理面板 SPA 依赖并构建，再拉取并构建独立的默认主题
 #（构建产物嵌入后端二进制）
-cd frontend && bun install && cd ../frontend-public && bun install && cd ..
+cd frontend && bun install && cd ..
 just build-frontend
+just build-theme
 
 # 启动服务
 just run
