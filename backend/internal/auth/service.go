@@ -232,7 +232,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	// Check if registration is allowed
 	settings, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Allow registration by default
 			settings.RegistrationEnabled = true
 		} else {
@@ -444,7 +444,7 @@ func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, p
 func (s *Service) GetCurrentUser(ctx context.Context, userID uint) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -457,7 +457,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, userID uint) (*model.User,
 func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProfileRequest) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -520,7 +520,7 @@ func (s *Service) deleteOldAvatar(ctx context.Context, userID uint, url string) 
 func (s *Service) ChangePassword(ctx context.Context, userID uint, oldPassword, newPassword string) error {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrUserNotFound
 		}
 		return err
@@ -546,7 +546,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID uint, oldPassword, 
 func (s *Service) UpdateSettings(ctx context.Context, userID uint, req UpdateSettingsRequest) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -578,7 +578,7 @@ func (s *Service) UpdateSettings(ctx context.Context, userID uint, req UpdateSet
 func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pending bool, err error) {
 	user, err := s.repo.FindUserByID(ctx, req.UserID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, ErrUserNotFound
 		}
 		return false, err
@@ -680,7 +680,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	// Find user with this token
 	user, err := s.repo.FindUserByToken(ctx, token)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrInvalidResetToken
 		}
 		return ErrQueryFailed

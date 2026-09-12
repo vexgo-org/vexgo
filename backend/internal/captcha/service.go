@@ -79,7 +79,7 @@ func NewService(deps Deps) *Service {
 func (s *Service) IsCaptchaEnabled(ctx context.Context) (bool, error) {
 	settings, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Not enabled by default
 			return false, nil
 		}

@@ -126,7 +126,7 @@ type SMTPConfigRequest struct {
 func (s *Service) GetSMTPConfig(ctx context.Context) (model.SMTPConfig, error) {
 	config, err := s.repo.GetSMTPConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Return default configuration
 			return model.SMTPConfig{
 				Enabled:   false,
@@ -151,7 +151,7 @@ func (s *Service) GetSMTPConfig(ctx context.Context) (model.SMTPConfig, error) {
 func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (model.SMTPConfig, error) {
 	config, err := s.repo.GetSMTPConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Create new configuration
 			password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
 			if encErr != nil {
@@ -207,7 +207,7 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 func (s *Service) TestSMTP(ctx context.Context, adminEmail string) (string, error) {
 	config, err := s.repo.GetSMTPConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", ErrSMTPNotConfigured
 		}
 		return "", err
@@ -274,7 +274,7 @@ func normalizeSiteLanguage(lang string) string {
 func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {
 	config, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Return default configuration
 			return model.GeneralSettings{
 				CaptchaEnabled:      false,
@@ -296,7 +296,7 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettingsRequest) (model.GeneralSettings, error) {
 	config, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Create new configuration
 			config = model.GeneralSettings{
 				CaptchaEnabled:      req.CaptchaEnabled,
@@ -347,7 +347,7 @@ type AIConfigRequest struct {
 func (s *Service) GetAIConfig(ctx context.Context) (model.AIConfig, error) {
 	config, err := s.repo.GetAIConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Return default configuration
 			return model.AIConfig{
 				Enabled:     false,
@@ -370,7 +370,7 @@ func (s *Service) GetAIConfig(ctx context.Context) (model.AIConfig, error) {
 func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (model.AIConfig, error) {
 	config, err := s.repo.GetAIConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Create new configuration
 			apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
 			if encErr != nil {
@@ -426,7 +426,7 @@ type AIResult struct {
 func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 	config, err := s.repo.GetAIConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrAINotConfigured
 		}
 		return nil, err
@@ -519,13 +519,16 @@ func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("AI API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("AI API returned status %d: %s", resp.StatusCode, aiErrorBody(resp))
 	}
 
 	// Parse response
+	body, err := readAIProviderBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse AI response: %w", err)
 	}
 
@@ -557,7 +560,7 @@ func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 	config, err := s.repo.GetAIConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrAINotConfigured
 		}
 		return nil, err
@@ -616,13 +619,16 @@ func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to fetch models, status: %d, response: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("failed to fetch models, status: %d, response: %s", resp.StatusCode, aiErrorBody(resp))
 	}
 
 	// Parse response
+	body, err := readAIProviderBody(resp)
+	if err != nil {
+		return nil, err
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse models response: %w", err)
 	}
 
@@ -653,6 +659,49 @@ func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 	}, nil
 }
 
+const (
+	// maxAIProviderBodyBytes caps how much of an AI provider response is held
+	// in memory. The endpoint is admin-configurable, so a misconfigured or
+	// hostile provider could otherwise stream an arbitrarily large JSON
+	// document into the process. Model lists and the bounded test completion
+	// are far below this.
+	maxAIProviderBodyBytes = 4 << 20 // 4 MiB
+
+	// aiErrorSnippetBytes caps how much of a failing provider response is
+	// quoted into the error message. That message reaches both the admin
+	// response and the server log, so quoting a whole error page would be
+	// worse than useless.
+	aiErrorSnippetBytes = 512
+)
+
+// readAIProviderBody reads a provider response body, capped at
+// maxAIProviderBodyBytes. An oversize body is reported as an error rather than
+// silently truncated, so a partial payload is never mistaken for a valid one.
+// Callers decode the returned bytes with json.Unmarshal instead of streaming
+// the body through json.Decoder, because the cap must apply while reading.
+func readAIProviderBody(resp *http.Response) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAIProviderBodyBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read AI provider response: %w", err)
+	}
+	if len(body) > maxAIProviderBodyBytes {
+		return nil, fmt.Errorf("AI provider response exceeds %d bytes", maxAIProviderBodyBytes)
+	}
+	return body, nil
+}
+
+// aiErrorBody reads a bounded snippet of a failing provider response for
+// quoting into an error message. A read failure is folded into the snippet
+// instead of discarding the status code: the status is the signal that matters,
+// and dropping it would be a worse outcome than losing the body.
+func aiErrorBody(resp *http.Response) string {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, aiErrorSnippetBytes))
+	if err != nil {
+		return fmt.Sprintf("(body unreadable: %v)", err)
+	}
+	return string(body)
+}
+
 // checkModelExists checks if model exists
 func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 	client := &http.Client{
@@ -673,12 +722,15 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return false, fmt.Errorf("models endpoint returned status %d: %s", resp.StatusCode, string(body))
+		return false, fmt.Errorf("models endpoint returned status %d: %s", resp.StatusCode, aiErrorBody(resp))
 	}
 
+	body, err := readAIProviderBody(resp)
+	if err != nil {
+		return false, err
+	}
 	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return false, fmt.Errorf("failed to parse models response: %w", err)
 	}
 
@@ -762,7 +814,7 @@ func (s *Service) DeleteTheme(ctx context.Context, themeID string) error {
 func (s *Service) GetThemeConfig(ctx context.Context) (string, error) {
 	config, err := s.repo.GetThemeConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return public.DefaultTheme, nil
 		}
 		return "", err
@@ -790,7 +842,7 @@ func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (st
 
 	config, err := s.repo.GetThemeConfig(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			config = model.ThemeConfig{ActiveTheme: activeTheme}
 			if err := s.repo.CreateThemeConfig(ctx, &config); err != nil {
 				return "", fmt.Errorf("failed to save theme config: %w", err)
