@@ -179,6 +179,14 @@ func (s *LocalStorage) Upload(_ context.Context, reader io.Reader, filename, con
 	}
 
 	if err := writeUploadFile(dst, reader); err != nil {
+		// The bytes on disk are truncated (or absent) and no media row will be
+		// created, so the file could never be served or deleted through the
+		// API: leaving it behind would only accumulate orphans under
+		// data/media. Removal is best-effort — the write error is the one worth
+		// reporting, and a concurrent removal is not an error.
+		if removeErr := root.Remove("media/" + filename); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			slog.Warn("failed to remove partial upload", "file", filename, "err", removeErr)
+		}
 		return "", err
 	}
 

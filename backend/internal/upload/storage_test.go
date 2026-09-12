@@ -1,8 +1,11 @@
 package upload
 
 import (
+	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -60,6 +63,23 @@ func TestWriteUploadFile_CopyErrorWins(t *testing.T) {
 	}
 	if !dst.closed {
 		t.Error("expected the file to be closed even when the copy failed")
+	}
+}
+
+// A failed write must not leave the partial file behind: no media row is
+// created for it, so nothing could ever serve or delete it through the API and
+// it would only accumulate orphans under data/media.
+func TestLocalStorage_UploadRemovesPartialFileOnCopyError(t *testing.T) {
+	dataDir := t.TempDir()
+	storage := NewLocalStorage(dataDir)
+	copyErr := errors.New("read failed")
+
+	if _, err := storage.Upload(context.Background(), failingReader{err: copyErr}, "partial.txt", ""); !errors.Is(err, copyErr) {
+		t.Fatalf("expected the copy error to be reported, got %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dataDir, "media", "partial.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("partial upload should be removed, Stat error = %v", err)
 	}
 }
 
