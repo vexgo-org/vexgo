@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -17,6 +18,9 @@ type fakeRepo struct {
 	pages  map[uint]*model.Page
 	bySlug map[string]uint
 	nextID uint
+	// lastSearch records the search term the service passed down, so tests can
+	// assert on the cap applied before the query reaches the repository.
+	lastSearch string
 }
 
 func newFakeRepo() *fakeRepo {
@@ -111,6 +115,7 @@ func (f *fakeRepo) Delete(_ context.Context, page *model.Page) error {
 func (f *fakeRepo) List(_ context.Context, status, search string, page, limit int) ([]model.Page, int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lastSearch = search
 	var out []model.Page
 	for _, p := range f.pages {
 		if status != "" && string(p.Status) != status {
@@ -138,6 +143,36 @@ func (f *fakeRepo) ListNav(_ context.Context) ([]model.Page, error) {
 
 func (f *fakeRepo) FindUserByID(_ context.Context, _ uint) (*model.User, error) {
 	return &model.User{Role: model.RoleAdmin}, nil
+}
+
+// The search cap counts runes: the old byte slice cut multi-byte terms
+// mid-character, putting invalid UTF-8 in the LIKE pattern that PostgreSQL
+// rejects in a query parameter.
+func TestList_SearchTruncationIsRuneSafe(t *testing.T) {
+	repo := newFakeRepo()
+	svc := newServiceWithRepo(repo)
+	ctx := context.Background()
+
+	// 200 runes / 600 bytes: over the old byte cap, exactly at the rune cap.
+	term := strings.Repeat("评", maxSearchRunes)
+	if _, _, err := svc.List(ctx, ListQuery{Search: term, Page: 1, Limit: 20}); err != nil {
+		t.Fatalf("List error: %v", err)
+	}
+	if repo.lastSearch != term {
+		t.Errorf("a term within the rune cap must pass through unchanged, got %d runes",
+			utf8.RuneCountInString(repo.lastSearch))
+	}
+
+	// 250 runes: cut at maxSearchRunes, still valid UTF-8.
+	if _, _, err := svc.List(ctx, ListQuery{Search: strings.Repeat("评", maxSearchRunes+50), Page: 1, Limit: 20}); err != nil {
+		t.Fatalf("List error: %v", err)
+	}
+	if got := utf8.RuneCountInString(repo.lastSearch); got != maxSearchRunes {
+		t.Errorf("expected %d runes, got %d", maxSearchRunes, got)
+	}
+	if !utf8.ValidString(repo.lastSearch) {
+		t.Error("truncated search term is not valid UTF-8")
+	}
 }
 
 func TestCreate_AdminOnly(t *testing.T) {
