@@ -40,6 +40,7 @@ export interface GeneralSettings {
   siteDescription?: string;
   siteIcon?: string;
   itemsPerPage?: number;
+  siteLanguage?: string;
   createdAt?: string;
   updatedAt?: string;
 }

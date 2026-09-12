@@ -8,7 +8,10 @@ VexGo is a self-hosted blog CMS. The repository is a full-stack app:
 - **Frontend**: React + TypeScript SPA built with Vite and Tailwind CSS, using shadcn/ui-style components.
 - Go module path: `github.com/vexgo-org/vexgo`
 
-Key architectural fact: **the frontend build output is written to `backend/internal/public/dist` and embedded into the backend binary**. After changing frontend code you must rebuild the frontend (`bun run build` in `frontend/`) for the backend to serve it. The dev server (`bun run dev`) proxies/points at the backend API at `http://localhost:3001/api` (configurable via `VITE_API_URL`).
+Key architectural facts:
+
+- **The admin SPA build is written to `backend/internal/public/dist` and embedded into the backend binary**. It is built with Vite base `/admin/`, so it is served only under `/admin/...` paths (assets at `/admin/assets/...`). All non-public routes — login/register/reset-password/verify-email/write/edit-post/profile/my-posts/notifications/settings plus the admin pages — live under `/admin/...`; old top-level URLs (e.g. `/login`) are 301-redirected to their `/admin/` equivalent (query strings preserved, so emailed `/verify-email?token=...` links keep working). After changing frontend code you must rebuild the frontend (`bun run build` in `frontend/`) for the backend to serve it. The dev server (`bun run dev`) proxies/points at the backend API at `http://localhost:3001/api` (configurable via `VITE_API_URL`).
+- **Public pages are server-side rendered from themes** (`/`, `/post/:slug`, `/posts/:slug`, `/user/:id`). A theme is a directory of Go-template HTML files (`index.html`, `post.html`, `user.html`, optional `404.html`) plus static assets under an `assets/` dir, served with the stable `/theme-assets/<file>` prefix (the `assets/` segment is added by the server, so templates reference files as `/theme-assets/comments.js`). The built-in default theme lives in the standalone `vexgo-org/vexgo-default-theme` repo: React (TSX) components emit the Go-template HTML at build time via `renderToString` (`scripts/generate.tsx`); `scripts/fetch-default-theme.sh` (or `just build-theme`) builds it and copies `dist/` to `backend/internal/public/default-theme`, which is embedded. Third-party themes are uploaded ZIPs extracted to `data/theme/<id>/`. The engine lives in `backend/internal/public/theme_render.go` (+ `theme_handlers.go`); it renders markdown with goldmark (safe mode, GFM). Template data context: `.Site`, `.Posts`, `.Post`, `.User`, `.Pagination`, `.Query` (+ `.PopularPosts`/`.PopularTags` on the home page, ranked like the public API: likes×5 + views, and tag usage), plus helpers `date`/`truncate`/`userURL`/`categoryURL`. Comments are rendered by a self-contained vanilla-JS widget (`widget/comments.js` in `vexgo-default-theme`, copied to the theme's assets at build time): the post template drops in `<div id="vexgo-comments" data-post-id="{{.Post.ID}}"></div>` + `<script src="/theme-assets/comments.js" defer></script>`, and the widget loads/submits/deletes via the public comment API using the admin SPA's localStorage session. `go()` expressions inside HTML attributes must not contain double quotes (React escapes them to `&quot;`, breaking template parse) — use the helper funcs instead.
 
 ## Setup
 
@@ -32,8 +35,9 @@ just format           # gofumpt -w -extra . && prettier --write "**/*.{js,jsx,ts
 just lint             # golangci-lint + prettier --check + gofumpt diff check + oxlint + gopls check
 just test             # go test -v ./...
 just run              # ensure dist exists, then go run backend/cmd/vexgo/main.go
-just build            # build frontend, then build backend
+just build            # build frontends (admin SPA + default theme), then backend
 just build-frontend   # bun run --cwd frontend build
+just build-theme      # fetch and build the standalone default theme
 just build-backend    # ensure dist exists, then go build backend/cmd/vexgo/main.go
 ```
 

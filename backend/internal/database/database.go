@@ -4,6 +4,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -187,6 +188,7 @@ func AutoMigrate(db *gorm.DB) error {
 
 	if err := db.AutoMigrate(
 		&model.Post{},
+		&model.Page{},
 		&model.User{},
 		&model.Tag{},
 		&model.Category{},
@@ -273,7 +275,7 @@ func Seed(db *gorm.DB) error {
 	// Create a default super admin (if not exists), store password using bcrypt
 	var u model.User
 	if err := db.Where("username = ?", defaultAdminUsername).First(&u).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			pwHash, err := bcrypt.GenerateFromPassword([]byte(defaultAdminPassword), bcrypt.DefaultCost)
 			if err != nil {
 				return fmt.Errorf("hash admin password: %w", err)
@@ -320,7 +322,7 @@ func Seed(db *gorm.DB) error {
 // seedSMTP inserts the default (disabled) SMTP config when no row exists.
 func seedSMTP(db *gorm.DB) error {
 	var config model.SMTPConfig
-	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+	if err := db.First(&config).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		config = model.SMTPConfig{Enabled: false, Port: 587, FromName: "VexGo"}
 		if err := db.Create(&config).Error; err != nil {
 			return fmt.Errorf("create default SMTP config: %w", err)
@@ -333,7 +335,7 @@ func seedSMTP(db *gorm.DB) error {
 // seedGeneralSettings inserts the default general settings when no row exists.
 func seedGeneralSettings(db *gorm.DB) error {
 	var config model.GeneralSettings
-	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+	if err := db.First(&config).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		config = model.GeneralSettings{
 			CaptchaEnabled:      false,
 			RegistrationEnabled: true,
@@ -352,7 +354,7 @@ func seedGeneralSettings(db *gorm.DB) error {
 // seedAIConfig inserts the default (disabled) AI config when no row exists.
 func seedAIConfig(db *gorm.DB) error {
 	var config model.AIConfig
-	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+	if err := db.First(&config).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		config = model.AIConfig{
 			Enabled:   false,
 			Provider:  "openai",
@@ -369,7 +371,7 @@ func seedAIConfig(db *gorm.DB) error {
 // seedThemeConfig inserts the default theme selection when no row exists.
 func seedThemeConfig(db *gorm.DB) error {
 	var config model.ThemeConfig
-	if err := db.First(&config).Error; err == gorm.ErrRecordNotFound {
+	if err := db.First(&config).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		config = model.ThemeConfig{ActiveTheme: "default"}
 		if err := db.Create(&config).Error; err != nil {
 			return fmt.Errorf("create default theme config: %w", err)
@@ -382,7 +384,7 @@ func seedThemeConfig(db *gorm.DB) error {
 // seedCategory inserts the default "Default" category when it is missing.
 func seedCategory(db *gorm.DB) error {
 	var category model.Category
-	if err := db.Where("name = ?", "Default").First(&category).Error; err == gorm.ErrRecordNotFound {
+	if err := db.Where("name = ?", "Default").First(&category).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		category = model.Category{
 			Name:        "Default",
 			Description: "Default category for articles without a specified category",

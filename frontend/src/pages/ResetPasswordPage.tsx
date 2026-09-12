@@ -91,7 +91,7 @@ export function ResetPasswordPage() {
       setError("");
       // Navigate to the login page after 3 seconds
       setTimeout(() => {
-        navigate("/login");
+        navigate("/admin/login");
       }, 3000);
     } catch (err: unknown) {
       const apiError = err as { response?: { data?: { error?: string } } };
@@ -233,7 +233,7 @@ export function ResetPasswordPage() {
           <div className="mt-6 text-center text-sm">
             <button
               type="button"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/admin/login")}
               className="text-primary hover:underline focus:outline-none flex items-center justify-center mx-auto"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />

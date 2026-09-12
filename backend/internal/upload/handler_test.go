@@ -1,20 +1,29 @@
 package upload
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// TestGenerateFilename_SanitizesExtension ensures the client-supplied
-// extension survives only as a short alphanumeric suffix; anything else
-// (separators, HTML, colons, overlong tails) yields a bare UUID name.
-func TestGenerateFilename_SanitizesExtension(t *testing.T) {
+// TestGenerateFilename_LimitsExtensionToAllowlist ensures the client-supplied
+// extension survives only when it is an allowlisted (non-executable) media
+// type; anything else — separators, HTML/SVG documents, colons, overlong
+// tails — yields a bare UUID name served as application/octet-stream.
+func TestGenerateFilename_LimitsExtensionToAllowlist(t *testing.T) {
 	cases := []struct {
 		name     string
 		original string
@@ -22,9 +31,15 @@ func TestGenerateFilename_SanitizesExtension(t *testing.T) {
 	}{
 		{"plain jpg", "photo.jpg", ".jpg"},
 		{"uppercase normalized", "PHOTO.JPG", ".jpg"},
-		{"multi-dot takes last", "archive.tar.gz", ".gz"},
+		{"multi-dot takes last", "archive.tar.png", ".png"},
+		{"disallowed gz stripped", "archive.tar.gz", ""},
 		{"no extension", "noext", ""},
 		{"dot only", "x.", ""},
+		{"html stripped", "evil.html", ""},
+		{"htm stripped", "evil.htm", ""},
+		{"svg stripped", "evil.svg", ""},
+		{"xhtml stripped", "evil.xhtml", ""},
+		{"js stripped", "evil.js", ""},
 		{"html injection", "x.<script>", ""},
 		{"windows ADS colon", "x.jpg:b", ""},
 		{"backslash traversal", `x.\evil.jpg`, ".jpg"},
@@ -99,5 +114,65 @@ func TestLocalStorage_ContainsHostileFilenames(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, "evil.txt")); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("evil.txt must not exist outside media")
+	}
+}
+
+// failingStorage always fails Upload with the error it was given, so the
+// handler's error path can be exercised without a real storage backend.
+type failingStorage struct{ err error }
+
+func (s failingStorage) Upload(context.Context, io.Reader, string, string) (string, error) {
+	return "", s.err
+}
+
+func (s failingStorage) Delete(context.Context, string) error { return nil }
+
+// TestUploadFile_DoesNotLeakStorageErrors pins the contract that a persistence
+// failure is logged server-side and answered with a generic 500: the storage
+// error may carry paths or backend addresses and must never reach the client.
+func TestUploadFile_DoesNotLeakStorageErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const internal = "s3://bucket/../../../etc/shadow: dial tcp 10.0.0.5:9000"
+	h := NewHandler(Deps{
+		JWTSecret: []byte("test-jwt-secret-for-upload-tests!"),
+		Storage:   failingStorage{err: errors.New(internal)},
+	})
+
+	r := gin.New()
+	r.POST("/upload", func(c *gin.Context) {
+		c.Set(middleware.CtxUserIDKey, uint(7))
+		h.UploadFile(c)
+	})
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "photo.png")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	if _, err := part.Write([]byte("not really a png")); err != nil {
+		t.Fatalf("write form file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/upload", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	response := w.Body.String()
+	for _, leak := range []string{"s3://", "10.0.0.5", "dial tcp", "etc/shadow"} {
+		if strings.Contains(response, leak) {
+			t.Errorf("internal storage detail leaked to client: %q present in body %s", leak, response)
+		}
+	}
+	if !strings.Contains(response, "Failed to upload") {
+		t.Errorf("expected a generic failure message, got body %s", response)
 	}
 }

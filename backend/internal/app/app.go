@@ -20,6 +20,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
+	"github.com/vexgo-org/vexgo/backend/internal/page"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 	"github.com/vexgo-org/vexgo/backend/internal/router"
@@ -106,6 +107,14 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.SecurityHeaders())
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
+	renderer.SetJWTSecret(cfg.JWTSecret)
+	// Theme-owned seed pages (e.g. the default theme's timeline/links) are
+	// created for missing slugs only; user edits are never overwritten.
+	if n, err := renderer.EnsureThemeSeeds(context.Background(), renderer.ActiveThemeID()); err != nil {
+		slog.Warn("failed to ensure theme seed pages", "err", err)
+	} else if n > 0 {
+		slog.Info("created theme seed pages", "count", n)
+	}
 	slog.Info("base url set for server-side rendering", "baseURL", renderer.BaseURL())
 
 	configureProxies(r, cfg)
@@ -128,6 +137,7 @@ func New(cfg *config.Config) (*App, error) {
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
 			Cipher:    cipher,
+			RateLimit: distributedRateLimit,
 		},
 		Post: post.Deps{
 			DB:        db,
@@ -135,6 +145,10 @@ func New(cfg *config.Config) (*App, error) {
 			Notifier:  notificationSvc,
 			Files:     storage,
 			Cache:     contentCache,
+		},
+		Page: page.Deps{
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
 		},
 		Upload: upload.Deps{
 			DB:        db,
@@ -165,12 +179,13 @@ func New(cfg *config.Config) (*App, error) {
 			RateLimit:          distributedRateLimit,
 		},
 		SSO: sso.Deps{
-			DB:         db,
-			SSO:        &cfg.SSO,
-			JWTSecret:  cfg.JWTSecret,
-			Mailer:     mailerSvc,
-			BaseURL:    cfg.BaseURL,
-			StateStore: ssoStateStore,
+			DB:                 db,
+			SSO:                &cfg.SSO,
+			JWTSecret:          cfg.JWTSecret,
+			Mailer:             mailerSvc,
+			BaseURL:            cfg.BaseURL,
+			BehindReverseProxy: cfg.BehindReverseProxy,
+			StateStore:         ssoStateStore,
 		},
 		Home: home.Deps{
 			DB:        db,

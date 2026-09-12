@@ -197,6 +197,10 @@ func (h *Handler) CreatePost(c *gin.Context) {
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permissions to create a post"})
 			return
 		}
+		if errors.Is(err, ErrInvalidStatus) {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post status"})
+			return
+		}
 		if errors.Is(err, model.ErrSlugTaken) {
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 			return
@@ -257,6 +261,8 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
 		case errors.Is(err, ErrForbidden):
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to modify this post"})
+		case errors.Is(err, ErrInvalidStatus):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post status"})
 		case errors.Is(err, model.ErrSlugTaken):
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 		case errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
@@ -676,10 +682,18 @@ func (h *Handler) DeleteTag(c *gin.Context) {
 
 // parseIDParam parses a numeric route :id, reporting whether it is valid.
 // Zero, non-numeric and out-of-range values cannot identify a row and are
-// treated as missing resources. The bit size matches uint so the conversion
-// can never truncate silently.
+// treated as missing resources.
 func parseIDParam(c *gin.Context) (uint, bool) {
-	id64, err := strconv.ParseUint(c.Param("id"), 10, strconv.IntSize)
+	return parseUintParam(c, "id")
+}
+
+// parseUintParam parses a numeric route parameter by name, reporting whether it
+// is valid. The bit size matches uint so the conversion can never truncate
+// silently. Callers must reject an invalid value instead of proceeding with 0:
+// otherwise a non-numeric path segment resolves to row 0, which can write
+// orphaned records and surfaces as a 500 rather than a client error.
+func parseUintParam(c *gin.Context, name string) (uint, bool) {
+	id64, err := strconv.ParseUint(c.Param(name), 10, strconv.IntSize)
 	if err != nil || id64 == 0 {
 		return 0, false
 	}
@@ -934,13 +948,16 @@ func (h *Handler) ResubmitPost(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			postId	path		int	true	"post id"
 //	@Success		200		{object}	LikeResponse
+//	@Failure		400		{object}	api.ErrorResponse
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/likes/{postId} [post]
 func (h *Handler) ToggleLike(c *gin.Context) {
-	postIDStr := c.Param("postId")
-	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
-	postID := uint(id64)
+	postID, ok := parseUintParam(c, "postId")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post ID"})
+		return
+	}
 
 	userID := middleware.CurrentUserID(c)
 
@@ -967,11 +984,14 @@ func (h *Handler) ToggleLike(c *gin.Context) {
 //	@Produce		json
 //	@Param			postId	path		int	true	"post id"
 //	@Success		200		{object}	LikeStatusResponse
+//	@Failure		400		{object}	api.ErrorResponse
 //	@Router			/likes/{postId} [get]
 func (h *Handler) GetLikeStatus(c *gin.Context) {
-	postIDStr := c.Param("postId")
-	id64, _ := strconv.ParseUint(postIDStr, 10, 64)
-	postID := uint(id64)
+	postID, ok := parseUintParam(c, "postId")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post ID"})
+		return
+	}
 
 	userID := middleware.CurrentUserID(c)
 

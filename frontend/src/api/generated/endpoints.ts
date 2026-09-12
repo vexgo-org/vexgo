@@ -44,6 +44,7 @@ import type {
   GetModerationPendingParams,
   GetModerationRejectedParams,
   GetNotificationsParams,
+  GetPagesParams,
   GetPostsDraftsParams,
   GetPostsParams,
   GetPostsUserIdParams,
@@ -59,6 +60,12 @@ import type {
   NotificationMessageResponse,
   NotificationNotificationListResponse,
   NotificationUnreadCountResponse,
+  PageCreatePageRequest,
+  PagePageDeleteResponse,
+  PagePageListResponse,
+  PagePageMessageResponse,
+  PagePageSingleResponse,
+  PageUpdatePageRequest,
   PostCategoriesListResponse,
   PostConfigThemeUploadBody,
   PostCreateCategoryRequest,
@@ -93,6 +100,9 @@ import type {
   SettingsThemeConfigResponse,
   SettingsThemeConfigUpdateRequest,
   SettingsThemeConfigUpdateResponse,
+  SettingsThemeDeleteResponse,
+  SettingsThemeLanguagesResponse,
+  SettingsThemePreviewLinkResponse,
   SettingsThemeUploadResponse,
   SettingsThemesListResponse,
   SsoSSOProvidersResponse,
@@ -576,8 +586,12 @@ export const getVexGoAPI = () => {
    * Accepts a multipart/form-data body with a single
    * 'theme' part. The zip must contain a vexgo-theme.json
    * metadata file (either at the root or inside a single
-   * subdirectory). Existing themes with the same id are
-   * overwritten.
+   * subdirectory) with required id, name and version fields;
+   * the id must match the theme directory name. The optional
+   * preview cover must be an http(s) URL when set. Archives
+   * are limited to 32MB zip / 100MB unpacked / 2000 files /
+   * 10MB per file. Existing themes with the same id are
+   * overwritten atomically.
    * @summary Upload a theme zip
    */
   const postConfigThemeUpload = (
@@ -605,16 +619,39 @@ export const getVexGoAPI = () => {
   };
 
   /**
-   * Streams the preview.png from the theme directory.
-   * Returns 404 if the theme, or its preview file,
-   * does not exist.
-   * @summary Theme preview image
+   * Removes an installed theme directory. The built-in default
+   * theme and the currently active theme cannot be deleted.
+   * @summary Delete a theme
    */
-  const getConfigThemesIdPreview = (id: string) => {
-    return customInstance<Blob>({
-      url: `/config/themes/${id}/preview`,
+  const deleteConfigThemesId = (id: string) => {
+    return customInstance<SettingsThemeDeleteResponse>({
+      url: `/config/themes/${id}`,
+      method: "DELETE",
+    });
+  };
+
+  /**
+   * Lists the language codes a theme ships under i18n/.
+   * @summary Theme i18n languages
+   */
+  const getConfigThemesIdLanguages = (id: string) => {
+    return customInstance<SettingsThemeLanguagesResponse>({
+      url: `/config/themes/${id}/languages`,
       method: "GET",
-      responseType: "blob",
+    });
+  };
+
+  /**
+   * Returns a same-origin URL that renders the theme in preview
+   * mode. The URL carries a short-lived signature because the
+   * console opens the preview in a new tab, which cannot send the
+   * Authorization header.
+   * @summary Mint a theme preview link
+   */
+  const getConfigThemesIdPreviewLink = (id: string) => {
+    return customInstance<SettingsThemePreviewLinkResponse>({
+      url: `/config/themes/${id}/preview-link`,
+      method: "GET",
     });
   };
 
@@ -870,6 +907,69 @@ export const getVexGoAPI = () => {
     return customInstance<NotificationMessageResponse>({
       url: `/notifications/${id}/read`,
       method: "PUT",
+    });
+  };
+
+  /**
+   * Public callers see published pages; admins may filter by status.
+   * @summary List pages
+   */
+  const getPages = (params?: GetPagesParams) => {
+    return customInstance<PagePageListResponse>({
+      url: `/pages`,
+      method: "GET",
+      params,
+    });
+  };
+
+  /**
+   * Admins only. Slug must be lowercase a-z0-9- and not reserved.
+   * @summary Create a page
+   */
+  const postPages = (pageCreatePageRequest: PageCreatePageRequest) => {
+    return customInstance<PagePageMessageResponse>({
+      url: `/pages`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: pageCreatePageRequest,
+    });
+  };
+
+  /**
+   * Admins only.
+   * @summary Delete a page
+   */
+  const deletePagesId = (id: number) => {
+    return customInstance<PagePageDeleteResponse>({
+      url: `/pages/${id}`,
+      method: "DELETE",
+    });
+  };
+
+  /**
+   * Admins only. Only the supplied fields are updated.
+   * @summary Update a page
+   */
+  const putPagesId = (
+    id: string,
+    pageUpdatePageRequest: PageUpdatePageRequest,
+  ) => {
+    return customInstance<PagePageMessageResponse>({
+      url: `/pages/${id}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: pageUpdatePageRequest,
+    });
+  };
+
+  /**
+   * Published pages are public; drafts require an admin session.
+   * @summary Look up a page by slug
+   */
+  const getPagesSlug = (slug: string) => {
+    return customInstance<PagePageSingleResponse>({
+      url: `/pages/${slug}`,
+      method: "GET",
     });
   };
 
@@ -1312,7 +1412,9 @@ export const getVexGoAPI = () => {
     putConfigTheme,
     postConfigThemeUpload,
     getConfigThemes,
-    getConfigThemesIdPreview,
+    deleteConfigThemesId,
+    getConfigThemesIdLanguages,
+    getConfigThemesIdPreviewLink,
     getLikesPostId,
     postLikesPostId,
     putModerationApproveId,
@@ -1334,6 +1436,11 @@ export const getVexGoAPI = () => {
     getNotificationsUnreadCount,
     deleteNotificationsId,
     putNotificationsIdRead,
+    getPages,
+    postPages,
+    deletePagesId,
+    putPagesId,
+    getPagesSlug,
     getPosts,
     postPosts,
     getPostsByIdId,
@@ -1469,9 +1576,17 @@ export type PostConfigThemeUploadResult = NonNullable<
 export type GetConfigThemesResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemes"]>>
 >;
-export type GetConfigThemesIdPreviewResult = NonNullable<
+export type DeleteConfigThemesIdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["deleteConfigThemesId"]>>
+>;
+export type GetConfigThemesIdLanguagesResult = NonNullable<
   Awaited<
-    ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdPreview"]>
+    ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdLanguages"]>
+  >
+>;
+export type GetConfigThemesIdPreviewLinkResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof getVexGoAPI>["getConfigThemesIdPreviewLink"]>
   >
 >;
 export type GetLikesPostIdResult = NonNullable<
@@ -1556,6 +1671,21 @@ export type DeleteNotificationsIdResult = NonNullable<
 >;
 export type PutNotificationsIdReadResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putNotificationsIdRead"]>>
+>;
+export type GetPagesResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getPages"]>>
+>;
+export type PostPagesResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postPages"]>>
+>;
+export type DeletePagesIdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["deletePagesId"]>>
+>;
+export type PutPagesIdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putPagesId"]>>
+>;
+export type GetPagesSlugResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getPagesSlug"]>>
 >;
 export type GetPostsResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getPosts"]>>

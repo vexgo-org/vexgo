@@ -30,15 +30,6 @@ type ListQuery struct {
 // expensive database query and a bloated cache key on every request.
 const maxSearchLength = 200
 
-// truncateRunes shortens s to at most n runes without splitting one.
-func truncateRunes(s string, n int) string {
-	runes := []rune(s)
-	if len(runes) <= n {
-		return s
-	}
-	return string(runes[:n])
-}
-
 // List returns the paginated post list with role-based visibility, filters,
 // and per-post like/comment counts.
 func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, error) {
@@ -47,7 +38,7 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, e
 		return nil, 0, ErrGuestViewDenied
 	}
 
-	q.Search = truncateRunes(q.Search, maxSearchLength)
+	q.Search = model.TruncateRunes(q.Search, maxSearchLength)
 
 	posts, total, err := s.repo.List(ctx, q.UserRole, q.UserID, ListFilter{
 		Page: q.Page, Limit: q.Limit, CategoryID: q.Category, Search: q.Search,
@@ -94,12 +85,33 @@ func (s *Service) GetBySlug(ctx context.Context, slug, currentUserRole string, c
 	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
 }
 
+// canViewPost reports whether the acting user may read this post. Admins see
+// every post, an author sees their own posts, and everyone else (including
+// guests) sees published posts only. It mirrors applyUserPostsVisibility in
+// repository.go so the single-post read path cannot expose an unpublished post
+// through a guessable slug or id.
+func canViewPost(post *model.Post, role string, userID uint) bool {
+	if model.IsAdmin(role) {
+		return true
+	}
+	if userID != 0 && post.AuthorID == userID {
+		return true
+	}
+	return post.Status == model.PostStatusPublished
+}
+
 // enrichPost fills like/comment counts, view count and privacy filtering on a
 // post that was just loaded from the database.
 func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	// If not logged in and guest viewing is not allowed, return 403
 	if currentUserRole == "" && !s.allowGuestView(ctx) {
 		return nil, ErrGuestViewDenied
+	}
+
+	// Unpublished posts are private to their author and to admins. Report a
+	// denial as "not found" so the API never confirms that the post exists.
+	if !canViewPost(post, currentUserRole, currentUserID) {
+		return nil, ErrPostNotFound
 	}
 
 	if !model.IsAdmin(currentUserRole) && post.AuthorID != currentUserID {
@@ -111,8 +123,13 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 		slog.Warn("failed to increment view count", "err", err)
 	}
 
-	// Fill likes count and current logged-in user's like status
-	count, _ := s.repo.CountLikes(ctx, post.ID)
+	// Fill likes count and current logged-in user's like status. Counts are
+	// enrichment, so a failed count must not fail the read — but reporting the
+	// zero value as if it were real would show the reader a wrong number.
+	count, countErr := s.repo.CountLikes(ctx, post.ID)
+	if countErr != nil {
+		slog.Warn("failed to count post likes", "postID", post.ID, "err", countErr)
+	}
 	post.LikesCount = int(count)
 	post.IsLiked = false
 	if currentUserID != 0 {
@@ -122,7 +139,10 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 	}
 
 	// Fill comments count
-	ccount, _ := s.repo.CountComments(ctx, post.ID)
+	ccount, ccErr := s.repo.CountComments(ctx, post.ID)
+	if ccErr != nil {
+		slog.Warn("failed to count post comments", "postID", post.ID, "err", ccErr)
+	}
 	post.CommentsCount = int(ccount)
 
 	return post, nil
@@ -138,6 +158,26 @@ type CreateRequest struct {
 	Excerpt    string
 	CoverImage string
 	Status     model.PostStatus
+}
+
+// validateAuthorStatus validates a client-supplied status for the
+// author-facing create/update endpoints. The status field is untrusted input:
+// without this check any role could publish past the moderation queue by
+// simply sending `"status":"published"`, which is what the role-derived
+// default exists to prevent.
+//
+// It returns ErrInvalidStatus for a value these endpoints never accept (an
+// unknown string, or `rejected`, which only the moderation endpoints may
+// assign), and ErrForbidden when a role below author-level attempts to
+// publish.
+func validateAuthorStatus(role string, status model.PostStatus) error {
+	if !model.ValidPostStatus(status) || status == model.PostStatusRejected {
+		return ErrInvalidStatus
+	}
+	if status == model.PostStatusPublished && !model.IsAuthor(role) {
+		return ErrForbidden
+	}
+	return nil
 }
 
 // Create creates a post, deriving the initial status from the user's role.
@@ -162,6 +202,15 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 	if exists {
 		return nil, fmt.Errorf("%w", model.ErrSlugTaken)
+	}
+
+	// An explicitly requested status must be one the acting role may set;
+	// otherwise it would override the role-derived default below and defeat
+	// the moderation queue.
+	if req.Status != "" {
+		if err := validateAuthorStatus(userRole, req.Status); err != nil {
+			return nil, err
+		}
 	}
 
 	// Determine initial post status based on user role
@@ -276,6 +325,17 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 		post.CoverImage = req.CoverImage
 	}
 	if req.Status != "" {
+		if err := validateAuthorStatus(user.Role, req.Status); err != nil {
+			return nil, err
+		}
+		// A rejected post must not be republished by a non-admin author: the
+		// rejection is a moderation decision, and overriding it here would
+		// bypass the approve endpoint. Admins keep the ability (they are the
+		// moderation authority) so an explicit override still has one path.
+		if req.Status == model.PostStatusPublished &&
+			post.Status == model.PostStatusRejected && !model.IsAdmin(user.Role) {
+			return nil, ErrForbidden
+		}
 		post.Status = model.PostStatus(req.Status)
 	}
 
@@ -501,11 +561,24 @@ func (s *Service) populateCounts(ctx context.Context, posts []model.Post, userID
 		postIDs[i] = posts[i].ID
 	}
 
-	likesCounts, _ := s.repo.BatchCountLikesByPostIDs(ctx, postIDs)
-	commentsCounts, _ := s.repo.BatchCountCommentsByPostIDs(ctx, postIDs)
+	// Counts are enrichment: a failed batch must not fail the whole list, but
+	// silently substituting zero would report wrong numbers for every row. A
+	// nil likedPosts would likewise mark every post as unliked for a reader who
+	// has liked some of them.
+	likesCounts, err := s.repo.BatchCountLikesByPostIDs(ctx, postIDs)
+	if err != nil {
+		slog.Warn("failed to count likes for post list", "posts", len(postIDs), "err", err)
+	}
+	commentsCounts, err := s.repo.BatchCountCommentsByPostIDs(ctx, postIDs)
+	if err != nil {
+		slog.Warn("failed to count comments for post list", "posts", len(postIDs), "err", err)
+	}
 	var likedPosts map[uint]bool
 	if userID != 0 {
-		likedPosts, _ = s.repo.BatchFindLikedPostIDs(ctx, postIDs, userID)
+		likedPosts, err = s.repo.BatchFindLikedPostIDs(ctx, postIDs, userID)
+		if err != nil {
+			slog.Warn("failed to load liked posts for post list", "posts", len(postIDs), "err", err)
+		}
 	}
 
 	for i := range posts {

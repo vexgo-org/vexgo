@@ -4,15 +4,12 @@ import { NotificationProvider } from "@/hooks/useNotifications";
 import { I18nProvider } from "@/lib/I18nContext";
 import { Layout } from "@/components/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { HomePage } from "@/pages/HomePage";
-import { PostDetailPage } from "@/pages/PostDetailPage";
 import { WritePostPage } from "@/pages/WritePostPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { MyPostsPage } from "@/pages/MyPostsPage";
-import { UserPostsPage } from "@/pages/UserPostsPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { ThemePage } from "@/pages/ThemePage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -26,6 +23,8 @@ import { CommentConfigPage } from "@/pages/CommentConfigPage";
 import { AISettingsPage } from "@/pages/AISettingsPage";
 import { NotificationCenterPage } from "@/pages/NotificationCenterPage";
 import { CreatorApplicationReviewPage } from "@/pages/CreatorApplicationReviewPage";
+import { PagesPage } from "@/pages/PagesPage";
+import { PageEditorPage } from "@/pages/PageEditorPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
@@ -62,18 +61,21 @@ function App() {
           <NotificationProvider>
             <Layout>
               <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/post/:slug" element={<PostDetailPage />} />
-                <Route path="/user/:id" element={<UserPostsPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                {/* Auth routes */}
+                <Route path="/admin/login" element={<LoginPage />} />
+                <Route path="/admin/register" element={<RegisterPage />} />
+                <Route
+                  path="/admin/reset-password"
+                  element={<ResetPasswordPage />}
+                />
+                <Route
+                  path="/admin/verify-email"
+                  element={<VerifyEmailPage />}
+                />
 
                 {/* Routes requiring login */}
                 <Route
-                  path="/write"
+                  path="/admin/write"
                   element={
                     <ProtectedRoute>
                       <WritePostPage />
@@ -81,7 +83,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/edit-post/:id"
+                  path="/admin/edit-post/:id"
                   element={
                     <ProtectedRoute>
                       <WritePostPage />
@@ -89,7 +91,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/profile"
+                  path="/admin/profile"
                   element={
                     <ProtectedRoute>
                       <ProfilePage />
@@ -97,7 +99,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/my-posts"
+                  path="/admin/my-posts"
                   element={
                     <ProtectedRoute>
                       <MyPostsPage />
@@ -105,7 +107,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/notifications"
+                  path="/admin/notifications"
                   element={
                     <ProtectedRoute>
                       <NotificationCenterPage />
@@ -114,7 +116,7 @@ function App() {
                 />
 
                 <Route
-                  path="/settings"
+                  path="/admin/settings"
                   element={
                     <ProtectedRoute>
                       <SettingsPage />
@@ -200,6 +202,30 @@ function App() {
                   element={
                     <ProtectedRoute requireAdmin>
                       <CreatorApplicationReviewPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pages"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PagesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pages/new"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PageEditorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/pages/:id"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PageEditorPage />
                     </ProtectedRoute>
                   }
                 />

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		t.Fatalf("get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Tag{}, &model.Post{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Category{}, &model.Tag{}, &model.Post{}, &model.Like{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -750,5 +751,186 @@ func TestLists_ExposePostCount(t *testing.T) {
 	}
 	if tagCounts[tag.ID] != 1 {
 		t.Errorf("expected used tag count 1, got %d", tagCounts[tag.ID])
+	}
+}
+
+// doCreatePost posts a new post through the real middleware+handler chain.
+func doCreatePost(t *testing.T, r *gin.Engine, token, slug, status string) *httptest.ResponseRecorder {
+	t.Helper()
+	body := strings.NewReader(`{"slug":"` + slug + `","title":"t","content":"c","category":"1","status":"` + status + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/posts", body)
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// doUpdatePost sends a raw JSON body to PUT /api/posts/{id} through the real
+// middleware+handler chain.
+func doUpdatePost(t *testing.T, r *gin.Engine, token string, id uint, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPut, "/api/posts/"+strconv.Itoa(int(id)), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// TestCreatePost_StatusBoundary covers the HTTP mapping of the status rules
+// that close the moderation bypass: a contributor publishing directly is 403,
+// an unknown or moderation-only status is 400, and an author publishes with
+// 201. Nothing rejected may be persisted.
+func TestCreatePost_StatusBoundary(t *testing.T) {
+	r, db := newTestRouter(t)
+	contributor := seedRoleUser(t, db, model.RoleContributor)
+	author := seedRoleUser(t, db, model.RoleAuthor)
+
+	cases := []struct {
+		name   string
+		user   model.User
+		slug   string
+		status string
+		want   int
+	}{
+		{"contributor cannot publish", contributor, "c-pub", "published", http.StatusForbidden},
+		{"contributor can submit for review", contributor, "c-pend", "pending", http.StatusCreated},
+		{"author can publish", author, "a-pub", "published", http.StatusCreated},
+		{"unknown status rejected", author, "a-bad", "garbage", http.StatusBadRequest},
+		{"moderation-only status rejected", author, "a-rej", "rejected", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := doCreatePost(t, r, mintToken(t, tc.user.ID, tc.user.Role), tc.slug, tc.status)
+			if w.Code != tc.want {
+				t.Fatalf("status code = %d (body %s), want %d", w.Code, w.Body.String(), tc.want)
+			}
+		})
+	}
+
+	var persisted int64
+	db.Model(&model.Post{}).Where("slug IN ?", []string{"c-pub", "a-bad", "a-rej"}).Count(&persisted)
+	if persisted != 0 {
+		t.Fatalf("rejected requests persisted %d posts", persisted)
+	}
+}
+
+// TestUpdatePost_StatusBoundary covers the update mapping: a contributor cannot
+// flip their own pending post to published (403, row unchanged) and an invalid
+// status is a 400.
+func TestUpdatePost_StatusBoundary(t *testing.T) {
+	r, db := newTestRouter(t)
+	contributor := seedRoleUser(t, db, model.RoleContributor)
+	post := model.Post{
+		Slug: "pending-post", Title: "t", Content: "c", Category: "1",
+		Status: model.PostStatusPending, AuthorID: contributor.ID,
+	}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("seed post: %v", err)
+	}
+	token := mintToken(t, contributor.ID, contributor.Role)
+
+	if w := doUpdatePost(t, r, token, post.ID, `{"status":"published"}`); w.Code != http.StatusForbidden {
+		t.Errorf("publish attempt: code = %d (body %s), want %d", w.Code, w.Body.String(), http.StatusForbidden)
+	}
+	if w := doUpdatePost(t, r, token, post.ID, `{"status":"garbage"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("invalid status: code = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+
+	var stored model.Post
+	if err := db.First(&stored, post.ID).Error; err != nil {
+		t.Fatalf("reload post: %v", err)
+	}
+	if stored.Status != model.PostStatusPending {
+		t.Errorf("status = %s, want pending", stored.Status)
+	}
+}
+
+// doLikeRequest issues a request against a like route with an optional bearer
+// token.
+func doLikeRequest(t *testing.T, r *gin.Engine, method, path, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// TestLikeRoutes_InvalidPostIDRejected pins that a non-numeric, zero or
+// out-of-range :postId is a client error instead of being parsed as 0 and acted
+// on. The parsed id used to be discarded with the error, so POST /likes/abc
+// reached the service with post_id 0 — writing an orphan like row where foreign
+// keys are unenforced — and GET reported the counts of row 0.
+func TestLikeRoutes_InvalidPostIDRejected(t *testing.T) {
+	paths := []string{
+		"/api/likes/not-a-number",
+		"/api/likes/0",
+		"/api/likes/99999999999999999999",
+	}
+
+	for _, path := range paths {
+		t.Run("get "+path, func(t *testing.T) {
+			r, _ := newTestRouter(t)
+			if w := doLikeRequest(t, r, http.MethodGet, path, ""); w.Code != http.StatusBadRequest {
+				t.Errorf("GET %s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
+			}
+		})
+
+		t.Run("post "+path, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			u := seedRoleUser(t, db, model.RoleContributor)
+			w := doLikeRequest(t, r, http.MethodPost, path, mintToken(t, u.ID, u.Role))
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("POST %s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
+			}
+
+			var count int64
+			if err := db.Model(&model.Like{}).Count(&count).Error; err != nil {
+				t.Fatalf("count likes: %v", err)
+			}
+			if count != 0 {
+				t.Errorf("POST %s persisted %d like rows", path, count)
+			}
+		})
+	}
+}
+
+// TestLikeRoutes_ValidPostIDStillWorks guards against over-correcting: a real
+// post id still toggles and still reports its status.
+func TestLikeRoutes_ValidPostIDStillWorks(t *testing.T) {
+	r, db := newTestRouter(t)
+	u := seedRoleUser(t, db, model.RoleContributor)
+	token := mintToken(t, u.ID, u.Role)
+
+	// The liker is also the author, so the toggle takes the plain like path and
+	// does not reach the notifier (the route harness wires none).
+	post := model.Post{Slug: "liked", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished, AuthorID: u.ID}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("seed post: %v", err)
+	}
+	path := "/api/likes/" + idString(post.ID)
+
+	w := doLikeRequest(t, r, http.MethodPost, path, token)
+	if w.Code != http.StatusOK {
+		t.Fatalf("valid like: expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"isLiked":true`) {
+		t.Errorf("expected the post to be liked, got %s", w.Body.String())
+	}
+
+	w = doLikeRequest(t, r, http.MethodGet, path, token)
+	if w.Code != http.StatusOK {
+		t.Fatalf("like status: expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"likesCount":1`) {
+		t.Errorf("expected like count 1, got %s", w.Body.String())
 	}
 }

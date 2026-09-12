@@ -1295,3 +1295,23 @@ func TestTokens_OnlyHashesAreStored(t *testing.T) {
 		t.Errorf("expected ErrRecordNotFound for unknown token, got %v", err)
 	}
 }
+
+// TestDummyPasswordHashMatchesSource pins the literal dummyPasswordHash to
+// dummyPasswordSource at bcrypt.DefaultCost. Login hashes against it for an
+// unknown email so the response costs the same as a real comparison; a stale
+// literal would either stop matching, making bcrypt bail out early, or cost
+// less than a real comparison. Either way the timing signal returns.
+func TestDummyPasswordHashMatchesSource(t *testing.T) {
+	if err := bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(dummyPasswordSource)); err != nil {
+		t.Fatalf("dummyPasswordHash no longer matches dummyPasswordSource: %v", err)
+	}
+
+	cost, err := bcrypt.Cost([]byte(dummyPasswordHash))
+	if err != nil {
+		t.Fatalf("dummyPasswordHash is not a valid bcrypt hash: %v", err)
+	}
+	if cost != bcrypt.DefaultCost {
+		t.Errorf("dummyPasswordHash cost = %d, want %d so an unknown account costs the same as a real one",
+			cost, bcrypt.DefaultCost)
+	}
+}

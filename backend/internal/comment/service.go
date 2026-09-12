@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -22,6 +23,12 @@ var (
 	ErrCommentNotFound = errors.New("comment not found")
 	// ErrUserNotFound means the acting user does not exist.
 	ErrUserNotFound = errors.New("user not found")
+	// ErrPostNotFound means the comment's target post does not exist or is not
+	// published, so nothing can be commented on.
+	ErrPostNotFound = errors.New("post not found")
+	// ErrParentCommentNotFound means a reply's parent comment does not exist on
+	// the same post, or is not visible.
+	ErrParentCommentNotFound = errors.New("parent comment not found")
 	// ErrForbidden means the acting user may not modify this comment.
 	ErrForbidden = errors.New("forbidden")
 	// ErrLLMConfigIncomplete means LLM review is enabled (or tested) without
@@ -44,6 +51,10 @@ type Deps struct {
 	JWTSecret []byte
 	Notifier  Notifier
 	Cipher    SecretCipher
+	// RateLimit stores the per-client request budget for comment creation.
+	// nil keeps the budget in-process; a distributed store shares one budget
+	// across instances.
+	RateLimit middleware.RateLimitStore
 }
 
 // Notifier is the seam for creating notifications. It is implemented by the
@@ -157,12 +168,40 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment
 		return nil, 0, err
 	}
 
+	// The target post must exist and be published: comments are only rendered
+	// on published posts, so accepting one for a draft, pending or deleted post
+	// would let a client attach comments to content nobody can read and inflate
+	// the counts of an unpublished row.
+	post, err := s.repo.FindPostByID(ctx, req.PostID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, ErrPostNotFound
+		}
+		return nil, 0, err
+	}
+	if post.Status != model.PostStatusPublished {
+		return nil, 0, ErrPostNotFound
+	}
+
 	comment := model.Comment{
 		PostID:  req.PostID,
 		Content: req.Content,
 		UserID:  req.UserID,
 	}
 	if req.ParentID != nil {
+		// A reply may only point at a visible comment on the same post: a
+		// cross-post parent would notify an unrelated author, and a hidden
+		// parent would leave the reply attached to a thread readers cannot see.
+		parent, err := s.repo.FindByID(ctx, strconv.FormatUint(uint64(*req.ParentID), 10))
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, 0, ErrParentCommentNotFound
+			}
+			return nil, 0, err
+		}
+		if parent.PostID != req.PostID || parent.Status != model.CommentStatusPublished {
+			return nil, 0, ErrParentCommentNotFound
+		}
 		comment.ParentID = req.ParentID
 	}
 	comment.Status, comment.ModerationReason = s.moderationDecision(ctx, req.Content, config)
@@ -180,7 +219,13 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment
 		}
 	}
 
-	count, _ := s.repo.CountByPostID(ctx, req.PostID)
+	// The count is returned so the client can sync its counter. It is not worth
+	// failing a successful post over, but a fabricated zero would silently
+	// resync the client to the wrong number.
+	count, err := s.repo.CountByPostID(ctx, req.PostID)
+	if err != nil {
+		slog.Warn("failed to count comments for post", "postID", req.PostID, "err", err)
+	}
 	return &comment, count, nil
 }
 
@@ -242,15 +287,29 @@ func matchBlockedKeyword(content, blockKeywords string) (string, bool) {
 // (model.Comment.ModerationReason, gorm size:500).
 const maxModerationReason = 500
 
+// notificationExcerptRunes caps how much comment content is quoted into a
+// notification body.
+const notificationExcerptRunes = 50
+
 // truncateReason caps a moderation reason at the column limit, counting
 // runes, so an oversized model reply or keyword cannot break comment
 // persistence on strict databases (MySQL/PostgreSQL).
 func truncateReason(reason string) string {
-	runes := []rune(reason)
-	if len(runes) <= maxModerationReason {
-		return reason
+	return model.TruncateRunes(reason, maxModerationReason)
+}
+
+// excerptForNotification quotes at most notificationExcerptRunes runes of a
+// comment into a notification, appending an ellipsis when it had to cut. The
+// cap counts runes for the same reason as truncateReason: a byte cap split
+// multi-byte content mid-character, so the stored notification held invalid
+// UTF-8 and the insert failed on MySQL/PostgreSQL — silently losing the
+// notification.
+func excerptForNotification(content string) string {
+	excerpt := model.TruncateRunes(content, notificationExcerptRunes)
+	if excerpt == content {
+		return content
 	}
-	return string(runes[:maxModerationReason])
+	return excerpt + "..."
 }
 
 // notifyPostAuthor notifies the post author unless they wrote the comment.
@@ -267,11 +326,7 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 	if err != nil {
 		return
 	}
-	// Truncate comment content to first 50 characters
-	commentContent := content
-	if len(commentContent) > 50 {
-		commentContent = commentContent[:50] + "..."
-	}
+	commentContent := excerptForNotification(content)
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:        post.AuthorID,
 		Type:          model.NotificationTypeComment,
@@ -299,11 +354,7 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 	if err != nil {
 		return
 	}
-	// Truncate reply content to first 50 characters
-	replyContent := content
-	if len(replyContent) > 50 {
-		replyContent = replyContent[:50] + "..."
-	}
+	replyContent := excerptForNotification(content)
 	if err := s.notifier.CreateNotification(ctx, model.NotificationInput{
 		UserID:        parentComment.UserID,
 		Type:          model.NotificationTypeReply,
@@ -339,8 +390,12 @@ func (s *Service) Delete(ctx context.Context, commentID string, userID uint) (in
 		return 0, err
 	}
 
-	// Return comment count after deletion for frontend sync
-	count, _ := s.repo.CountByPostID(ctx, comment.PostID)
+	// Return comment count after deletion for frontend sync. The delete already
+	// succeeded, so a failed count is logged rather than reported as zero.
+	count, err := s.repo.CountByPostID(ctx, comment.PostID)
+	if err != nil {
+		slog.Warn("failed to count comments for post", "postID", comment.PostID, "err", err)
+	}
 	return count, nil
 }
 

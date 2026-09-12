@@ -29,11 +29,16 @@ run:
 build:
     # Build VexGo.
     just build-frontend
+    just build-theme
     just build-backend
 
 build-frontend:
-    # Build frontend.
+    # Build frontend (admin SPA).
     bun run --cwd frontend build
+
+build-theme:
+    # Fetch and build the standalone default theme.
+    bash scripts/fetch-default-theme.sh --force
 
 build-backend:
     # Build backend.
@@ -41,8 +46,9 @@ build-backend:
     go build backend/cmd/vexgo/main.go
 
 @ensure-dist:
-    # Ensure `backend/internal/public/dist` directory exists.
+    # Ensure the embedded frontend builds exist (go:embed requires them).
     test -d backend/internal/public/dist || just build-frontend
+    test -f backend/internal/public/default-theme/index.html || bash scripts/fetch-default-theme.sh
 
 generate:
     # Codegen using swag and orval.

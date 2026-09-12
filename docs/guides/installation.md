@@ -376,23 +376,17 @@ Use this when you want the latest development version or need to customize the c
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 
-# Build the frontend (output is embedded into the backend binary)
-cd frontend
-bun install
-bun run build
-cd ..
-
-# Build the backend
-cd backend
-go mod download
-go build -o vexgo ./cmd/vexgo
-cd ..
+# Install the admin SPA dependencies and build it, then fetch and build the
+# standalone default theme (outputs are embedded into the backend binary)
+cd frontend && bun install && cd ..
+just build-frontend
+just build-theme
 ```
 
 ### Step 3: Run
 
 ```bash
-./backend/vexgo
+just run
 ```
 
 ### Development Commands
@@ -413,6 +407,8 @@ The frontend build output is written to `backend/internal/public/dist` and embed
 ### Access the Site
 
 Open `http://localhost:3001` (or `http://your-server-ip:3001` on a remote server).
+
+The admin panel is at `http://localhost:3001/admin/` (login at `/admin/login`, write at `/admin/write`); legacy top-level URLs 301-redirect to their `/admin/` equivalent with the query string preserved.
 
 ### Default Credentials
 

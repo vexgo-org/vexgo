@@ -143,6 +143,22 @@ func TestMemoryRateLimitStore_BudgetPerKey(t *testing.T) {
 	}
 }
 
+// The zero value must be usable: the entry map is created lazily under the
+// mutex, so a store that was never initialized serves a budget instead of
+// panicking on its first request.
+func TestMemoryRateLimitStore_ZeroValueIsUsable(t *testing.T) {
+	ctx := context.Background()
+	var s memoryRateLimitStore
+
+	if allowed, err := s.Allow(ctx, "auth:10.0.0.1", 1, time.Minute); !allowed || err != nil {
+		t.Fatalf("Allow on the zero value = %v, %v; want true, nil", allowed, err)
+	}
+	// The write had to land in a real map, not be dropped silently.
+	if allowed, err := s.Allow(ctx, "auth:10.0.0.1", 1, time.Minute); allowed || err != nil {
+		t.Fatalf("expected the spent budget (false, nil), got %v, %v", allowed, err)
+	}
+}
+
 // TestMemoryRateLimitStore_FailsClosedAtCap drives the in-memory store to the
 // hard cap on tracked keys and checks that unknown keys are rejected (instead
 // of the map growing without bound), while an already-tracked key still works.
@@ -171,7 +187,10 @@ func TestMemoryRateLimitStore_FailsClosedAtCap(t *testing.T) {
 // threshold is reached, entries idle beyond the TTL are evicted and their keys
 // get a fresh budget.
 func TestMemoryRateLimitStore_SweepsIdleEntries(t *testing.T) {
-	s := newMemoryRateLimitStore()
+	// The table is seeded directly below, so it must exist up front; a store
+	// that goes through Allow instead creates it lazily (see the zero-value
+	// test above).
+	s := &memoryRateLimitStore{entries: make(map[string]*rateLimitEntry)}
 	// An exhausted entry that went idle long ago.
 	s.entries["auth:10.0.0.1"] = &rateLimitEntry{
 		limiter:  rate.NewLimiter(rate.Every(time.Minute), 1),

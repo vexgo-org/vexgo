@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -47,7 +47,6 @@ import { normalizeTagsArray } from "@/lib/utils";
 export function MyPostsPage() {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,9 +60,10 @@ export function MyPostsPage() {
   // Check if user is guest
   useEffect(() => {
     if (isAuthenticated && user?.role === "guest") {
-      navigate("/");
+      // Guests cannot manage posts; send them to the public site.
+      window.location.href = "/";
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user]);
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -189,7 +189,7 @@ export function MyPostsPage() {
         </h1>
         {user?.role !== "guest" && (
           <Button asChild>
-            <Link to="/write">
+            <Link to="/admin/write">
               <Plus className="w-4 h-4 mr-2" />
               {t("myPostsPage.writePost")}
             </Link>
@@ -212,7 +212,7 @@ export function MyPostsPage() {
             </p>
             {user?.role !== "guest" && (
               <Button asChild>
-                <Link to="/write">
+                <Link to="/admin/write">
                   <Plus className="w-4 h-4 mr-2" />
                   {t("myPostsPage.writePost")}
                 </Link>
@@ -249,12 +249,12 @@ export function MyPostsPage() {
                         </span>
                       </div>
 
-                      {/* Title */}
-                      <Link to={`/post/${post.slug}`}>
+                      {/* Title — the post page is served by the public theme */}
+                      <a href={`/post/${post.slug}`}>
                         <h2 className="text-lg font-semibold mb-2 hover:text-primary transition-colors">
                           {post.title}
                         </h2>
-                      </Link>
+                      </a>
 
                       {/* Excerpt */}
                       <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
@@ -280,12 +280,12 @@ export function MyPostsPage() {
                     {/* Action buttons */}
                     <div className="flex flex-col gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <Link to={`/post/${post.slug}`}>
+                        <a href={`/post/${post.slug}`}>
                           <Eye className="w-4 h-4" />
-                        </Link>
+                        </a>
                       </Button>
                       <Button variant="outline" size="sm" asChild>
-                        <Link to={`/edit-post/${post.id}`}>
+                        <Link to={`/admin/edit-post/${post.id}`}>
                           <Edit className="w-4 h-4" />
                         </Link>
                       </Button>

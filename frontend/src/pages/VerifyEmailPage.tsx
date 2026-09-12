@@ -89,18 +89,18 @@ export function VerifyEmailPage() {
               <Button
                 asChild
                 className="flex-1"
-                onClick={() => navigate("/login")}
+                onClick={() => navigate("/admin/login")}
               >
                 {t("verifyEmail.goToLogin")}
               </Button>
             ) : (
               <>
                 <Button asChild className="flex-1">
-                  <Link to="/login">{t("verifyEmail.goToLogin")}</Link>
+                  <Link to="/admin/login">{t("verifyEmail.goToLogin")}</Link>
                 </Button>
                 {status === "error" && (
                   <Button variant="outline" asChild className="flex-1">
-                    <Link to="/">{t("verifyEmail.backToHome")}</Link>
+                    <Link to="/admin">{t("verifyEmail.backToHome")}</Link>
                   </Button>
                 )}
               </>

@@ -1,9 +1,9 @@
 package sso
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -106,11 +106,23 @@ const ssoStorageKey = "sso_callback_result"
 // postMessage avoids the window.opener=null issue caused by cross-origin
 // redirects during the OAuth2 / OIDC flow.
 func respondPostMessage(c *gin.Context, data map[string]string) {
-	pairs := make([]string, 0, len(data))
-	for k, v := range data {
-		pairs = append(pairs, fmt.Sprintf(`%q:%q`, k, v))
+	writePopupResult(c, http.StatusOK, data)
+}
+
+// respondError writes an error result to localStorage and closes the popup.
+func respondError(c *gin.Context, msg string) {
+	writePopupResult(c, http.StatusBadRequest, map[string]string{"error": msg})
+}
+
+// writePopupResult renders the popup closer page. The payload is produced by
+// json.Marshal, which escapes <, > and & as \u003c/\u003e/\u0026 by default: a
+// value containing "</script>" therefore cannot break out of the script
+// element the way raw %q formatting would allow.
+func writePopupResult(c *gin.Context, status int, data map[string]string) {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		payload = []byte("{\"error\":\"failed to encode result\"}")
 	}
-	payload := "{" + strings.Join(pairs, ",") + "}"
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <head></head>
 <body>
@@ -119,18 +131,5 @@ try { localStorage.setItem(%q, JSON.stringify(%s)) } catch(e) {}
 window.close()
 </script>
 </body>`, ssoStorageKey, payload)
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
-}
-
-// respondError writes an error result to localStorage and closes the popup.
-func respondError(c *gin.Context, msg string) {
-	html := fmt.Sprintf(`<!DOCTYPE html>
-<head></head>
-<body>
-<script>
-try { localStorage.setItem(%q, JSON.stringify({"error":%q})) } catch(e) {}
-window.close()
-</script>
-</body>`, ssoStorageKey, msg)
-	c.Data(http.StatusBadRequest, "text/html; charset=utf-8", []byte(html))
+	c.Data(status, "text/html; charset=utf-8", []byte(html))
 }

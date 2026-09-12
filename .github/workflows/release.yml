@@ -40,6 +40,9 @@ jobs:
         working-directory: frontend
         run: bun run build
 
+      - name: Build default theme
+        run: bash scripts/fetch-default-theme.sh --force
+
       # ── Backend ───────────────────────────────────────────────
       - name: Setup Go
         uses: actions/setup-go@v7

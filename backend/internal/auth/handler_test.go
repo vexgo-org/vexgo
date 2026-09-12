@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -146,7 +148,7 @@ func TestEmailLinkOrigin_NotPoisonedByRequestHeaders(t *testing.T) {
 			_, _, db := newTestService(t)
 			body := registerAndGetEmailedLink(t, db, tt.baseURL, tt.behindProxy)
 
-			wantPrefix := tt.wantScheme + "://" + tt.wantHost + "/verify-email?token="
+			wantPrefix := tt.wantScheme + "://" + tt.wantHost + "/admin/verify-email?token="
 			if !strings.Contains(body, wantPrefix) {
 				t.Errorf("email link should start with %q, got:\n%s", wantPrefix, body)
 			}
@@ -339,5 +341,87 @@ func TestVerifyEmail_HandlerDoesNotLeakInternalErrors(t *testing.T) {
 	}
 	if !strings.Contains(body, "Failed to verify email") {
 		t.Errorf("expected generic message, got body %s", body)
+	}
+}
+
+// captureLogs redirects the default slog logger into a buffer for the test's
+// duration and returns it.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return buf
+}
+
+// A malformed payload must produce exactly one log record. A duplicated
+// "failed to bind ..." line used to log the same failure a second time and at
+// an inconsistent level.
+func TestLogin_BadPayloadLoggedOnce(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logs := captureLogs(t)
+
+	_, _, db := newTestService(t)
+	h := NewHandler(Deps{
+		DB:        db,
+		JWTSecret: testJWTSecret,
+		Files:     &fakeFiles{},
+		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
+		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+	})
+
+	r := gin.New()
+	r.POST("/login", h.Login)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("{not json"))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	output := logs.String()
+	if got := strings.Count(output, "invalid request payload"); got != 1 {
+		t.Errorf("expected exactly one 'invalid request payload' record, got %d:\n%s", got, output)
+	}
+	if strings.Contains(output, "failed to bind") {
+		t.Errorf("the redundant bind log line is still emitted:\n%s", output)
+	}
+}
+
+// The parse-success debug line used to carry the account address. Debug logs
+// are commonly enabled while diagnosing auth, so the address must not appear.
+func TestLogin_DebugLogsOmitEmail(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logs := captureLogs(t)
+
+	_, _, db := newTestService(t)
+	h := NewHandler(Deps{
+		DB:        db,
+		JWTSecret: testJWTSecret,
+		Files:     &fakeFiles{},
+		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
+		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+	})
+
+	r := gin.New()
+	r.POST("/login", h.Login)
+
+	const email = "alice@example.com"
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/login",
+		strings.NewReader(`{"email":"`+email+`","password":"password123"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	output := logs.String()
+	if !strings.Contains(output, "login request parsed successfully") {
+		t.Fatalf("expected the parse debug line to be logged:\n%s", output)
+	}
+	if strings.Contains(output, email) {
+		t.Errorf("debug logs leaked the account email:\n%s", output)
 	}
 }

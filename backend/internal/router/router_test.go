@@ -10,6 +10,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
 	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
+	"github.com/vexgo-org/vexgo/backend/internal/page"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
@@ -50,6 +51,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		Notification: notification.Deps{DB: db, JWTSecret: secret},
 		Comment:      comment.Deps{DB: db, JWTSecret: secret},
 		Post:         post.Deps{DB: db, JWTSecret: secret},
+		Page:         page.Deps{DB: db, JWTSecret: secret},
 		Upload:       upload.Deps{DB: db, JWTSecret: secret},
 		User:         user.Deps{DB: db, JWTSecret: secret},
 		Captcha: captcha.Deps{
@@ -128,9 +130,17 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"PUT /api/moderation/approve/:id",
 		"PUT /api/moderation/reject/:id",
 		"PUT /api/moderation/resubmit/:id",
+		// page
+		"GET /api/pages",
+		"GET /api/pages/:slug",
+		"POST /api/pages",
+		"PUT /api/pages/:id",
+		"DELETE /api/pages/:id",
 		// settings
 		"GET /api/config/themes",
-		"GET /api/config/themes/:id/preview",
+		"GET /api/config/themes/:id/languages",
+		"GET /api/config/themes/:id/preview-link",
+		"DELETE /api/config/themes/:id",
 		"GET /api/config/smtp",
 		"PUT /api/config/smtp",
 		"POST /api/config/smtp/test",

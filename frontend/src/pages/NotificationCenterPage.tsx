@@ -194,18 +194,19 @@ export function NotificationCenterPage() {
     if (relatedType === "post") {
       try {
         const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
-        navigate(`/post/${response.post?.slug || ""}`);
+        // The post page is served by the public theme, outside this SPA.
+        window.location.href = `/post/${response.post?.slug || ""}`;
       } catch {
-        // Fallback: navigate with the ID (will be handled by the post page)
-        navigate(`/post/by-id/${postId}`);
+        // Fallback: the post is managed in the admin console.
+        navigate(`/admin/edit-post/${postId}`);
       }
     } else if (relatedType === "comment") {
       // Navigate to the post page and scroll to the comment
       try {
         const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
-        navigate(`/post/${response.post?.slug || ""}#comment-${relatedId}`);
+        window.location.href = `/post/${response.post?.slug || ""}#comment-${relatedId}`;
       } catch {
-        navigate(`/post/by-id/${postId}#comment-${relatedId}`);
+        navigate(`/admin/edit-post/${postId}`);
       }
     }
   };

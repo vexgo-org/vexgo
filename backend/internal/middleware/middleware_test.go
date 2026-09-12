@@ -527,6 +527,105 @@ func TestPermission_SuperAdminAlwaysAllowed(t *testing.T) {
 	}
 }
 
+// TestJWTAuth_RejectsNonHS256 guards the algorithm pin: a token signed with
+// another HMAC variant (sharing the secret) must not be accepted.
+func TestJWTAuth_RejectsNonHS256(t *testing.T) {
+	db := newTestDB(t)
+	u := model.User{Username: "alice", Email: "alice@example.com", Role: model.RoleAuthor, PasswordVersion: 1}
+	if err := db.Create(&u).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"user_id":          float64(u.ID),
+		"username":         "alice",
+		"role":             model.RoleAuthor,
+		"password_version": float64(1),
+		"iat":              float64(time.Now().Unix()),
+	})
+	signed, err := tok.SignedString(testSecret)
+	if err != nil {
+		t.Fatalf("sign HS512 token: %v", err)
+	}
+
+	a := NewAuth(db, testSecret)
+	if code, _ := runAuth(t, a.JWTAuth(), "Bearer "+signed); code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth expected 401 for HS512 token, got %d", code)
+	}
+	code, cap := runAuth(t, a.OptionalJWTAuth(), "Bearer "+signed)
+	if code != http.StatusOK || !cap.passed || cap.userID != nil {
+		t.Errorf("OptionalJWTAuth expected anonymous pass-through, code=%d userID=%v", code, cap.userID)
+	}
+}
+
+// TestSecurityHeaders verifies the baseline headers, including the CSP
+// directives that pin <base>, forbid plugins and constrain framing.
+func TestSecurityHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(SecurityHeaders())
+	r.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	for header, want := range map[string]string{
+		"X-Content-Type-Options":  "nosniff",
+		"X-Frame-Options":         "SAMEORIGIN",
+		"Referrer-Policy":         "strict-origin-when-cross-origin",
+		"Content-Security-Policy": ContentSecurityPolicy,
+	} {
+		if got := w.Header().Get(header); got != want {
+			t.Errorf("header %s = %q, want %q", header, got, want)
+		}
+	}
+}
+
+// TestSanitizeQuery_RedactsCredentials guards the access log against logging
+// credential-bearing query parameters, including the OAuth callback values.
+func TestSanitizeQuery_RedactsCredentials(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{"email token", "token=secret-token"},
+		{"oauth code", "method=sso_get_token&code=abc123&state=nonce"},
+		{"api key", "api_key=sk-live-123"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeQuery(tc.query)
+			for _, secret := range []string{"secret-token", "abc123", "nonce", "sk-live-123"} {
+				if strings.Contains(got, secret) {
+					t.Errorf("sanitizeQuery(%q) leaked %q: %q", tc.query, secret, got)
+				}
+			}
+			if !strings.Contains(got, "REDACTED") {
+				t.Errorf("sanitizeQuery(%q) = %q, want a redaction marker", tc.query, got)
+			}
+		})
+	}
+
+	// Non-sensitive queries pass through unchanged.
+	if got := sanitizeQuery("page=2&search=go"); got != "page=2&search=go" {
+		t.Errorf("sanitizeQuery dropped a safe query: %q", got)
+	}
+}
+
+// TestSanitizeReferer_DropsQuery ensures a token in the page URL cannot leak
+// into logs through the Referer of a subresource request.
+func TestSanitizeReferer_DropsQuery(t *testing.T) {
+	got := sanitizeReferer("https://blog.example.com/admin/verify-email?token=abc123")
+	if strings.Contains(got, "abc123") {
+		t.Errorf("sanitizeReferer leaked the token: %q", got)
+	}
+	if got != "https://blog.example.com/admin/verify-email" {
+		t.Errorf("sanitizeReferer = %q, want the URL without its query", got)
+	}
+	if sanitizeReferer("") != "" {
+		t.Error("empty referer must stay empty")
+	}
+}
+
 func TestRequestLogger_LogsRequest(t *testing.T) {
 	var buf bytes.Buffer
 

@@ -20,7 +20,10 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 		if err := s.repo.DeleteLike(ctx, existing); err != nil {
 			return false, 0, err
 		}
-		c, _ := s.repo.CountLikes(ctx, postID)
+		c, countErr := s.repo.CountLikes(ctx, postID)
+		if countErr != nil {
+			slog.Warn("failed to count post likes", "postID", postID, "err", countErr)
+		}
 		return false, c, nil
 	}
 
@@ -31,7 +34,13 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 	if err != nil {
 		return false, 0, err
 	}
-	count, _ = s.repo.CountLikes(ctx, postID)
+	likesCount, err := s.repo.CountLikes(ctx, postID)
+	if err != nil {
+		// The like itself succeeded; reporting a fabricated zero would tell the
+		// user their like did not register.
+		slog.Warn("failed to count post likes", "postID", postID, "err", err)
+	}
+	count = likesCount
 	if !created {
 		return true, count, nil
 	}
@@ -64,6 +73,9 @@ func (s *Service) LikeStatus(ctx context.Context, postID, userID uint) (isLiked 
 			isLiked = true
 		}
 	}
-	count, _ = s.repo.CountLikes(ctx, postID)
+	count, countErr := s.repo.CountLikes(ctx, postID)
+	if countErr != nil {
+		slog.Warn("failed to count post likes", "postID", postID, "err", countErr)
+	}
 	return isLiked, count
 }

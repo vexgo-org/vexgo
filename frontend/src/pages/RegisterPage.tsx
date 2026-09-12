@@ -226,14 +226,14 @@ export function RegisterPage() {
       }
       setIsCaptchaModalOpen(false);
       resetCaptcha();
-      navigate("/");
+      navigate("/admin/login");
     } catch (err) {
       // Registration succeeded but the account needs email verification: tell
       // the user to check their inbox and send them to the login page.
       if ((err as { requiresVerification?: boolean }).requiresVerification) {
         const registrationMessage = (err as { registrationMessage?: string })
           .registrationMessage;
-        navigate("/login", {
+        navigate("/admin/login", {
           state: {
             registrationMessage: registrationMessage || t("register.success"),
           },
@@ -312,7 +312,7 @@ export function RegisterPage() {
     try {
       const token = await ssoLogin(provider);
       await loginWithToken(token);
-      navigate("/");
+      navigate("/admin");
     } catch (err) {
       const message = err instanceof Error ? err.message : "SSO login failed";
       toast.error(message || t("registerPage.ssoLoginFailed"));
@@ -529,7 +529,7 @@ export function RegisterPage() {
             <span className="text-muted-foreground">
               {t("registerPage.haveAccount")}
             </span>{" "}
-            <Link to="/login" className="text-primary hover:underline">
+            <Link to="/admin/login" className="text-primary hover:underline">
               {t("registerPage.loginNow")}
             </Link>
           </div>

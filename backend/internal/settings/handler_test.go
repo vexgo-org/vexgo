@@ -65,10 +65,14 @@ func newTestAdminRouter(t *testing.T) (*gin.Engine, *gorm.DB, *secrets.Cipher) {
 	if err != nil {
 		t.Fatalf("create cipher: %v", err)
 	}
+	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
+	// The theme preview link endpoint signs its URL with the server secret, so
+	// the renderer needs it even though these tests exercise the HTTP layer.
+	renderer.SetJWTSecret(handlerTestJWTSecret)
 	deps := Deps{
 		DB:        db,
 		JWTSecret: handlerTestJWTSecret,
-		Themes:    public.NewRenderer(db, "http://localhost", t.TempDir()),
+		Themes:    renderer,
 		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
 		Cipher:    cipher,
 	}
@@ -303,7 +307,7 @@ func TestUploadTheme_AcceptsWellFormedZip(t *testing.T) {
 	token := mintAdminToken(t)
 
 	zipBytes := buildThemeZip(t, map[string]string{
-		"vexgo-theme.json":    `{"id": "testtheme", "name": "Test Theme"}`,
+		"vexgo-theme.json":    `{"id": "testtheme", "name": "Test Theme", "version": "1.0.0", "preview": "https://example.com/cover.png"}`,
 		"assets/style.css":    "body {}",
 		"templates/home.html": "<html></html>",
 	})
@@ -311,5 +315,97 @@ func TestUploadTheme_AcceptsWellFormedZip(t *testing.T) {
 	w := doThemeUpload(t, r, token, zipBytes)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"overwritten":false`) {
+		t.Errorf("expected overwritten:false on first install, got: %s", w.Body.String())
+	}
+
+	// Re-uploading the same id overwrites atomically.
+	w = doThemeUpload(t, r, token, zipBytes)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 on re-upload, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"overwritten":true`) {
+		t.Errorf("expected overwritten:true on re-install, got: %s", w.Body.String())
+	}
+}
+
+// TestUploadTheme_RejectsInvalidMetadata ensures the strict vexgo-theme.json
+// contract (id/name/version required, id matches directory, preview must be
+// an http(s) URL) is enforced at upload time.
+func TestUploadTheme_RejectsInvalidMetadata(t *testing.T) {
+	r, _, _ := newTestAdminRouter(t)
+	token := mintAdminToken(t)
+
+	cases := map[string]map[string]string{
+		"missing version": {
+			"vexgo-theme.json": `{"id": "bad1", "name": "Bad"}`,
+		},
+		"missing name": {
+			"vexgo-theme.json": `{"id": "bad2", "version": "1.0.0"}`,
+		},
+		"missing id": {
+			"vexgo-theme.json": `{"name": "Bad", "version": "1.0.0"}`,
+		},
+		"id mismatch": {
+			"subdir/vexgo-theme.json": `{"id": "other", "name": "Bad", "version": "1.0.0"}`,
+		},
+		"local preview": {
+			"vexgo-theme.json": `{"id": "bad3", "name": "Bad", "version": "1.0.0", "preview": "assets/cover.png"}`,
+		},
+		"non-http preview": {
+			"vexgo-theme.json": `{"id": "bad4", "name": "Bad", "version": "1.0.0", "preview": "ftp://example.com/c.png"}`,
+		},
+	}
+	for name, entries := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := doThemeUpload(t, r, token, buildThemeZip(t, entries))
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// TestDeleteTheme_RouteBoundaries covers the HTTP layer: unknown id → 404,
+// default → 400, active → 400, and happy-path delete → 200.
+func TestDeleteTheme_RouteBoundaries(t *testing.T) {
+	r, _, _ := newTestAdminRouter(t)
+	token := mintAdminToken(t)
+
+	doDelete := func(id string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodDelete, "/api/config/themes/"+id, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+
+	if w := doDelete("no-such-theme"); w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown theme, got %d: %s", w.Code, w.Body.String())
+	}
+	if w := doDelete("default"); w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for default theme, got %d: %s", w.Code, w.Body.String())
+	}
+
+	zipBytes := buildThemeZip(t, map[string]string{
+		"vexgo-theme.json": `{"id": "routedelete", "name": "R", "version": "1.0.0"}`,
+		"index.html":       "hello",
+	})
+	if w := doThemeUpload(t, r, token, zipBytes); w.Code != http.StatusOK {
+		t.Fatalf("upload status = %d: %s", w.Code, w.Body.String())
+	}
+
+	// Activate via HTTP, then delete must refuse while active.
+	req := httptest.NewRequest(http.MethodPut, "/api/config/theme", strings.NewReader(`{"activeTheme":"routedelete"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("activate status = %d: %s", w.Code, w.Body.String())
+	}
+	if w := doDelete("routedelete"); w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 deleting active theme, got %d: %s", w.Code, w.Body.String())
 	}
 }
