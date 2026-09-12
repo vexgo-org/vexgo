@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"log/slog"
 	"mime"
 	"net/http"
 	"net/url"
@@ -69,8 +70,13 @@ type Renderer struct {
 
 // NewRenderer creates a Renderer with the given dependencies.
 func NewRenderer(db *gorm.DB, baseURL, dataDir string) *Renderer {
-	// Ensure the themes directory exists
-	_ = os.MkdirAll(filepath.Join(dataDir, ThemesDir), 0o750)
+	// The themes directory holds uploaded themes. Failing to create it is not
+	// fatal here, but left unreported it would surface much later as a
+	// baffling "file not found" during a theme install or preview.
+	themesDir := filepath.Join(dataDir, ThemesDir)
+	if err := os.MkdirAll(themesDir, 0o750); err != nil {
+		slog.Warn("failed to create themes directory", "dir", themesDir, "err", err)
+	}
 	return &Renderer{db: db, baseURL: baseURL, dataDir: dataDir}
 }
 
