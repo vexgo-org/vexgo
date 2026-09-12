@@ -3,6 +3,7 @@ package comment
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -299,6 +300,129 @@ func TestDelete_Permissions(t *testing.T) {
 
 	if _, err := svc.Delete(ctx, strconv.FormatUint(uint64(id), 10), commenter.ID); !errors.Is(err, ErrCommentNotFound) {
 		t.Errorf("expected ErrCommentNotFound, got %v", err)
+	}
+}
+
+// Comments are only rendered on published posts, so attaching one to an
+// unpublished or deleted post must be refused instead of inflating the counts
+// of content nobody can read.
+func TestCreate_TargetPostMustBePublished(t *testing.T) {
+	ctx := context.Background()
+	svc, _, db := newTestService(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+
+	cases := []struct {
+		name   string
+		status model.PostStatus
+	}{
+		{"draft post", model.PostStatusDraft},
+		{"pending post", model.PostStatusPending},
+		{"rejected post", model.PostStatusRejected},
+	}
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			post := model.Post{
+				Slug: fmt.Sprintf("hidden-%d", i), Title: fmt.Sprintf("hidden-%d", i),
+				Content: "body", Category: "1", AuthorID: author.ID, Status: tc.status,
+			}
+			if err := db.Create(&post).Error; err != nil {
+				t.Fatalf("seed post: %v", err)
+			}
+
+			if _, _, err := svc.Create(ctx, CreateRequest{
+				PostID: post.ID, UserID: commenter.ID, Content: "sneaky",
+			}); !errors.Is(err, ErrPostNotFound) {
+				t.Fatalf("expected ErrPostNotFound for a %s, got %v", tc.status, err)
+			}
+
+			var count int64
+			if err := db.Model(&model.Comment{}).Where("post_id = ?", post.ID).Count(&count).Error; err != nil {
+				t.Fatalf("count comments: %v", err)
+			}
+			if count != 0 {
+				t.Errorf("expected no comment persisted, got %d", count)
+			}
+		})
+	}
+
+	// A post that does not exist at all is also refused rather than surfacing
+	// a foreign-key error as a 500.
+	if _, _, err := svc.Create(ctx, CreateRequest{
+		PostID: 999999, UserID: commenter.ID, Content: "orphan",
+	}); !errors.Is(err, ErrPostNotFound) {
+		t.Errorf("expected ErrPostNotFound for a missing post, got %v", err)
+	}
+}
+
+// A reply may only point at a visible comment on the same post: a cross-post
+// parent would notify an unrelated author, and a hidden parent would leave the
+// reply attached to a thread readers cannot see.
+func TestCreate_ReplyParentMustBeVisibleAndOnSamePost(t *testing.T) {
+	ctx := context.Background()
+	svc, notifier, db := newTestService(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	post := seedPost(t, db, author.ID)
+	otherPost := model.Post{
+		Slug: "another-post", Title: "another post", Content: "body",
+		Category: "1", AuthorID: author.ID, Status: model.PostStatusPublished,
+	}
+	if err := db.Create(&otherPost).Error; err != nil {
+		t.Fatalf("failed to seed second post: %v", err)
+	}
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+	replier := seedUser(t, db, "replier", model.RoleGuest)
+
+	parent, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "parent"})
+	if err != nil {
+		t.Fatalf("Create parent error: %v", err)
+	}
+
+	foreignParent, _, err := svc.Create(ctx, CreateRequest{PostID: otherPost.ID, UserID: commenter.ID, Content: "elsewhere"})
+	if err != nil {
+		t.Fatalf("Create foreign parent error: %v", err)
+	}
+
+	hiddenParent, _, err := svc.Create(ctx, CreateRequest{PostID: post.ID, UserID: commenter.ID, Content: "hidden"})
+	if err != nil {
+		t.Fatalf("Create hidden parent error: %v", err)
+	}
+	if err := db.Model(&model.Comment{}).Where("id = ?", hiddenParent.ID).
+		Update("status", model.CommentStatusPending).Error; err != nil {
+		t.Fatalf("hide parent: %v", err)
+	}
+
+	notifier.calls = nil
+
+	cases := []struct {
+		name     string
+		postID   uint
+		parentID uint
+	}{
+		{"parent belongs to another post", post.ID, foreignParent.ID},
+		{"parent is not publicly visible", post.ID, hiddenParent.ID},
+		{"parent does not exist", post.ID, 999999},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parentID := tc.parentID
+			if _, _, err := svc.Create(ctx, CreateRequest{
+				PostID: tc.postID, UserID: replier.ID, Content: "reply", ParentID: &parentID,
+			}); !errors.Is(err, ErrParentCommentNotFound) {
+				t.Fatalf("expected ErrParentCommentNotFound, got %v", err)
+			}
+			if len(notifier.calls) != 0 {
+				t.Errorf("expected no notifications for a rejected reply, got %v", notifier.calls)
+			}
+		})
+	}
+
+	// A well-formed reply to a visible parent on the same post still works.
+	parentID := parent.ID
+	if _, _, err := svc.Create(ctx, CreateRequest{
+		PostID: post.ID, UserID: replier.ID, Content: "valid reply", ParentID: &parentID,
+	}); err != nil {
+		t.Fatalf("Create valid reply error: %v", err)
 	}
 }
 

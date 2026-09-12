@@ -23,6 +23,12 @@ var (
 	ErrCommentNotFound = errors.New("comment not found")
 	// ErrUserNotFound means the acting user does not exist.
 	ErrUserNotFound = errors.New("user not found")
+	// ErrPostNotFound means the comment's target post does not exist or is not
+	// published, so nothing can be commented on.
+	ErrPostNotFound = errors.New("post not found")
+	// ErrParentCommentNotFound means a reply's parent comment does not exist on
+	// the same post, or is not visible.
+	ErrParentCommentNotFound = errors.New("parent comment not found")
 	// ErrForbidden means the acting user may not modify this comment.
 	ErrForbidden = errors.New("forbidden")
 	// ErrLLMConfigIncomplete means LLM review is enabled (or tested) without
@@ -162,12 +168,40 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*model.Comment
 		return nil, 0, err
 	}
 
+	// The target post must exist and be published: comments are only rendered
+	// on published posts, so accepting one for a draft, pending or deleted post
+	// would let a client attach comments to content nobody can read and inflate
+	// the counts of an unpublished row.
+	post, err := s.repo.FindPostByID(ctx, req.PostID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, ErrPostNotFound
+		}
+		return nil, 0, err
+	}
+	if post.Status != model.PostStatusPublished {
+		return nil, 0, ErrPostNotFound
+	}
+
 	comment := model.Comment{
 		PostID:  req.PostID,
 		Content: req.Content,
 		UserID:  req.UserID,
 	}
 	if req.ParentID != nil {
+		// A reply may only point at a visible comment on the same post: a
+		// cross-post parent would notify an unrelated author, and a hidden
+		// parent would leave the reply attached to a thread readers cannot see.
+		parent, err := s.repo.FindByID(ctx, strconv.FormatUint(uint64(*req.ParentID), 10))
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, 0, ErrParentCommentNotFound
+			}
+			return nil, 0, err
+		}
+		if parent.PostID != req.PostID || parent.Status != model.CommentStatusPublished {
+			return nil, 0, ErrParentCommentNotFound
+		}
 		comment.ParentID = req.ParentID
 	}
 	comment.Status, comment.ModerationReason = s.moderationDecision(ctx, req.Content, config)

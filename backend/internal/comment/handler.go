@@ -109,7 +109,14 @@ func (h *Handler) CreateComment(c *gin.Context) {
 		ParentID: req.ParentID,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create comment"})
+		switch {
+		case errors.Is(err, ErrPostNotFound):
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
+		case errors.Is(err, ErrParentCommentNotFound):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Parent comment does not exist on this post"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to create comment"})
+		}
 		return
 	}
 
