@@ -80,6 +80,10 @@ func decodeStateValue(raw string) (stateValue, bool) {
 // swept amortized (at most one O(n) scan per stateSweepThreshold writes once
 // the map has grown) so abandoned flows cannot grow the map without bound
 // while Set stays O(1) on average.
+//
+// The zero value is ready to use: the entry map is created lazily under the
+// mutex on the first write, so a store that was never explicitly initialized
+// behaves as empty instead of panicking on its first Set.
 type memoryStateStore struct {
 	mu             sync.Mutex
 	entries        map[string]memoryStateEntry
@@ -91,14 +95,26 @@ type memoryStateEntry struct {
 	expires time.Time
 }
 
+// newMemoryStateStore returns an empty in-process state store. It is
+// equivalent to a zero-value memoryStateStore and exists so callers can state
+// that intent explicitly.
 func newMemoryStateStore() *memoryStateStore {
-	return &memoryStateStore{entries: make(map[string]memoryStateEntry)}
+	return &memoryStateStore{}
+}
+
+// ensureEntriesLocked creates the entry map on first use. Callers must hold
+// m.mu.
+func (m *memoryStateStore) ensureEntriesLocked() {
+	if m.entries == nil {
+		m.entries = make(map[string]memoryStateEntry)
+	}
 }
 
 func (m *memoryStateStore) Set(_ context.Context, key, value string, ttl time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.ensureEntriesLocked()
 	m.setsSinceSweep++
 	if len(m.entries) >= stateSweepThreshold && m.setsSinceSweep >= stateSweepThreshold {
 		// Amortized sweeping: at most one O(n) scan per stateSweepThreshold
