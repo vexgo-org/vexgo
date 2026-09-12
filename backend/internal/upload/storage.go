@@ -177,13 +177,32 @@ func (s *LocalStorage) Upload(_ context.Context, reader io.Reader, filename, con
 	if err != nil {
 		return "", fmt.Errorf("failed to create file: %w", err)
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, reader); err != nil {
-		return "", fmt.Errorf("failed to save file: %w", err)
+	if err := writeUploadFile(dst, reader); err != nil {
+		return "", err
 	}
 
 	return fmt.Sprintf("/uploads/%s", filename), nil
+}
+
+// writeUploadFile copies the upload into dst and closes it exactly once.
+// Closing is part of writing, not cleanup: the bytes are only durable once the
+// descriptor is flushed, so a late write-back failure (full disk, NFS) must
+// fail the upload instead of being deferred away — that reported a truncated
+// or empty file as stored. When both steps fail the copy error wins, since it
+// describes the content loss, but the close still runs to release the
+// descriptor.
+func writeUploadFile(dst io.WriteCloser, reader io.Reader) error {
+	_, copyErr := io.Copy(dst, reader)
+	closeErr := dst.Close()
+	switch {
+	case copyErr != nil:
+		return fmt.Errorf("failed to save file: %w", copyErr)
+	case closeErr != nil:
+		return fmt.Errorf("failed to flush uploaded file: %w", closeErr)
+	default:
+		return nil
+	}
 }
 
 // Delete removes a local file identified by its /uploads/ URL. Missing files
