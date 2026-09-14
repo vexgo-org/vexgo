@@ -34,7 +34,7 @@ var ReservedSlugs = map[string]struct{}{
 
 // IsReservedSlug reports whether slug is a system-reserved name.
 func IsReservedSlug(slug string) bool {
-	_, ok := ReservedSlugs[strings.ToLower(strings.TrimSpace(slug))]
+	_, ok := ReservedSlugs[normalizeSlug(slug)]
 	return ok
 }
 
