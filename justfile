@@ -19,6 +19,7 @@ lint:
 
 test:
     # Run tests.
+    just ensure-dist
     go test -v ./...
 
 run:
