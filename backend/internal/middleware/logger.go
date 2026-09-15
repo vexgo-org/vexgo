@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -53,6 +54,10 @@ func sanitizeQuery(rawQuery string) string {
 // ?token=... link, an OAuth ?code=... callback) leaks it into the Referer of
 // every same-origin subresource it loads, so the query is never logged.
 func sanitizeReferer(raw string) string {
+	// Header values may carry surrounding whitespace, which url.Parse rejects;
+	// trimming first keeps the referer's origin visible in the log instead of
+	// dropping the whole value as unparseable.
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}

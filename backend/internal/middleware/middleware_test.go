@@ -626,6 +626,36 @@ func TestSanitizeReferer_DropsQuery(t *testing.T) {
 	}
 }
 
+// TestSanitizeReferer_TrimsWhitespace ensures a header value with surrounding
+// whitespace keeps its origin in the log: URL parsing rejects the untrimmed
+// value, which used to drop the referer entirely.
+func TestSanitizeReferer_TrimsWhitespace(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "surrounding whitespace",
+			raw:  "  https://blog.example.com/posts/hello?token=abc123  ",
+			want: "https://blog.example.com/posts/hello",
+		},
+		{
+			name: "whitespace only",
+			raw:  " \t ",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeReferer(tt.raw); got != tt.want {
+				t.Errorf("sanitizeReferer(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRequestLogger_LogsRequest(t *testing.T) {
 	var buf bytes.Buffer
 
