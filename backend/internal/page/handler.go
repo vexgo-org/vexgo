@@ -129,11 +129,7 @@ func (h *Handler) CreatePage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
-	page, err := h.svc.Create(c.Request.Context(), u.Role, u.ID, CreateRequest{
-		Slug: req.Slug, Title: req.Title, Content: req.Content,
-		ShowInNav: req.ShowInNav, SortOrder: req.SortOrder,
-		Status: model.PageStatus(req.Status),
-	})
+	page, err := h.svc.Create(c.Request.Context(), u.Role, u.ID, req)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrForbidden):
@@ -180,11 +176,7 @@ func (h *Handler) UpdatePage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
 		return
 	}
-	page, err := h.svc.Update(c.Request.Context(), c.Param("id"), u.Role, UpdateRequest{
-		Slug: req.Slug, Title: req.Title, Content: req.Content,
-		ShowInNav: req.ShowInNav, SortOrder: req.SortOrder,
-		Status: model.PageStatus(req.Status),
-	})
+	page, err := h.svc.Update(c.Request.Context(), c.Param("id"), u.Role, req)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPageNotFound):

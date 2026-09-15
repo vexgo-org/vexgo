@@ -178,13 +178,13 @@ func TestList_SearchTruncationIsRuneSafe(t *testing.T) {
 func TestCreate_AdminOnly(t *testing.T) {
 	svc := newServiceWithRepo(newFakeRepo())
 	ctx := context.Background()
-	if _, err := svc.Create(ctx, model.RoleAuthor, 1, CreateRequest{Slug: "about", Title: "About", Content: "hi"}); err == nil {
+	if _, err := svc.Create(ctx, model.RoleAuthor, 1, CreatePageRequest{Slug: "about", Title: "About", Content: "hi"}); err == nil {
 		t.Fatal("non-admin create should be forbidden")
 	}
-	if _, err := svc.Create(ctx, "", 0, CreateRequest{Slug: "about", Title: "About", Content: "hi"}); err == nil {
+	if _, err := svc.Create(ctx, "", 0, CreatePageRequest{Slug: "about", Title: "About", Content: "hi"}); err == nil {
 		t.Fatal("guest create should be forbidden")
 	}
-	p, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "About", Title: "About", Content: "hi", Status: model.PageStatusPublished})
+	p, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "About", Title: "About", Content: "hi", Status: "published"})
 	if err != nil {
 		t.Fatalf("admin create: %v", err)
 	}
@@ -196,22 +196,22 @@ func TestCreate_AdminOnly(t *testing.T) {
 func TestCreate_RejectsReservedUppercaseDuplicate(t *testing.T) {
 	svc := newServiceWithRepo(newFakeRepo())
 	ctx := context.Background()
-	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "admin", Title: "x", Content: "y"}); err == nil {
+	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "admin", Title: "x", Content: "y"}); err == nil {
 		t.Error("reserved slug should be rejected")
 	}
-	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "HELLO", Title: "x", Content: "y"}); err != nil {
+	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "HELLO", Title: "x", Content: "y"}); err != nil {
 		t.Errorf("uppercase should be normalized, got %v", err)
 	} else {
 		// second create with same normalized slug conflicts
-		if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "hello", Title: "x", Content: "y"}); err == nil {
+		if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "hello", Title: "x", Content: "y"}); err == nil {
 			t.Error("duplicate slug should conflict")
 		}
 	}
-	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "hello-world", Title: "x", Content: "y"}); err != nil {
+	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "hello-world", Title: "x", Content: "y"}); err != nil {
 		t.Errorf("valid slug rejected: %v", err)
 	}
 	// Non-ASCII page slugs are rejected per the locked ASCII-only decision.
-	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "about-us", Title: "x", Content: "y"}); err != nil {
+	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "about-us", Title: "x", Content: "y"}); err != nil {
 		t.Errorf("ascii slug rejected: %v", err)
 	}
 }
@@ -220,7 +220,7 @@ func TestGetBySlug_DraftHiddenFromGuest(t *testing.T) {
 	repo := newFakeRepo()
 	svc := newServiceWithRepo(repo)
 	ctx := context.Background()
-	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreateRequest{Slug: "secret", Title: "s", Content: "c"}); err != nil {
+	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "secret", Title: "s", Content: "c"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := svc.GetBySlug(ctx, "secret", ""); err == nil {
@@ -235,19 +235,19 @@ func TestUpdateDelete_AdminOnly(t *testing.T) {
 	repo := newFakeRepo()
 	svc := newServiceWithRepo(repo)
 	ctx := context.Background()
-	p, err := svc.Create(ctx, model.RoleSuperAdmin, 1, CreateRequest{Slug: "docs", Title: "d", Content: "c", Status: model.PageStatusPublished})
+	p, err := svc.Create(ctx, model.RoleSuperAdmin, 1, CreatePageRequest{Slug: "docs", Title: "d", Content: "c", Status: "published"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := fmt.Sprintf("%d", p.ID)
-	if _, err := svc.Update(ctx, id, model.RoleAuthor, UpdateRequest{Title: "x"}); err == nil {
+	if _, err := svc.Update(ctx, id, model.RoleAuthor, UpdatePageRequest{Title: "x"}); err == nil {
 		t.Error("non-admin update should be forbidden")
 	}
 	if err := svc.Delete(ctx, id, model.RoleAuthor); err == nil {
 		t.Error("non-admin delete should be forbidden")
 	}
 	sortOrder := 5
-	if _, err := svc.Update(ctx, id, model.RoleAdmin, UpdateRequest{SortOrder: &sortOrder}); err != nil {
+	if _, err := svc.Update(ctx, id, model.RoleAdmin, UpdatePageRequest{SortOrder: &sortOrder}); err != nil {
 		t.Errorf("admin update: %v", err)
 	}
 	if err := svc.Delete(ctx, id, model.RoleAdmin); err != nil {

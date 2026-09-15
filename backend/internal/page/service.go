@@ -126,18 +126,9 @@ func (s *Service) GetBySlug(ctx context.Context, slug, role string) (*model.Page
 	return page, nil
 }
 
-// CreateRequest carries the fields accepted when creating a page.
-type CreateRequest struct {
-	Slug      string
-	Title     string
-	Content   string
-	ShowInNav bool
-	SortOrder int
-	Status    model.PageStatus
-}
-
-// Create creates a page; only admins may create pages.
-func (s *Service) Create(ctx context.Context, role string, userID uint, req CreateRequest) (*model.Page, error) {
+// Create creates a page; only admins may create pages. It takes the request
+// DTO from types.go so the handler binds and forwards it unchanged.
+func (s *Service) Create(ctx context.Context, role string, userID uint, req CreatePageRequest) (*model.Page, error) {
 	if !model.IsAdmin(role) {
 		return nil, ErrForbidden
 	}
@@ -155,7 +146,7 @@ func (s *Service) Create(ctx context.Context, role string, userID uint, req Crea
 	if exists {
 		return nil, model.ErrSlugTaken
 	}
-	status := req.Status
+	status := model.PageStatus(req.Status)
 	if status != model.PageStatusPublished {
 		status = model.PageStatusDraft
 	}
@@ -173,18 +164,9 @@ func (s *Service) Create(ctx context.Context, role string, userID uint, req Crea
 	return &page, nil
 }
 
-// UpdateRequest carries the fields accepted when updating a page.
-type UpdateRequest struct {
-	Slug      string
-	Title     string
-	Content   string
-	ShowInNav *bool
-	SortOrder *int
-	Status    model.PageStatus
-}
-
-// Update modifies a page; only admins may update pages.
-func (s *Service) Update(ctx context.Context, id, role string, req UpdateRequest) (*model.Page, error) {
+// Update modifies a page; only admins may update pages. Like Create it takes
+// the request DTO from types.go.
+func (s *Service) Update(ctx context.Context, id, role string, req UpdatePageRequest) (*model.Page, error) {
 	if !model.IsAdmin(role) {
 		return nil, ErrForbidden
 	}
@@ -210,8 +192,8 @@ func (s *Service) Update(ctx context.Context, id, role string, req UpdateRequest
 	if req.SortOrder != nil {
 		page.SortOrder = *req.SortOrder
 	}
-	if req.Status == model.PageStatusPublished || req.Status == model.PageStatusDraft {
-		page.Status = req.Status
+	if status := model.PageStatus(req.Status); status == model.PageStatusPublished || status == model.PageStatusDraft {
+		page.Status = status
 	}
 	if err := s.repo.Save(ctx, page); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {

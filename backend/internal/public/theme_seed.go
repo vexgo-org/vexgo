@@ -173,9 +173,9 @@ func (r *Renderer) EnsureThemeSeeds(ctx context.Context, themeID string) (int, e
 		if !errors.Is(err, page.ErrPageNotFound) {
 			return created, err
 		}
-		_, err = svc.Create(ctx, model.RoleSuperAdmin, author.ID, page.CreateRequest{
+		_, err = svc.Create(ctx, model.RoleSuperAdmin, author.ID, page.CreatePageRequest{
 			Slug: seed.Slug, Title: seed.Title, Content: seed.Content,
-			ShowInNav: seed.ShowInNav, SortOrder: seed.SortOrder, Status: seed.Status,
+			ShowInNav: seed.ShowInNav, SortOrder: seed.SortOrder, Status: string(seed.Status),
 		})
 		if err != nil {
 			slog.Warn("skipping theme seed page", "theme", themeID, "slug", seed.Slug, "err", err)
