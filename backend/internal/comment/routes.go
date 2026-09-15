@@ -13,12 +13,10 @@ import (
 func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.GET("/comments/post/:id", h.GetComments)
 	// Comment creation is rate limited per client so an authenticated account
-	// cannot flood a post's thread.
-	if limiter := middleware.NewRateLimiter("comment", commentRateLimitPerMinute, h.rateLimit); limiter != nil {
-		api.POST("/comments", h.mw.JWTAuth(), limiter, h.CreateComment)
-	} else {
-		api.POST("/comments", h.mw.JWTAuth(), h.CreateComment)
-	}
+	// cannot flood a post's thread. commentRateLimitPerMinute is a positive
+	// constant, so the limiter is always built.
+	limiter := middleware.NewRateLimiter("comment", commentRateLimitPerMinute, h.rateLimit)
+	api.POST("/comments", h.mw.JWTAuth(), limiter, h.CreateComment)
 	api.DELETE("/comments/:id", h.mw.JWTAuth(), h.DeleteComment)
 
 	admin := h.mw.Permission(model.RoleAdmin, model.RoleSuperAdmin)
