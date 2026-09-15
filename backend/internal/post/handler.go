@@ -613,7 +613,7 @@ func (h *Handler) GetTags(c *gin.Context) {
 //	@Failure		500	{object}	api.ErrorResponse
 //	@Router			/categories/{id} [delete]
 func (h *Handler) DeleteCategory(c *gin.Context) {
-	id, ok := parseIDParam(c)
+	id, ok := parseUintParam(c, "id")
 	if !ok {
 		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Category does not exist"})
 		return
@@ -654,7 +654,7 @@ func (h *Handler) DeleteCategory(c *gin.Context) {
 //	@Failure		500	{object}	api.ErrorResponse
 //	@Router			/tags/{id} [delete]
 func (h *Handler) DeleteTag(c *gin.Context) {
-	id, ok := parseIDParam(c)
+	id, ok := parseUintParam(c, "id")
 	if !ok {
 		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Tag does not exist"})
 		return
@@ -680,18 +680,12 @@ func (h *Handler) DeleteTag(c *gin.Context) {
 	c.JSON(http.StatusOK, DeleteMessageResponse{Message: "Tag deleted successfully"})
 }
 
-// parseIDParam parses a numeric route :id, reporting whether it is valid.
-// Zero, non-numeric and out-of-range values cannot identify a row and are
-// treated as missing resources.
-func parseIDParam(c *gin.Context) (uint, bool) {
-	return parseUintParam(c, "id")
-}
-
 // parseUintParam parses a numeric route parameter by name, reporting whether it
-// is valid. The bit size matches uint so the conversion can never truncate
-// silently. Callers must reject an invalid value instead of proceeding with 0:
-// otherwise a non-numeric path segment resolves to row 0, which can write
-// orphaned records and surfaces as a 500 rather than a client error.
+// is valid. Zero, non-numeric and out-of-range values cannot identify a row and
+// are treated as missing resources: callers must reject an invalid value
+// instead of proceeding with 0, which would resolve to row 0 and write orphaned
+// records or surface as a 500 rather than a client error. The bit size matches
+// uint so the conversion can never truncate silently.
 func parseUintParam(c *gin.Context, name string) (uint, bool) {
 	id64, err := strconv.ParseUint(c.Param(name), 10, strconv.IntSize)
 	if err != nil || id64 == 0 {
