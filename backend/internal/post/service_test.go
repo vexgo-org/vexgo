@@ -504,6 +504,48 @@ func TestToggleLike(t *testing.T) {
 	}
 }
 
+// errLikeRead stands in for a like table that cannot be read.
+var errLikeRead = errors.New("like read failed")
+
+// failingFindLikeRepo delegates to a working repository but fails the like
+// lookup, so ToggleLike sees a repository error other than "not liked yet".
+type failingFindLikeRepo struct {
+	Repository
+}
+
+func (failingFindLikeRepo) FindLike(context.Context, uint, uint) (*model.Like, error) {
+	return nil, errLikeRead
+}
+
+// TestToggleLike_ReportsRepositoryFailure pins that a failed like lookup is
+// reported instead of being read as "not liked yet", which used to insert the
+// opposite like and report a fabricated success.
+func TestToggleLike_ReportsRepositoryFailure(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	liker := seedUser(t, db, "liker", model.RoleGuest)
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{Slug: "like-failure", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	svc.repo = failingFindLikeRepo{Repository: svc.repo}
+
+	isLiked, count, err := svc.ToggleLike(ctx, post.ID, liker.ID)
+	if !errors.Is(err, errLikeRead) {
+		t.Fatalf("expected the lookup failure to be reported, got isLiked=%v count=%d err=%v", isLiked, count, err)
+	}
+
+	// The failed lookup must not have written a like as a side effect.
+	var likes int64
+	db.Model(&model.Like{}).Count(&likes)
+	if likes != 0 {
+		t.Errorf("expected no like row after a failed lookup, got %d", likes)
+	}
+}
+
 func TestCreateLikeIfAbsent_ConflictSafe(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
