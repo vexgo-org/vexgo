@@ -25,6 +25,13 @@ var SlugPattern = regexp.MustCompile(
 // MaxSlugLength is the maximum allowed slug length in Unicode characters.
 const MaxSlugLength = 200
 
+// NormalizeSlug lowercases and trims a slug before validation and storage.
+// Every domain that accepts a slug normalizes it the same way, so the storage
+// key never depends on the surrounding whitespace or letter case.
+func NormalizeSlug(slug string) string {
+	return strings.ToLower(strings.TrimSpace(slug))
+}
+
 // ValidateSlug checks whether a slug conforms to the Unicode-safe pattern and
 // length limit. The slug must contain at least one Unicode letter so that
 // pure-numeric values, which may collide with old numeric URLs, are rejected.

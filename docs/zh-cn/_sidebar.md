@@ -5,8 +5,11 @@
   - [安装](/zh-cn/guides/installation)
   - [配置](/zh-cn/guides/configuration)
   - [部署](/zh-cn/guides/deployment)
+  - [主题开发](/zh-cn/guides/theme-development)
 - 🧠 概念
   - [架构](/zh-cn/concepts/architecture)
+  - [主题系统](/zh-cn/concepts/theming)
 - 📚 参考
   - [配置参考](/zh-cn/reference/configuration)
+  - [主题模板参考](/zh-cn/reference/theme-templates)
   - [API 参考](api.html ":ignore")

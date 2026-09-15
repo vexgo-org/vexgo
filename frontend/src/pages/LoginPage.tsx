@@ -199,7 +199,7 @@ export function LoginPage() {
 
   const locationState = location.state as
     { from?: { pathname: string }; registrationMessage?: string } | undefined;
-  const from = locationState?.from?.pathname || "/";
+  const from = locationState?.from?.pathname || "/admin";
 
   useEffect(() => {
     if (locationState?.registrationMessage) {
@@ -539,7 +539,7 @@ export function LoginPage() {
           <div className="mt-4 text-center text-sm">
             <button
               type="button"
-              onClick={() => navigate("/reset-password")}
+              onClick={() => navigate("/admin/reset-password")}
               className="text-primary hover:underline focus:outline-none"
             >
               {t("loginPage.forgotPassword")}
@@ -550,7 +550,7 @@ export function LoginPage() {
             <span className="text-muted-foreground">
               {t("loginPage.noAccount")}
             </span>{" "}
-            <Link to="/register" className="text-primary hover:underline">
+            <Link to="/admin/register" className="text-primary hover:underline">
               {t("loginPage.registerNow")}
             </Link>
           </div>

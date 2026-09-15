@@ -24,8 +24,63 @@ import {
   Palette,
   Upload,
   Eye,
+  Trash2,
+  ExternalLink,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function isPreviewURL(value?: string): value is string {
+  if (!value) return false;
+  if (value.length > 2048) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function ThemeCover({
+  theme,
+  alt,
+  className,
+  imgClassName,
+}: {
+  theme: ThemeInfo;
+  alt: string;
+  className?: string;
+  imgClassName?: string;
+}) {
+  const { t } = useTranslation();
+  const [failed, setFailed] = useState(false);
+  const src = isPreviewURL(theme.preview) && !failed ? theme.preview : null;
+  if (!src) {
+    return (
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center gap-1 bg-muted text-muted-foreground",
+          className,
+        )}
+      >
+        <ImageIcon className="w-8 h-8" />
+        <span className="text-xs">{t("themePage.noPreview")}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={cn("overflow-hidden bg-muted", className)}>
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className={cn("w-full h-full object-cover", imgClassName)}
+      />
+    </div>
+  );
+}
 
 interface ThemeInfo {
   id: string;
@@ -51,6 +106,7 @@ export function ThemePage() {
     text: string;
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<ThemeInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,7 +132,7 @@ export function ThemePage() {
     window.scrollTo(0, 0);
 
     if (user && user.role !== "admin" && user.role !== "super_admin") {
-      navigate("/");
+      navigate("/admin/my-posts");
       return;
     }
 
@@ -111,6 +167,62 @@ export function ThemePage() {
     fileInputRef.current?.click();
   };
 
+  const handlePreviewTheme = async (themeId: string) => {
+    // The preview needs a short-lived signed link, which the API mints for an
+    // admin. Open the tab synchronously so the popup blocker still sees the
+    // click, then navigate it once the link arrives.
+    const tab = window.open("about:blank", "_blank");
+    if (tab) {
+      tab.opener = null;
+    }
+    try {
+      const res = await unwrap(
+        getVexGoAPI().getConfigThemesIdPreviewLink(themeId),
+      );
+      if (!res.url) {
+        throw new Error("theme preview link missing from response");
+      }
+      if (tab) {
+        tab.location.replace(res.url);
+      } else {
+        window.location.assign(res.url);
+      }
+    } catch {
+      tab?.close();
+      setMessage({ type: "error", text: t("themePage.previewFailed") });
+    }
+  };
+
+  const handleDeleteTheme = async (theme: ThemeInfo) => {
+    if (
+      theme.id === "default" ||
+      activeTheme === theme.id ||
+      deleting !== null
+    ) {
+      return;
+    }
+    const confirmed = window.confirm(
+      t("themePage.deleteConfirm", { themeName: theme.name }),
+    );
+    if (!confirmed) return;
+    setDeleting(theme.id);
+    setMessage(null);
+    try {
+      await unwrap(getVexGoAPI().deleteConfigThemesId(theme.id));
+      setMessage({
+        type: "success",
+        text: t("themePage.deleteSuccess", { themeName: theme.name }),
+      });
+      setSelectedTheme(null);
+      await loadData();
+    } catch (error) {
+      console.error("Failed to delete theme:", error);
+      setMessage({ type: "error", text: t("themePage.deleteFailed") });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -128,8 +240,16 @@ export function ThemePage() {
     setMessage(null);
 
     try {
-      await getVexGoAPI().postConfigThemeUpload({ theme: file });
-      setMessage({ type: "success", text: t("themePage.uploadSuccess") });
+      const res = await unwrap(
+        getVexGoAPI().postConfigThemeUpload({ theme: file }),
+      );
+      const themeName = file.name.replace(/\.zip$/i, "");
+      setMessage({
+        type: "success",
+        text: res.overwritten
+          ? t("themePage.uploadOverwritten", { themeName })
+          : t("themePage.uploadSuccess"),
+      });
       // Reload the theme list
       loadData();
     } catch (error) {
@@ -206,7 +326,7 @@ export function ThemePage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
           {themes.length === 0 ? (
             <Card className="col-span-full">
               <CardContent className="pt-6">
@@ -216,174 +336,229 @@ export function ThemePage() {
               </CardContent>
             </Card>
           ) : (
-            themes.map((theme) => (
-              <Dialog key={theme.id}>
-                <DialogTrigger asChild>
-                  <div
-                    className={cn(
-                      "cursor-pointer transition-all hover:shadow-md rounded-lg overflow-hidden bg-card border",
-                      activeTheme === theme.id
-                        ? "border-primary border-2"
-                        : "border-border",
-                    )}
-                    onClick={() => setSelectedTheme(theme)}
-                  >
-                    {theme.preview && (
-                      <div className="w-full h-48 overflow-hidden">
-                        <img
-                          src={`/api/theme/${theme.id}/preview`}
-                          alt={`${theme.name} preview`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="p-4">
-                      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                        <h3 className="font-semibold text-sm">{theme.name}</h3>
-                        {activeTheme === theme.id && (
-                          <Badge className="bg-primary text-primary-foreground text-xs">
-                            {t("themePage.currentBadge")}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="space-y-1 text-xs text-muted-foreground mb-4">
-                        <p>
-                          <span className="font-semibold">
-                            {t("themePage.author")}:
-                          </span>{" "}
-                          {theme.author}
-                        </p>
-                        <p>
-                          <span className="font-semibold">
-                            {t("themePage.version")}:
-                          </span>{" "}
-                          {theme.version}
-                        </p>
-                        {theme.description && (
-                          <p className="line-clamp-2">
-                            <span className="font-semibold">
-                              {t("themePage.themeDescription")}:
-                            </span>{" "}
-                            {theme.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="flex items-center gap-1 text-xs"
-                        >
-                          <Eye className="w-3 h-3" />
-                          {t("themePage.viewDetails")}
-                        </Button>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApplyTheme(theme.id);
-                          }}
-                          disabled={
-                            activeTheme === theme.id || applying !== null
-                          }
-                          variant={
-                            activeTheme === theme.id ? "secondary" : "default"
-                          }
-                          size="sm"
-                          className="text-xs"
-                        >
-                          {applying === theme.id && (
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            themes.map((theme) => {
+              const isActive = activeTheme === theme.id;
+              const isDefault = theme.id === "default";
+              const canDelete = !isDefault && !isActive && deleting === null;
+              return (
+                <Dialog key={theme.id}>
+                  <DialogTrigger asChild>
+                    <div
+                      className={cn(
+                        "cursor-pointer transition-all hover:shadow-md rounded-lg overflow-hidden bg-card border",
+                        isActive ? "border-primary border-2" : "border-border",
+                      )}
+                      onClick={() => setSelectedTheme(theme)}
+                    >
+                      <ThemeCover
+                        theme={theme}
+                        alt={`${theme.name} preview`}
+                        className="w-full h-48"
+                      />
+                      <div className="p-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                          <h3 className="font-semibold text-sm">
+                            {theme.name}
+                          </h3>
+                          {isActive && (
+                            <Badge className="bg-primary text-primary-foreground text-xs">
+                              {t("themePage.currentBadge")}
+                            </Badge>
                           )}
-                          {activeTheme === theme.id
-                            ? t("themePage.applied")
-                            : t("themePage.applyTheme")}
-                        </Button>
+                        </div>
+                        <div className="space-y-1 text-xs text-muted-foreground mb-4">
+                          <p>
+                            <span className="font-semibold">
+                              {t("themePage.author")}:
+                            </span>{" "}
+                            {theme.author}
+                          </p>
+                          <p>
+                            <span className="font-semibold">
+                              {t("themePage.version")}:
+                            </span>{" "}
+                            {theme.version}
+                          </p>
+                          {theme.description && (
+                            <p className="line-clamp-2">
+                              <span className="font-semibold">
+                                {t("themePage.themeDescription")}:
+                              </span>{" "}
+                              {theme.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap justify-between items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex items-center gap-1 text-xs"
+                          >
+                            <Eye className="w-3 h-3" />
+                            {t("themePage.viewDetails")}
+                          </Button>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePreviewTheme(theme.id);
+                              }}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              {t("themePage.previewTheme")}
+                            </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApplyTheme(theme.id);
+                              }}
+                              disabled={isActive || applying !== null}
+                              variant={isActive ? "secondary" : "default"}
+                              size="sm"
+                              className="text-xs"
+                            >
+                              {applying === theme.id && (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              )}
+                              {isActive
+                                ? t("themePage.applied")
+                                : t("themePage.applyTheme")}
+                            </Button>
+                          </div>
+                        </div>
+                        {!isDefault && (
+                          <div className="mt-2 flex justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-destructive hover:text-destructive px-2"
+                              disabled={!canDelete}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTheme(theme);
+                              }}
+                            >
+                              {deleting === theme.id ? (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3 h-3 mr-1" />
+                              )}
+                              {t("themePage.deleteTheme")}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  {selectedTheme && (
-                    <>
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between">
-                          {selectedTheme.name}
-                        </DialogTitle>
-                        <DialogDescription>
-                          <div className="space-y-2 text-sm">
-                            <p>
-                              <span className="font-semibold">
-                                {t("themePage.author")}:
-                              </span>{" "}
-                              {selectedTheme.author}
-                            </p>
-                            <p>
-                              <span className="font-semibold">
-                                {t("themePage.version")}:
-                              </span>{" "}
-                              {selectedTheme.version}
-                            </p>
-                            {selectedTheme.description && (
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    {selectedTheme && selectedTheme.id === theme.id && (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center justify-between">
+                            {selectedTheme.name}
+                          </DialogTitle>
+                          <DialogDescription>
+                            <div className="space-y-2 text-sm">
                               <p>
                                 <span className="font-semibold">
-                                  {t("themePage.themeDescription")}:
+                                  {t("themePage.author")}:
                                 </span>{" "}
-                                {selectedTheme.description}
+                                {selectedTheme.author}
                               </p>
-                            )}
-                            {selectedTheme.url && (
                               <p>
                                 <span className="font-semibold">
-                                  {t("themePage.link")}:
-                                </span>
-                                <a
-                                  href={selectedTheme.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:underline break-all"
-                                >
-                                  {selectedTheme.url}
-                                </a>
+                                  {t("themePage.version")}:
+                                </span>{" "}
+                                {selectedTheme.version}
                               </p>
-                            )}
-                          </div>
-                        </DialogDescription>
-                      </DialogHeader>
-                      {selectedTheme.preview && (
+                              {selectedTheme.description && (
+                                <p>
+                                  <span className="font-semibold">
+                                    {t("themePage.themeDescription")}:
+                                  </span>{" "}
+                                  {selectedTheme.description}
+                                </p>
+                              )}
+                              {selectedTheme.url && (
+                                <p>
+                                  <span className="font-semibold">
+                                    {t("themePage.link")}:
+                                  </span>
+                                  <a
+                                    href={selectedTheme.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline break-all"
+                                  >
+                                    {selectedTheme.url}
+                                  </a>
+                                </p>
+                              )}
+                            </div>
+                          </DialogDescription>
+                        </DialogHeader>
                         <div className="mt-4">
-                          <img
-                            src={`/api/theme/${selectedTheme.id}/preview`}
+                          <p className="text-xs font-semibold mb-1">
+                            {t("themePage.previewCover")}
+                          </p>
+                          <ThemeCover
+                            theme={selectedTheme}
                             alt={`${selectedTheme.name} preview`}
-                            className="w-full h-auto rounded-md shadow-sm"
+                            className="w-full aspect-video rounded-md"
                           />
                         </div>
-                      )}
-                      <div className="mt-6 flex justify-end">
-                        <Button
-                          onClick={() => handleApplyTheme(selectedTheme.id)}
-                          disabled={
-                            activeTheme === selectedTheme.id ||
-                            applying !== null
-                          }
-                          variant={
-                            activeTheme === selectedTheme.id
-                              ? "secondary"
-                              : "default"
-                          }
-                        >
-                          {applying === selectedTheme.id && (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <div className="mt-6 flex justify-end gap-2 flex-wrap">
+                          <Button
+                            variant="secondary"
+                            onClick={() => handlePreviewTheme(selectedTheme.id)}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            {t("themePage.previewTheme")}
+                          </Button>
+                          {selectedTheme.id !== "default" && (
+                            <Button
+                              variant="destructive"
+                              onClick={() => handleDeleteTheme(selectedTheme)}
+                              disabled={
+                                activeTheme === selectedTheme.id ||
+                                deleting !== null
+                              }
+                            >
+                              {deleting === selectedTheme.id && (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              )}
+                              {t("themePage.deleteTheme")}
+                            </Button>
                           )}
-                          {activeTheme === selectedTheme.id
-                            ? t("themePage.applied")
-                            : t("themePage.applyTheme")}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </DialogContent>
-              </Dialog>
-            ))
+                          <Button
+                            onClick={() => handleApplyTheme(selectedTheme.id)}
+                            disabled={
+                              activeTheme === selectedTheme.id ||
+                              applying !== null
+                            }
+                            variant={
+                              activeTheme === selectedTheme.id
+                                ? "secondary"
+                                : "default"
+                            }
+                          >
+                            {applying === selectedTheme.id && (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            )}
+                            {activeTheme === selectedTheme.id
+                              ? t("themePage.applied")
+                              : t("themePage.applyTheme")}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              );
+            })
           )}
         </div>
 
@@ -414,6 +589,9 @@ export function ThemePage() {
                 vexgo-theme.json
               </code>{" "}
               {t("themePage.instruction4")}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t("themePage.metaRequirements")}
             </p>
             <p>
               3. {t("themePage.instruction5")}{" "}

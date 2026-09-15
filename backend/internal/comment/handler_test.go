@@ -234,6 +234,54 @@ func TestModerationConfigTestEndpoint_HidesInternalErrors(t *testing.T) {
 	}
 }
 
+// TC-CMOD-027: a comment can only target a published post (404 otherwise), and
+// a reply can only point at a visible parent on the same post (400 otherwise).
+func TestCreateComment_TargetValidation(t *testing.T) {
+	r, db := newTestRouter(t)
+	author := seedUser(t, db, "author", model.RoleContributor)
+	commenter := seedUser(t, db, "commenter", model.RoleGuest)
+	token := mintHandlerToken(t, commenter.ID, model.RoleGuest)
+
+	draft := model.Post{Slug: "draft-post", Title: "draft", Content: "body", Category: "1", AuthorID: author.ID, Status: model.PostStatusDraft}
+	published := seedPost(t, db, author.ID)
+	otherPost := model.Post{Slug: "another-post", Title: "another post", Content: "body", Category: "1", AuthorID: author.ID, Status: model.PostStatusPublished}
+	if err := db.Create(&draft).Error; err != nil {
+		t.Fatalf("seed draft post: %v", err)
+	}
+	if err := db.Create(&otherPost).Error; err != nil {
+		t.Fatalf("seed second post: %v", err)
+	}
+
+	// Commenting on a draft post is refused and nothing is written.
+	w := doJSON(t, r, http.MethodPost, "/api/comments", token,
+		`{"postId": `+strconv.FormatUint(uint64(draft.ID), 10)+`, "content": "hidden"}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 commenting on a draft post, got %d %s", w.Code, w.Body.String())
+	}
+
+	// A reply whose parent lives on another post is a client error, not a 500.
+	parentOnOther := doJSON(t, r, http.MethodPost, "/api/comments", token,
+		`{"postId": `+strconv.FormatUint(uint64(otherPost.ID), 10)+`, "content": "elsewhere"}`)
+	if parentOnOther.Code != http.StatusCreated {
+		t.Fatalf("seed parent comment failed: %d %s", parentOnOther.Code, parentOnOther.Body.String())
+	}
+	var created struct {
+		Comment struct {
+			ID uint `json:"id"`
+		} `json:"comment"`
+	}
+	if err := json.Unmarshal(parentOnOther.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode parent comment: %v", err)
+	}
+
+	w = doJSON(t, r, http.MethodPost, "/api/comments", token,
+		`{"postId": `+strconv.FormatUint(uint64(published.ID), 10)+
+			`, "content": "cross-post reply", "parentId": `+strconv.FormatUint(uint64(created.Comment.ID), 10)+`}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a cross-post parent, got %d %s", w.Code, w.Body.String())
+	}
+}
+
 // TC-CMOD-026: moderation config endpoints and lists stay admin-only.
 func TestModerationRoutes_RoleGating(t *testing.T) {
 	r, db := newTestRouter(t)

@@ -224,19 +224,27 @@ The moderation configuration (switches, prompt, keywords, model) lives in the da
 
 ## Theme System
 
-Public pages are rendered server-side. The embedded **default theme** is always available; admins can upload additional themes as ZIP archives from the admin panel.
+Public pages are rendered server-side: the renderer in `internal/public` executes Go templates from the active theme and returns finished HTML, so visitors do not need JavaScript to read content. The embedded **default theme** is always available; admins can upload additional themes as ZIP archives from the admin panel. The active theme is a database value and can be switched at runtime without a restart.
 
-A theme contains:
+A theme is a directory of templates plus optional translations, seed pages and static assets:
 
 ```text
-theme.zip
-└── theme-id/
-    ├── vexgo-theme.json   # metadata (id, name, author, version, ...)
-    ├── preview.png        # optional preview image
-    └── dist/              # built frontend assets (index.html, JS, CSS)
+my-theme/
+├── vexgo-theme.json   # metadata (id, name, version, ...)
+├── index.html         # home page template
+├── post.html          # post detail template
+├── page.html          # generic custom-page template
+├── user.html          # profile template
+├── 404.html           # optional not-found template
+├── <slug>.html        # optional dedicated template for one custom page
+├── i18n/<lang>.json   # optional translation dictionaries
+├── seed/<slug>.md     # optional default pages
+└── assets/            # static files served at /theme-assets/*
 ```
 
-Installed themes are extracted to `data/theme/<id>/` and served by the renderer. The active theme is stored in the database and can be switched at runtime without restarting the server.
+Uploaded themes are extracted to `data/theme/<id>/`. All root-level templates are parsed into one set (so `{{define}}` fragments are shared across files), rendered with `html/template` auto-escaping, and Markdown bodies are rendered by goldmark in safe mode. Parsed templates are cached per theme and re-read when the theme's files change.
+
+The full pipeline — template resolution and its fallback chains, the language priority order, caching, seed pages, and the theme trust boundary — is explained in [Theming](/concepts/theming). Field-level details live in the [Theme Templates reference](/reference/theme-templates).
 
 ## SSO
 
@@ -356,6 +364,7 @@ cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/
 
 ## Related Reading
 
+- [Theming](/concepts/theming) — how the server-side rendering pipeline and theme system work
 - [Configuration Reference](/reference/configuration) — every flag, variable, and config key
 - [API Reference](/reference/api) — the REST endpoints exposed by this architecture
 - [Configuration Guide](/guides/configuration) — practical setup recipes

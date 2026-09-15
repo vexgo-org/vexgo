@@ -8,7 +8,7 @@ This tutorial is written for complete beginners. By the end you will have a runn
 
 You need:
 
-- A machine running **Linux** or **macOS** (or a machine with **Docker** installed)
+- A machine running **Linux**, **macOS**, **Windows**, or **FreeBSD** (or a machine with **Docker** installed)
 - An internet connection
 - A web browser
 
@@ -60,6 +60,8 @@ You should see the VexGo home page.
 
 3. Click **Log in**.
 
+Direct link: `http://127.0.0.1:3001/admin/login`. Legacy top-level URLs (such as `/login`) 301-redirect to their `/admin/` equivalent with the query string preserved.
+
 ## Step 4: Change the Default Password
 
 The default password is public knowledge — change it before doing anything else.
@@ -71,7 +73,7 @@ The default password is public knowledge — change it before doing anything els
 
 ## Step 5: Write Your First Post
 
-1. Click **New Post** (or **Write** in the navigation).
+1. Click **New Post** (or **Write** in the navigation). Direct link: `http://127.0.0.1:3001/admin/write`.
 2. Enter a title, for example: `Hello, VexGo!`
 3. Write some content in the Markdown editor.
 4. Select a **category** (the default category already exists).
@@ -81,7 +83,7 @@ Your post now appears on the home page, visible to everyone who visits your site
 
 ## Step 6: Explore the Admin Panel
 
-With the super admin account you can manage the whole site. From the admin panel you can:
+With the super admin account you can manage the whole site. Open the admin panel at `http://127.0.0.1:3001/admin/` — from there you can:
 
 - Moderate **pending posts and comments** (if moderation is enabled)
 - Manage **users and roles**
@@ -95,4 +97,4 @@ Now that VexGo is running, you can go deeper:
 - **Deploy it for real** — [Production Deployment](/guides/deployment) covers reverse proxies, HTTPS, and systemd.
 - **Tune the configuration** — the [Configuration Guide](/guides/configuration) explains config files, environment variables, and databases.
 - **Understand the internals** — [Architecture](/concepts/architecture) explains how VexGo is built.
-- **Look up endpoints** — the [API Reference](/reference/api) documents every REST endpoint.
+- **Look up endpoints** — the [API Reference](api.html) documents every REST endpoint.

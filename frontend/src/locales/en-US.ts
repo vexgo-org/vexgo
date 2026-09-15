@@ -283,20 +283,32 @@ export const enUS = {
       "Refresh this page to see new themes. After application, changes take effect immediately for all users",
     uploadTheme: "Upload Theme",
     uploadSuccess: "Theme uploaded successfully",
+    uploadOverwritten:
+      'Theme "{themeName}" has been overwritten with the new package',
     uploadFailed: "Failed to upload theme",
     uploadError: "Upload error: {message}",
     uploadInvalidType: "Please upload a zip file",
     viewDetails: "View Details",
+    previewTheme: "Preview",
+    previewFailed: "Failed to open theme preview",
+    deleteTheme: "Delete",
+    deleteConfirm: 'Delete theme "{themeName}"? This cannot be undone.',
+    deleteSuccess: 'Theme "{themeName}" has been deleted',
+    deleteFailed: "Failed to delete theme",
+    noPreview: "No cover",
+    previewCover: "Cover",
     method1: {
       title: "Method 1: Upload Theme Package",
       step1: '1. Click the "Upload Theme" button above',
-      step2: "2. Select a zip file containing the theme",
+      step2: "2. Select a zip file containing the theme (max 32MB)",
       step3:
         "3. Wait for the upload to complete, the system will automatically extract and load the theme",
     },
     method2: {
       title: "Method 2: Manual Installation",
     },
+    metaRequirements:
+      "vexgo-theme.json requires id, name and version (id must match the folder name); the optional preview cover must be an http(s) URL.",
   },
 
   // General Settings Page
@@ -320,6 +332,13 @@ export const enUS = {
     itemsPerPage: "Items Per Page",
     itemsPerPagePlaceholder: "Number of items to display per page",
     itemsPerPageDesc: "Number of items to display per page (1-100)",
+    siteLanguage: "Site Language",
+    siteLanguageDesc:
+      "Default language of the public theme. Visitors can still override it with ?lang=.",
+    siteLanguageEn: "English",
+    siteLanguageZh: "简体中文",
+    siteLanguageMissing:
+      "The active theme does not ship this language and will fall back to English for missing texts.",
     captcha: "Slider Captcha",
     captchaDesc: "Enable sliding puzzle captcha for enhanced security",
     registration: "Allow Registration",
@@ -651,6 +670,7 @@ export const enUS = {
     home: "Home",
     writePost: "Write Post",
     myPosts: "My Posts",
+    pages: "Pages",
     notifications: "Notifications",
     adminPanel: "Admin Panel",
     searchPlaceholder: "Search articles...",
@@ -659,7 +679,7 @@ export const enUS = {
     profile: "Profile",
     settings: "Settings",
     logout: "Logout",
-    about: "About",
+    viewSite: "View Site",
     allRightsReserved: "© 2026 {siteName}. All rights reserved.",
   },
 
@@ -1023,6 +1043,50 @@ export const enUS = {
       approved: "Approved",
       rejected: "Rejected",
     },
+  },
+
+  // Pages
+  pagesPage: {
+    title: "Pages",
+    newPage: "New Page",
+    searchPlaceholder: "Search pages...",
+    all: "All",
+    published: "Published",
+    draft: "Draft",
+    inNav: "In nav",
+    noPages: "No pages yet",
+    confirmDelete: "Confirm delete page?",
+    cannotUndo:
+      "This action cannot be undone. The page will be permanently deleted.",
+    cancel: "Cancel",
+    delete: "Delete",
+  },
+
+  // Page Editor
+  pageEditorPage: {
+    newPage: "New Page",
+    editPage: "Edit Page",
+    goBack: "Go Back",
+    title: "Title",
+    titlePlaceholder: "Enter page title...",
+    titleRequired: "Please enter page title",
+    slug: "URL Slug",
+    slugRequired: "Please enter a URL slug",
+    slugInvalid:
+      "Slug must be lowercase letters, numbers and hyphens, and not reserved",
+    slugReserved: "This slug is reserved by the system",
+    slugTaken: "This slug is already taken by another page",
+    generateSlug: "Generate from title",
+    status: "Status",
+    draft: "Draft",
+    published: "Published",
+    sortOrder: "Sort Order",
+    showInNav: "Show in navigation",
+    content: "Content",
+    contentPlaceholder: "Start writing...",
+    contentRequired: "Please enter page content",
+    save: "Save",
+    saveFailed: "Failed to save page, please try again",
   },
 
   // Image Cropper

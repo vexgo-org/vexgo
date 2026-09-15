@@ -51,6 +51,7 @@ type GeneralSettingsResponse struct {
 	SiteDescription     string `json:"siteDescription"`
 	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
 	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
+	SiteLanguage        string `json:"siteLanguage" example:"en"`
 }
 
 // GeneralSettingsUpdateRequest is the body of PUT
@@ -63,6 +64,7 @@ type GeneralSettingsUpdateRequest struct {
 	SiteDescription     string `json:"siteDescription"`
 	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
 	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
+	SiteLanguage        string `json:"siteLanguage" example:"en"`
 }
 
 // GeneralSettingsUpdateResponse is the body of PUT
@@ -111,9 +113,27 @@ type AIModelsResponse struct {
 	Models  []string `json:"models" example:"gpt-4o,gpt-4o-mini,gpt-3.5-turbo"`
 }
 
+// ThemeLanguagesResponse is the body of GET
+// /api/config/themes/{id}/languages. Lists the language codes a theme ships
+// under i18n/; empty means the theme predates i18n.
+type ThemeLanguagesResponse struct {
+	Theme     string   `json:"theme" example:"default"`
+	Languages []string `json:"languages" example:"en,zh"`
+}
+
 // ThemesListResponse is the body of GET /api/config/themes.
 type ThemesListResponse struct {
 	Themes []public.ThemeInfo `json:"themes"`
+}
+
+// ThemePreviewLinkResponse is the body of GET
+// /api/config/themes/{id}/preview-link. The URL renders the theme in preview
+// mode and carries a short-lived signature, because the console opens it in a
+// new tab where no Authorization header is available. It expires after
+// public.ThemePreviewTTL.
+type ThemePreviewLinkResponse struct {
+	Theme string `json:"theme" example:"my-theme"`
+	URL   string `json:"url" example:"/?theme=my-theme&theme_token=1234567890.abc"`
 }
 
 // ThemeConfigResponse is the body of GET and PUT
@@ -138,5 +158,12 @@ type ThemeConfigUpdateResponse struct {
 
 // ThemeUploadResponse is the body of POST /api/config/theme/upload.
 type ThemeUploadResponse struct {
-	Message string `json:"message" example:"Theme uploaded successfully"`
+	Message     string `json:"message" example:"Theme uploaded successfully"`
+	Overwritten bool   `json:"overwritten" example:"false"`
+}
+
+// ThemeDeleteResponse is the body of DELETE /api/config/themes/{id}.
+type ThemeDeleteResponse struct {
+	Message string `json:"message" example:"Theme deleted successfully"`
+	Deleted string `json:"deleted" example:"my-theme"`
 }

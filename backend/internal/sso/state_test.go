@@ -114,6 +114,22 @@ func TestDefaultStateStoreIsInProcess(t *testing.T) {
 	}
 }
 
+// The zero value must be usable: the entry map is created lazily under the
+// mutex, so a store that was never initialized holds state instead of
+// panicking on its first write.
+func TestMemoryStateStore_ZeroValueIsUsable(t *testing.T) {
+	ctx := context.Background()
+	var store memoryStateStore
+
+	if err := store.Set(ctx, "state", "value", time.Minute); err != nil {
+		t.Fatalf("Set on the zero value: %v", err)
+	}
+	value, ok, err := store.GetDel(ctx, "state")
+	if err != nil || !ok || value != "value" {
+		t.Fatalf("GetDel = %q, %v, %v; want value, true, nil", value, ok, err)
+	}
+}
+
 // TestMemoryStateStore_SweepsExpiredEntries checks that expired entries are
 // swept once the map passes the sweep threshold, so abandoned flows cannot
 // grow the map without bound.

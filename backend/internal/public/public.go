@@ -1,6 +1,6 @@
-// Package public serves the embedded frontend, static assets, themes and the
-// server-side-rendered pages. All state (database, base URL, data directory)
-// is injected via NewRenderer.
+// Package public serves the embedded admin SPA, theme assets and the
+// server-side-rendered public pages. All state (database, base URL, data
+// directory) is injected via NewRenderer.
 package public
 
 import (
@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -21,6 +22,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// staticFS embeds the admin SPA build. It keeps serving every non-public
+// route (login, write, /admin/*, ...) until those move under /admin.
+//
 //go:embed dist/**/*
 //go:embed dist/manifest.json
 var staticFS embed.FS
@@ -28,7 +32,16 @@ var staticFS embed.FS
 //go:embed dist/index.html
 var indexHTML []byte
 
-// ThemeInfo represents metadata for a theme
+// defaultThemeFS embeds the built-in theme: Go-template pages (index.html,
+// post.html, user.html, 404.html) plus their static assets under assets/.
+// It is produced by the standalone vexgo-default-theme build; run
+// scripts/fetch-default-theme.sh (or `just build-theme`) before compiling.
+//
+//go:embed default-theme
+var defaultThemeFS embed.FS
+
+// ThemeInfo represents metadata for a theme. Preview is the cover image and
+// must be an http(s) URL when set; local paths are rejected at upload time.
 type ThemeInfo struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -45,25 +58,32 @@ const (
 	FaviconFile   = "favicon.ico"
 	DefaultTheme  = "default"
 	ThemeMetaFile = "vexgo-theme.json"
-
-	// Theme internal structure definition
-	DistDir   = "dist"       // Static assets directory
-	IndexFile = "index.html" // Relative to DistDir
 )
 
 // Renderer serves static files and themes using the injected database, base
 // URL and data directory.
 type Renderer struct {
-	db      *gorm.DB
-	baseURL string
-	dataDir string
+	db        *gorm.DB
+	baseURL   string
+	dataDir   string
+	jwtSecret []byte
 }
 
 // NewRenderer creates a Renderer with the given dependencies.
 func NewRenderer(db *gorm.DB, baseURL, dataDir string) *Renderer {
-	// Ensure the themes directory exists
-	_ = os.MkdirAll(filepath.Join(dataDir, ThemesDir), 0o755)
+	// The themes directory holds uploaded themes. Failing to create it is not
+	// fatal here, but left unreported it would surface much later as a
+	// baffling "file not found" during a theme install or preview.
+	themesDir := filepath.Join(dataDir, ThemesDir)
+	if err := os.MkdirAll(themesDir, 0o750); err != nil {
+		slog.Warn("failed to create themes directory", "dir", themesDir, "err", err)
+	}
 	return &Renderer{db: db, baseURL: baseURL, dataDir: dataDir}
+}
+
+// SetJWTSecret configures the JWT secret used for draft page previews.
+func (r *Renderer) SetJWTSecret(secret []byte) {
+	r.jwtSecret = secret
 }
 
 // BaseURL returns the configured site base URL used for SSR links.
@@ -76,12 +96,12 @@ func (r *Renderer) DataDir() string {
 	return r.dataDir
 }
 
-// GetIndexHTML returns the embedded index.html content
+// GetIndexHTML returns the embedded admin SPA index.html content
 func GetIndexHTML() []byte {
 	return indexHTML
 }
 
-// ReadAsset reads an asset file from the embedded filesystem.
+// ReadAsset reads an asset file from the embedded admin SPA filesystem.
 // The given path is relative to the embedded `dist/` directory.
 func ReadAsset(assetPath string) ([]byte, error) {
 	// Use forward slashes for embed.FS compatibility across platforms
@@ -155,6 +175,26 @@ func (r *Renderer) ThemeExists(themeID string) bool {
 	return err == nil
 }
 
+// ValidateThemeTemplates parses every template the theme provides and
+// returns an error when the theme ships no templates or any template fails
+// to parse. Activation requires this to succeed so a broken theme can never
+// become the site-wide active theme.
+func (r *Renderer) ValidateThemeTemplates(themeID string) error {
+	_, err := r.parseThemeTemplates(themeID)
+	return err
+}
+
+// InvalidateThemeCache drops the parsed-template caches for one theme so the
+// next request re-reads it from disk (used after upload/overwrite/delete).
+func (r *Renderer) InvalidateThemeCache(themeID string) {
+	themeCache.Lock()
+	delete(themeCache.themes, themeID)
+	themeCache.Unlock()
+	themeSourcesCache.Lock()
+	delete(themeSourcesCache.themes, themeID)
+	themeSourcesCache.Unlock()
+}
+
 // activeTheme returns the currently active theme from the database, falling
 // back to the default theme.
 func (r *Renderer) activeTheme() string {
@@ -168,302 +208,287 @@ func (r *Renderer) activeTheme() string {
 	return config.ActiveTheme
 }
 
-// IsPathInside verifies that targetPath is within basePath. Exported because
-// other domains resolve untrusted paths against theme directories too (e.g.
-// settings theme previews) and must apply the same containment check.
-func IsPathInside(basePath, targetPath string) bool {
-	absBase, err := filepath.Abs(basePath)
-	if err != nil {
-		return false
+// legacyAdminRedirect maps a top-level route that moved under /admin/ to its
+// new location, preserving the trailing path and query string (emailed links
+// such as /verify-email?token=... must keep their query). It returns ok false
+// for paths that never were SPA routes.
+func legacyAdminRedirect(u *url.URL) (string, bool) {
+	path := u.Path
+	if !strings.HasPrefix(path, "/") {
+		return "", false
 	}
-
-	cleanTarget := filepath.Clean(targetPath)
-	fullPath := filepath.Join(absBase, cleanTarget)
-	absTarget, err := filepath.Abs(fullPath)
-	if err != nil {
-		return false
+	// Segment 1 is the old top-level route name ("login", "edit-post", ...).
+	segments := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
+	switch segments[0] {
+	case "login", "register", "reset-password", "verify-email", "write",
+		"profile", "my-posts", "notifications", "settings", "edit-post":
+		target := "/admin" + path
+		if u.RawQuery != "" {
+			target += "?" + u.RawQuery
+		}
+		return target, true
+	default:
+		return "", false
 	}
-
-	rel, err := filepath.Rel(absBase, absTarget)
-	if err != nil {
-		return false
-	}
-
-	return !strings.HasPrefix(rel, "..") && rel != ".."
 }
 
 // getRequestedTheme determines which theme should be used for this request.
-// It checks the 'theme' query parameter first (for admin preview), then falls back
-// to the globally active theme stored in the database.
+// The ?theme= preview switch is honored only for an authenticated admin (the
+// same check that gates draft previews); every other visitor gets the globally
+// active theme, so a visitor cannot render a theme that is not active.
 func (r *Renderer) getRequestedTheme(c *gin.Context) string {
-	// Query param takes precedence (allows admin to preview themes)
-	if theme := c.Query("theme"); theme != "" {
+	if theme, _, ok := r.previewThemeOverride(c); ok {
 		return theme
 	}
-	// Use the DB-stored active theme
 	if theme := r.activeTheme(); theme != "" {
 		return theme
 	}
 	return DefaultTheme
 }
 
-// getFileContent reads a file for the given theme, falling back to the embedded default theme.
-func (r *Renderer) getFileContent(themeID, relativePath string) ([]byte, string, bool) {
-	cleanPath := strings.TrimPrefix(relativePath, "/")
-	cleanPath = filepath.Clean(cleanPath)
-
-	if themeID != DefaultTheme {
-		if strings.Contains(themeID, "..") || strings.Contains(themeID, "/") || strings.Contains(themeID, "\\") {
-			return nil, "", false
-		}
-
-		themeBasePath := filepath.Join(r.dataDir, ThemesDir, themeID)
-		if !IsPathInside(themeBasePath, cleanPath) {
-			return nil, "", false
-		}
-
-		localPath := filepath.Join(themeBasePath, cleanPath)
-		if info, err := os.Stat(localPath); err == nil && !info.IsDir() {
-			content, err := os.ReadFile(localPath)
-			if err == nil {
-				return content, mime.TypeByExtension(filepath.Ext(localPath)), true
-			}
-		}
-		// If local theme file doesn't exist / can't be read, fall back to embedded
-	}
-
-	// For default theme, read from embedded filesystem
-	// cleanPath should be "dist/index.html" or "dist/assets/..." format
-	if content, err := fs.ReadFile(staticFS, cleanPath); err == nil {
-		return content, mime.TypeByExtension(filepath.Ext(cleanPath)), true
-	}
-	return nil, "", false
+// uploadContentTypes maps stored-media extensions to the content type served
+// for them. It never maps to a type a browser executes as a document
+// (html/svg/xml/js are absent), and any unlisted extension falls back to
+// application/octet-stream. Because the type is set explicitly before
+// http.ServeContent runs, the file server never sniffs the bytes, so an
+// uploaded file cannot be rendered as a document on this origin. The upload
+// domain keeps its own filename allowlist; an extension it allows but this map
+// omits is simply served as an opaque byte stream.
+var uploadContentTypes = map[string]string{
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".avif": "image/avif",
+	".bmp":  "image/bmp",
+	".ico":  "image/x-icon",
+	".tif":  "image/tiff",
+	".tiff": "image/tiff",
+	".mp4":  "video/mp4",
+	".webm": "video/webm",
+	".mov":  "video/quicktime",
+	".mp3":  "audio/mpeg",
+	".wav":  "audio/wav",
+	".ogg":  "audio/ogg",
+	".m4a":  "audio/mp4",
+	".pdf":  "application/pdf",
+	".txt":  "text/plain; charset=utf-8",
+	".csv":  "text/csv; charset=utf-8",
+	".md":   "text/plain; charset=utf-8",
 }
 
-// RegisterStaticRoutes registers all static file routes, including theme support.
-func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
-	// Initialize asset manifest for dynamic asset loading
-	if err := LoadAssetManifest(); err != nil {
-		// Log error but continue with fallback to hardcoded paths
-		slog.Warn("failed to load asset manifest", "err", err)
-	}
+// uploadHandler serves one local media file. The path is confined to mediaDir
+// with os.Root, and the content type comes from uploadContentTypes (never from
+// sniffing), so a hostile upload can never be served as an executable document.
+func (r *Renderer) uploadHandler(mediaDir string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clean := path.Clean(strings.TrimPrefix(c.Param("filepath"), "/"))
+		if clean == "." || !fs.ValidPath(clean) {
+			c.Status(http.StatusNotFound)
+			return
+		}
 
+		root, err := os.OpenRoot(mediaDir)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		defer func() { _ = root.Close() }()
+
+		file, err := root.Open(clean)
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		defer func() { _ = file.Close() }()
+
+		info, err := file.Stat()
+		if err != nil || info.IsDir() {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		contentType, ok := uploadContentTypes[strings.ToLower(path.Ext(clean))]
+		if !ok {
+			contentType = "application/octet-stream"
+		}
+		c.Header("Content-Type", contentType)
+		http.ServeContent(c.Writer, c.Request, clean, info.ModTime(), file)
+	}
+}
+
+// RegisterStaticRoutes registers all static file routes, theme support and the
+// server-side-rendered public pages.
+func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	// Serve local uploads if S3 is not enabled
 	if !s3Enabled {
-		mediaDir := filepath.Join(r.dataDir, "media")
-		e.Static("/uploads", mediaDir)
+		serveUpload := r.uploadHandler(filepath.Join(r.dataDir, "media"))
+		e.GET("/uploads/*filepath", serveUpload)
+		e.HEAD("/uploads/*filepath", serveUpload)
 	}
 
-	// Serve embedded assets (the default theme's assets)
-	e.GET("/assets/*filepath", func(c *gin.Context) {
-		file := strings.TrimPrefix(c.Param("filepath"), "/")
-		theme := r.getRequestedTheme(c)
+	// Admin SPA assets. The SPA is built with base /admin/, so its HTML
+	// references /admin/assets/... and everything non-public lives under
+	// /admin/.
+	e.GET("/admin/assets/*filepath", r.handleAdminAsset)
 
-		if theme != DefaultTheme {
-			targetFile := path.Join(DistDir, "assets", file)
-			content, mimeType, exists := r.getFileContent(theme, targetFile)
-			if exists {
-				if mimeType == "" {
-					mimeType = "application/octet-stream"
-				}
-				c.Data(http.StatusOK, mimeType, content)
-				return
-			}
-		}
+	// Theme assets: resolved against the active theme so templates can
+	// reference them with a stable /theme-assets/... prefix no matter which
+	// theme is active.
+	e.GET("/theme-assets/*filepath", r.handleThemeAsset)
 
-		content, err := ReadAsset("assets/" + file)
-		if err != nil {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		ext := filepath.Ext(file)
-		if mimeType := mime.TypeByExtension(ext); mimeType != "" {
-			c.Data(http.StatusOK, mimeType, content)
-			return
-		}
-		c.Data(http.StatusOK, "application/octet-stream", content)
-	})
+	// Public pages: server-side rendered by the active theme.
+	e.GET("/", r.handleIndex)
+	e.GET("/posts/:slug", r.handlePost)
+	e.GET("/post/:slug", r.handlePost)
+	e.GET("/user/:id", r.handleUser)
 
-	// Post detail page - server-side rendering (plural form)
-	e.GET("/posts/:slug", func(c *gin.Context) {
-		slug := c.Param("slug")
+	// Favicon: allow overrides via configured site icon (highest priority),
+	// then ./data/favicon.ico, then the active theme's favicon.
+	e.GET("/favicon.ico", r.handleFavicon)
 
-		// Check if it's an API request
-		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
-			// Let the API handler process it
-			c.Next()
-			return
-		}
+	// Theme file route: /themes/:id/assets/*path serves a theme's static
+	// assets, which an admin theme preview needs because browser subresource
+	// requests (CSS, JS, images) cannot carry the bearer token. Everything else
+	// in a theme — templates, i18n files and the vexgo-theme.json manifest —
+	// stays private, so this is not a public read of arbitrary theme files.
+	e.GET("/themes/:id/*path", r.handleThemeFile)
 
-		// Server-side rendering: lookup by slug. Drafts, pending and rejected
-		// posts stay hidden — the SSR page must not expose them via a
-		// guessable slug when the API filters them out.
-		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").
-			Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
-			First(&post).Error; err != nil {
-			// Post not found, serve SPA so the frontend can render a 404 page.
-			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
-			return
-		}
+	// SPA fallback: the admin SPA is the only non-public surface and lives
+	// under /admin/. Everything else that used to be an SPA route is
+	// redirected to its /admin/ equivalent so old bookmarks and emailed links
+	// keep working; unknown paths are 404s.
+	e.NoRoute(r.handleNoRoute)
+}
 
-		// Render HTML
-		html, err := RenderPostHTML(post, r.baseURL)
-		if err != nil {
-			// Rendering failed, fall back to SPA
-			c.Next()
-			return
-		}
+// serveAsset writes an asset with a content type derived from its extension,
+// falling back to a download-safe binary type so an unknown extension is never
+// rendered as a document. Shared by the SPA, theme and preview asset routes.
+func serveAsset(c *gin.Context, file string, content []byte) {
+	mimeType := mime.TypeByExtension(filepath.Ext(file))
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	c.Data(http.StatusOK, mimeType, content)
+}
 
-		c.Data(http.StatusOK, "text/html; charset=utf-8", html)
-	})
-
-	// Post detail page - server-side rendering (singular form)
-	e.GET("/post/:slug", func(c *gin.Context) {
-		slug := c.Param("slug")
-
-		// Check if it's an API request
-		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
-			// Let the API handler process it
-			c.Next()
-			return
-		}
-
-		// Server-side rendering: lookup by slug (published posts only, see the
-		// plural route above)
-		var post model.Post
-		if err := r.db.Preload("Author").Preload("Tags").
-			Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
-			First(&post).Error; err != nil {
-			c.Data(http.StatusNotFound, "text/html; charset=utf-8", GetIndexHTML())
-			return
-		}
-
-		html, err := RenderPostHTML(post, r.baseURL)
-		if err != nil {
-			c.Next()
-			return
-		}
-
-		c.Data(http.StatusOK, "text/html; charset=utf-8", html)
-	})
-
-	// Root route
-	e.GET("/", func(c *gin.Context) {
-		if strings.Contains(c.Request.Header.Get("Accept"), "application/json") {
-			c.Next()
-			return
-		}
-
-		// Server-side rendering with proper data initialization
-		var posts []model.Post
-		r.db.Preload("Author").
-			Preload("Tags").
-			Where("status = ?", model.PostStatusPublished).
-			Order("created_at DESC").
-			Limit(10).
-			Find(&posts)
-		// Always render, even with empty posts or query errors
-		html, renderErr := RenderIndexHTML(posts, r.baseURL)
-		if renderErr == nil {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", html)
-			return
-		}
-
-		// Fall back to default HTML
-		theme := r.getRequestedTheme(c)
-		if theme == DefaultTheme {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
-			return
-		}
-
-		// For custom themes, try to load from local theme directory
-		targetFile := path.Join(DistDir, IndexFile)
-		content, _, exists := r.getFileContent(theme, targetFile)
-		if !exists {
-			// Fall back to default theme
-			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
-	})
-
-	// Favicon: allow overrides via configured site icon (highest priority), then ./data/favicon.ico, then theme default
-	e.GET("/favicon.ico", func(c *gin.Context) {
-		// Check if a site icon URL is configured in GeneralSettings
-		var settings model.GeneralSettings
-		if err := r.db.First(&settings).Error; err == nil && settings.SiteIcon != "" {
-			iconURL := settings.SiteIcon
-			// If it's a local path (starts with /), serve from the local filesystem
-			if strings.HasPrefix(iconURL, "/uploads/") {
-				localPath := filepath.Join(r.dataDir, "media", filepath.Base(iconURL))
-				if _, err := os.Stat(localPath); err == nil {
-					c.File(localPath)
-					return
-				}
-			} else {
-				// External URL or S3 URL - redirect
-				c.Redirect(http.StatusFound, iconURL)
-				return
-			}
-		}
-
-		localFavicon := filepath.Join(r.dataDir, FaviconFile)
-		if _, err := os.Stat(localFavicon); err == nil {
-			c.File(localFavicon)
-			return
-		}
-
-		theme := r.getRequestedTheme(c)
-		content, mimeType, exists := r.getFileContent(theme, path.Join(DistDir, FaviconFile))
-		if exists {
-			if mimeType == "" {
-				mimeType = "image/x-icon"
-			}
-			c.Data(http.StatusOK, mimeType, content)
-			return
-		}
+// handleAdminAsset serves the built SPA's hashed assets from the embedded dist.
+func (r *Renderer) handleAdminAsset(c *gin.Context) {
+	file := strings.TrimPrefix(c.Param("filepath"), "/")
+	content, err := ReadAsset("assets/" + file)
+	if err != nil {
 		c.Status(http.StatusNotFound)
-	})
+		return
+	}
+	serveAsset(c, file, content)
+}
 
-	// Theme assets route: /themes/:id/*path
-	e.GET("/themes/:id/*path", func(c *gin.Context) {
-		themeID := c.Param("id")
-		reqPath := c.Param("path")
-		content, mimeType, exists := r.getFileContent(themeID, reqPath)
-		if !exists {
-			c.Status(http.StatusNotFound)
+// handleThemeAsset serves the active theme's assets/ directory through the
+// stable /theme-assets/ prefix, so templates do not have to know which theme
+// is active.
+func (r *Renderer) handleThemeAsset(c *gin.Context) {
+	file := strings.TrimPrefix(c.Param("filepath"), "/")
+	content, ok := r.readThemeFile(r.getRequestedTheme(c), filepath.Join("assets", file))
+	if !ok {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	serveAsset(c, file, content)
+}
+
+// handleFavicon serves /favicon.ico, preferring the configured site icon, then
+// ./data/favicon.ico, then the active theme's copy.
+func (r *Renderer) handleFavicon(c *gin.Context) {
+	var settings model.GeneralSettings
+	if err := r.db.First(&settings).Error; err == nil && settings.SiteIcon != "" {
+		if r.serveConfiguredIcon(c, settings.SiteIcon) {
 			return
 		}
-		if mimeType == "" {
-			mimeType = "application/octet-stream"
-		}
-		c.Data(http.StatusOK, mimeType, content)
-	})
+	}
 
-	// SPA fallback (noRoute) - serve index.html from the requested theme
-	e.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+	localFavicon := filepath.Join(r.dataDir, FaviconFile)
+	if _, err := os.Stat(localFavicon); err == nil {
+		c.File(localFavicon)
+		return
+	}
+
+	if content, ok := r.readThemeFile(r.getRequestedTheme(c), FaviconFile); ok {
+		c.Data(http.StatusOK, "image/x-icon", content)
+		return
+	}
+	c.Status(http.StatusNotFound)
+}
+
+// serveConfiguredIcon serves or redirects the configured site icon and reports
+// whether it answered the request. A local upload that is gone from disk
+// reports false so the caller can fall back to the other favicon sources.
+func (r *Renderer) serveConfiguredIcon(c *gin.Context, iconURL string) bool {
+	if !strings.HasPrefix(iconURL, "/uploads/") {
+		// External or S3 URL: let the browser fetch it directly.
+		c.Redirect(http.StatusFound, iconURL)
+		return true
+	}
+	localPath := filepath.Join(r.dataDir, "media", filepath.Base(iconURL))
+	if _, err := os.Stat(localPath); err != nil {
+		return false
+	}
+	c.File(localPath)
+	return true
+}
+
+// handleThemeFile serves a non-active theme's static assets for the admin theme
+// preview, which cannot carry a bearer token on subresource requests. Only
+// assets/ is reachable: templates, i18n files and the vexgo-theme.json manifest
+// stay private, so this is not a public read of arbitrary theme files.
+func (r *Renderer) handleThemeFile(c *gin.Context) {
+	themeID := c.Param("id")
+	// Clean before the prefix check so an `assets/../vexgo-theme.json`
+	// traversal collapses to the private path and is rejected.
+	clean := path.Clean(strings.TrimPrefix(c.Param("path"), "/"))
+	if !strings.HasPrefix(clean, "assets/") || !fs.ValidPath(clean) {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	content, ok := r.readThemeFile(themeID, clean)
+	if !ok {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	serveAsset(c, clean, content)
+}
+
+// handleNoRoute answers everything the explicit routes did not match: API and
+// theme-asset 404s, the admin SPA with its legacy redirects, and finally the
+// custom pages that live at /:slug.
+func (r *Renderer) handleNoRoute(c *gin.Context) {
+	requestPath := c.Request.URL.Path
+	if strings.HasPrefix(requestPath, "/api/") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+		return
+	}
+	if strings.HasPrefix(requestPath, "/theme-assets/") {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if requestPath == "/admin" || strings.HasPrefix(requestPath, "/admin/") {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
+		return
+	}
+	if target, ok := legacyAdminRedirect(c.Request.URL); ok {
+		c.Redirect(http.StatusMovedPermanently, target)
+		return
+	}
+	// Custom pages live at /:slug as the last match. Only single-segment GET
+	// paths reach this point (multi-segment and system prefixes have returned
+	// above), so delegate to the page handler; unknown slugs render the 404.
+	if c.Request.Method == http.MethodGet {
+		slug := strings.TrimPrefix(requestPath, "/")
+		if slug != "" && !strings.Contains(slug, "/") {
+			c.Params = append(c.Params, gin.Param{Key: "slug", Value: slug})
+			r.handlePage(c)
 			return
 		}
-
-		theme := r.getRequestedTheme(c)
-
-		// If using default theme or custom theme file not found, serve default
-		if theme == DefaultTheme {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
-			return
-		}
-
-		targetFile := path.Join(DistDir, IndexFile)
-		content, _, exists := r.getFileContent(theme, targetFile)
-		if !exists {
-			// Fall back to default theme
-			c.Data(http.StatusOK, "text/html; charset=utf-8", GetIndexHTML())
-			return
-		}
-
-		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
-	})
+	}
+	c.Status(http.StatusNotFound)
 }

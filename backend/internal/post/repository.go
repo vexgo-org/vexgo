@@ -216,19 +216,18 @@ func (r *gormRepository) listPage(query *gorm.DB, page, limit int) ([]model.Post
 }
 
 // applyUserPostsVisibility narrows a user's posts to those visible to the
-// acting role; contributors see all of their own posts.
+// acting user: admins see every non-rejected post, users see their own
+// non-rejected posts, and everyone else (guests and other users) sees
+// published posts only. Keeping the non-owner case at published-only is what
+// stops a logged-in author from reading another user's drafts.
 func applyUserPostsVisibility(query *gorm.DB, userRole string, authorID, currentUserID uint) *gorm.DB {
-	switch userRole {
-	case "", model.RoleGuest:
-		return query.Where("status = ?", model.PostStatusPublished)
-	case model.RoleContributor:
-		if authorID != currentUserID {
-			return query.Where("status = ?", model.PostStatusPublished)
-		}
-		return query.Where("status != ?", model.PostStatusRejected)
-	default:
+	if model.IsAdmin(userRole) {
 		return query.Where("status != ?", model.PostStatusRejected)
 	}
+	if currentUserID != 0 && authorID == currentUserID {
+		return query.Where("status != ?", model.PostStatusRejected)
+	}
+	return query.Where("status = ?", model.PostStatusPublished)
 }
 
 func (r *gormRepository) List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error) {

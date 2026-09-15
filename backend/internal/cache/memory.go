@@ -36,15 +36,28 @@ func (e memoryEntry) expired(now time.Time) bool {
 // once the map grows past a threshold; new keys beyond a hard cap are not
 // stored (reads fall through to the source), so an unbounded stream of unique
 // keys — for example crafted query strings — cannot grow the process.
+//
+// The zero value is ready to use: the entry map is created lazily under the
+// mutex on the first write, so a Memory that was never explicitly initialized
+// reads as an empty cache instead of panicking on its first Set.
 type Memory struct {
 	mu             sync.Mutex
 	entries        map[string]memoryEntry
 	setsSinceSweep int
 }
 
-// NewMemory returns an empty in-process cache backend.
+// NewMemory returns an empty in-process cache backend. It is equivalent to a
+// zero-value Memory and exists so callers can state that intent explicitly.
 func NewMemory() *Memory {
-	return &Memory{entries: make(map[string]memoryEntry)}
+	return &Memory{}
+}
+
+// ensureEntriesLocked creates the entry map on first use. Callers must hold
+// m.mu.
+func (m *Memory) ensureEntriesLocked() {
+	if m.entries == nil {
+		m.entries = make(map[string]memoryEntry)
+	}
 }
 
 // Get returns the value stored under key, deleting it lazily when expired.
@@ -75,6 +88,7 @@ func (m *Memory) Set(_ context.Context, key, value string, ttl time.Duration) er
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.ensureEntriesLocked()
 	m.setsSinceSweep++
 	if len(m.entries) >= memorySweepThreshold && m.setsSinceSweep >= memorySweepThreshold {
 		// Amortized sweeping: at most one O(n) scan per memorySweepThreshold
@@ -119,6 +133,8 @@ func (m *Memory) GetDel(_ context.Context, key string) (string, bool, error) {
 func (m *Memory) Incr(_ context.Context, key string, ttl time.Duration) (int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	m.ensureEntriesLocked()
 
 	lookupKey := keyPrefix + key
 	entry, ok := m.entries[lookupKey]

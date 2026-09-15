@@ -22,6 +22,10 @@ var (
 	ErrGuestViewDenied = errors.New("guest view denied")
 	// ErrBadRequest means the request is invalid for the current state.
 	ErrBadRequest = errors.New("bad request")
+	// ErrInvalidStatus means the requested post status is not a value the
+	// author-facing endpoints accept (unknown value, or the moderation-only
+	// `rejected` state).
+	ErrInvalidStatus = errors.New("invalid post status")
 	// ErrDuplicateName means a category or tag with the same name already exists.
 	ErrDuplicateName = errors.New("duplicate name")
 	// ErrCategoryNotFound means the category does not exist.

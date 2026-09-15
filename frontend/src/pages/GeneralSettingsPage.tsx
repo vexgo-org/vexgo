@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Settings, Save, Upload, Trash2 } from "lucide-react";
@@ -33,20 +40,34 @@ export function GeneralSettingsPage() {
     siteDescription: "",
     siteIcon: "",
     itemsPerPage: 20,
+    siteLanguage: "en",
     createdAt: "",
     updatedAt: "",
   });
+  const [themeLanguages, setThemeLanguages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadConfig = useCallback(async () => {
     try {
       const response = await unwrap(getVexGoAPI().getConfigGeneral());
-      setConfig(response);
+      setConfig((prev) => ({ ...prev, ...response }));
     } catch (error) {
       console.error("Failed to load general settings:", error);
       toast.error(t("generalSettings.loadFailed"));
     } finally {
       setLoading(false);
+    }
+    try {
+      const theme = await unwrap(getVexGoAPI().getConfigTheme());
+      const active =
+        (theme as { activeTheme?: string }).activeTheme || "default";
+      const langs = await unwrap(
+        getVexGoAPI().getConfigThemesIdLanguages(active),
+      );
+      const list = (langs as { languages?: string[] }).languages || [];
+      setThemeLanguages(list);
+    } catch {
+      setThemeLanguages([]);
     }
   }, [t]);
 
@@ -256,6 +277,46 @@ export function GeneralSettingsPage() {
             <p className="text-xs text-muted-foreground">
               {t("generalSettings.itemsPerPageDesc")}
             </p>
+          </div>
+
+          {/* Site language */}
+          <div className="space-y-2">
+            <Label htmlFor="siteLanguage">
+              {t("generalSettings.siteLanguage")}
+            </Label>
+            <Select
+              value={config.siteLanguage || "en"}
+              onValueChange={(value: string) =>
+                setConfig({ ...config, siteLanguage: value })
+              }
+            >
+              <SelectTrigger id="siteLanguage">
+                <SelectValue placeholder={t("generalSettings.siteLanguage")} />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(new Set(["en", "zh", ...themeLanguages])).map(
+                  (lang) => (
+                    <SelectItem key={lang} value={lang}>
+                      {lang === "zh"
+                        ? t("generalSettings.siteLanguageZh")
+                        : lang === "en"
+                          ? t("generalSettings.siteLanguageEn")
+                          : lang}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t("generalSettings.siteLanguageDesc")}
+            </p>
+            {themeLanguages.length > 0 &&
+              config.siteLanguage &&
+              !themeLanguages.includes(config.siteLanguage) && (
+                <p className="text-xs text-amber-600">
+                  {t("generalSettings.siteLanguageMissing")}
+                </p>
+              )}
           </div>
 
           {/* Enable slider captcha */}

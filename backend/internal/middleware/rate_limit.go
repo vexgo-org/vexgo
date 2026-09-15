@@ -82,13 +82,28 @@ type rateLimitEntry struct {
 }
 
 // memoryRateLimitStore keeps per-key token buckets in the process.
+//
+// The zero value is ready to use: the entry map is created lazily under the
+// mutex on the first request, so a store that was never explicitly initialized
+// serves a fresh budget for every key instead of panicking.
 type memoryRateLimitStore struct {
 	mu      sync.Mutex
 	entries map[string]*rateLimitEntry
 }
 
+// newMemoryRateLimitStore returns an empty in-process store. It is equivalent
+// to a zero-value memoryRateLimitStore and exists so callers can state that
+// intent explicitly.
 func newMemoryRateLimitStore() *memoryRateLimitStore {
-	return &memoryRateLimitStore{entries: make(map[string]*rateLimitEntry)}
+	return &memoryRateLimitStore{}
+}
+
+// ensureEntriesLocked creates the entry map on first use. Callers must hold
+// s.mu.
+func (s *memoryRateLimitStore) ensureEntriesLocked() {
+	if s.entries == nil {
+		s.entries = make(map[string]*rateLimitEntry)
+	}
 }
 
 // Allow consumes one request from the key's token bucket. Buckets start full
@@ -102,6 +117,8 @@ func (s *memoryRateLimitStore) Allow(_ context.Context, key string, limit int, w
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.ensureEntriesLocked()
 
 	// Sweep idle entries first so a client whose entry was just evicted gets
 	// a fresh budget instead of being judged on the stale limiter.

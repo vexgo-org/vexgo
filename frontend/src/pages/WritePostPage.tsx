@@ -69,13 +69,13 @@ export function WritePostPage() {
   useEffect(() => {
     if (!isAuthenticated || !user) {
       alert(t("writePostPage.permissionDenied"));
-      navigate("/");
+      navigate("/admin/login");
       return;
     }
     // Check if user has permission to create posts
     if (user.role === "guest") {
       alert(t("writePostPage.permissionDenied"));
-      navigate("/");
+      navigate("/admin/my-posts");
       return;
     }
   }, [isAuthenticated, user, navigate, t]);
@@ -223,7 +223,7 @@ export function WritePostPage() {
       setCoverImage(post.coverImage || "");
     } catch (error) {
       console.error("Failed to load post:", error);
-      navigate("/");
+      navigate("/admin/my-posts");
     }
   };
 
@@ -322,12 +322,13 @@ export function WritePostPage() {
       };
 
       if (isEditMode) {
-        const response = await unwrap(getVexGoAPI().putPostsId(id!, postData));
-        navigate(`/post/${response.post?.slug}`);
+        await unwrap(getVexGoAPI().putPostsId(id!, postData));
       } else {
-        const response = await unwrap(getVexGoAPI().postPosts(postData));
-        navigate(`/post/${response.post?.slug}`);
+        await unwrap(getVexGoAPI().postPosts(postData));
       }
+      // Stay inside the admin console; the published post is served by the
+      // active theme on the public site.
+      navigate("/admin/my-posts");
     } catch (error: unknown) {
       console.error("Failed to save post:", error);
       // The backend error body is {"error": string} (409 also carries code: "slug_taken")
