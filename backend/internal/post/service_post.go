@@ -188,7 +188,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 
 	// Normalize slug to lowercase before validation and storage.
-	req.Slug = strings.ToLower(strings.TrimSpace(req.Slug))
+	req.Slug = model.NormalizeSlug(req.Slug)
 
 	// Validate slug
 	if err := model.ValidateSlug(req.Slug); err != nil {
@@ -288,7 +288,7 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 
 	if req.Slug != "" {
 		// Normalize slug to lowercase before validation and storage.
-		req.Slug = strings.ToLower(strings.TrimSpace(req.Slug))
+		req.Slug = model.NormalizeSlug(req.Slug)
 
 		if req.Slug == post.Slug {
 			// After normalization the slug matches the current one — no change.

@@ -34,7 +34,7 @@ var ReservedSlugs = map[string]struct{}{
 
 // IsReservedSlug reports whether slug is a system-reserved name.
 func IsReservedSlug(slug string) bool {
-	_, ok := ReservedSlugs[normalizeSlug(slug)]
+	_, ok := ReservedSlugs[model.NormalizeSlug(slug)]
 	return ok
 }
 
@@ -65,11 +65,6 @@ type ListQuery struct {
 	Search string
 	Page   int
 	Limit  int
-}
-
-// normalizeSlug lowercases and trims the slug before validation and storage.
-func normalizeSlug(slug string) string {
-	return strings.ToLower(strings.TrimSpace(slug))
 }
 
 // validatePageSlug checks format plus the reserved-word blocklist.
@@ -132,7 +127,7 @@ func (s *Service) Create(ctx context.Context, role string, userID uint, req Crea
 	if !model.IsAdmin(role) {
 		return nil, ErrForbidden
 	}
-	req.Slug = normalizeSlug(req.Slug)
+	req.Slug = model.NormalizeSlug(req.Slug)
 	if err := validatePageSlug(req.Slug); err != nil {
 		return nil, err
 	}
@@ -212,7 +207,7 @@ func (s *Service) changeSlug(ctx context.Context, page *model.Page, requested st
 	if requested == "" {
 		return nil
 	}
-	slug := normalizeSlug(requested)
+	slug := model.NormalizeSlug(requested)
 	if slug == page.Slug {
 		return nil
 	}
