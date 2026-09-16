@@ -13,5 +13,6 @@ export interface SettingsGeneralSettingsResponse {
   registrationEnabled?: boolean;
   siteDescription?: string;
   siteIcon?: string;
+  siteLanguage?: string;
   siteName?: string;
 }

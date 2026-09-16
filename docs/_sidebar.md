@@ -5,8 +5,11 @@
   - [Installation](/guides/installation)
   - [Configuration](/guides/configuration)
   - [Deployment](/guides/deployment)
+  - [Theme Development](/guides/theme-development)
 - 🧠 Concepts
   - [Architecture](/concepts/architecture)
+  - [Theming](/concepts/theming)
 - 📚 Reference
   - [Configuration](/reference/configuration)
+  - [Theme Templates](/reference/theme-templates)
   - [API](api.html ":ignore")

@@ -67,6 +67,28 @@ func TestMemoryCache(t *testing.T) {
 	exerciseCache(t, NewMemory())
 }
 
+// The zero value must be usable: the entry map is created lazily under the
+// mutex, so a Memory that was never initialized behaves as an empty cache
+// instead of panicking on its first write.
+func TestMemoryCache_ZeroValueIsUsable(t *testing.T) {
+	exerciseCache(t, &Memory{})
+}
+
+// A Memory that starts at its zero value still counts: Incr is the other write
+// path, and a nil map would panic there rather than at Set.
+func TestMemoryCache_ZeroValueCounts(t *testing.T) {
+	ctx := context.Background()
+	var c Memory
+
+	n, err := c.Incr(ctx, "rate", time.Minute)
+	if err != nil || n != 1 {
+		t.Fatalf("Incr on the zero value = %d, %v; want 1, nil", n, err)
+	}
+	if n, err := c.Incr(ctx, "rate", time.Minute); err != nil || n != 2 {
+		t.Fatalf("second Incr = %d, %v; want 2, nil", n, err)
+	}
+}
+
 func TestMemoryCacheExpiry(t *testing.T) {
 	ctx := context.Background()
 	c := NewMemory()

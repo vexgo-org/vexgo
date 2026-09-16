@@ -13,7 +13,9 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	admin := h.mw.Permission(model.RoleAdmin, model.RoleSuperAdmin)
 
 	api.GET("/config/themes", h.GetThemes)
-	api.GET("/config/themes/:id/preview", h.GetThemePreview)
+	api.GET("/config/themes/:id/languages", h.GetThemeLanguages)
+	api.GET("/config/themes/:id/preview-link", h.mw.JWTAuth(), admin, h.GetThemePreviewLink)
+	api.DELETE("/config/themes/:id", h.mw.JWTAuth(), admin, h.DeleteTheme)
 
 	api.GET("/config/smtp", h.mw.JWTAuth(), admin, h.GetSMTPConfig)
 	api.PUT("/config/smtp", h.mw.JWTAuth(), admin, h.UpdateSMTPConfig)

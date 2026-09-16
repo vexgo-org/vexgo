@@ -23,12 +23,12 @@ export function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
   // Check whether admin access is required (admin or super_admin)
   if (requireAdmin && user?.role !== "admin" && user?.role !== "super_admin") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin/my-posts" replace />;
   }
 
   return <>{children}</>;

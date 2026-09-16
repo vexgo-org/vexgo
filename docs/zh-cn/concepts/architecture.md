@@ -223,19 +223,27 @@ VexGo 有两条审核管线——文章和评论各一条。两者都围绕 `sta
 
 ## 主题系统
 
-公开页面由服务端渲染。内置的**默认主题**始终可用；管理员可通过管理面板上传 ZIP 格式的主题。
+公开页面由服务端渲染：`internal/public` 中的渲染器执行当前主题的 Go 模板并返回渲染好的 HTML，因此访客无需执行 JavaScript 即可阅读内容。内置的**默认主题**始终可用；管理员可通过管理面板上传 ZIP 格式的主题。当前主题是数据库中的一个值，无需重启即可在运行时切换。
 
-主题包含：
+一个主题就是「模板 + 可选的翻译、种子页面和静态资源」构成的目录：
 
 ```text
-theme.zip
-└── theme-id/
-    ├── vexgo-theme.json   # 元数据（id、name、author、version 等）
-    ├── preview.png        # 可选预览图
-    └── dist/              # 构建好的前端资源（index.html、JS、CSS）
+my-theme/
+├── vexgo-theme.json   # 元数据（id、name、version 等）
+├── index.html         # 首页模板
+├── post.html          # 文章详情模板
+├── page.html          # 自定义页面通用模板
+├── user.html          # 用户主页模板
+├── 404.html           # 可选的未找到页面模板
+├── <slug>.html        # 可选：某个自定义页面的专属模板
+├── i18n/<lang>.json   # 可选：翻译字典
+├── seed/<slug>.md     # 可选：默认页面
+└── assets/            # 静态文件，通过 /theme-assets/* 提供
 ```
 
-安装的主题解压到 `data/theme/<id>/`，由渲染器提供。当前主题存储在数据库中，无需重启即可在运行时切换。
+上传的主题解压到 `data/theme/<id>/`。根目录下的所有模板会解析进同一个集合（因此 `{{define}}` 片段可跨文件共享），由 `html/template` 自动转义渲染，Markdown 正文由 goldmark 以安全模式渲染。解析后的模板按主题缓存，主题文件变化时重新读取。
+
+完整管线——模板解析及其回退链、语言优先级、缓存、种子页面，以及主题的信任边界——见[主题系统](/zh-cn/concepts/theming)。逐字段细节见[主题模板参考](/zh-cn/reference/theme-templates)。
 
 ## SSO
 
@@ -355,6 +363,7 @@ cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/
 
 ## 相关阅读
 
+- [主题系统](/zh-cn/concepts/theming) —— 服务端渲染管线与主题系统如何工作
 - [配置参考](/zh-cn/reference/configuration) —— 全部参数、变量和配置键
 - [API 参考](/zh-cn/reference/api) —— 该架构暴露的 REST 端点
 - [配置指南](/zh-cn/guides/configuration) —— 实操配置方法

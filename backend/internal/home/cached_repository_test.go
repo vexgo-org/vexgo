@@ -28,6 +28,20 @@ func (f *fakeRepo) CountPosts(_ context.Context) (int64, error) {
 	return 42, nil
 }
 
+func (f *fakeRepo) CountUsers(_ context.Context) (int64, error)      { return f.count() }
+func (f *fakeRepo) CountCategories(_ context.Context) (int64, error) { return f.count() }
+func (f *fakeRepo) CountTags(_ context.Context) (int64, error)       { return f.count() }
+func (f *fakeRepo) CountComments(_ context.Context) (int64, error)   { return f.count() }
+
+// count is the shared body of the aggregate counters, which differ only in the
+// table they read.
+func (f *fakeRepo) count() (int64, error) {
+	if f.countsErr != nil {
+		return 0, f.countsErr
+	}
+	return 42, nil
+}
+
 func (f *fakeRepo) GetGeneralSettings(_ context.Context) (model.GeneralSettings, error) {
 	f.settingsCalls++
 	if f.settingsErr != nil {

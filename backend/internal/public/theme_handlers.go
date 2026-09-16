@@ -1,0 +1,327 @@
+package public
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+const htmlContentType = "text/html; charset=utf-8"
+
+// requestContext resolves one SSR request's site data and merged theme
+// dictionary with a single settings query: site default first, then the
+// ?lang=/cookie/Accept-Language chain, then the merged dict.
+func (r *Renderer) requestContext(c *gin.Context, theme string) (*SiteData, Dict) {
+	site := r.buildSiteData(c.Request.Context(), "")
+	lang := r.resolveRequestLanguage(c, site.DefaultLanguage)
+	site.Language = lang
+	return site, r.loadMergedDict(theme, lang, site.DefaultLanguage)
+}
+
+// pageRender is one SSR page to render: which theme and template file to use,
+// the data handed to the template, and the theme's language dictionary.
+// Keeping the coordinates in one value keeps the render helpers at two
+// parameters as they grow.
+type pageRender struct {
+	Theme string
+	Page  string
+	Data  any
+	Dict  Dict
+}
+
+// renderRequestPage renders one SSR page and scopes it to the previewed theme
+// when the request is entitled to the ?theme= admin preview switch. Plain
+// requests and non-request callers use renderThemeWithDict directly so no
+// rewriting leaks into the site-wide render path.
+func (r *Renderer) renderRequestPage(c *gin.Context, p pageRender) ([]byte, error) {
+	out, err := r.renderThemeWithDict(p.Theme, p.Page, p.Data, p.Dict)
+	if err != nil {
+		return nil, err
+	}
+	if preview, token, ok := r.previewThemeOverride(c); ok && preview == p.Theme {
+		out = rewriteThemePreview(out, p.Theme, token)
+	}
+	return out, nil
+}
+
+// servePage renders one page of the requested theme and writes it as HTML with
+// a 200 status. When rendering fails (theme missing a template, template syntax
+// error) it falls back to a plain 404 so public routes never crash.
+func (r *Renderer) servePage(c *gin.Context, p pageRender) {
+	out, err := r.renderRequestPage(c, p)
+	if err != nil {
+		c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
+		return
+	}
+	c.Data(http.StatusOK, htmlContentType, out)
+}
+
+// renderNotFound renders the theme's 404 template (when present) with a plain
+// fallback otherwise. Both outcomes are a 404, so the body is the only thing
+// the render decides.
+func (r *Renderer) renderNotFound(c *gin.Context, theme string, site *SiteData, dict Dict) {
+	data := NotFoundData{Site: site, Pages: r.buildNavPages(c.Request.Context())}
+	out, err := r.renderRequestPage(c, pageRender{Theme: theme, Page: NotFoundTemplate, Data: data, Dict: dict})
+	if err != nil {
+		c.Data(http.StatusNotFound, htmlContentType, []byte("Page not found"))
+		return
+	}
+	c.Data(http.StatusNotFound, htmlContentType, out)
+}
+
+// previewThemeOverride returns the theme selected by the ?theme= preview
+// switch, the signature to carry across the preview's own links, and whether
+// this request is entitled to use the switch. The switch exists for the admin
+// console's theme preview, so it is honored for an authenticated admin, or for
+// a request carrying a signed, short-lived preview link — the console opens the
+// preview in a new tab, where no Authorization header is available. Every other
+// visitor keeps the globally active theme and cannot render a theme that is not
+// active. The admin decision is memoized per request, so a page render validates
+// the token once rather than for selection and again for rewriting.
+func (r *Renderer) previewThemeOverride(c *gin.Context) (theme, token string, ok bool) {
+	theme = c.Query("theme")
+	if theme == "" {
+		return "", "", false
+	}
+	token = c.Query(ThemePreviewParam)
+	if r.isPreviewAdmin(c) || r.validThemePreviewToken(theme, token) {
+		return theme, token, true
+	}
+	return "", "", false
+}
+
+// previewAdminKey caches this request's preview-admin decision. Gin clears the
+// context keys between requests, so the cache never leaks to another caller.
+const previewAdminKey = "public.previewAdmin"
+
+// isPreviewAdmin reports whether the request carries a still-valid admin JWT,
+// granting draft-page previews (?preview=1) and the ?theme= preview switch.
+//
+// The token is resolved against the database through middleware.TokenUser — the
+// same rules the API applies — so the role comes from the stored account, not
+// from the token claim. Trusting the claim alone would let a demoted admin (or
+// a token invalidated by a password change or a later login) keep previewing
+// unpublished pages until it expires.
+func (r *Renderer) isPreviewAdmin(c *gin.Context) bool {
+	if cached, ok := c.Get(previewAdminKey); ok {
+		admin, _ := cached.(bool)
+		return admin
+	}
+	admin := r.checkPreviewAdmin(c)
+	c.Set(previewAdminKey, admin)
+	return admin
+}
+
+// checkPreviewAdmin performs the uncached preview-admin check.
+func (r *Renderer) checkPreviewAdmin(c *gin.Context) bool {
+	token, ok := middleware.BearerToken(c.GetHeader("Authorization"))
+	if !ok {
+		return false
+	}
+	user, ok := middleware.TokenUser(c.Request.Context(), r.db, r.jwtSecret, token)
+	return ok && model.IsAdmin(user.Role)
+}
+
+// handleIndex renders the home page: published posts, paginated, with the
+// optional ?search= / ?category= / ?page= filters.
+func (r *Renderer) handleIndex(c *gin.Context) {
+	theme := r.getRequestedTheme(c)
+	site, dict := r.requestContext(c, theme)
+	page := parsePageParam(c)
+	search := c.Query("search")
+	category := c.Query("category")
+
+	posts, pagination, _, err := r.listPageData(c.Request.Context(), postListQuery{
+		Base:     "/",
+		Page:     page,
+		Limit:    site.ItemsPerPage,
+		Search:   search,
+		Category: category,
+	})
+	if err != nil {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	// Distinct categories among published posts, for the sidebar filter.
+	var categories []string
+	if err := r.db.WithContext(c.Request.Context()).
+		Model(&model.Post{}).
+		Where("status = ? AND category != ''", model.PostStatusPublished).
+		Distinct().
+		Pluck("category", &categories).Error; err != nil {
+		categories = nil
+	}
+
+	data := IndexData{
+		Site:         site,
+		Posts:        posts,
+		Pages:        r.buildNavPages(c.Request.Context()),
+		Pagination:   pagination,
+		Query:        IndexQueryData{Search: search, Category: category},
+		Categories:   categories,
+		PopularPosts: r.popularPostsData(c.Request.Context(), 5),
+		PopularTags:  r.popularTagsData(c.Request.Context(), 10),
+	}
+	r.servePage(c, pageRender{Theme: theme, Page: IndexTemplate, Data: data, Dict: dict})
+}
+
+// handlePost renders a published post by slug. Drafts, pending and rejected
+// posts stay hidden — the SSR page must not expose them via a guessable slug
+// when the API filters them out.
+func (r *Renderer) handlePost(c *gin.Context) {
+	theme := r.getRequestedTheme(c)
+	site, dict := r.requestContext(c, theme)
+	slug := c.Param("slug")
+
+	var post model.Post
+	if err := r.db.WithContext(c.Request.Context()).
+		Preload("Author").
+		Preload("Tags").
+		Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
+		First(&post).Error; err != nil {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	commentCounts := r.countCommentsBatch(c.Request.Context(), []uint{post.ID})
+	likeCounts := r.countLikesBatch(c.Request.Context(), []uint{post.ID})
+
+	data := PostData{Site: site, Pages: r.buildNavPages(c.Request.Context())}
+	data.Post.ID = post.ID
+	data.Post.Title = post.Title
+	data.Post.Slug = post.Slug
+	data.Post.Excerpt = post.Excerpt
+	data.Post.CoverImage = post.CoverImage
+	data.Post.Category = post.Category
+	data.Post.CreatedAt = post.CreatedAt
+	data.Post.UpdatedAt = post.UpdatedAt
+	data.Post.ViewCount = post.ViewCount
+	data.Post.CommentsCount = commentCounts[post.ID]
+	data.Post.LikesCount = likeCounts[post.ID]
+	data.Post.ContentHTML = RenderMarkdown(post.Content)
+	data.Post.URL = "/post/" + post.Slug
+	if post.Author.ID != 0 {
+		data.Post.AuthorName = post.Author.Username
+		data.Post.AuthorID = post.Author.ID
+		data.Post.AuthorAvatar = post.Author.Avatar
+	}
+	for _, tag := range post.Tags {
+		data.Post.Tags = append(data.Post.Tags, tag.Name)
+	}
+
+	r.servePage(c, pageRender{Theme: theme, Page: PostTemplate, Data: data, Dict: dict})
+}
+
+// handleUser renders a user's public profile and their published posts.
+func (r *Renderer) handleUser(c *gin.Context) {
+	theme := r.getRequestedTheme(c)
+	site, dict := r.requestContext(c, theme)
+
+	userID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || userID == 0 {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	var user model.User
+	if err := r.db.WithContext(c.Request.Context()).First(&user, userID).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			slog.Error("failed to load user for public page", "err", err)
+		}
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	page := parsePageParam(c)
+	posts, pagination, total, err := r.listPageData(c.Request.Context(), postListQuery{
+		Base:     "/user/" + strconv.FormatUint(userID, 10),
+		Page:     page,
+		Limit:    site.ItemsPerPage,
+		AuthorID: uint(userID),
+	})
+	if err != nil {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	data := UserData{Site: site, Pages: r.buildNavPages(c.Request.Context())}
+	data.User.ID = user.ID
+	data.User.Username = user.Username
+	data.User.Avatar = user.Avatar
+	if !user.HideBio {
+		data.User.Bio = user.Bio
+	}
+	data.User.CreatedAt = user.CreatedAt
+	data.User.PostsCount = total
+	data.Posts = posts
+	data.Pagination = pagination
+
+	r.servePage(c, pageRender{Theme: theme, Page: UserTemplate, Data: data, Dict: dict})
+}
+
+// handlePage renders a custom page at /:slug. Template resolution is
+// <slug>.html first, then the generic page.html, then the 404 template with a
+// 404 status (per the locked slug.html chain). Drafts are hidden unless the
+// request carries ?preview=1 with an admin JWT.
+func (r *Renderer) handlePage(c *gin.Context) {
+	theme := r.getRequestedTheme(c)
+	site, dict := r.requestContext(c, theme)
+	slug := c.Param("slug")
+	if slug == "" || strings.Contains(slug, "/") {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	preview := c.Query("preview") == "1" && r.isPreviewAdmin(c)
+
+	var page model.Page
+	query := r.db.WithContext(c.Request.Context()).Where("slug = ?", slug)
+	if !preview {
+		query = query.Where("status = ?", model.PageStatusPublished)
+	}
+	if err := query.First(&page).Error; err != nil {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+	if page.Status != model.PageStatusPublished && !preview {
+		r.renderNotFound(c, theme, site, dict)
+		return
+	}
+
+	data := PageData{Site: site, Pages: r.buildNavPages(c.Request.Context())}
+	data.Page.ID = page.ID
+	data.Page.Title = page.Title
+	data.Page.Slug = page.Slug
+	data.Page.CreatedAt = page.CreatedAt
+	data.Page.UpdatedAt = page.UpdatedAt
+	data.Page.ContentHTML = RenderPageContent(page.Content)
+	data.Page.URL = "/" + page.Slug
+
+	if dedicated := page.Slug + ".html"; r.themeProvides(theme, dedicated) {
+		r.servePage(c, pageRender{Theme: theme, Page: dedicated, Data: data, Dict: dict})
+		return
+	}
+	if r.themeProvides(theme, PageTemplate) {
+		r.servePage(c, pageRender{Theme: theme, Page: PageTemplate, Data: data, Dict: dict})
+		return
+	}
+	r.renderNotFound(c, theme, site, dict)
+}
+
+// parsePageParam reads the 1-based ?page= query parameter, defaulting to 1.
+func parsePageParam(c *gin.Context) int {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		return 1
+	}
+	return page
+}

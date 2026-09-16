@@ -68,8 +68,10 @@ var (
 )
 
 const (
-	verificationLinkPath string = "/verify-email"
-	resetLinkPath        string = "/reset-password"
+	// Account-action pages moved under /admin when the admin SPA became the
+	// only non-public surface; emailed links must point there.
+	verificationLinkPath string = "/admin/verify-email"
+	resetLinkPath        string = "/admin/reset-password"
 
 	// dummyPasswordSource is the plaintext hashed into dummyPasswordHash. Its
 	// value is arbitrary; only its cost matters.
@@ -80,13 +82,13 @@ const (
 // does not exist. It costs one bcrypt evaluation at DefaultCost — the same
 // work as a real comparison — so response timing cannot reveal which
 // addresses are registered.
-var dummyPasswordHash = func() []byte {
-	hash, err := bcrypt.GenerateFromPassword([]byte(dummyPasswordSource), bcrypt.DefaultCost)
-	if err != nil {
-		panic("auth: failed to generate dummy password hash: " + err.Error())
-	}
-	return hash
-}()
+//
+// The literal is a hash of dummyPasswordSource at bcrypt.DefaultCost. Since
+// both inputs are fixed the result is too, so there is nothing to compute at
+// startup — and deriving it at runtime could only fail, in package
+// initialisation, before the logger exists. TestDummyPasswordHashMatchesSource
+// keeps the literal in step with dummyPasswordSource and DefaultCost.
+const dummyPasswordHash = "$2a$10$hmu1R6rZHBXkDRgiC38cdeGmpATYlujC3EghVel5waX47kFlpcljK"
 
 // Deps holds the dependencies required by the auth domain.
 type Deps struct {
@@ -170,7 +172,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (string, *model.U
 		// costs about as much as the real comparison below; otherwise the
 		// timing gap would allow enumerating registered emails.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
+			_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(req.Password))
 		}
 		return "", nil, ErrInvalidCredentials
 	}
@@ -230,7 +232,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	// Check if registration is allowed
 	settings, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Allow registration by default
 			settings.RegistrationEnabled = true
 		} else {
@@ -291,7 +293,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	}
 
 	// Encrypt password
-	slog.Debug("starting password hashing", "email", req.Email)
+	slog.Debug("starting password hashing")
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		slog.Error(
@@ -301,7 +303,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		)
 		return nil, ErrHashPassword
 	}
-	slog.Debug("password hashed successfully", "email", req.Email)
+	slog.Debug("password hashed successfully")
 
 	// Create new user
 	newUser := model.User{
@@ -442,7 +444,7 @@ func (s *Service) sendVerificationEmail(ctx context.Context, user *model.User, p
 func (s *Service) GetCurrentUser(ctx context.Context, userID uint) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -455,7 +457,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, userID uint) (*model.User,
 func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProfileRequest) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -518,7 +520,7 @@ func (s *Service) deleteOldAvatar(ctx context.Context, userID uint, url string) 
 func (s *Service) ChangePassword(ctx context.Context, userID uint, oldPassword, newPassword string) error {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrUserNotFound
 		}
 		return err
@@ -544,7 +546,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID uint, oldPassword, 
 func (s *Service) UpdateSettings(ctx context.Context, userID uint, req UpdateSettingsRequest) (*model.User, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
@@ -576,7 +578,7 @@ func (s *Service) UpdateSettings(ctx context.Context, userID uint, req UpdateSet
 func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pending bool, err error) {
 	user, err := s.repo.FindUserByID(ctx, req.UserID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, ErrUserNotFound
 		}
 		return false, err
@@ -678,7 +680,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	// Find user with this token
 	user, err := s.repo.FindUserByToken(ctx, token)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrInvalidResetToken
 		}
 		return ErrQueryFailed

@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -91,6 +92,22 @@ func CurrentUserID(c *gin.Context) uint {
 	return 0
 }
 
+// BearerToken extracts the credential from an Authorization header value of
+// the form "Bearer <token>". It reports false for a missing header, another
+// scheme, a malformed value, or an empty token, so every caller applies one
+// definition of a well-formed bearer credential. Callers decide how to react:
+// JWTAuth rejects the request while OptionalJWTAuth treats it as anonymous.
+func BearerToken(header string) (string, bool) {
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", false
+	}
+	if parts[1] == "" {
+		return "", false
+	}
+	return parts[1], true
+}
+
 // JWTAuth authenticates requests via a Bearer JWT and writes the user info
 // into the gin context.
 func (a *Auth) JWTAuth() gin.HandlerFunc {
@@ -101,15 +118,17 @@ func (a *Auth) JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		rawToken, ok := BearerToken(authHeader)
+		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication format error"})
 			return
 		}
 
-		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
-			// Ensure using HS256 signing method
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		token, err := jwt.Parse(rawToken, func(token *jwt.Token) (any, error) {
+			// Pin the signing method: only tokens this server signed with
+			// HS256 are accepted, so a token using another HMAC variant (or an
+			// asymmetric algorithm) is rejected instead of verified.
+			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, jwt.ErrTokenUnverifiable
 			}
 			return a.jwtSecret, nil
@@ -193,14 +212,15 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		rawToken, ok := BearerToken(authHeader)
+		if !ok {
 			c.Next()
 			return
 		}
 
-		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (any, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		token, err := jwt.Parse(rawToken, func(token *jwt.Token) (any, error) {
+			// Same pin as JWTAuth: only this server's HS256 tokens are valid.
+			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, jwt.ErrTokenUnverifiable
 			}
 			return a.jwtSecret, nil
@@ -270,4 +290,66 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// TokenUser validates a raw bearer token and resolves it to the current
+// database user, applying every rule JWTAuth applies to a request: the token
+// must be HS256-signed with this server's secret, carry a usable user_id, and
+// name an account that still exists with a matching password version and a last
+// login no later than the token's iat.
+//
+// It is the shared entry point for callers outside the middleware chain (the
+// public renderer's draft-page preview) so they cannot re-derive authorization
+// from the token's role claim. The returned role is read from the database, and
+// the absence of a database fails closed rather than trusting the signature
+// alone.
+//
+// The lookup runs under the caller's context, so a cancelled request does not
+// leave the user query running.
+func TokenUser(ctx context.Context, db *gorm.DB, secret []byte, rawToken string) (model.User, bool) {
+	hasDatabase := db != nil
+	hasToken := rawToken != ""
+	hasSecret := len(secret) > 0
+	if !hasDatabase || !hasToken || !hasSecret {
+		return model.User{}, false
+	}
+
+	token, err := jwt.Parse(rawToken, func(token *jwt.Token) (any, error) {
+		// Same pin as JWTAuth: only this server's HS256 tokens are verified.
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, jwt.ErrTokenUnverifiable
+		}
+		return secret, nil
+	})
+	if err != nil || !token.Valid {
+		return model.User{}, false
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return model.User{}, false
+	}
+	userID := claimsUserID(claims)
+	if userID == 0 {
+		return model.User{}, false
+	}
+
+	var user model.User
+	if err := db.WithContext(ctx).First(&user, userID).Error; err != nil {
+		// The token names an account that no longer exists; never fall back
+		// to its role claim.
+		return model.User{}, false
+	}
+	if tokenPasswordVersion, ok := claims["password_version"].(float64); ok {
+		if int(tokenPasswordVersion) != user.PasswordVersion {
+			return model.User{}, false
+		}
+	}
+	if tokenIat, ok := claims["iat"].(float64); ok {
+		if int64(tokenIat) < user.LastLoginAt.Unix() {
+			return model.User{}, false
+		}
+	}
+
+	return user, true
 }

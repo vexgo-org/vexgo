@@ -4,7 +4,7 @@
 
 ## 环境要求
 
-- **操作系统**：Linux、MacOS、Windows、FreeBSD，或任何装有 Docker 的系统
+- **操作系统**：Linux、macOS、Windows、FreeBSD，或任何装有 Docker 的系统
 - **内存**：最低 512 MB，推荐 1 GB
 - **磁盘**：应用本身至少 100 MB，另需数据存储空间
 
@@ -376,23 +376,17 @@ sudo journalctl -u vexgo -f
 git clone https://github.com/vexgo-org/vexgo.git
 cd vexgo
 
-# 构建前端（产物嵌入后端二进制）
-cd frontend
-bun install
-bun run build
-cd ..
-
-# 构建后端
-cd backend
-go mod download
-go build -o vexgo ./cmd/vexgo
-cd ..
+# 安装管理面板 SPA 依赖并构建，再拉取并构建独立的默认主题
+#（构建产物嵌入后端二进制）
+cd frontend && bun install && cd ..
+just build-frontend
+just build-theme
 ```
 
 ### 第 3 步：运行
 
 ```bash
-./backend/vexgo
+just run
 ```
 
 ### 开发常用命令
@@ -413,6 +407,8 @@ go test -v ./...       # 运行后端测试
 ### 访问网站
 
 打开 `http://localhost:3001`（远程服务器则为 `http://your-server-ip:3001`）。
+
+管理面板位于 `http://localhost:3001/admin/`（登录 `/admin/login`，写文章 `/admin/write`）；旧版顶层 URL 会 301 重定向到对应的 `/admin/` 地址，并保留查询字符串。
 
 ### 默认账号
 

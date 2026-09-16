@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -59,7 +60,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, token string) error {
 
 	user, err := s.repo.FindUserByToken(ctx, token)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			slog.Warn("invalid verification token")
 			return ErrInvalidVerificationToken
 		}
@@ -112,7 +113,7 @@ func (s *Service) verifyEmailToken(ctx context.Context, token string) error {
 
 	user, err := s.repo.FindUserByToken(ctx, token)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrInvalidVerificationToken
 		}
 		return fmt.Errorf("%w: %w", ErrQueryFailed, err)
@@ -135,7 +136,7 @@ func (s *Service) verifyEmailToken(ctx context.Context, token string) error {
 func (s *Service) VerificationStatus(ctx context.Context, userID uint) (emailVerified bool, email string, err error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, "", ErrUserNotFound
 		}
 		return false, "", err

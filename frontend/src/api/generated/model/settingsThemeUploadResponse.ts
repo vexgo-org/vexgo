@@ -8,4 +8,5 @@
 
 export interface SettingsThemeUploadResponse {
   message?: string;
+  overwritten?: boolean;
 }

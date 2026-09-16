@@ -3,6 +3,7 @@ package home
 
 import (
 	"context"
+	"log/slog"
 
 	"gorm.io/gorm"
 )
@@ -57,11 +58,19 @@ func (s *Service) Stats(ctx context.Context, userRole string) Stats {
 		return Stats{}
 	}
 
-	postsCount, _ := s.repo.CountPosts(ctx)
-	usersCount, _ := s.repo.CountUsers(ctx)
-	categoriesCount, _ := s.repo.CountCategories(ctx)
-	tagsCount, _ := s.repo.CountTags(ctx)
-	commentsCount, _ := s.repo.CountComments(ctx)
+	// Each counter is independent, so one failing table must not blank the whole
+	// dashboard. The failures are logged under one stable message with the
+	// counter name as an attribute, keeping log grouping low-cardinality.
+	postsCount, err := s.repo.CountPosts(ctx)
+	logStatCount("posts", err)
+	usersCount, err := s.repo.CountUsers(ctx)
+	logStatCount("users", err)
+	categoriesCount, err := s.repo.CountCategories(ctx)
+	logStatCount("categories", err)
+	tagsCount, err := s.repo.CountTags(ctx)
+	logStatCount("tags", err)
+	commentsCount, err := s.repo.CountComments(ctx)
+	logStatCount("comments", err)
 
 	return Stats{
 		Posts:      postsCount,
@@ -69,5 +78,14 @@ func (s *Service) Stats(ctx context.Context, userRole string) Stats {
 		Comments:   commentsCount,
 		Categories: categoriesCount,
 		Tags:       tagsCount,
+	}
+}
+
+// logStatCount reports a failed aggregate count. The stat is not worth failing
+// the dashboard over, so it falls back to zero — but silently, the cause of a
+// permanently zeroed counter would be invisible.
+func logStatCount(stat string, err error) {
+	if err != nil {
+		slog.Warn("failed to count site stat", "stat", stat, "err", err)
 	}
 }

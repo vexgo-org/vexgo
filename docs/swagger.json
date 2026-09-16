@@ -996,6 +996,10 @@
                         "description": "Site icon URL",
                         "type": "string"
                     },
+                    "siteLanguage": {
+                        "description": "Default public theme language (e.g. en, zh)",
+                        "type": "string"
+                    },
                     "siteName": {
                         "description": "Site name",
                         "type": "string"
@@ -1105,6 +1109,59 @@
                     "NotificationTypeLike",
                     "NotificationTypeReply",
                     "NotificationTypeReview"
+                ]
+            },
+            "model.Page": {
+                "properties": {
+                    "author": {
+                        "$ref": "#/components/schemas/model.User"
+                    },
+                    "authorId": {
+                        "type": "integer"
+                    },
+                    "content": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "showInNav": {
+                        "type": "boolean"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/model.PageStatus"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "content",
+                    "title"
+                ],
+                "type": "object"
+            },
+            "model.PageStatus": {
+                "enum": [
+                    "draft",
+                    "published"
+                ],
+                "type": "string",
+                "x-enum-varnames": [
+                    "PageStatusDraft",
+                    "PageStatusPublished"
                 ]
             },
             "model.Post": {
@@ -1320,6 +1377,140 @@
                     "unreadCount": {
                         "example": 3,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "page.CreatePageRequest": {
+                "properties": {
+                    "content": {
+                        "example": "Hello",
+                        "type": "string"
+                    },
+                    "showInNav": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "slug": {
+                        "example": "about",
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "example": 10,
+                        "type": "integer"
+                    },
+                    "status": {
+                        "enum": [
+                            "draft",
+                            "published"
+                        ],
+                        "example": "published",
+                        "type": "string"
+                    },
+                    "title": {
+                        "example": "About",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "content",
+                    "slug",
+                    "title"
+                ],
+                "type": "object"
+            },
+            "page.PageDeleteResponse": {
+                "properties": {
+                    "message": {
+                        "example": "Page deleted successfully",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "page.PageListResponse": {
+                "properties": {
+                    "pages": {
+                        "items": {
+                            "$ref": "#/components/schemas/model.Page"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/page.Pagination"
+                    }
+                },
+                "type": "object"
+            },
+            "page.PageMessageResponse": {
+                "properties": {
+                    "message": {
+                        "example": "Page created successfully",
+                        "type": "string"
+                    },
+                    "page": {
+                        "$ref": "#/components/schemas/model.Page"
+                    }
+                },
+                "type": "object"
+            },
+            "page.PageSingleResponse": {
+                "properties": {
+                    "page": {
+                        "$ref": "#/components/schemas/model.Page"
+                    }
+                },
+                "type": "object"
+            },
+            "page.Pagination": {
+                "properties": {
+                    "limit": {
+                        "example": 10,
+                        "type": "integer"
+                    },
+                    "page": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "total": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "totalPages": {
+                        "example": 5,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "page.UpdatePageRequest": {
+                "properties": {
+                    "content": {
+                        "example": "Hello",
+                        "type": "string"
+                    },
+                    "showInNav": {
+                        "type": "boolean"
+                    },
+                    "slug": {
+                        "example": "about",
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "enum": [
+                            "draft",
+                            "published"
+                        ],
+                        "example": "published",
+                        "type": "string"
+                    },
+                    "title": {
+                        "example": "About",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1781,6 +1972,10 @@
                         "example": "https://example.com/icon.png",
                         "type": "string"
                     },
+                    "siteLanguage": {
+                        "example": "en",
+                        "type": "string"
+                    },
                     "siteName": {
                         "example": "My VexGo Site",
                         "type": "string"
@@ -1811,6 +2006,10 @@
                     },
                     "siteIcon": {
                         "example": "https://example.com/icon.png",
+                        "type": "string"
+                    },
+                    "siteLanguage": {
+                        "example": "en",
                         "type": "string"
                     },
                     "siteName": {
@@ -1949,11 +2148,61 @@
                 },
                 "type": "object"
             },
+            "settings.ThemeDeleteResponse": {
+                "properties": {
+                    "deleted": {
+                        "example": "my-theme",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "Theme deleted successfully",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "settings.ThemeLanguagesResponse": {
+                "properties": {
+                    "languages": {
+                        "example": [
+                            "en",
+                            "zh"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "theme": {
+                        "example": "default",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "settings.ThemePreviewLinkResponse": {
+                "properties": {
+                    "theme": {
+                        "example": "my-theme",
+                        "type": "string"
+                    },
+                    "url": {
+                        "example": "/?theme=my-theme\u0026theme_token=1234567890.abc",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "settings.ThemeUploadResponse": {
                 "properties": {
                     "message": {
                         "example": "Theme uploaded successfully",
                         "type": "string"
+                    },
+                    "overwritten": {
+                        "example": false,
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -4114,7 +4363,7 @@
         },
         "/config/theme/upload": {
             "post": {
-                "description": "Accepts a multipart/form-data body with a single\n'theme' part. The zip must contain a vexgo-theme.json\nmetadata file (either at the root or inside a single\nsubdirectory). Existing themes with the same id are\noverwritten.",
+                "description": "Accepts a multipart/form-data body with a single\n'theme' part. The zip must contain a vexgo-theme.json\nmetadata file (either at the root or inside a single\nsubdirectory) with required id, name and version fields;\nthe id must match the theme directory name. The optional\npreview cover must be an http(s) URL when set. Archives\nare limited to 32MB zip / 100MB unpacked / 2000 files /\n10MB per file. Existing themes with the same id are\noverwritten atomically.",
                 "requestBody": {
                     "content": {
                         "multipart/form-data": {
@@ -4155,7 +4404,7 @@
                                 }
                             }
                         },
-                        "description": "invalid zip / missing metadata / zip-slip entry"
+                        "description": "invalid zip / missing metadata / zip-slip entry / archive too large"
                     },
                     "401": {
                         "content": {
@@ -4209,9 +4458,9 @@
                 ]
             }
         },
-        "/config/themes/{id}/preview": {
-            "get": {
-                "description": "Streams the preview.png from the theme directory.\nReturns 404 if the theme, or its preview file,\ndoes not exist.",
+        "/config/themes/{id}": {
+            "delete": {
+                "description": "Removes an installed theme directory. The built-in default\ntheme and the currently active theme cannot be deleted.",
                 "parameters": [
                     {
                         "description": "theme id",
@@ -4226,28 +4475,47 @@
                 "responses": {
                     "200": {
                         "content": {
-                            "image/png": {
+                            "application/json": {
                                 "schema": {
-                                    "format": "binary",
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/settings.ThemeDeleteResponse"
                                 }
                             }
                         },
-                        "description": "preview image bytes"
+                        "description": "OK"
                     },
-                    "404": {
+                    "400": {
                         "content": {
-                            "image/png": {
+                            "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
                             }
                         },
-                        "description": "theme or preview not found"
+                        "description": "default / active theme protected"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "theme not found"
                     },
                     "500": {
                         "content": {
-                            "image/png": {
+                            "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/api.ErrorResponse"
                                 }
@@ -4256,7 +4524,121 @@
                         "description": "Internal Server Error"
                     }
                 },
-                "summary": "Theme preview image",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a theme",
+                "tags": [
+                    "config"
+                ]
+            }
+        },
+        "/config/themes/{id}/languages": {
+            "get": {
+                "description": "Lists the language codes a theme ships under i18n/.",
+                "parameters": [
+                    {
+                        "description": "theme id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/settings.ThemeLanguagesResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "theme not found"
+                    }
+                },
+                "summary": "Theme i18n languages",
+                "tags": [
+                    "config"
+                ]
+            }
+        },
+        "/config/themes/{id}/preview-link": {
+            "get": {
+                "description": "Returns a same-origin URL that renders the theme in preview\nmode. The URL carries a short-lived signature because the\nconsole opens the preview in a new tab, which cannot send the\nAuthorization header.",
+                "parameters": [
+                    {
+                        "description": "theme id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/settings.ThemePreviewLinkResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "theme not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Mint a theme preview link",
                 "tags": [
                     "config"
                 ]
@@ -4286,6 +4668,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
                     }
                 },
                 "summary": "Read the like status for a post",
@@ -4316,6 +4708,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
                     },
                     "401": {
                         "content": {
@@ -5679,6 +6081,331 @@
                 "summary": "Mark a single notification as read",
                 "tags": [
                     "notifications"
+                ]
+            }
+        },
+        "/pages": {
+            "get": {
+                "description": "Public callers see published pages; admins may filter by status.",
+                "parameters": [
+                    {
+                        "description": "page number (1-based)",
+                        "in": "query",
+                        "name": "page",
+                        "schema": {
+                            "default": 1,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "page size",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "status filter",
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "enum": [
+                                "draft",
+                                "published"
+                            ],
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "free-text filter",
+                        "in": "query",
+                        "name": "search",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/page.PageListResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "List pages",
+                "tags": [
+                    "pages"
+                ]
+            },
+            "post": {
+                "description": "Admins only. Slug must be lowercase a-z0-9- and not reserved.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/page.CreatePageRequest",
+                                "summary": "request",
+                                "description": "page payload"
+                            }
+                        }
+                    },
+                    "description": "page payload",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/page.PageMessageResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "validation error"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "admin only"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.CodeErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "slug already taken"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create a page",
+                "tags": [
+                    "pages"
+                ]
+            }
+        },
+        "/pages/{id}": {
+            "delete": {
+                "description": "Admins only.",
+                "parameters": [
+                    {
+                        "description": "page id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/page.PageDeleteResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "admin only"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "page not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete a page",
+                "tags": [
+                    "pages"
+                ]
+            },
+            "put": {
+                "description": "Admins only. Only the supplied fields are updated.",
+                "parameters": [
+                    {
+                        "description": "page id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/page.UpdatePageRequest",
+                                "summary": "request",
+                                "description": "updated page fields"
+                            }
+                        }
+                    },
+                    "description": "updated page fields",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/page.PageMessageResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "invalid slug"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "admin only"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "page not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.CodeErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "slug already taken"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update a page",
+                "tags": [
+                    "pages"
+                ]
+            }
+        },
+        "/pages/{slug}": {
+            "get": {
+                "description": "Published pages are public; drafts require an admin session.",
+                "parameters": [
+                    {
+                        "description": "page slug",
+                        "in": "path",
+                        "name": "slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/page.PageSingleResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "page not found"
+                    }
+                },
+                "summary": "Look up a page by slug",
+                "tags": [
+                    "pages"
                 ]
             }
         },

@@ -22,19 +22,22 @@
 - [安装](/zh-cn/guides/installation) —— 通过 Docker、Docker Compose、Nix、二进制包或源码编译安装 VexGo。
 - [配置](/zh-cn/guides/configuration) —— 配置服务器、数据库、SSO、S3 存储等。
 - [部署](/zh-cn/guides/deployment) —— 在生产环境通过反向代理 + HTTPS 运行 VexGo。
+- [主题开发](/zh-cn/guides/theme-development) —— 编写、打包并安装自定义主题。
 
 ## 🧠 概念
 
 **原理讲解** —— 了解 VexGo 的内部设计。
 
-- [架构](/zh-cn/concepts/architecture) —— 后端结构、角色与权限、内容审核、主题系统。
+- [架构](/zh-cn/concepts/architecture) —— 后端结构、角色与权限、内容审核、SSO。
+- [主题系统](/zh-cn/concepts/theming) —— 主题如何变成服务端渲染的页面。
 
 ## 📚 参考
 
 **技术参考** —— 查询精确的技术细节。
 
 - [配置参考](/zh-cn/reference/configuration) —— 所有 CLI 参数、环境变量和配置文件键。
-- [API 参考](/zh-cn/reference/api) —— 全部 REST 端点、请求/响应格式和错误码。
+- [主题模板参考](/zh-cn/reference/theme-templates) —— 全部主题文件、模板上下文字段和辅助函数。
+- [API 参考](api.html) —— 全部 REST 端点、请求/响应格式和错误码。
 
 ---
 

@@ -152,6 +152,9 @@ func TestGetGeneralSettings_Default(t *testing.T) {
 	if !config.RegistrationEnabled || !config.AllowGuestViewPosts || config.SiteName != "VexGo" || config.ItemsPerPage != 20 {
 		t.Errorf("expected default settings, got %+v", config)
 	}
+	if config.SiteLanguage != "en" {
+		t.Errorf("expected default site language en, got %q", config.SiteLanguage)
+	}
 }
 
 func TestUpdateGeneralSettings(t *testing.T) {
@@ -181,6 +184,49 @@ func TestUpdateGeneralSettings(t *testing.T) {
 	}
 	if got.RegistrationEnabled {
 		t.Errorf("expected RegistrationEnabled=false persisted, got %+v", got)
+	}
+}
+
+func TestUpdateGeneralSettings_SiteLanguage(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+
+	// zh-CN normalizes to zh and persists.
+	config, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "B", SiteLanguage: "zh-CN"})
+	if err != nil {
+		t.Fatalf("UpdateGeneralSettings error: %v", err)
+	}
+	if config.SiteLanguage != "zh" {
+		t.Errorf("expected normalized zh, got %q", config.SiteLanguage)
+	}
+
+	// Empty/invalid input falls back to en instead of storing garbage.
+	for _, in := range []string{"", "!!", "toolonglanguagecode"} {
+		config, err = svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "B", SiteLanguage: in})
+		if err != nil {
+			t.Fatalf("UpdateGeneralSettings(%q) error: %v", in, err)
+		}
+		if config.SiteLanguage != "en" {
+			t.Errorf("UpdateGeneralSettings(%q) = %q, want en", in, config.SiteLanguage)
+		}
+	}
+}
+
+func TestThemeLanguages(t *testing.T) {
+	svc, _ := newTestService(t)
+	langs, err := svc.ThemeLanguages("default")
+	if err != nil {
+		t.Fatalf("ThemeLanguages error: %v", err)
+	}
+	found := map[string]bool{}
+	for _, l := range langs {
+		found[l] = true
+	}
+	if !found["en"] || !found["zh"] {
+		t.Errorf("default theme should list en and zh, got %v", langs)
+	}
+	if _, err := svc.ThemeLanguages("no-such-theme"); err == nil {
+		t.Error("expected error for unknown theme")
 	}
 }
 
@@ -268,10 +314,28 @@ func TestUpdateThemeConfig(t *testing.T) {
 	}
 }
 
-func TestThemePreview_UnknownTheme(t *testing.T) {
-	svc, _ := newTestService(t)
-	if _, err := svc.ThemePreview("no-such-theme"); !errors.Is(err, ErrThemeNotFound) {
-		t.Errorf("expected ErrThemeNotFound, got %v", err)
+func TestValidatePreviewURL(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"", true},
+		{"https://example.com/cover.png", true},
+		{"http://localhost:3000/cover.jpg", true},
+		{"https://example.com/a?x=1#y", true},
+		{"ftp://example.com/cover.png", false},
+		{"data:image/png;base64,aaa", false},
+		{"/assets/cover.png", false},
+		{"assets/cover.png", false},
+		{"../secret.png", false},
+		{"https://", false},
+		{"not a url", false},
+		{strings.Repeat("https://example.com/", 200), false},
+	}
+	for _, tc := range cases {
+		if got := ValidatePreviewURL(tc.in); got != tc.want {
+			t.Errorf("ValidatePreviewURL(%q) = %v, want %v", tc.in, got, tc.want)
+		}
 	}
 }
 
@@ -507,27 +571,78 @@ func TestTestAI_UndecryptableKeyTreatedAsUnset(t *testing.T) {
 	}
 }
 
-// TestThemePreview_RejectsEscapingPreviewPath ensures a malicious theme
-// metadata cannot make the public preview endpoint serve files outside the
-// theme directory (arbitrary file read).
-func TestThemePreview_RejectsEscapingPreviewPath(t *testing.T) {
+// TestDeleteTheme_Boundaries covers guest-visible state changes only through
+// the service: default/active protection, unknown id, and happy path.
+func TestDeleteTheme_Boundaries(t *testing.T) {
 	svc, _ := newTestService(t)
+	ctx := context.Background()
 	dataDir := svc.themes.DataDir()
 
-	themeID := "evil"
+	// default is protected
+	if err := svc.DeleteTheme(ctx, "default"); !errors.Is(err, ErrCannotDeleteDefault) {
+		t.Errorf("expected ErrCannotDeleteDefault, got %v", err)
+	}
+
+	// unknown theme
+	if err := svc.DeleteTheme(ctx, "no-such-theme"); !errors.Is(err, ErrThemeNotFound) {
+		t.Errorf("expected ErrThemeNotFound, got %v", err)
+	}
+
+	// install a valid theme with one template
+	themeID := "deletable"
 	themeDir := filepath.Join(dataDir, public.ThemesDir, themeID)
 	if err := os.MkdirAll(themeDir, 0o755); err != nil {
 		t.Fatalf("mkdir error: %v", err)
 	}
-	meta := `{"id": "evil", "preview": "../../secret.txt"}`
+	meta := `{"id": "deletable", "name": "D", "version": "1.0.0", "preview": "https://example.com/c.png"}`
 	if err := os.WriteFile(filepath.Join(themeDir, public.ThemeMetaFile), []byte(meta), 0o600); err != nil {
 		t.Fatalf("write meta error: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dataDir, "secret.txt"), []byte("top secret"), 0o600); err != nil {
-		t.Fatalf("write secret error: %v", err)
+	if err := os.WriteFile(filepath.Join(themeDir, "index.html"), []byte(`hello`), 0o600); err != nil {
+		t.Fatalf("write template error: %v", err)
 	}
 
-	if _, err := svc.ThemePreview(themeID); !errors.Is(err, ErrPreviewNotFound) {
-		t.Errorf("expected ErrPreviewNotFound for escaping preview path, got %v", err)
+	// activate it, then delete must refuse while active
+	if _, err := svc.UpdateThemeConfig(ctx, themeID); err != nil {
+		t.Fatalf("activate error: %v", err)
+	}
+	if err := svc.DeleteTheme(ctx, themeID); !errors.Is(err, ErrThemeIsActive) {
+		t.Errorf("expected ErrThemeIsActive, got %v", err)
+	}
+
+	// switch back to default, then delete succeeds
+	if _, err := svc.UpdateThemeConfig(ctx, "default"); err != nil {
+		t.Fatalf("deactivate error: %v", err)
+	}
+	if err := svc.DeleteTheme(ctx, themeID); err != nil {
+		t.Fatalf("DeleteTheme error: %v", err)
+	}
+	if _, err := os.Stat(themeDir); !os.IsNotExist(err) {
+		t.Errorf("expected theme dir removed, stat err: %v", err)
+	}
+}
+
+// TestUpdateThemeConfig_RejectsBrokenTemplates ensures activation never
+// promotes a theme whose templates fail to parse.
+func TestUpdateThemeConfig_RejectsBrokenTemplates(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+	dataDir := svc.themes.DataDir()
+
+	themeID := "broken"
+	themeDir := filepath.Join(dataDir, public.ThemesDir, themeID)
+	if err := os.MkdirAll(themeDir, 0o755); err != nil {
+		t.Fatalf("mkdir error: %v", err)
+	}
+	meta := `{"id": "broken", "name": "B", "version": "1.0.0"}`
+	if err := os.WriteFile(filepath.Join(themeDir, public.ThemeMetaFile), []byte(meta), 0o600); err != nil {
+		t.Fatalf("write meta error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(themeDir, "index.html"), []byte(`{{ .Unclosed`), 0o600); err != nil {
+		t.Fatalf("write template error: %v", err)
+	}
+
+	if _, err := svc.UpdateThemeConfig(ctx, themeID); !errors.Is(err, ErrThemeTemplatesInvalid) {
+		t.Errorf("expected ErrThemeTemplatesInvalid, got %v", err)
 	}
 }

@@ -80,6 +80,10 @@ func decodeStateValue(raw string) (stateValue, bool) {
 // swept amortized (at most one O(n) scan per stateSweepThreshold writes once
 // the map has grown) so abandoned flows cannot grow the map without bound
 // while Set stays O(1) on average.
+//
+// The zero value is ready to use: the entry map is created lazily under the
+// mutex on the first write, so a store that was never explicitly initialized
+// behaves as empty instead of panicking on its first Set.
 type memoryStateStore struct {
 	mu             sync.Mutex
 	entries        map[string]memoryStateEntry
@@ -91,14 +95,26 @@ type memoryStateEntry struct {
 	expires time.Time
 }
 
+// newMemoryStateStore returns an empty in-process state store. It is
+// equivalent to a zero-value memoryStateStore and exists so callers can state
+// that intent explicitly.
 func newMemoryStateStore() *memoryStateStore {
-	return &memoryStateStore{entries: make(map[string]memoryStateEntry)}
+	return &memoryStateStore{}
+}
+
+// ensureEntriesLocked creates the entry map on first use. Callers must hold
+// m.mu.
+func (m *memoryStateStore) ensureEntriesLocked() {
+	if m.entries == nil {
+		m.entries = make(map[string]memoryStateEntry)
+	}
 }
 
 func (m *memoryStateStore) Set(_ context.Context, key, value string, ttl time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.ensureEntriesLocked()
 	m.setsSinceSweep++
 	if len(m.entries) >= stateSweepThreshold && m.setsSinceSweep >= stateSweepThreshold {
 		// Amortized sweeping: at most one O(n) scan per stateSweepThreshold
@@ -185,6 +201,10 @@ type Deps struct {
 	// OAuth callback URLs are built from it instead of the request host.
 	BaseURL string
 
+	// BehindReverseProxy enables honoring X-Forwarded-Proto when BaseURL is
+	// not configured. Mirrors cfg.BehindReverseProxy / behind_reverse_proxy.
+	BehindReverseProxy bool
+
 	// StateStore persists one-time OAuth state values. nil keeps them
 	// in-process; a distributed store shares one state across instances.
 	StateStore StateStore
@@ -192,12 +212,13 @@ type Deps struct {
 
 // Service contains the business logic of the sso domain.
 type Service struct {
-	repo      Repository
-	sso       *config.SSOConfig
-	jwtSecret []byte
-	mailer    *mailer.Service
-	baseURL   string
-	states    StateStore
+	repo                Repository
+	sso                 *config.SSOConfig
+	jwtSecret           []byte
+	mailer              *mailer.Service
+	baseURL             string
+	honorForwardedProto bool
+	states              StateStore
 }
 
 // NewService creates an sso service with the given dependencies.
@@ -206,7 +227,15 @@ func NewService(deps Deps) *Service {
 	if states == nil {
 		states = newMemoryStateStore()
 	}
-	return &Service{repo: NewRepository(deps.DB), sso: deps.SSO, jwtSecret: deps.JWTSecret, mailer: deps.Mailer, baseURL: deps.BaseURL, states: states}
+	return &Service{
+		repo:                NewRepository(deps.DB),
+		sso:                 deps.SSO,
+		jwtSecret:           deps.JWTSecret,
+		mailer:              deps.Mailer,
+		baseURL:             deps.BaseURL,
+		honorForwardedProto: deps.BehindReverseProxy,
+		states:              states,
+	}
 }
 
 // linkableByEmail reports whether a local account may be linked to an SSO
@@ -398,8 +427,15 @@ func (s *Service) callbackURI(c *gin.Context, provider string) string {
 	if base := s.baseURL; base != "" {
 		return fmt.Sprintf("%s/api/sso/%s/callback", strings.TrimRight(base, "/"), provider)
 	}
+
+	// Degraded fallback when BASE_URL is unset: the request origin is used.
+	// X-Forwarded-Proto is trusted only behind a configured reverse proxy,
+	// mirroring auth's emailed-link handling — otherwise a client could steer
+	// the OAuth redirect_uri with a forged header.
 	scheme := "http"
-	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+	directTLS := c.Request.TLS != nil
+	forwardedHTTPS := s.honorForwardedProto && c.GetHeader("X-Forwarded-Proto") == "https"
+	if directTLS || forwardedHTTPS {
 		scheme = "https"
 	}
 
@@ -449,7 +485,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
-	body, err := apiGet("https://api.github.com/user", tok.AccessToken, "token")
+	body, err := apiGet(c.Request.Context(), "https://api.github.com/user", tok.AccessToken, "token")
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +510,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 	// endpoint alone does not prove ownership, so confirmation comes from
 	// /user/emails: either the address we got is flagged verified there, or
 	// the account's verified primary email replaces it.
-	if emails := fetchGitHubEmails(tok.AccessToken); emails != nil {
+	if emails := fetchGitHubEmails(c.Request.Context(), tok.AccessToken); emails != nil {
 		if isVerifiedGitHubEmail(emails, info.email) {
 			info.emailVerified = true
 		} else if primary := verifiedGitHubPrimaryEmail(emails); primary != "" {
@@ -483,7 +519,7 @@ func (s *Service) exchangeGitHub(c *gin.Context, code, redirectURI string) (*sso
 		}
 	}
 	if info.email == "" {
-		info.email = fetchGitHubPrimaryEmail(tok.AccessToken)
+		info.email = fetchGitHubPrimaryEmail(c.Request.Context(), tok.AccessToken)
 		info.emailVerified = info.email != ""
 	}
 	if info.providerID == "" {
@@ -499,7 +535,7 @@ func (s *Service) exchangeGoogle(c *gin.Context, code, redirectURI string) (*sso
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
-	body, err := apiGet("https://www.googleapis.com/oauth2/v2/userinfo", tok.AccessToken, "bearer")
+	body, err := apiGet(c.Request.Context(), "https://www.googleapis.com/oauth2/v2/userinfo", tok.AccessToken, "bearer")
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +587,7 @@ func (s *Service) exchangeOIDC(c *gin.Context, code, redirectURI string) (*ssoUs
 		if oidcCfg.UserInfoURL == "" {
 			return nil, errors.New("OIDC: id_token missing and OIDC_USERINFO_URL not configured")
 		}
-		body, err := apiGet(oidcCfg.UserInfoURL, tok.AccessToken, "bearer")
+		body, err := apiGet(c.Request.Context(), oidcCfg.UserInfoURL, tok.AccessToken, "bearer")
 		if err != nil {
 			return nil, err
 		}
@@ -781,8 +817,26 @@ func (s *Service) generateUsername(ctx context.Context, name, email string) stri
 // Utilities
 // ─────────────────────────────────────────────
 
-func apiGet(url, accessToken, scheme string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+const (
+	// ssoRequestTimeout bounds every outbound provider call. It covers the
+	// whole exchange including reading the body, so a hung or slow identity
+	// provider cannot pin a login handler (and its goroutine) open.
+	ssoRequestTimeout = 15 * time.Second
+	// maxSSOResponseBytes caps how much of a provider response is buffered in
+	// memory. Profile and email payloads are a few KB; anything larger means a
+	// misbehaving or hostile endpoint and is rejected instead of held.
+	maxSSOResponseBytes = 1 << 20 // 1 MiB
+)
+
+// ssoHTTPClient is the shared client for provider API calls. A dedicated
+// client with an explicit timeout replaces http.DefaultClient, which has none.
+var ssoHTTPClient = &http.Client{Timeout: ssoRequestTimeout}
+
+// apiGet performs an authenticated GET against a provider API and returns the
+// response body. The request is bound to ctx so an aborted login cancels the
+// call, and the body is capped so an unbounded response cannot exhaust memory.
+func apiGet(ctx context.Context, apiURL, accessToken, scheme string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -792,18 +846,28 @@ func apiGet(url, accessToken, scheme string) ([]byte, error) {
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 	}
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := ssoHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+
+	// Read one byte past the cap so an oversized body is detected rather than
+	// silently truncated.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSSOResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxSSOResponseBytes {
+		return nil, fmt.Errorf("provider response exceeds %d bytes", maxSSOResponseBytes)
+	}
+	return body, nil
 }
 
 // fetchGitHubEmails returns the account's email entries from GitHub's
 // /user/emails endpoint, or nil when unavailable.
-func fetchGitHubEmails(accessToken string) []map[string]any {
-	body, err := apiGet("https://api.github.com/user/emails", accessToken, "token")
+func fetchGitHubEmails(ctx context.Context, accessToken string) []map[string]any {
+	body, err := apiGet(ctx, "https://api.github.com/user/emails", accessToken, "token")
 	if err != nil {
 		return nil
 	}
@@ -847,8 +911,8 @@ func verifiedGitHubPrimaryEmail(emails []map[string]any) string {
 
 // fetchGitHubPrimaryEmail returns the primary, verified email address from
 // GitHub's /user/emails endpoint, or an empty string when unavailable.
-func fetchGitHubPrimaryEmail(accessToken string) string {
-	return verifiedGitHubPrimaryEmail(fetchGitHubEmails(accessToken))
+func fetchGitHubPrimaryEmail(ctx context.Context, accessToken string) string {
+	return verifiedGitHubPrimaryEmail(fetchGitHubEmails(ctx, accessToken))
 }
 
 // isValidMethod reports whether the SSO flow method is supported.

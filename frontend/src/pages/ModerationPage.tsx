@@ -144,11 +144,12 @@ export function ModerationPage() {
   };
 
   const handleViewPost = (postSlug: string) => {
-    navigate(`/post/${postSlug}`);
+    // The post page is served by the public theme, outside this SPA.
+    window.location.href = `/post/${postSlug}`;
   };
 
   const handleEditPost = (postId: string | number) => {
-    navigate(`/edit-post/${postId}`);
+    navigate(`/admin/edit-post/${postId}`);
   };
 
   const formatDate = (dateString: string) => {
