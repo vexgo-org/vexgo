@@ -83,6 +83,15 @@ s3_bucket: "my-bucket"
 | `BEHIND_REVERSE_PROXY`    | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                      |
 | `TRUSTED_PROXIES`         | —         | 逗号分隔的可信代理 IP/CIDR                                                                   |
 
+### 限流
+
+两个上限都按客户端 IP 统计，作用于无需登录的接口；设为 `0` 表示关闭对应的限流。
+
+| 变量                            | 默认值 | 说明                               |
+| ------------------------------- | ------ | ---------------------------------- |
+| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`   | 注册、登录、密码重置、重发验证邮件 |
+| `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `30`   | 验证码的生成与校验                 |
+
 ### 数据库
 
 | 变量          | 默认值    | 说明                                                                |
@@ -336,4 +345,4 @@ SMTP 密码以及 AI / 评论审核 API 密钥存储在数据库中。设置 `SE
 - **当前主题** —— 切换已安装的主题
 - **SMTP** —— 见上文
 
-对应的 API 端点见 [API 参考](/zh-cn/reference/api)，完整的参数、变量和配置键清单见[配置参考](/zh-cn/reference/configuration)。
+对应的 API 端点见 [API 参考](api.html)，完整的参数、变量和配置键清单见[配置参考](/zh-cn/reference/configuration)。

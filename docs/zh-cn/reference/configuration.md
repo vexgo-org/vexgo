@@ -41,9 +41,18 @@
 | `SETTINGS_ENCRYPTION_KEY` | —         | 用于在数据库中对静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）做 AES-256-GCM 加密的口令。留空时这些信息以明文存储（启动时会记录警告）。 |
 | `LOG_LEVEL`               | `info`    | 日志级别：`debug`、`info`、`warn`、`error`                                                                                                 |
 | `BASE_URL`                | —         | 实例公网地址，如 `https://vexgo.example.com`。用于生成 OAuth 回调与邮件链接（邮箱验证、密码重置、换绑邮箱）。反向代理后必须设置。          |
-| `FRONTEND_URL`            | —         | 构建面向用户的链接时使用的前端地址。未设置时回退到 `http://localhost:5173`（Vite 开发服务器）。                                            |
+| `FRONTEND_URL`            | —         | 遗留的开发服务器地址；仅在启动时应用并记录日志（未设置时回退到 `http://localhost:5173`）。邮件中的链接由 `BASE_URL` 生成。                 |
 | `BEHIND_REVERSE_PROXY`    | `false`   | 位于反向代理之后时设为 `true`，以解析 `X-Forwarded-*` 请求头                                                                               |
 | `TRUSTED_PROXIES`         | —         | 逗号分隔的可信代理 IP/CIDR。仅在 `BEHIND_REVERSE_PROXY=true` 时生效。留空 = 默认私有网段。                                                 |
+
+### 限流
+
+两个上限都按客户端 IP 统计，作用于无需登录的接口；设为 `0` 表示关闭对应的限流。
+
+| 变量                            | 默认值 | 说明                               |
+| ------------------------------- | ------ | ---------------------------------- |
+| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`   | 注册、登录、密码重置、重发验证邮件 |
+| `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `30`   | 验证码的生成与校验                 |
 
 ### 数据库
 
@@ -126,19 +135,20 @@
 
 ### 服务器
 
-| YAML 键                         | 默认值    | 说明                                                                                         |
-| ------------------------------- | --------- | -------------------------------------------------------------------------------------------- |
-| `addr`                          | `0.0.0.0` | 监听地址                                                                                     |
-| `port`                          | `3001`    | 监听端口                                                                                     |
-| `data_dir`                      | `./data`  | 数据目录路径                                                                                 |
-| `jwt_secret`                    | —         | JWT 签名密钥（**生产环境必填**）                                                             |
-| `settings_encryption_key`       | —         | 加密静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）的口令。留空 = 明文存储并输出启动警告。 |
-| `log_level`                     | `info`    | `debug`、`info`、`warn`、`error`                                                             |
-| `base_url`                      | —         | 实例公网地址，如 `https://vexgo.example.com`                                                 |
-| `frontend_url`                  | —         | 面向用户链接的前端地址                                                                       |
-| `behind_reverse_proxy`          | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                      |
-| `trusted_proxies`               | `[]`      | 可信代理 IP/CIDR 列表                                                                        |
-| `captcha_rate_limit_per_minute` | `30`      | 无鉴权验证码接口的单 IP 每分钟请求上限；`0` 表示不限制                                       |
+| YAML 键                         | 默认值    | 说明                                                                                                              |
+| ------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
+| `addr`                          | `0.0.0.0` | 监听地址                                                                                                          |
+| `port`                          | `3001`    | 监听端口                                                                                                          |
+| `data_dir`                      | `./data`  | 数据目录路径                                                                                                      |
+| `jwt_secret`                    | —         | JWT 签名密钥（**生产环境必填**）                                                                                  |
+| `settings_encryption_key`       | —         | 加密静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）的口令。留空 = 明文存储并输出启动警告。                      |
+| `log_level`                     | `info`    | `debug`、`info`、`warn`、`error`                                                                                  |
+| `base_url`                      | —         | 实例公网地址，如 `https://vexgo.example.com`                                                                      |
+| `frontend_url`                  | —         | 遗留的开发服务器地址；仅在启动时应用并记录日志（未设置时回退到 `http://localhost:5173`），邮件链接使用 `base_url` |
+| `behind_reverse_proxy`          | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                                           |
+| `trusted_proxies`               | `[]`      | 可信代理 IP/CIDR 列表                                                                                             |
+| `captcha_rate_limit_per_minute` | `30`      | 无鉴权验证码接口的单 IP 每分钟请求上限；`0` 表示不限制                                                            |
+| `auth_rate_limit_per_minute`    | `10`      | 无鉴权认证接口（注册、登录、密码重置、重发验证邮件）的单 IP 每分钟请求上限；`0` 表示不限制                        |
 
 ### 数据库
 
@@ -213,6 +223,7 @@
 | 反向代理             | `BEHIND_REVERSE_PROXY`          | `behind_reverse_proxy`          | —            |
 | 可信代理             | `TRUSTED_PROXIES`               | `trusted_proxies`               | —            |
 | 验证码限流           | `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `captcha_rate_limit_per_minute` | —            |
+| 认证接口限流         | `AUTH_RATE_LIMIT_PER_MINUTE`    | `auth_rate_limit_per_minute`    | —            |
 | 数据库类型           | `DB_TYPE`                       | `db_type`                       | —            |
 | 数据库主机           | `DB_HOST`                       | `db_host`                       | —            |
 | 数据库端口           | `DB_PORT`                       | `db_port`                       | —            |

@@ -83,6 +83,15 @@ Every setting can also be provided as an environment variable. This is the natur
 | `BEHIND_REVERSE_PROXY`    | `false`   | Honor `X-Forwarded-*` headers when `true`                                                                                                        |
 | `TRUSTED_PROXIES`         | —         | Comma-separated trusted proxy IPs/CIDRs                                                                                                          |
 
+### Rate Limiting
+
+Both limits count requests per client IP on unauthenticated endpoints; `0` disables the corresponding limit.
+
+| Variable                        | Default | Description                                          |
+| ------------------------------- | ------- | ---------------------------------------------------- |
+| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`    | Register, login, password reset, verification resend |
+| `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `30`    | Captcha generation and verification                  |
+
 ### Database
 
 | Variable      | Default   | Description                                                         |
@@ -336,4 +345,4 @@ Some settings are managed from the **admin panel** and stored in the database (n
 - **Active theme** — switch between installed themes
 - **SMTP** — see above
 
-See the [API Reference](/reference/api) for the corresponding endpoints, and the [Configuration Reference](/reference/configuration) for the complete list of flags, variables, and config keys.
+See the [API Reference](api.html) for the corresponding endpoints, and the [Configuration Reference](/reference/configuration) for the complete list of flags, variables, and config keys.

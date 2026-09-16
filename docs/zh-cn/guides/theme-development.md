@@ -106,7 +106,7 @@ my-theme.zip
 cd my-theme && zip -r ../my-theme.zip .
 ```
 
-然后在管理面板打开 **设置 → 主题**，上传压缩包并激活。如果更习惯用 API，接口见 [API 参考](/zh-cn/reference/api)；压缩包放在 `theme` 这个 multipart 字段里。
+然后在管理面板打开 **设置 → 主题**，上传压缩包并激活。如果更习惯用 API，接口见 [API 参考](api.html)；压缩包放在 `theme` 这个 multipart 字段里。
 
 上传会在写入任何文件之前完成校验：
 

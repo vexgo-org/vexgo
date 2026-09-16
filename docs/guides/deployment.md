@@ -189,6 +189,8 @@ Schedule backups with cron or systemd timers, and store them off-machine (e.g. a
 
 > **Before upgrading:** back up your data directory and database. Restart after upgrading so database migrations run.
 
+> **Admin routes:** the admin console lives under `/admin/...` (for example `/admin/login` and `/admin/write`). Legacy top-level URLs such as `/login` 301-redirect to their `/admin/` equivalent with the query string preserved, so existing bookmarks and emailed `?token=...` links keep working.
+
 ### Docker
 
 ```bash

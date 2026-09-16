@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# VexGo admin console (SPA)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The admin console for VexGo: React + TypeScript, built with Vite and styled with Tailwind CSS and shadcn/ui-style primitives.
 
-Currently, two official plugins are available:
+It is not a standalone site. `bun run build` writes the bundle to `backend/internal/public/dist/` (gitignored), which is embedded into the Go binary and served under `/admin/...` only. Public pages are server-side rendered from themes, so the SPA never claims the site root.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Develop
 
-## React Compiler
+```bash
+bun install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# Vite dev server with HMR; talks to the backend API directly.
+# The API base comes from VITE_API_URL (see .env.example), default http://localhost:3001/api
+bun run dev
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+bun run lint     # oxlint
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Build
 
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
-
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs["recommended-typescript"],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```bash
+bun run build    # tsc -b && vite build && bun scripts/copy-manifest.mjs
 ```
+
+From the repository root, `just build-frontend` runs the same thing. **The backend serves the embedded build**, so frontend changes are invisible until you rebuild — the dev server does not proxy through the backend.
+
+## Layout
+
+| Path                     | Contents                                                                |
+| ------------------------ | ----------------------------------------------------------------------- |
+| `src/pages/`             | Route pages                                                             |
+| `src/components/`        | Feature components; `src/components/ui/` holds the shadcn/ui primitives |
+| `src/api/generated/`     | Generated API client — never edit by hand, run `just generate`          |
+| `src/locales/`           | i18n strings; keep `en-US.ts` and `zh-CN.ts` in sync                    |
+| `src/lib/`, `src/types/` | Shared logic and shared types                                           |
+
+Conventions (formatting, testing, commits) live in `CONTRIBUTING.md`; the repository-wide agent notes are in `AGENTS.md`.

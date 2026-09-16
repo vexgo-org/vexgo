@@ -187,6 +187,8 @@ pg_dump -U vexgo_user vexgo_db > vexgo-db-$(date +%F).sql
 
 > **升级前：** 备份数据目录和数据库。升级后重启，以便数据库迁移执行。
 
+> **管理端路径：** 管理面板位于 `/admin/...`（例如 `/admin/login`、`/admin/write`）。旧的一级路径（如 `/login`）会 301 重定向到对应的 `/admin/` 地址并保留查询串，因此已有书签和邮件里的 `?token=...` 链接仍然可用。
+
 ### Docker
 
 ```bash

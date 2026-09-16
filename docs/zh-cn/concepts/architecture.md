@@ -7,7 +7,7 @@
 VexGo 是一个自托管的博客 CMS，由两部分组成：
 
 - **Go 后端**（`backend/`）—— 基于 Gin 和 GORM 构建的 HTTP API，提供管理面板、公开站点和 REST API。支持 SQLite、PostgreSQL 或 MySQL。
-- **React 前端**（`frontend/`）—— 基于 TypeScript + Vite + Tailwind CSS 的 SPA，与 API 通信。构建产物嵌入后端二进制。
+- **React 前端**（`frontend/`）—— 管理面板：基于 TypeScript + Vite + Tailwind CSS 的 SPA，与 API 通信。构建产物嵌入后端二进制，并只在 `/admin/...` 下提供；旧的一级路径（如 `/login`）会 301 重定向到对应位置且保留查询串，因此旧书签仍然可用。公开页面则由主题进行服务端渲染。
 
 **主题系统**让后端能够以服务端渲染的方式，用上传的主题渲染公开页面——访客无需 JavaScript 即可阅读内容。
 
@@ -19,9 +19,11 @@ VexGo 是一个自托管的博客 CMS，由两部分组成：
 backend/
   cmd/vexgo/main.go         # 入口：通过 cli 解析配置，委托给 app 包处理
   internal/
+    api/                     # REST 接口共享的传输类型（响应体、错误结构）
     app/                     # 组合根：组装所有依赖
-    auth/                    # 注册、登录、JWT、个人资料、密码重置
+    auth/                    # 注册、登录、JWT、个人资料、密码重置、邮箱验证
     cache/                   # 缓存后端：进程内内存 + Valkey（valkey-io/valkey-go）
+    captcha/                 # 滑块验证码的生成与校验
     cli/                     # cobra 命令行：参数、帮助、版本、.env 加载
     comment/                 # 评论和 AI 内容审核
     config/                  # 基于 viper 的分层配置解析，JWT、S3、SSO 初始化
@@ -30,7 +32,8 @@ backend/
     mailer/                  # SMTP 邮件构建与发送
     notification/            # 站内通知
     middleware/              # JWT 认证、角色权限、请求日志
-    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover、Mailer）
+    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）
+    page/                    # 自定义页面（/:slug）
     post/                    # 文章 CRUD、分类、标签、点赞
     public/                  # 嵌入的前端、主题、SSR 渲染器、静态路由
     router/                  # 路由注册（组合所有领域）
@@ -39,7 +42,6 @@ backend/
     sso/                     # GitHub / Google / OIDC 登录
     upload/                  # 文件上传（本地磁盘或 S3）
     user/                    # 用户管理、角色、创作者申请
-    verification/            # 邮箱验证和滑块验证码
 ```
 
 ### 分层架构（每个领域）
@@ -55,12 +57,12 @@ repository.go → 持久化接口 + GORM 实现（调用数据库）
 这种分离确保：
 
 - **Handler** 不直接操作 GORM——它们委托给 Service。
-- **Service** 在 `Repository` 接口之后与数据库无关，可以使用 fake 进行单元测试。
+- **Service** 在 `Repository` 接口之后与数据库无关，因此无需真实数据库即可测试（各领域的测试用内存 SQLite 运行，接缝则用 fake）。
 - **Repository** 封装所有 SQL/GORM 查询，包括批量操作以避免 N+1 问题。
 
-### 共享接口（`model/interfaces.go`）
+### 共享接缝（`model/interfaces.go`）
 
-跨领域的接缝定义在 `model` 包中，作为小型接口：
+`model` 包中只有两个跨领域接缝的小型接口；其余接口由消费方领域自行声明：
 
 ```go
 // NotificationInput 是 CreateNotification 接收的通知字段（userID、type、title、content、relatedID、relatedType）。
@@ -81,24 +83,16 @@ type Notifier interface {
 
 // FileRemover 删除已存储的文件（通过公开 URL）；由 upload.Storage 实现。
 type FileRemover interface {
-    Delete(url string) error
-}
-
-// Mailer 是发送事务性邮件和管理邮箱验证/密码重置令牌的接缝；由 mailer 领域实现。
-type Mailer interface {
-    IsEmailEnabled() (bool, error)
-    GenerateVerificationToken(userID uint) (string, error)
-    SendVerificationEmail(toEmail, toName, verificationLink string) error
-    VerifyEmail(token string) error
-    GenerateEmailChangeToken(userID uint, newEmail string) (string, error)
-    SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error
-    GeneratePasswordResetToken(userID uint) (string, error)
-    SendPasswordResetEmail(toEmail, toName, resetLink string) error
-    ConfirmEmailChange(token string) error
+    Delete(ctx context.Context, url string) error
 }
 ```
 
-这些接口允许 `post`、`comment` 和 `user` 等领域触发通知和文件清理——`auth`/`verification` 则用于发送邮件——而无需导入具体实现，从而保持依赖图无环。
+具体实现由 `internal/app` 装配，所以没有任何领域包导入其他领域的具体类型：
+
+- `notification` 实现 `Notifier`；由 `post`、`comment`、`user` 消费。
+- `upload` 实现 `FileRemover`；由 `post`、`user`、`auth` 用于文件清理。
+- `captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接缝；`settings` 自行声明 `SecretCipher`，`post`/`home` 自行声明 `ReadCache`。
+- 邮件是刻意的例外：`mailer.Service` 以具体类型注入 `auth` 与 `settings`。它只负责发送；验证令牌、密码重置与帐号数据仍留在各领域的 repository 中。
 
 ### 缓存后端（`internal/cache/`）
 
@@ -140,21 +134,23 @@ cmd/vexgo/main.go
             └─→ internal/*     ← 各领域包
 
 叶子包（无内部导入）：
-    model/         ← 数据模型 + 共享接口，被所有领域包导入
-    config/        ← 配置解析，被 cli、app、auth、database、sso、upload 导入
+    model/         ← 数据模型 + 共享接缝，被所有领域包导入
+    config/        ← 配置解析，被 cli、app、database、sso、upload 导入
     secrets/       ← 静态敏感信息的 AES-256-GCM cipher；各领域通过自己的
                      SecretCipher 接口消费，由 app 装配
+    cache/         ← 内存 + Valkey 后端；各领域通过自己的窄接缝
+                     （CounterStore、StateStore、ReadCache）消费
 
 共享层：
     middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）
 
 跨领域边：
     auth/          ← 被 comment、post、sso 使用（隐私过滤）
-    mailer/        ← 实现 model.Mailer，被 auth 和 verification 用于发送邮件
     notification/  ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
     upload/        ← 实现 model.FileRemover，被 user、auth、post 用于文件清理
-    verification/  ← 被 auth 用作验证码检查接缝
+    captcha/       ← 实现 auth 声明的验证码检查接缝 auth.CaptchaChecker
     public/        ← 被 settings 用作主题渲染器接缝
+    mailer/        ← 以具体类型 *mailer.Service 注入 auth 与 settings（只负责发送）
 ```
 
 ### 配置管理
@@ -365,5 +361,5 @@ cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/
 
 - [主题系统](/zh-cn/concepts/theming) —— 服务端渲染管线与主题系统如何工作
 - [配置参考](/zh-cn/reference/configuration) —— 全部参数、变量和配置键
-- [API 参考](/zh-cn/reference/api) —— 该架构暴露的 REST 端点
+- [API 参考](api.html) —— 该架构暴露的 REST 端点
 - [配置指南](/zh-cn/guides/configuration) —— 实操配置方法

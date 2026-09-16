@@ -41,9 +41,18 @@ Run `./vexgo --help` for the authoritative list.
 | `SETTINGS_ENCRYPTION_KEY` | —         | Passphrase used to encrypt secrets at rest in the database (SMTP password, AI and comment-moderation API keys) with AES-256-GCM. When empty, these secrets are stored in plaintext (a warning is logged at startup). |
 | `LOG_LEVEL`               | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                                      |
 | `BASE_URL`                | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required behind a reverse proxy.                |
-| `FRONTEND_URL`            | —         | Frontend origin used when building user-facing links. Falls back to `http://localhost:5173` (the Vite dev server).                                                                                                   |
+| `FRONTEND_URL`            | —         | Legacy dev-server origin; applied and logged at startup only (falls back to `http://localhost:5173`). Emailed links are built from `BASE_URL`.                                                                       |
 | `BEHIND_REVERSE_PROXY`    | `false`   | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                                                                                                                     |
 | `TRUSTED_PROXIES`         | —         | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks.                                                                                               |
+
+### Rate Limiting
+
+Both limits are per client IP and apply to unauthenticated endpoints; `0` disables the corresponding limit.
+
+| Variable                        | Default | Description                                              |
+| ------------------------------- | ------- | -------------------------------------------------------- |
+| `AUTH_RATE_LIMIT_PER_MINUTE`    | `10`    | Register, login, password reset, and verification resend |
+| `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `30`    | Captcha generation and verification                      |
 
 ### Database
 
@@ -126,19 +135,20 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 
 ### Server
 
-| YAML key                        | Default   | Description                                                                                                                                      |
-| ------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `addr`                          | `0.0.0.0` | Listen address                                                                                                                                   |
-| `port`                          | `3001`    | Listen port                                                                                                                                      |
-| `data_dir`                      | `./data`  | Data directory path                                                                                                                              |
-| `jwt_secret`                    | —         | JWT secret key (**required in production**)                                                                                                      |
-| `settings_encryption_key`       | —         | Passphrase for encrypting secrets at rest (SMTP password, AI and comment-moderation API keys). Empty = plaintext storage with a startup warning. |
-| `log_level`                     | `info`    | `debug`, `info`, `warn`, `error`                                                                                                                 |
-| `base_url`                      | —         | Public base URL, e.g. `https://vexgo.example.com`                                                                                                |
-| `frontend_url`                  | —         | Frontend origin for user-facing links                                                                                                            |
-| `behind_reverse_proxy`          | `false`   | Honor `X-Forwarded-*` headers when `true`                                                                                                        |
-| `trusted_proxies`               | `[]`      | List of trusted proxy IPs/CIDRs                                                                                                                  |
-| `captcha_rate_limit_per_minute` | `30`      | Per-IP requests-per-minute cap on the unauthenticated captcha endpoints; `0` disables the cap                                                    |
+| YAML key                        | Default   | Description                                                                                                                                       |
+| ------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `addr`                          | `0.0.0.0` | Listen address                                                                                                                                    |
+| `port`                          | `3001`    | Listen port                                                                                                                                       |
+| `data_dir`                      | `./data`  | Data directory path                                                                                                                               |
+| `jwt_secret`                    | —         | JWT secret key (**required in production**)                                                                                                       |
+| `settings_encryption_key`       | —         | Passphrase for encrypting secrets at rest (SMTP password, AI and comment-moderation API keys). Empty = plaintext storage with a startup warning.  |
+| `log_level`                     | `info`    | `debug`, `info`, `warn`, `error`                                                                                                                  |
+| `base_url`                      | —         | Public base URL, e.g. `https://vexgo.example.com`                                                                                                 |
+| `frontend_url`                  | —         | Legacy dev-server origin. It is only applied and logged at startup (falling back to `http://localhost:5173`); links in emails use `base_url`.     |
+| `behind_reverse_proxy`          | `false`   | Honor `X-Forwarded-*` headers when `true`                                                                                                         |
+| `trusted_proxies`               | `[]`      | List of trusted proxy IPs/CIDRs                                                                                                                   |
+| `captcha_rate_limit_per_minute` | `30`      | Per-IP requests-per-minute cap on the unauthenticated captcha endpoints; `0` disables the cap                                                     |
+| `auth_rate_limit_per_minute`    | `10`      | Per-IP requests-per-minute cap on the unauthenticated auth endpoints (register, login, password reset, verification resend); `0` disables the cap |
 
 ### Database
 
@@ -213,6 +223,7 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 | Reverse proxy           | `BEHIND_REVERSE_PROXY`          | `behind_reverse_proxy`          | —            |
 | Trusted proxies         | `TRUSTED_PROXIES`               | `trusted_proxies`               | —            |
 | Captcha rate limit      | `CAPTCHA_RATE_LIMIT_PER_MINUTE` | `captcha_rate_limit_per_minute` | —            |
+| Auth rate limit         | `AUTH_RATE_LIMIT_PER_MINUTE`    | `auth_rate_limit_per_minute`    | —            |
 | DB type                 | `DB_TYPE`                       | `db_type`                       | —            |
 | DB host                 | `DB_HOST`                       | `db_host`                       | —            |
 | DB port                 | `DB_PORT`                       | `db_port`                       | —            |

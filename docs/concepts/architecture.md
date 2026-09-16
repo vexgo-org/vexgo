@@ -7,7 +7,7 @@
 VexGo is a self-hosted blog CMS with two main parts:
 
 - **A Go backend** (`backend/`) — an HTTP API built with Gin and GORM, serving the admin panel, the public site, and the REST API. It can run against SQLite, PostgreSQL, or MySQL.
-- **A React frontend** (`frontend/`) — a TypeScript + Vite + Tailwind CSS SPA that talks to the API. Its build output is embedded into the backend binary.
+- **A React frontend** (`frontend/`) — the admin console: a TypeScript + Vite + Tailwind CSS SPA that talks to the API. Its build output is embedded into the backend binary and served under `/admin/...`; legacy top-level URLs (such as `/login`) 301-redirect there with the query string preserved, so old bookmarks keep working. Public pages are server-side rendered from themes instead.
 
 A **theme system** lets the backend server-side-render public pages with uploaded themes, so visitors don't need JavaScript to read content.
 
@@ -19,9 +19,11 @@ The backend follows a domain-oriented layout under `backend/internal` with a com
 backend/
   cmd/vexgo/main.go         # entry point: resolves config via cli, delegates to app package
   internal/
+    api/                     # wire types shared by the REST surface (responses, error bodies)
     app/                     # composition root: wires all dependencies together
-    auth/                    # registration, login, JWT, profile, password reset
+    auth/                    # registration, login, JWT, profile, password reset, email verification
     cache/                   # cache backends: in-process memory + Valkey (valkey-io/valkey-go)
+    captcha/                 # sliding-puzzle captcha generation and verification
     cli/                     # cobra command line: flags, help, version, .env loading
     comment/                 # comments and AI-powered moderation
     config/                  # layered config resolution via viper, JWT, S3, SSO setup
@@ -30,7 +32,8 @@ backend/
     mailer/                  # SMTP mail building and sending
     notification/            # in-app notifications
     middleware/              # JWT auth, role-based permissions, request logging
-    model/                   # GORM data models + shared interfaces (Notifier, FileRemover, Mailer)
+    model/                   # GORM data models + shared seams (Notifier, FileRemover)
+    page/                    # custom pages served at /:slug
     post/                    # post CRUD, categories, tags, likes
     public/                  # embedded frontend, themes, SSR renderer, static routes
     router/                  # route registration (composes every domain)
@@ -39,7 +42,6 @@ backend/
     sso/                     # GitHub / Google / OIDC login
     upload/                  # file upload (local disk or S3)
     user/                    # user management, roles, creator applications
-    verification/            # email verification and sliding-puzzle captcha
 ```
 
 ### Layered Architecture (per domain)
@@ -55,12 +57,12 @@ repository.go → persistence interface + GORM implementation (calls database)
 This separation ensures that:
 
 - **Handlers** never touch GORM directly — they delegate to the service.
-- **Services** are database-agnostic behind a `Repository` interface, making them unit-testable with fakes.
+- **Services** are database-agnostic behind a `Repository` interface, so they can be tested without a live database (the domain tests run them against in-memory SQLite, and the seams are faked).
 - **Repositories** encapsulate all SQL/GORM queries, including batch operations for N+1 prevention.
 
-### Shared Interfaces (`model/interfaces.go`)
+### Shared Seams (`model/interfaces.go`)
 
-Cross-domain seams are defined in the `model` package as small interfaces:
+Two cross-domain seams live in the `model` package as small interfaces; the other domains declare their own where they are consumed:
 
 ```go
 // NotificationInput groups the notification fields passed to CreateNotification.
@@ -81,25 +83,16 @@ type Notifier interface {
 
 // FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
 type FileRemover interface {
-    Delete(url string) error
-}
-
-// Mailer is the seam for sending transactional email and managing email
-// verification / password-reset tokens; implemented by the mailer domain.
-type Mailer interface {
-    IsEmailEnabled() (bool, error)
-    GenerateVerificationToken(userID uint) (string, error)
-    SendVerificationEmail(toEmail, toName, verificationLink string) error
-    VerifyEmail(token string) error
-    GenerateEmailChangeToken(userID uint, newEmail string) (string, error)
-    SendEmailChangeEmail(toEmail, toName, newEmail, verificationLink string) error
-    GeneratePasswordResetToken(userID uint) (string, error)
-    SendPasswordResetEmail(toEmail, toName, resetLink string) error
-    ConfirmEmailChange(token string) error
+    Delete(ctx context.Context, url string) error
 }
 ```
 
-These interfaces allow domains like `post`, `comment`, and `user` to trigger notifications and file cleanup — and `auth`/`verification` to send email — without importing the concrete implementations, keeping the dependency graph acyclic.
+The implementations are wired in `internal/app`, so no domain imports another domain's concrete type:
+
+- `notification` implements `Notifier`; `post`, `comment`, and `user` consume it.
+- `upload` implements `FileRemover`; `post`, `user`, and `auth` consume it for file cleanup.
+- `captcha` implements the `CaptchaChecker` seam that `auth` declares; `settings` declares its own `SecretCipher` and `post`/`home` their own `ReadCache` the same way.
+- Email is the deliberate exception: `mailer.Service` is injected as a concrete type into `auth` and `settings`. It is send-only; verification tokens, password resets, and accounts stay in the domain repositories.
 
 ### Cache Backends (`internal/cache/`)
 
@@ -141,21 +134,23 @@ cmd/vexgo/main.go
             └─→ internal/*     ← domain packages
 
 Leaf packages (no internal imports):
-    model/         ← data models + shared interfaces, imported by every domain
-    config/        ← configuration parsing, imported by cli, app, auth, database, sso, upload
+    model/         ← data models + shared seams, imported by every domain
+    config/        ← configuration parsing, imported by cli, app, database, sso, upload
     secrets/       ← AES-256-GCM cipher for secrets at rest; domains consume it
                      through their own SecretCipher interfaces, wired by app
+    cache/         ← memory + Valkey backends; domains consume it through their
+                     own narrow seams (CounterStore, StateStore, ReadCache)
 
 Shared layer:
     middleware/     ← JWT auth, role permissions, request logging (imports model only)
 
 Cross-domain edges:
     auth/          ← used by comment, post, sso (for privacy filtering)
-    mailer/        ← implements model.Mailer, used by auth and verification for email
     notification/  ← implements model.Notifier, used by comment, post, user as notification seam
     upload/        ← implements model.FileRemover, used by user, auth, post for file cleanup
-    verification/  ← used by auth as the captcha-check seam
+    captcha/       ← implements auth.CaptchaChecker, the captcha-check seam auth declares
     public/        ← used by settings as the theme-renderer seam
+    mailer/        ← injected as a concrete *mailer.Service into auth and settings (send-only)
 ```
 
 ### Configuration Management
@@ -366,5 +361,5 @@ cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/
 
 - [Theming](/concepts/theming) — how the server-side rendering pipeline and theme system work
 - [Configuration Reference](/reference/configuration) — every flag, variable, and config key
-- [API Reference](/reference/api) — the REST endpoints exposed by this architecture
+- [API Reference](api.html) — the REST endpoints exposed by this architecture
 - [Configuration Guide](/guides/configuration) — practical setup recipes

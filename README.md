@@ -15,7 +15,7 @@ VexGo is a lightweight, self-hosted blog content management system designed for 
 
 - **🖥️ Modern Web Interface**: React-based admin panel for content management
 - **🚀 High Performance**: Built with Go and Gin for fast, efficient processing
-- **🔐 Secure Authentication**: JWT-based user system with role-based permissions (user / admin / super_admin)
+- **🔐 Secure Authentication**: JWT-based user system with role-based permissions (guest / contributor / author / admin / super_admin)
 - **📝 Rich Content**: Markdown editor, categories, tags, drafts, likes, and comments
 - **🛡️ Configurable Comment Moderation**: Independent manual-review, keyword-filter, and LLM-review switches with fail-closed LLM fallback
 - **🖼️ Media Management**: Built-in file storage with S3-compatible support
@@ -35,6 +35,7 @@ VexGo is a lightweight, self-hosted blog content management system designed for 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Documentation](docs/README.md)
 - [Configuration](#configuration)
 - [SSO / Single Sign-On](#sso--single-sign-on)
 - [Database](#database)
@@ -582,8 +583,11 @@ The backend follows a domain-oriented layout under `backend/internal` with a com
 backend/
   cmd/vexgo/main.go  # entry point: resolves config via cli, delegates to app.New()
   internal/
+    api/             # wire types shared by the REST surface (responses, error bodies)
     app/             # composition root: wires storage, DB, and every domain
-    auth/            # registration, login, JWT, profile, password reset
+    auth/            # registration, login, JWT, profile, password reset, email verification
+    cache/           # cache backends: in-process memory + Valkey
+    captcha/         # sliding-puzzle captcha generation and verification
     cli/             # cobra command line: flags, help, version, .env loading
     comment/         # comments and AI-powered moderation
     config/          # layered config resolution via viper (flags > file > env > defaults), JWT, S3, SSO setup (pure setup, no backend imports)
@@ -592,15 +596,16 @@ backend/
     mailer/          # SMTP mail building and sending
     notification/    # in-app notifications
     middleware/      # JWT auth, role-based permissions, request logging
-    model/           # GORM data models + shared seams (Notifier, FileRemover, Mailer)
+    model/           # GORM data models + shared seams (Notifier, FileRemover)
+    page/            # custom pages served at /:slug
     post/            # post CRUD, categories, tags, likes
     public/          # embedded frontend, themes, SSR renderer, static routes
     router/          # route registration (composes every domain)
+    secrets/         # AES-256-GCM encryption of secrets stored in the database
     settings/        # admin configuration (SMTP, AI, general, theme)
     sso/             # GitHub / Google / OIDC login
     upload/          # file upload (local disk or S3)
     user/            # user management, roles, creator applications
-    verification/    # email verification and sliding-puzzle captcha
 ```
 
 Each domain package follows a consistent three-layer pattern:
@@ -625,9 +630,9 @@ import (
 
 ### Dependency facts
 
-- **Leaf packages** — `config/` and `model/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`, `Mailer`); `config` is imported by `app`, `auth`, `database`, `middleware`, `sso`, and `upload`.
-- **Shared layer** — `middleware/` (JWT auth, role permissions, request logging) depends only on `config` and `model`.
-- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `auth` itself depends on `verification`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, `mailer` implements `Mailer`. The dependency graph is acyclic.
+- **Leaf packages** — `config/`, `model/`, `secrets/`, and `cache/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
+- **Shared layer** — `middleware/` (JWT auth, role permissions, request logging) depends only on `model`.
+- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
 - **Wiring** — `backend/cmd/vexgo/main.go` is the thin entry point: it parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root — it opens the database, creates storage and the `public.Renderer`, and wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
 ## Contributing

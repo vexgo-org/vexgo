@@ -117,7 +117,7 @@ Rules:
 - File uploads use `@Accept multipart/form-data` with `@Param <name> formData file true "<desc>"`. (swag v2 is pinned past `v2.0.0-rc5` in `go.mod` because rc5 cannot emit a correct multipart file schema.)
 - Keep annotation formatting clean: `just format` runs `go tool swag fmt backend/`; CI enforces it via `just check-swag-fmt`.
 - If you add, remove, or rename a route, also update the route surface locked by `backend/internal/router/router_test.go` — and make sure the `@Router` path/method matches the registered route, otherwise the generated client calls a URL that 404s.
-- In frontend code, call the API via `getVexGoAPI()` from `@/api/generated/endpoints`. Requests go through the shared axios instance in `frontend/src/api/customAxios.ts` (attaches the token, redirects to `/login` on non-auth 401s).
+- In frontend code, call the API via `getVexGoAPI()` from `@/api/generated/endpoints`. Requests go through the shared axios instance in `frontend/src/api/customAxios.ts` (attaches the token, redirects to `/admin/login` on non-auth 401s).
 
 ## Project Layout
 
@@ -125,24 +125,29 @@ Rules:
 backend/
   cmd/vexgo/main.go        # application entry point (thin: calls app.New / app.Run)
   internal/
+    api/                   # wire types shared by the REST surface
     app/                   # composition root: wires storage, DB, and every domain
-    auth/                  # authentication and JWT
+    auth/                  # authentication, JWT, email verification
+    cache/                 # cache backends: in-process memory + Valkey
+    captcha/               # sliding-puzzle captcha
+    cli/                   # cobra command line
     comment/               # comments and moderation
     config/                # flag, env, and config-file parsing
     database/              # DB connection, migrations, seeding
     home/                  # homepage data endpoints
     mailer/                # email sending (SMTP)
-    notification/          # notifications
     middleware/            # JWT auth and permission middleware
-    model/                 # GORM data models + shared seams (Notifier, FileRemover, Mailer)
+    model/                 # GORM data models + shared seams (Notifier, FileRemover)
+    notification/          # notifications
+    page/                  # custom pages served at /:slug
     post/                  # blog post CRUD
     public/                # embedded frontend assets and SSR renderer
     router/                # route registration
+    secrets/               # AES-256-GCM encryption of secrets at rest
     settings/              # site settings endpoints
     sso/                   # OAuth2 / OIDC login
     upload/                # file upload (local disk or S3)
     user/                  # user management
-    verification/          # email verification
 frontend/
   src/
     components/            # React components
@@ -155,6 +160,8 @@ frontend/
   vite.config.ts
 scripts/                   # helper scripts (e.g. API test examples)
 examples/                  # example configuration files
+docs/                      # user documentation (docsify site, English + zh-cn)
+docs/test-cases/           # manual and unit test-case catalogues per feature
 nix/                       # Nix packaging
 .github/workflows/         # CI pipelines
 justfile                   # format / lint tasks
@@ -240,6 +247,8 @@ Testing expectations:
 - cover both success and failure paths where relevant
 - verify boundary conditions, not only happy paths
 - for regressions, add a test that reproduces the previously broken case
+
+Feature-level catalogues of the cases behind those tests live in `docs/test-cases/` (for example `docs/test-cases/comment-moderation.md` for the moderation pipeline). They are English-only and reference the Go test files that implement each case; add a row when you add a case worth tracking.
 
 Examples of cases that should be verified:
 

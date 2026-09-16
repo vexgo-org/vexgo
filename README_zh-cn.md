@@ -15,7 +15,7 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 
 - **🖥️ 现代化 Web 界面**：基于 React 的管理面板用于内容管理
 - **🚀 高性能**：使用 Go 和 Gin 构建，实现快速高效的处理
-- **🔐 安全认证**：基于 JWT 的用户系统，具有基于角色的权限（user / admin / super_admin）
+- **🔐 安全认证**：基于 JWT 的用户系统，具有基于角色的权限（guest / contributor / author / admin / super_admin）
 - **📝 丰富内容**：Markdown 编辑器、分类、标签、草稿、点赞和评论
 - **🛡️ 可配置的评论审核**：人工审核、关键词过滤、LLM 审核相互独立的开关，LLM 失败时默认拦截
 - **🖼️ 媒体管理**：内置文件存储，支持 S3 兼容服务
@@ -35,6 +35,7 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 ## 目录
 
 - [快速开始](#快速开始)
+- [文档索引](docs/zh-cn/README.md)
 - [配置](#配置)
 - [SSO / 单点登录](#sso--单点登录)
 - [数据库](#数据库)
@@ -580,8 +581,11 @@ just run
 backend/
   cmd/vexgo/main.go  # 入口：通过 cli 解析配置，委托给 app.New()
   internal/
+    api/             # REST 接口共享的传输类型（响应体、错误结构）
     app/             # 组合根：装配存储、数据库与所有领域模块
-    auth/            # 注册、登录、JWT、个人资料、密码重置
+    auth/            # 注册、登录、JWT、个人资料、密码重置、邮箱验证
+    cache/           # 缓存后端：进程内内存 + Valkey
+    captcha/         # 滑块验证码的生成与校验
     cli/             # cobra 命令行：参数、帮助、版本、.env 加载
     comment/         # 评论与 AI 审核
     config/          # 基于 viper 的分层配置解析（参数 > 文件 > 环境变量 > 默认值），JWT、S3、SSO 初始化（纯配置，不依赖后端模块）
@@ -590,15 +594,16 @@ backend/
     mailer/          # SMTP 邮件构建与发送
     notification/    # 站内通知
     middleware/      # JWT 认证、角色权限、请求日志
-    model/           # GORM 数据模型 + 共享接口（Notifier、FileRemover、Mailer）
+    model/           # GORM 数据模型 + 共享接口（Notifier、FileRemover）
+    page/            # 自定义页面（/:slug）
     post/            # 文章 CRUD、分类、标签、点赞
     public/          # 内嵌前端、主题、SSR 渲染、静态路由
     router/          # 路由注册（组合所有领域模块）
+    secrets/         # 数据库中静态敏感信息的 AES-256-GCM 加密
     settings/        # 管理端配置（SMTP、AI、通用设置、主题）
     sso/             # GitHub / Google / OIDC 登录
     upload/          # 文件上传（本地磁盘或 S3）
     user/            # 用户管理、角色、创作者申请
-    verification/    # 邮箱验证与滑块验证码
 ```
 
 每个领域包内部遵循一致的三层结构：
@@ -623,9 +628,9 @@ import (
 
 ### 依赖事实
 
-- **叶子包** — `config/` 和 `model/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`、`Mailer`）；`config` 被 `app`、`auth`、`database`、`middleware`、`sso`、`upload` 引用。
-- **共享层** — `middleware/`（JWT 认证、角色权限、请求日志）只依赖 `config` 和 `model`。
-- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`auth` 自身依赖 `verification`；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`、`mailer` 实现 `Mailer`。依赖图无环。
+- **叶子包** — `config/`、`model/`、`secrets/`、`cache/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`）。
+- **共享层** — `middleware/`（JWT 认证、角色权限、请求日志）只依赖 `model`。
+- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`，`captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接口。`mailer.Service` 以具体类型注入 `auth` 与 `settings`。依赖图无环。
 - **接线** — `backend/cmd/vexgo/main.go` 是极简入口：解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根——打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
 
 ## 贡献指南

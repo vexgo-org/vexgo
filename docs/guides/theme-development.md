@@ -106,7 +106,7 @@ Build the archive from a directory so the manifest lands where the server expect
 cd my-theme && zip -r ../my-theme.zip .
 ```
 
-Then, in the admin panel, open **Settings → Theme**, upload the archive, and activate it. If you prefer the API, the endpoint is documented in the [API reference](/reference/api); the archive goes in a `theme` multipart part.
+Then, in the admin panel, open **Settings → Theme**, upload the archive, and activate it. If you prefer the API, the endpoint is documented in the [API reference](api.html); the archive goes in a `theme` multipart part.
 
 Uploads are validated before anything is written:
 
