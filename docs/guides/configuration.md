@@ -10,14 +10,18 @@ VexGo reads settings from four sources. When the same setting appears in more th
 command-line arguments  >  config file  >  environment variables  >  defaults
 ```
 
-| Source                 | Example                  | Used for                          |
-| ---------------------- | ------------------------ | --------------------------------- |
-| Command-line arguments | `./vexgo --port 8080`    | One-off overrides                 |
-| Config file (`-c`)     | `./vexgo -c config.yml`  | Everything (recommended)          |
-| Environment variables  | `PORT=8080 ./vexgo`      | Containers (Docker, systemd)      |
-| Defaults               | `3001`, `./data`, `info` | Fallback when nothing else is set |
+| Source                 | Example                        | Used for                          |
+| ---------------------- | ------------------------------ | --------------------------------- |
+| Command-line arguments | `./vexgo server --port 8080`   | One-off overrides                 |
+| Config file (`-c`)     | `./vexgo server -c config.yml` | Everything (recommended)          |
+| Environment variables  | `PORT=8080 ./vexgo server`     | Containers (Docker, systemd)      |
+| Defaults               | `3001`, `./data`, `info`       | Fallback when nothing else is set |
 
-**CLI flags:** `--config, -c <file>`, `--addr, -a`, `--port, -p`, `--data, -d`, `--version, -V`, `--help, -h`. Run `./vexgo --help` to see the full list.
+Start the server with `./vexgo server`. Running `./vexgo` without arguments prints help instead of starting the server.
+
+**Server flags:** `--config, -c <file>`, `--addr, -a <addr>`, `--port, -p <port>`, `--data, -d <dir>`, `--help, -h`. These flags follow `server`; run `./vexgo server --help` to see the full list.
+
+**Root-only version flag:** use `./vexgo --version` (or `-V`) to print the version and exit, not `./vexgo server --version`.
 
 > **Tip:** secrets (like `JWT_SECRET` or database passwords) can go in either the config file or environment variables — pick what fits your deployment. Never commit real secrets to a repository.
 
@@ -32,7 +36,7 @@ cp examples/config.yml config.yml
 Edit the values, then start VexGo with:
 
 ```bash
-./vexgo -c config.yml
+./vexgo server -c config.yml
 ```
 
 Example config file (abridged):
@@ -178,7 +182,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 Run VexGo with the PostgreSQL config:
 
 ```bash
-go run ./backend/cmd/vexgo -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo server -c examples/config-postgres.yml
 ```
 
 Or with environment variables:
@@ -190,7 +194,7 @@ export DB_PORT=5432
 export DB_USER=vexgo_user
 export DB_PASSWORD=password
 export DB_NAME=vexgo_db
-./vexgo
+./vexgo server
 ```
 
 ### MySQL
@@ -218,8 +222,7 @@ mysql> FLUSH PRIVILEGES;
 Run VexGo with the MySQL config:
 
 ```bash
-cd backend
-go run ./cmd/vexgo -c ../examples/config-mysql.yml
+go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
 ```
 
 > On the first start, VexGo runs database migrations automatically — there's nothing to import manually.
@@ -299,7 +302,7 @@ docker run -d --name vexgo \
   -e S3_SECRET_KEY=your-secret-key \
   -e S3_FORCE_PATH=true \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 > **MinIO/Wasabi:** set `S3_FORCE_PATH=true` — most S3-compatible services require path-style URLs.

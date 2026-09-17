@@ -23,7 +23,7 @@
 如果你已安装 Docker：
 
 ```bash
-docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
+docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### 方式 B：直接运行二进制文件
@@ -33,7 +33,7 @@ docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/ve
 
 ```bash
 chmod +x vexgo-linux-amd64
-./vexgo-linux-amd64
+./vexgo-linux-amd64 server
 ```
 
 > **刚才发生了什么？** VexGo 在 `3001` 端口启动了一个 HTTP 服务器，并在 `./data` 目录创建了 SQLite 数据库。这就是整个服务器——无需单独安装数据库。

@@ -50,13 +50,13 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 ### Linux
 
 ```bash
-./vexgo-linux-amd64
+./vexgo-linux-amd64 server
 ```
 
 ### Docker
 
 ```bash
-sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
+sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### ❄️Nix
@@ -64,7 +64,7 @@ sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-o
 无需安装即可立即试用 VexGo：
 
 ```bash
-nix run github:vexgo-org/vexgo
+nix run github:vexgo-org/vexgo -- server
 ```
 
 ### ❄️NixOS Flake
@@ -132,7 +132,9 @@ sudo nixos-rebuild switch --flake .#your-host
 
 ## 配置
 
-配置优先级：**命令行参数 > 配置文件 > 环境变量 > 默认值**
+配置优先级：**服务器命令行参数 > 配置文件 > 环境变量 > 默认值**
+
+使用 `vexgo server` 启动服务器；不带参数运行 `vexgo` 会打印帮助信息。服务器参数（`--config/-c`、`--addr/-a`、`--port/-p`、`--data/-d`）必须跟在 `server` 之后，详情见 `vexgo server --help`。版本参数仅限根命令：`vexgo --version`（或 `-V`）。
 
 ### 使用配置文件
 
@@ -311,7 +313,7 @@ s3_disable_bucket_in_custom_url: false
 然后运行以下命令：
 
 ```bash
-./vexgo-linux-amd64 -c /the/path/to/config.yml
+./vexgo-linux-amd64 server -c /the/path/to/config.yml
 ```
 
 ### 使用环境变量
@@ -413,7 +415,7 @@ sudo docker run -d --name vexgo \
   -e OIDC_ISSUER_URL=https://auth.example.com/realms/myrealm \
   -e OIDC_CLIENT_ID=your-client-id \
   -e OIDC_CLIENT_SECRET=your-client-secret \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 **示例：环境变量方式**
@@ -424,7 +426,7 @@ export OIDC_ENABLED=true
 export OIDC_ISSUER_URL=https://auth.example.com/realms/myrealm
 export OIDC_CLIENT_ID=your-client-id
 export OIDC_CLIENT_SECRET=your-client-secret
-./vexgo-linux-amd64
+./vexgo-linux-amd64 server
 ```
 
 #### S3 / 对象存储
@@ -459,7 +461,7 @@ sudo docker run -d --name vexgo \
   -e S3_SECRET_KEY=your-secret-key \
   -e S3_FORCE_PATH=true \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 #### 内容缓存与 Valkey
@@ -499,7 +501,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 然后使用以下命令启动后端：
 
 ```bash
-go run ./backend/cmd/vexgo -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo server -c examples/config-postgres.yml
 ```
 
 ### MySQL
@@ -525,8 +527,7 @@ mysql> FLUSH PRIVILEGES;
 然后使用以下命令启动后端：
 
 ```bash
-cd backend
-go run ./cmd/vexgo -c ../examples/config-mysql.yml
+go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
 ```
 
 ## 开发环境
@@ -568,8 +569,10 @@ just build-frontend
 just build-theme
 
 # 启动服务
-just run
+just server
 ```
+
+`just server` 启动服务器。`just run *args` 将参数传给 CLI，例如 `just run server -c examples/config.yml` 或 `just run --version`；不带参数的 `just run` 会打印帮助信息。
 
 然后访问 http://127.0.0.1:3001。默认超级管理员账号：`admin@example.com` / `password`——请在个人资料页面修改密码。
 

@@ -50,26 +50,30 @@ mkdir -p ./data
 ### Step 3: Run VexGo
 
 ```bash
-./vexgo
+./vexgo server
 ```
 
 VexGo starts on `http://0.0.0.0:3001` by default.
 
 ### Step 4: Run with Custom Options
 
+Server flags must follow the `server` subcommand:
+
 ```bash
 # Custom port and data directory
-./vexgo --port 8080 --data /path/to/data
+./vexgo server --port 8080 --data /path/to/data
 
 # Custom listen address
-./vexgo --addr 127.0.0.1
+./vexgo server --addr 127.0.0.1
 
 # Load a config file
-./vexgo -c /path/to/config.yml
+./vexgo server -c /path/to/config.yml
 
 # See all available options
-./vexgo --help
+./vexgo server --help
 ```
+
+Running bare `./vexgo` prints help instead of starting the server. The version flag is root-only: use `./vexgo --version` (or `./vexgo -V`), not `./vexgo server --version`.
 
 ### Step 5: Run as a systemd Service (Optional)
 
@@ -85,7 +89,7 @@ Type=simple
 User=vexgo
 Group=vexgo
 WorkingDirectory=/opt/vexgo
-ExecStart=/opt/vexgo/vexgo
+ExecStart=/opt/vexgo/vexgo server
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -123,7 +127,8 @@ docker run -d \
   -p 3001:3001 \
   -v ./data:/app/data \
   --restart unless-stopped \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest \
+  ./vexgo server
 ```
 
 ### Step 2: Verify
@@ -146,7 +151,8 @@ docker run -d \
   -e JWT_SECRET=your-secret-key-change-this-in-production \
   -e SETTINGS_ENCRYPTION_KEY=your-very-long-random-secret-here-change-this-in-production \
   --restart unless-stopped \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest \
+  ./vexgo server
 ```
 
 ### Common Docker Commands
@@ -160,7 +166,7 @@ docker rm -f vexgo
 # Update to the latest version
 docker pull ghcr.io/vexgo-org/vexgo:latest
 docker stop vexgo && docker rm vexgo
-docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest
+docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ---
@@ -177,6 +183,7 @@ version: "3.8"
 services:
   vexgo:
     image: ghcr.io/vexgo-org/vexgo:latest
+    command: ["./vexgo", "server"]
     container_name: vexgo
     ports:
       - "3001:3001"
@@ -244,21 +251,21 @@ source ~/.nix-profile/etc/profile.d/nix.sh
 
 ```bash
 # Run without installing (fetches from GitHub)
-nix run github:vexgo-org/vexgo
+nix run github:vexgo-org/vexgo -- server
 ```
 
 ### Step 3: Install Permanently
 
 ```bash
 nix profile install github:vexgo-org/vexgo
-vexgo
+vexgo server
 ```
 
 ### Step 4: Run with Custom Options
 
 ```bash
-nix run github:vexgo-org/vexgo -- -c /path/to/config.yml
-nix run github:vexgo-org/vexgo -- --port 8080 --addr 0.0.0.0
+nix run github:vexgo-org/vexgo -- server -c /path/to/config.yml
+nix run github:vexgo-org/vexgo -- server --port 8080 --addr 0.0.0.0
 ```
 
 ---
@@ -386,8 +393,10 @@ just build-theme
 ### Step 3: Run
 
 ```bash
-just run
+just server
 ```
+
+`just run` passes arguments to the CLI, for example `just run server -c examples/config.yml` or `just run --version`. Bare `just run` prints help.
 
 ### Development Commands
 
