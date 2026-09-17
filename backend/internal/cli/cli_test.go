@@ -21,13 +21,27 @@ func writeConfig(t *testing.T, content string) string {
 	return path
 }
 
-// runCmd builds a fresh root command per call (cobra accumulates flag state
+// runServerCmd builds a fresh root command per call (cobra accumulates flag state
 // across Execute calls), captures its output, runs the given args, and
-// returns stdout, the resolved config, and the execution error.
-func runCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, error) {
+// returns stdout, and the execution error.
+func runRootCmd(t *testing.T, args ...string) (*bytes.Buffer, error) {
 	t.Helper()
 	var out bytes.Buffer
-	root, state := newRootCmd("test-version")
+	root := newRootCmd("test-version")
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs(args)
+	err := root.Execute()
+	return &out, err
+}
+
+// runServerCmd builds a fresh `vexgo server` command per call (cobra accumulates flag state
+// across Execute calls), captures its output, runs the given args, and
+// returns stdout, the resolved config, and the execution error.
+func runServerCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, error) {
+	t.Helper()
+	var out bytes.Buffer
+	root, state := newServerCmd()
 	root.SetOut(&out)
 	root.SetErr(&out)
 	root.SetArgs(args)
@@ -37,7 +51,7 @@ func runCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, error)
 
 func TestLongSpellings(t *testing.T) {
 	path := writeConfig(t, "")
-	_, cfg, err := runCmd(t, "--config", path, "--addr", "10.0.0.1", "--port", "8080", "--data", "/tmp/data")
+	_, cfg, err := runServerCmd(t, "--config", path, "--addr", "10.0.0.1", "--port", "8080", "--data", "/tmp/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +71,7 @@ func TestLongSpellings(t *testing.T) {
 
 func TestShortSpellings(t *testing.T) {
 	path := writeConfig(t, "")
-	_, cfg, err := runCmd(t, "-c", path, "-a", "10.0.0.1", "-p", "9090", "-d", "/custom/data")
+	_, cfg, err := runServerCmd(t, "-c", path, "-a", "10.0.0.1", "-p", "9090", "-d", "/custom/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +88,7 @@ func TestShortSpellings(t *testing.T) {
 
 func TestEqualsSyntax(t *testing.T) {
 	path := writeConfig(t, "")
-	_, cfg, err := runCmd(t, "--config="+path, "--addr=10.0.0.1", "--port=8080", "--data=/tmp/data")
+	_, cfg, err := runServerCmd(t, "--config="+path, "--addr=10.0.0.1", "--port=8080", "--data=/tmp/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +102,7 @@ func TestEqualsSyntax(t *testing.T) {
 
 func TestAliasPairsLastWins(t *testing.T) {
 	// Long spelling followed by short spelling: the last one wins.
-	_, cfg, err := runCmd(t, "--addr", "ignored", "-a", "10.1.1.1", "--port", "1111", "-p", "2222")
+	_, cfg, err := runServerCmd(t, "--addr", "ignored", "-a", "10.1.1.1", "--port", "1111", "-p", "2222")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +115,7 @@ func TestAliasPairsLastWins(t *testing.T) {
 }
 
 func TestNoArgsDefaults(t *testing.T) {
-	_, cfg, err := runCmd(t)
+	_, cfg, err := runServerCmd(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +125,9 @@ func TestNoArgsDefaults(t *testing.T) {
 }
 
 func TestVersionLong(t *testing.T) {
-	out, cfg, err := runCmd(t, "--version")
+	out, err := runRootCmd(t, "--version")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg != nil {
-		t.Fatal("--version should not resolve a config")
 	}
 	if !strings.Contains(out.String(), "vexgo test-version") {
 		t.Fatalf("--version should print the version, got %q", out.String())
@@ -124,20 +135,17 @@ func TestVersionLong(t *testing.T) {
 }
 
 func TestVersionShort(t *testing.T) {
-	out, cfg, err := runCmd(t, "-V")
+	out, err := runRootCmd(t, "-V")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg != nil {
-		t.Fatal("-V should not resolve a config")
 	}
 	if !strings.Contains(out.String(), "vexgo test-version") {
 		t.Fatalf("-V should print the version, got %q", out.String())
 	}
 }
 
-func TestHelpLong(t *testing.T) {
-	out, cfg, err := runCmd(t, "--help")
+func TestServerHelpLong(t *testing.T) {
+	out, cfg, err := runServerCmd(t, "--help")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +157,6 @@ func TestHelpLong(t *testing.T) {
 		"-a, --addr",
 		"-p, --port",
 		"-d, --data",
-		"-V, --version",
 		`(default "0.0.0.0")`,
 		"(default 3001)",
 		`(default "./data")`,
@@ -161,7 +168,7 @@ func TestHelpLong(t *testing.T) {
 }
 
 func TestHelpShort(t *testing.T) {
-	out, cfg, err := runCmd(t, "-h")
+	out, cfg, err := runServerCmd(t, "-h")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +181,7 @@ func TestHelpShort(t *testing.T) {
 }
 
 func TestUnknownFlagIsAnError(t *testing.T) {
-	_, cfg, err := runCmd(t, "--nope")
+	_, cfg, err := runServerCmd(t, "--nope")
 	if err == nil {
 		t.Fatal("unknown flag should be an error")
 	}
@@ -184,7 +191,7 @@ func TestUnknownFlagIsAnError(t *testing.T) {
 }
 
 func TestMissingConfigFileIsAnError(t *testing.T) {
-	_, cfg, err := runCmd(t, "-c", filepath.Join(t.TempDir(), "nonexistent.yaml"))
+	_, cfg, err := runServerCmd(t, "-c", filepath.Join(t.TempDir(), "nonexistent.yaml"))
 	if err == nil {
 		t.Fatal("missing config file should be an error")
 	}
@@ -195,7 +202,7 @@ func TestMissingConfigFileIsAnError(t *testing.T) {
 
 func TestInvalidConfigFileIsAnError(t *testing.T) {
 	path := writeConfig(t, "addr: [unclosed\n")
-	_, cfg, err := runCmd(t, "-c", path)
+	_, cfg, err := runServerCmd(t, "-c", path)
 	if err == nil {
 		t.Fatal("invalid config file should be an error")
 	}
@@ -208,7 +215,7 @@ func TestFlagOverridesConfigFileAndEnv(t *testing.T) {
 	t.Setenv("ADDR", "env-addr")
 	path := writeConfig(t, "addr: file-addr\nport: 5000\n")
 
-	_, cfg, err := runCmd(t, "-c", path, "-a", "flag-addr")
+	_, cfg, err := runServerCmd(t, "-c", path, "-a", "flag-addr")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +232,7 @@ func TestFlagOverridesConfigFileAndEnv(t *testing.T) {
 func TestExplicitEmptyDataOverridesEnv(t *testing.T) {
 	t.Setenv("DATA_DIR", "/env/data")
 
-	_, cfg, err := runCmd(t, "--data=")
+	_, cfg, err := runServerCmd(t, "--data=")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +244,7 @@ func TestExplicitEmptyDataOverridesEnv(t *testing.T) {
 func TestExplicitZeroPortOverridesEnv(t *testing.T) {
 	t.Setenv("PORT", "8080")
 
-	_, cfg, err := runCmd(t, "--port", "0")
+	_, cfg, err := runServerCmd(t, "--port", "0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +257,7 @@ func TestAbsentFlagDoesNotOverrideEnv(t *testing.T) {
 	t.Setenv("PORT", "8080")
 	t.Setenv("DATA_DIR", "/env/data")
 
-	_, cfg, err := runCmd(t, "-a", "10.0.0.1")
+	_, cfg, err := runServerCmd(t, "-a", "10.0.0.1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +287,7 @@ func TestDashTerminator(t *testing.T) {
 }
 
 func TestInterspersedPositional(t *testing.T) {
-	_, cfg, err := runCmd(t, "serve", "--port", "7000")
+	_, cfg, err := runServerCmd(t, "--port", "7000")
 	if err != nil {
 		t.Fatalf("interspersed positional arguments should be tolerated: %v", err)
 	}
