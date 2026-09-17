@@ -349,3 +349,85 @@ func TestLoadDotEnvValidFileSetsVariablesQuietly(t *testing.T) {
 		t.Fatalf("valid .env should not log anything, got %q", buf.String())
 	}
 }
+
+func TestRootRejectsPositionalArgs(t *testing.T) {
+	_, err := runRootCmd(t, "serve")
+	if err == nil {
+		t.Fatal("root should reject positional arguments")
+	}
+}
+
+func TestUnknownCommandIsAnError(t *testing.T) {
+	_, err := runRootCmd(t, "unknown")
+	if err == nil {
+		t.Fatal("unknown command should be an error")
+	}
+}
+
+func TestServerRejectsPositionalArgs(t *testing.T) {
+	_, _, err := runServerCmd(t, "serve")
+	if err == nil {
+		t.Fatal("server should reject positional arguments")
+	}
+}
+
+func TestServerRejectsMultiplePositionalArgs(t *testing.T) {
+	_, _, err := runServerCmd(t, "foo", "bar")
+	if err == nil {
+		t.Fatal("server should reject positional arguments")
+	}
+}
+
+func TestServerRejectsArgsAfterDashTerminator(t *testing.T) {
+	_, _, err := runServerCmd(t, "--", "--port", "9999")
+	if err == nil {
+		t.Fatal("arguments after -- should be rejected")
+	}
+}
+
+func TestRootRejectsServerFlags(t *testing.T) {
+	_, err := runRootCmd(t, "--port", "8080")
+	if err == nil {
+		t.Fatal("root should reject server flags")
+	}
+}
+
+func TestServerUnknownFlagIsAnError(t *testing.T) {
+	_, cfg, err := runServerCmd(t, "--nope")
+
+	if err == nil {
+		t.Fatal("unknown flag should be an error")
+	}
+
+	if cfg != nil {
+		t.Fatal("config should not be resolved when flag parsing fails")
+	}
+}
+
+func TestPortFlagMissingValueIsAnError(t *testing.T) {
+	_, _, err := runServerCmd(t, "--port")
+	if err == nil {
+		t.Fatal("--port without a value should be an error")
+	}
+}
+
+func TestConfigFlagMissingValueIsAnError(t *testing.T) {
+	_, _, err := runServerCmd(t, "--config")
+	if err == nil {
+		t.Fatal("--config without a value should be an error")
+	}
+}
+
+func TestInvalidPortIsAnError(t *testing.T) {
+	_, _, err := runServerCmd(t, "--port", "not-a-number")
+	if err == nil {
+		t.Fatal("non-numeric port should be an error")
+	}
+}
+
+func TestVersionRejectsPositionalArgs(t *testing.T) {
+	_, err := runRootCmd(t, "--version", "foo")
+	if err == nil {
+		t.Fatal("version command should reject positional arguments")
+	}
+}
