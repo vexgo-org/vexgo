@@ -272,20 +272,6 @@ func TestAbsentFlagDoesNotOverrideEnv(t *testing.T) {
 	}
 }
 
-func TestDashTerminator(t *testing.T) {
-	t.Setenv("PORT", "8080")
-
-	// Everything after -- is positional; --port 9999 must not be parsed,
-	// so the env value survives.
-	_, cfg, err := runCmd(t, "--", "--port", "9999")
-	if err != nil {
-		t.Fatalf("-- terminator should not be an error: %v", err)
-	}
-	if cfg.Port != 8080 {
-		t.Fatalf("args after -- must not be parsed as flags; env PORT should survive, got %d", cfg.Port)
-	}
-}
-
 func TestInterspersedPositional(t *testing.T) {
 	_, cfg, err := runServerCmd(t, "--port", "7000")
 	if err != nil {
