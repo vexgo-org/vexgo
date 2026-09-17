@@ -389,7 +389,7 @@ func (r *Renderer) handleAdminAsset(c *gin.Context) {
 // is active.
 func (r *Renderer) handleThemeAsset(c *gin.Context) {
 	file := strings.TrimPrefix(c.Param("filepath"), "/")
-	content, ok := r.readThemeFile(r.getRequestedTheme(c), filepath.Join("assets", file))
+	content, ok := r.readThemeFile(r.getRequestedTheme(c), path.Join("assets", file))
 	if !ok {
 		c.Status(http.StatusNotFound)
 		return
