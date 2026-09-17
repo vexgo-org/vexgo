@@ -52,6 +52,11 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("get sql.DB: %v", err)
 	}
+	// Close the pool before t.TempDir's cleanup removes the directory (cleanups
+	// run LIFO, so this one runs first). Windows refuses to delete a file that
+	// still has an open handle, unlike Linux where unlink on an open file is
+	// allowed.
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	sqlDB.SetMaxOpenConns(1)
 	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Comment{}, &model.CommentModerationConfig{}); err != nil {
 		t.Fatalf("migrate: %v", err)

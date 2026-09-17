@@ -32,14 +32,30 @@ func newMigratedDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+// openFileBackedDB opens a file-backed database through Open and closes its
+// connection pool when the test finishes. The cleanup runs before t.TempDir's
+// own (cleanups run LIFO, and t.TempDir is always called first by the caller),
+// which Windows requires: it refuses to delete a file that still has an open
+// handle, unlike Linux where unlink on an open file is allowed.
+func openFileBackedDB(t *testing.T, cfg *config.Config, dataDir string) *gorm.DB {
+	t.Helper()
+	db, err := Open(cfg, dataDir)
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB: %v", err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	return db
+}
+
 func TestOpen_DefaultSQLite(t *testing.T) {
 	t.Setenv("DB_TYPE", "")
 	dataDir := t.TempDir()
 
-	db, err := Open(&config.Config{}, dataDir)
-	if err != nil {
-		t.Fatalf("Open error: %v", err)
-	}
+	db := openFileBackedDB(t, &config.Config{}, dataDir)
 	if db == nil {
 		t.Fatal("expected non-nil db")
 	}
@@ -53,9 +69,7 @@ func TestOpen_CreatesMissingDataDir(t *testing.T) {
 	t.Setenv("DB_TYPE", "")
 	dataDir := filepath.Join(t.TempDir(), "nested", "dir")
 
-	if _, err := Open(&config.Config{}, dataDir); err != nil {
-		t.Fatalf("Open error: %v", err)
-	}
+	openFileBackedDB(t, &config.Config{}, dataDir)
 	if _, err := os.Stat(dataDir); err != nil {
 		t.Errorf("expected dataDir created: %v", err)
 	}

@@ -420,6 +420,11 @@ func TestFindOrCreateTag_UniqueIndexRaceRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get sql.DB: %v", err)
 	}
+	// Close the pool before t.TempDir's cleanup removes the directory (cleanups
+	// run LIFO, so this one runs first). Windows refuses to delete a file that
+	// still has an open handle, unlike Linux where unlink on an open file is
+	// allowed.
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	sqlDB.SetMaxOpenConns(2)
 	if err := db.AutoMigrate(&model.Tag{}); err != nil {
 		t.Fatalf("migrate: %v", err)
