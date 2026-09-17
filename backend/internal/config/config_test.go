@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -324,7 +326,7 @@ func TestMissingConfigFileIsAnError(t *testing.T) {
 	if err == nil {
 		t.Fatal("missing config file should be an error")
 	}
-	if !strings.Contains(err.Error(), "no such file or directory") {
+	if !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("error should carry the clean path error, got %v", err)
 	}
 }
