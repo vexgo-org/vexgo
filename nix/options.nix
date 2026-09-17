@@ -92,7 +92,7 @@ in
         Group = "vexgo";
         Environment = lib.mapAttrsToList (k: v: "${k}=${v}") cfg.environment;
         EnvironmentFile = lib.mkIf (cfg.environmentFile != null) cfg.environmentFile;
-        ExecStart = "${lib.getExe cfg.package} -c ${configFile}";
+        ExecStart = "${lib.getExe cfg.package} server -c ${configFile}";
         Restart = "on-failure";
         RestartSec = "5s";
         StateDirectory = "vexgo";
