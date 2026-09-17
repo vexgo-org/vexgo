@@ -1,0 +1,6 @@
+# The .gitattributes rule normalises the checkout to LF; this stops editors from writing CRLF back into it.
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8

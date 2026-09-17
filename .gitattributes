@@ -1,1 +1,5 @@
+# Check out every text file with LF so gofmt/gofumpt, prettier, and CI agree on line endings.
+# The eol attribute overrides core.autocrlf, so this holds even on Windows checkouts that keep core.autocrlf=true.
+* text=auto eol=lf
+
 frontend/src/components/** linguist-vendored
