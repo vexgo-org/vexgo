@@ -425,3 +425,43 @@ func TestLogin_DebugLogsOmitEmail(t *testing.T) {
 		t.Errorf("debug logs leaked the account email:\n%s", output)
 	}
 }
+
+// A profile update carrying a scheme the browser would execute must be refused
+// at the HTTP boundary and must not reach the database.
+func TestUpdateProfileHandler_RejectsUnsafeAvatar(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, _, db := newTestService(t)
+	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+	h := NewHandler(Deps{
+		DB:        db,
+		JWTSecret: testJWTSecret,
+		Files:     &fakeFiles{},
+		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
+		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+	})
+
+	r := gin.New()
+	r.PUT("/api/auth/profile", func(c *gin.Context) {
+		c.Set(middleware.CtxUserIDKey, u.ID)
+		h.UpdateProfile(c)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile",
+		strings.NewReader(`{"avatar":"javascript:document.title=\"xss\""}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var stored model.User
+	if err := db.First(&stored, u.ID).Error; err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if stored.Avatar != "" {
+		t.Errorf("unsafe avatar must not be stored, got %q", stored.Avatar)
+	}
+}
