@@ -23,7 +23,7 @@ Choose the method that fits you best. Both start the same server.
 If you have Docker installed, run:
 
 ```bash
-docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
+docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### Option B: Run the binary directly
@@ -33,7 +33,7 @@ docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/ve
 
 ```bash
 chmod +x vexgo-linux-amd64
-./vexgo-linux-amd64
+./vexgo-linux-amd64 server
 ```
 
 > **What just happened?** VexGo started an HTTP server on port `3001` and created a SQLite database in the `./data` directory. That's the whole server — no separate database to install.

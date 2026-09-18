@@ -94,8 +94,10 @@ Build the frontends once, then start the backend:
 cd frontend && bun install && cd ..
 just build-frontend
 just build-theme
-just run
+just server
 ```
+
+`just server` starts the server. `just run *args` passes arguments to the CLI, for example `just run server -c examples/config.yml` or `just run --version`; `just run` without arguments prints help. For the binary, use `vexgo server` to start, `vexgo server --help` for server flags (`--config/-c`, `--addr/-a`, `--port/-p`, `--data/-d`), and `vexgo --version` for the root-only version flag.
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password` — change it on your profile page.
 

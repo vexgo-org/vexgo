@@ -17,7 +17,11 @@ An explicit value in a higher-priority source overrides lower sources. Note that
 
 ## Command-Line Flags
 
-Run `./vexgo --help` for the authoritative list.
+Start the server with `./vexgo server`. Running `./vexgo` without a subcommand prints help instead of starting the server. Server flags must follow `server`; positional arguments are rejected.
+
+Run `./vexgo server --help` for the authoritative list of server flags. Use `./vexgo --version` (or `-V`) to print the version.
+
+Server flags (used as `vexgo server <flag>...`):
 
 | Flag                  | Default   | Description                                   |
 | --------------------- | --------- | --------------------------------------------- |
@@ -25,8 +29,14 @@ Run `./vexgo --help` for the authoritative list.
 | `--addr, -a <addr>`   | `0.0.0.0` | Listen address                                |
 | `--port, -p <port>`   | `3001`    | Listen port                                   |
 | `--data, -d <dir>`    | `./data`  | Data directory (SQLite DB and uploaded media) |
-| `--version, -V`       | —         | Print version and exit                        |
 | `--help, -h`          | —         | Print help and exit                           |
+
+Root command flags:
+
+| Flag            | Default | Description            |
+| --------------- | ------- | ---------------------- |
+| `--version, -V` | —       | Print version and exit |
+| `--help, -h`    | —       | Print help and exit    |
 
 ## Environment Variables
 

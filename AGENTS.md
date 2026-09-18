@@ -24,13 +24,13 @@ VexGo is a self-hosted blog CMS: a Go backend (Gin + GORM) serving the JSON API,
 
 ## Commands
 
-Requirements: Go, bun, and the tools in the root `justfile` (`nix develop` provides them). Install with `go mod download` and `cd frontend && bun install`. Configuration layers flags > config file (`-c`, see `examples/`) > environment (`.env.example`) > defaults; runtime data lives in `./data`.
+Requirements: Go, bun, and the tools in the root `justfile` (`nix develop` provides them). Install with `go mod download` and `cd frontend && bun install`. Configuration layers server flags > config file (`vexgo server -c`, see `examples/`) > environment (`.env.example`) > defaults; runtime data lives in `./data`.
 
 ```bash
 just format           # gofumpt -w -extra . && prettier --write ... && go tool swag fmt backend/
 just lint             # golangci-lint, deadcode, prettier, gofumpt, oxlint, gopls, swag fmt, OpenAPI freshness
 just test             # go test -v ./...
-just run              # start the server
+just server           # start the server
 just build            # admin SPA + default theme + backend
 just build-frontend   # admin SPA only
 just build-theme      # fetch and build the standalone default theme
@@ -39,6 +39,7 @@ just generate         # swag -> docs/swagger.json -> orval -> frontend client
 
 - Run `just format` and `just lint` after any change, `just test` for behavior changes, and `just build` before handoff. If `just` is unavailable, run the corresponding recipe from the `justfile` directly.
 - `just lint` fails on a stale `docs/swagger.json` or unformatted swag annotations. Never hand-edit `docs/swagger.json` or `frontend/src/api/generated/`; change the handler types/annotations and run `just generate`.
+- Start with `vexgo server`; bare `vexgo` prints help. Server flags are `--config/-c`, `--addr/-a`, `--port/-p`, and `--data/-d`; version is root-only (`vexgo --version` or `-V`). `just run *args` passes CLI arguments (e.g. `just run server -c examples/config.yml` or `just run --version`); bare `just run` prints help.
 - Frontend dev loop: `bun run dev` in `frontend/` (API base from `VITE_API_URL`, default `http://localhost:3001/api`).
 
 ## Testing

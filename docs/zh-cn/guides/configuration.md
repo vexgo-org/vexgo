@@ -10,14 +10,18 @@ VexGo 从四个来源读取配置。当同一设置出现在多个来源时，�
 命令行参数  >  配置文件  >  环境变量  >  默认值
 ```
 
-| 来源             | 示例                     | 适用场景                |
-| ---------------- | ------------------------ | ----------------------- |
-| 命令行参数       | `./vexgo --port 8080`    | 一次性覆盖              |
-| 配置文件（`-c`） | `./vexgo -c config.yml`  | 所有配置（推荐）        |
-| 环境变量         | `PORT=8080 ./vexgo`      | 容器（Docker、systemd） |
-| 默认值           | `3001`、`./data`、`info` | 未设置任何值时的兜底    |
+| 来源             | 示例                           | 适用场景                |
+| ---------------- | ------------------------------ | ----------------------- |
+| 命令行参数       | `./vexgo server --port 8080`   | 一次性覆盖              |
+| 配置文件（`-c`） | `./vexgo server -c config.yml` | 所有配置（推荐）        |
+| 环境变量         | `PORT=8080 ./vexgo server`     | 容器（Docker、systemd） |
+| 默认值           | `3001`、`./data`、`info`       | 未设置任何值时的兜底    |
 
-**CLI 参数：** `--config, -c <file>`、`--addr, -a`、`--port, -p`、`--data, -d`、`--version, -V`、`--help, -h`。运行 `./vexgo --help` 查看完整列表。
+使用 `./vexgo server` 启动服务器。不带参数运行 `./vexgo` 会打印帮助信息，而不是启动服务器。
+
+**服务器参数：** `--config, -c <file>`、`--addr, -a <addr>`、`--port, -p <port>`、`--data, -d <dir>`、`--help, -h`。这些参数必须跟在 `server` 之后；运行 `./vexgo server --help` 查看完整列表。
+
+**仅限根命令的版本参数：** 使用 `./vexgo --version`（或 `-V`）打印版本并退出，而不是 `./vexgo server --version`。
 
 > **提示：** 密钥（如 `JWT_SECRET` 或数据库密码）既可在配置文件中，也可用环境变量提供——选择符合你部署方式的方案。切勿把真实密钥提交到仓库。
 
@@ -32,7 +36,7 @@ cp examples/config.yml config.yml
 编辑其中的值，然后启动 VexGo：
 
 ```bash
-./vexgo -c config.yml
+./vexgo server -c config.yml
 ```
 
 示例配置文件（节选）：
@@ -178,7 +182,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 使用 PostgreSQL 配置运行 VexGo：
 
 ```bash
-go run ./backend/cmd/vexgo -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo server -c examples/config-postgres.yml
 ```
 
 或使用环境变量：
@@ -190,7 +194,7 @@ export DB_PORT=5432
 export DB_USER=vexgo_user
 export DB_PASSWORD=password
 export DB_NAME=vexgo_db
-./vexgo
+./vexgo server
 ```
 
 ### MySQL
@@ -218,8 +222,7 @@ mysql> FLUSH PRIVILEGES;
 使用 MySQL 配置运行 VexGo：
 
 ```bash
-cd backend
-go run ./cmd/vexgo -c ../examples/config-mysql.yml
+go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
 ```
 
 > 首次启动时 VexGo 会自动执行数据库迁移——无需手动导入任何东西。
@@ -299,7 +302,7 @@ docker run -d --name vexgo \
   -e S3_SECRET_KEY=your-secret-key \
   -e S3_FORCE_PATH=true \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 > **MinIO/Wasabi：** 请设置 `S3_FORCE_PATH=true`——大多数 S3 兼容服务需要路径风格 URL。

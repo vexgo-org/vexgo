@@ -63,7 +63,7 @@ If `trusted_proxies` is empty, VexGo defaults to common private networks (`127.0
 Also set your public base URL (used for SSO redirects) via the environment variable:
 
 ```bash
-BASE_URL=https://your-domain.com ./vexgo
+BASE_URL=https://your-domain.com ./vexgo server
 ```
 
 or in your Docker/systemd environment.
@@ -97,7 +97,7 @@ Type=simple
 User=vexgo
 Group=vexgo
 WorkingDirectory=/opt/vexgo
-ExecStart=/opt/vexgo/vexgo
+ExecStart=/opt/vexgo/vexgo server
 Restart=always
 RestartSec=5
 
@@ -196,7 +196,7 @@ Schedule backups with cron or systemd timers, and store them off-machine (e.g. a
 ```bash
 docker pull ghcr.io/vexgo-org/vexgo:latest
 docker stop vexgo && docker rm vexgo
-docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest
+docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### Binary
@@ -222,7 +222,7 @@ sudo nixos-rebuild switch --flake .#myhost
 ```bash
 sudo lsof -i :3001          # find the process
 sudo kill -9 <PID>          # or use a different port:
-./vexgo --port 8080
+./vexgo server --port 8080
 ```
 
 ### Permission denied
@@ -245,7 +245,7 @@ docker logs vexgo-postgres                        # DB logs
 ```bash
 docker logs vexgo
 docker inspect vexgo
-docker rm -f vexgo && docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
+docker rm -f vexgo && docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### systemd service issues

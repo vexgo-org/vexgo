@@ -63,7 +63,7 @@ trusted_proxies: ["192.168.1.100"] # 或 CIDR，如 "10.0.0.0/8"
 同时通过环境变量设置公网地址（SSO 重定向用）：
 
 ```bash
-BASE_URL=https://your-domain.com ./vexgo
+BASE_URL=https://your-domain.com ./vexgo server
 ```
 
 或配置在 Docker/systemd 环境中。
@@ -97,7 +97,7 @@ Type=simple
 User=vexgo
 Group=vexgo
 WorkingDirectory=/opt/vexgo
-ExecStart=/opt/vexgo/vexgo
+ExecStart=/opt/vexgo/vexgo server
 Restart=always
 RestartSec=5
 
@@ -194,7 +194,7 @@ pg_dump -U vexgo_user vexgo_db > vexgo-db-$(date +%F).sql
 ```bash
 docker pull ghcr.io/vexgo-org/vexgo:latest
 docker stop vexgo && docker rm vexgo
-docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest
+docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### 二进制包
@@ -220,7 +220,7 @@ sudo nixos-rebuild switch --flake .#myhost
 ```bash
 sudo lsof -i :3001          # 查找占用进程
 sudo kill -9 <PID>          # 或使用其他端口：
-./vexgo --port 8080
+./vexgo server --port 8080
 ```
 
 ### 权限不足
@@ -243,7 +243,7 @@ docker logs vexgo-postgres                        # 数据库日志
 ```bash
 docker logs vexgo
 docker inspect vexgo
-docker rm -f vexgo && docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
+docker rm -f vexgo && docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### systemd 服务问题

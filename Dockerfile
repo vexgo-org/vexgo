@@ -53,4 +53,4 @@ ENV ADDR=0.0.0.0
 ENV PORT=3001
 ENV DATA_DIR=/app/data
 
-CMD ["./vexgo"]
+CMD ["./vexgo", "server"]

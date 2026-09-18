@@ -17,38 +17,37 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/config"
 )
 
+// runState carries the configuration resolved by RunE out of the command.
+type runState struct {
+	cfg *config.Config
+}
+
 // Execute runs the vexgo command line with the given arguments and returns
 // the resolved configuration. A nil *Config with a nil error means the
 // command printed help or version information and there is nothing to run;
 // a non-nil error means argument parsing or configuration resolution failed.
 // version is the build version string, injected via ldflags.
 func Execute(version string, args []string) (*config.Config, error) {
-	root, state := newRootCmd(version)
+	root := newRootCmd(version)
 	root.SetArgs(args)
+
+	server, state := newServerCmd()
+	root.AddCommand(server)
+
 	if err := root.Execute(); err != nil {
 		return nil, err
 	}
 	return state.cfg, nil
 }
 
-// runState carries the configuration resolved by RunE out of the command.
-type runState struct {
-	cfg *config.Config
-}
-
-// newRootCmd builds the vexgo root command. Flag defaults are the same
-// constants config.Load falls back to, so help text cannot drift from
-// resolution; a flag overrides the lower sources only when it is explicitly
-// passed, which viper decides via the flag's Changed state.
-func newRootCmd(version string) (*cobra.Command, *runState) {
-	state := &runState{}
-	var configFile string
-
+// newRootCmd builds the vexgo root command.
+// And provides a `--version` flag to display
+// version information.
+func newRootCmd(version string) *cobra.Command {
 	root := &cobra.Command{
-		Use:   "vexgo",
-		Short: "Self-hosted blog CMS server",
-		// Tolerate stray positional arguments (for example "vexgo serve").
-		Args:          cobra.ArbitraryArgs,
+		Use:           "vexgo",
+		Short:         "Self-hosted blog CMS server",
+		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -59,7 +58,32 @@ func newRootCmd(version string) (*cobra.Command, *runState) {
 				_, err := fmt.Fprintf(cmd.OutOrStdout(), "vexgo %s\n", version)
 				return err
 			}
+			return cmd.Help()
+		},
+	}
 
+	root.Flags().BoolP("version", "V", false, "print version and exit")
+	return root
+}
+
+// newServerCmd builds the `vexgo server` command. Flag defaults are the same
+// constants config.Load falls back to, so help text cannot drift from
+// resolution; a flag overrides the lower sources only when it is explicitly
+// passed, which viper decides via the flag's Changed state.
+func newServerCmd() (*cobra.Command, *runState) {
+	var configFile string
+	state := &runState{}
+
+	server := &cobra.Command{
+		Use:           "server",
+		Short:         "Start VexGo server",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// .env is only needed when actually building the server
 			// configuration; help and version exit without reading it.
 			loadDotEnv()
@@ -73,13 +97,12 @@ func newRootCmd(version string) (*cobra.Command, *runState) {
 		},
 	}
 
-	root.Flags().StringVarP(&configFile, "config", "c", "", "path to configuration file (YAML format)")
-	root.Flags().StringP("addr", "a", config.DefaultAddr, "address to listen on")
-	root.Flags().IntP("port", "p", config.DefaultPort, "port to listen on")
-	root.Flags().StringP("data", "d", config.DefaultDataDir, "data directory for storing SQLite database and media files")
-	root.Flags().BoolP("version", "V", false, "print version and exit")
+	server.Flags().StringVarP(&configFile, "config", "c", "", "path to configuration file (YAML format)")
+	server.Flags().StringP("addr", "a", config.DefaultAddr, "address to listen on")
+	server.Flags().IntP("port", "p", config.DefaultPort, "port to listen on")
+	server.Flags().StringP("data", "d", config.DefaultDataDir, "data directory for storing SQLite database and media files")
 
-	return root, state
+	return server, state
 }
 
 // resolveConfig binds the parsed flags to viper and resolves the layered

@@ -50,26 +50,30 @@ mkdir -p ./data
 ### 第 3 步：运行 VexGo
 
 ```bash
-./vexgo
+./vexgo server
 ```
 
 默认在 `http://0.0.0.0:3001` 启动。
 
 ### 第 4 步：自定义参数运行
 
+服务器参数必须跟在 `server` 子命令之后：
+
 ```bash
 # 自定义端口和数据目录
-./vexgo --port 8080 --data /path/to/data
+./vexgo server --port 8080 --data /path/to/data
 
 # 自定义监听地址
-./vexgo --addr 127.0.0.1
+./vexgo server --addr 127.0.0.1
 
 # 加载配置文件
-./vexgo -c /path/to/config.yml
+./vexgo server -c /path/to/config.yml
 
 # 查看所有可用参数
-./vexgo --help
+./vexgo server --help
 ```
+
+不带参数运行 `./vexgo` 会打印帮助信息，而不是启动服务器。版本参数仅限根命令：使用 `./vexgo --version`（或 `./vexgo -V`），而不是 `./vexgo server --version`。
 
 ### 第 5 步：注册为 systemd 服务（可选）
 
@@ -85,7 +89,7 @@ Type=simple
 User=vexgo
 Group=vexgo
 WorkingDirectory=/opt/vexgo
-ExecStart=/opt/vexgo/vexgo
+ExecStart=/opt/vexgo/vexgo server
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -123,7 +127,8 @@ docker run -d \
   -p 3001:3001 \
   -v ./data:/app/data \
   --restart unless-stopped \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest \
+  ./vexgo server
 ```
 
 ### 第 2 步：验证
@@ -146,7 +151,8 @@ docker run -d \
   -e JWT_SECRET=your-secret-key-change-this-in-production \
   -e SETTINGS_ENCRYPTION_KEY=your-very-long-random-secret-here-change-this-in-production \
   --restart unless-stopped \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest \
+  ./vexgo server
 ```
 
 ### 常用 Docker 命令
@@ -160,7 +166,7 @@ docker rm -f vexgo
 # 更新到最新版本
 docker pull ghcr.io/vexgo-org/vexgo:latest
 docker stop vexgo && docker rm vexgo
-docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest
+docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ---
@@ -177,6 +183,7 @@ version: "3.8"
 services:
   vexgo:
     image: ghcr.io/vexgo-org/vexgo:latest
+    command: ["./vexgo", "server"]
     container_name: vexgo
     ports:
       - "3001:3001"
@@ -244,21 +251,21 @@ source ~/.nix-profile/etc/profile.d/nix.sh
 
 ```bash
 # 无需安装即可运行（从 GitHub 拉取）
-nix run github:vexgo-org/vexgo
+nix run github:vexgo-org/vexgo -- server
 ```
 
 ### 第 3 步：永久安装
 
 ```bash
 nix profile install github:vexgo-org/vexgo
-vexgo
+vexgo server
 ```
 
 ### 第 4 步：自定义参数运行
 
 ```bash
-nix run github:vexgo-org/vexgo -- -c /path/to/config.yml
-nix run github:vexgo-org/vexgo -- --port 8080 --addr 0.0.0.0
+nix run github:vexgo-org/vexgo -- server -c /path/to/config.yml
+nix run github:vexgo-org/vexgo -- server --port 8080 --addr 0.0.0.0
 ```
 
 ---
@@ -386,8 +393,10 @@ just build-theme
 ### 第 3 步：运行
 
 ```bash
-just run
+just server
 ```
+
+`just run` 将参数传给 CLI，例如 `just run server -c examples/config.yml` 或 `just run --version`。不带参数的 `just run` 会打印帮助信息。
 
 ### 开发常用命令
 

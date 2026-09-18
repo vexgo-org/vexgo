@@ -22,10 +22,14 @@ test:
     just ensure-dist
     go test -v ./...
 
-run:
+run *args:
     # Run VexGo.
+    go run backend/cmd/vexgo/main.go {{args}}
+
+server:
+    # Start VexGo server.
     just ensure-dist
-    go run backend/cmd/vexgo/main.go
+    go run backend/cmd/vexgo/main.go server
 
 build:
     # Build VexGo.

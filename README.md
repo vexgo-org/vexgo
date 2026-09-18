@@ -50,13 +50,13 @@ Select the corresponding system and architecture on the release page to download
 ### Linux
 
 ```bash
-./vexgo-linux-amd64
+./vexgo-linux-amd64 server
 ```
 
 ### Docker
 
 ```bash
-sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest
+sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 ### ❄️Nix
@@ -64,7 +64,7 @@ sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-o
 You can try VexGo instantly without installing:
 
 ```bash
-nix run github:vexgo-org/vexgo
+nix run github:vexgo-org/vexgo -- server
 ```
 
 ### ❄️NixOS Flake
@@ -132,7 +132,9 @@ You can change your account password on your profile page.
 
 ## Configuration
 
-Configuration priority: command-line arguments > configuration files > environment variables > default values
+Configuration priority: server command-line arguments > configuration files > environment variables > default values
+
+Start with `vexgo server`; running `vexgo` without arguments prints help. Server flags (`--config/-c`, `--addr/-a`, `--port/-p`, `--data/-d`) follow `server`; use `vexgo server --help` for details. The version flag is root-only: `vexgo --version` (or `-V`).
 
 ### Use config file
 
@@ -313,7 +315,7 @@ s3_disable_bucket_in_custom_url: false
 Then, Run the following command:
 
 ```bash
-./vexgo-linux-amd64 -c /the/path/to/config.yml
+./vexgo-linux-amd64 server -c /the/path/to/config.yml
 ```
 
 ### Use environment variables
@@ -415,7 +417,7 @@ sudo docker run -d --name vexgo \
   -e OIDC_ISSUER_URL=https://auth.example.com/realms/myrealm \
   -e OIDC_CLIENT_ID=your-client-id \
   -e OIDC_CLIENT_SECRET=your-client-secret \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 **Example: environment variables**
@@ -426,7 +428,7 @@ export OIDC_ENABLED=true
 export OIDC_ISSUER_URL=https://auth.example.com/realms/myrealm
 export OIDC_CLIENT_ID=your-client-id
 export OIDC_CLIENT_SECRET=your-client-secret
-./vexgo-linux-amd64
+./vexgo-linux-amd64 server
 ```
 
 #### S3 / Object Storage
@@ -461,7 +463,7 @@ sudo docker run -d --name vexgo \
   -e S3_SECRET_KEY=your-secret-key \
   -e S3_FORCE_PATH=true \
   -e S3_DISABLE_BUCKET_IN_CUSTOM_URL=false \
-  ghcr.io/vexgo-org/vexgo:latest
+  ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
 #### Content Cache & Valkey
@@ -501,7 +503,7 @@ postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 
 Run backend with this command:
 
 ```bash
-go run ./backend/cmd/vexgo -c examples/config-postgres.yml
+go run ./backend/cmd/vexgo server -c examples/config-postgres.yml
 ```
 
 ### Mysql
@@ -527,8 +529,7 @@ mysql> FLUSH PRIVILEGES;
 Run backend with this command:
 
 ```bash
-cd backend
-go run ./cmd/vexgo -c ../examples/config-mysql.yml
+go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
 ```
 
 ## Development
@@ -570,8 +571,10 @@ just build-frontend
 just build-theme
 
 # Start the server
-just run
+just server
 ```
+
+`just server` starts the server. `just run *args` passes CLI arguments, for example `just run server -c examples/config.yml` or `just run --version`; bare `just run` prints help.
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` / `password` — change it on your profile page.
 
