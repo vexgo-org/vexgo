@@ -315,6 +315,20 @@ func TestDevThemeDirMissingTemplate(t *testing.T) {
 	}
 }
 
+// TestDevThemeDirNotExist rejects a --theme-dir that points at a path which
+// does not exist, so a typo fails loudly instead of falling through to the
+// embedded default theme or exposing whatever the process can read.
+func TestDevThemeDirNotExist(t *testing.T) {
+	r := newTestRenderer(t)
+	r.SetThemeDir(filepath.Join(t.TempDir(), "no-such-theme"))
+
+	if _, err := r.themeFS(DevTheme); err == nil {
+		t.Fatal("themeFS should reject a non-existent dev theme dir")
+	} else if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("expected a 'does not exist' error, got %v", err)
+	}
+}
+
 // TestRenderTheme_RejectsTraversal ensures hostile theme ids never touch the
 // file system outside the themes directory.
 func TestRenderTheme_RejectsTraversal(t *testing.T) {

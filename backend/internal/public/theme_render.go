@@ -827,6 +827,11 @@ func (r *Renderer) themeFS(themeID string) (fs.FS, error) {
 		if r.themeDir == "" {
 			return nil, errors.New("no dev theme directory configured")
 		}
+
+		if _, err := os.Stat(r.themeDir); err != nil {
+			return nil, fmt.Errorf("theme dir does not exist: %w", err)
+		}
+
 		return os.DirFS(r.themeDir), nil
 	}
 	if themeID == DefaultTheme {
