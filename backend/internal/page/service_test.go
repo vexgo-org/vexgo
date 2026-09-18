@@ -223,12 +223,82 @@ func TestGetBySlug_DraftHiddenFromGuest(t *testing.T) {
 	if _, err := svc.Create(ctx, model.RoleAdmin, 1, CreatePageRequest{Slug: "secret", Title: "s", Content: "c"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.GetBySlug(ctx, "secret", ""); err == nil {
+	if _, err := svc.GetBySlug(ctx, "secret", 0, ""); err == nil {
 		t.Error("guest should not see draft")
 	}
-	if _, err := svc.GetBySlug(ctx, "secret", model.RoleAdmin); err != nil {
+	if _, err := svc.GetBySlug(ctx, "secret", 0, model.RoleAdmin); err != nil {
 		t.Errorf("admin should see draft: %v", err)
 	}
+}
+
+// A page is readable by anonymous visitors, so its author block must not hand
+// out account state or an email address the owner did not publish; the owner
+// and administrators still see the account.
+func TestAuthorBlockRedactedForPublicViewers(t *testing.T) {
+	ctx := context.Background()
+
+	// seedPublished stores a published page whose author block looks like a
+	// preloaded admin account (the fake repository does not preload anything).
+	seedPublished := func(t *testing.T) (*Service, *model.Page) {
+		t.Helper()
+		repo := newFakeRepo()
+		svc := newServiceWithRepo(repo)
+		if _, err := svc.Create(ctx, model.RoleAdmin, 7, CreatePageRequest{
+			Slug: "about", Title: "A", Content: "c", Status: "published",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		stored := repo.pages[1]
+		stored.AuthorID = 7
+		stored.Author = model.User{
+			ID: 7, Username: "author", Email: "author@example.com",
+			Role: model.RoleAdmin, EmailVerified: true,
+			ProfileVisibility: model.ProfileVisibilityPublic,
+		}
+		return svc, stored
+	}
+
+	check := func(t *testing.T, p *model.Page, wantEmail string, wantAccountState bool) {
+		t.Helper()
+		if p.Author.Username != "author" {
+			t.Fatalf("test setup lost the author block: %+v", p.Author)
+		}
+		if p.Author.Email != wantEmail {
+			t.Errorf("expected email %q, got %q", wantEmail, p.Author.Email)
+		}
+		if wantAccountState {
+			return
+		}
+		if p.Author.Role != "" || p.Author.EmailVerified || p.Author.ProfileVisibility != "" {
+			t.Errorf("account state leaked in the author block: %+v", p.Author)
+		}
+	}
+
+	t.Run("anonymous list and slug", func(t *testing.T) {
+		svc, _ := seedPublished(t)
+
+		pages, _, err := svc.List(ctx, ListQuery{Status: string(model.PageStatusPublished), Page: 1, Limit: 10})
+		if err != nil {
+			t.Fatalf("List error: %v", err)
+		}
+		check(t, &pages[0], "", false)
+
+		page, err := svc.GetBySlug(ctx, "about", 0, "")
+		if err != nil {
+			t.Fatalf("GetBySlug error: %v", err)
+		}
+		check(t, page, "", false)
+	})
+
+	t.Run("admin keeps the account", func(t *testing.T) {
+		svc, _ := seedPublished(t)
+
+		page, err := svc.GetBySlug(ctx, "about", 99, model.RoleSuperAdmin)
+		if err != nil {
+			t.Fatalf("GetBySlug error: %v", err)
+		}
+		check(t, page, "author@example.com", true)
+	})
 }
 
 func TestUpdateDelete_AdminOnly(t *testing.T) {

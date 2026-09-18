@@ -22,6 +22,8 @@ var (
 	ErrGuestViewDenied = errors.New("guest view denied")
 	// ErrBadRequest means the request is invalid for the current state.
 	ErrBadRequest = errors.New("bad request")
+	// ErrAuthorNotFound means the requested post author does not exist.
+	ErrAuthorNotFound = errors.New("author not found")
 	// ErrInvalidStatus means the requested post status is not a value the
 	// author-facing endpoints accept (unknown value, or the moderation-only
 	// `rejected` state).

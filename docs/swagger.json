@@ -6823,6 +6823,16 @@
                         },
                         "description": "invalid user id"
                     },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "author not found"
+                    },
                     "500": {
                         "content": {
                             "application/json": {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -59,12 +60,26 @@ func newServiceWithRepo(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-// ListQuery carries pagination and filters for List.
+// ListQuery carries pagination, filters and the identity of the viewer for
+// List. The viewer decides how much of the page author is serialized.
 type ListQuery struct {
-	Status string
-	Search string
-	Page   int
-	Limit  int
+	Status     string
+	Search     string
+	Page       int
+	Limit      int
+	ViewerID   uint
+	ViewerRole string
+}
+
+// filterAuthorsForViewer strips everything the viewer may not see from the
+// author block of each page. Pages are public (`GET /api/pages` serves
+// published ones to anonymous callers), so their authors go through the same
+// privacy filter as post and comment authors: without it the endpoint hands
+// out the page author's email, role and account state.
+func filterAuthorsForViewer(pages []model.Page, viewerID uint, viewerRole string) {
+	for i := range pages {
+		auth.FilterUserByPrivacy(&pages[i].Author, viewerID, viewerRole)
+	}
 }
 
 // validatePageSlug checks format plus the reserved-word blocklist.
@@ -102,12 +117,19 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Page, int64, e
 		q.Limit = 20
 	}
 	q.Search = model.TruncateRunes(q.Search, maxSearchRunes)
-	return s.repo.List(ctx, q)
+
+	pages, total, err := s.repo.List(ctx, q)
+	if err != nil {
+		return nil, 0, err
+	}
+	filterAuthorsForViewer(pages, q.ViewerID, q.ViewerRole)
+
+	return pages, total, nil
 }
 
 // GetBySlug returns one page by slug. Published pages are public; drafts are
 // only visible to admins (SSR preview and admin console).
-func (s *Service) GetBySlug(ctx context.Context, slug, role string) (*model.Page, error) {
+func (s *Service) GetBySlug(ctx context.Context, slug string, viewerID uint, role string) (*model.Page, error) {
 	page, err := s.repo.FindBySlug(ctx, slug)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -118,6 +140,11 @@ func (s *Service) GetBySlug(ctx context.Context, slug, role string) (*model.Page
 	if page.Status != model.PageStatusPublished && !model.IsAdmin(role) {
 		return nil, ErrPageNotFound
 	}
+
+	// The author block is public data on a published page, so it is filtered
+	// for the viewer like any other author block.
+	auth.FilterUserByPrivacy(&page.Author, viewerID, role)
+
 	return page, nil
 }
 

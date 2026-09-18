@@ -166,7 +166,9 @@ func (r *Renderer) EnsureThemeSeeds(ctx context.Context, themeID string) (int, e
 	svc := page.NewService(page.Deps{DB: r.db, JWTSecret: r.jwtSecret})
 	created := 0
 	for _, seed := range seeds {
-		_, err := svc.GetBySlug(ctx, seed.Slug, model.RoleSuperAdmin)
+		// The seeder only needs the lookup to answer "does this slug exist?",
+		// and it runs as an administrator, so the author filter is a no-op.
+		_, err := svc.GetBySlug(ctx, seed.Slug, 0, model.RoleSuperAdmin)
 		if err == nil {
 			continue
 		}

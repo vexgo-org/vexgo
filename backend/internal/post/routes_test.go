@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,11 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	h := NewHandler(Deps{DB: db, JWTSecret: testJWTSecret})
 	r := gin.New()
 	api := r.Group("/api")
+	// Production mounts the optional-JWT middleware on the whole /api group
+	// (router.RegisterAPIRoutes); without it every public read route would
+	// look anonymous in this harness, and the per-viewer filtering those
+	// routes apply could not be exercised.
+	api.Use(middleware.NewAuth(db, testJWTSecret).OptionalJWTAuth())
 	h.RegisterRoutes(api)
 	return r, db
 }
@@ -937,5 +943,119 @@ func TestLikeRoutes_ValidPostIDStillWorks(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), `"likesCount":1`) {
 		t.Errorf("expected like count 1, got %s", w.Body.String())
+	}
+}
+
+// An author id that is not in use is a missing resource, not an empty page:
+// the public profile route answers 404 for it too. Existence is therefore not
+// newly revealed, and the guest-view gate still runs before the lookup so the
+// route cannot become an account probe for anonymous callers.
+func TestGetUserPosts_UnknownAuthorIsNotFound(t *testing.T) {
+	r, db := newTestRouter(t)
+	author := seedRoleUser(t, db, model.RoleAuthor)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/posts/user/99999", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unknown author: expected 404, got %d (body=%s)", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/posts/user/"+idString(author.ID), nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("known author without posts: expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"posts":[]`) {
+		t.Errorf("expected an empty page for a known author, got %s", w.Body.String())
+	}
+}
+
+// The author block on the public list endpoints is filtered for the viewer:
+// an anonymous caller receives no email, a signed-in reader receives one only
+// while the author left the address public, and neither receives account
+// state (role, verification, last login, privacy switches).
+func TestPublicAuthorBlocksAreRedacted(t *testing.T) {
+	cases := []struct {
+		name        string
+		viewer      string // "" means no token at all
+		hideEmail   bool
+		wantEmail   string
+		wantNoState bool
+	}{
+		{name: "anonymous", wantEmail: "", wantNoState: true},
+		{name: "signed-in reader", viewer: model.RoleAuthor, wantEmail: "author@example.com", wantNoState: true},
+		{name: "signed-in reader, address hidden", viewer: model.RoleAuthor, hideEmail: true, wantEmail: "", wantNoState: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, db := newTestRouter(t)
+			author := seedRoleUser(t, db, model.RoleAuthor)
+			author.Email = "author@example.com"
+			author.EmailVerified = true
+			author.HideEmail = tc.hideEmail
+			author.ProfileVisibility = model.ProfileVisibilityPublic
+			author.LastLoginAt = time.Now()
+			if err := db.Save(&author).Error; err != nil {
+				t.Fatalf("save author: %v", err)
+			}
+			post := model.Post{Slug: "public", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished, AuthorID: author.ID}
+			if err := db.Create(&post).Error; err != nil {
+				t.Fatalf("seed post: %v", err)
+			}
+
+			token := ""
+			if tc.viewer != "" {
+				viewer := model.User{Username: "reader", Email: "reader@example.com", Role: tc.viewer, PasswordVersion: 1}
+				if err := db.Create(&viewer).Error; err != nil {
+					t.Fatalf("seed reader: %v", err)
+				}
+				token = mintToken(t, viewer.ID, tc.viewer)
+			}
+
+			for _, path := range []string{"/api/posts?page=1&limit=5", "/api/stats/latest-posts", "/api/stats/popular-posts"} {
+				req := httptest.NewRequest(http.MethodGet, path, nil)
+				if token != "" {
+					req.Header.Set("Authorization", "Bearer "+token)
+				}
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, req)
+				if w.Code != http.StatusOK {
+					t.Fatalf("%s: expected 200, got %d (body=%s)", path, w.Code, w.Body.String())
+				}
+
+				var body struct {
+					Posts []struct {
+						Author struct {
+							Username          string    `json:"username"`
+							Email             string    `json:"email"`
+							Role              string    `json:"role"`
+							EmailVerified     bool      `json:"email_verified"`
+							LastLoginAt       time.Time `json:"last_login_at"`
+							ProfileVisibility string    `json:"profile_visibility"`
+						} `json:"author"`
+					} `json:"posts"`
+				}
+				if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+					t.Fatalf("%s: decode body: %v", path, err)
+				}
+				if len(body.Posts) != 1 {
+					t.Fatalf("%s: expected 1 post, got %d", path, len(body.Posts))
+				}
+
+				author := body.Posts[0].Author
+				if author.Username != "u_"+model.RoleAuthor {
+					t.Errorf("%s: test setup lost the author, got %+v", path, author)
+				}
+				if author.Email != tc.wantEmail {
+					t.Errorf("%s: expected email %q, got %q", path, tc.wantEmail, author.Email)
+				}
+				if tc.wantNoState {
+					if author.Role != "" || author.EmailVerified || !author.LastLoginAt.IsZero() || author.ProfileVisibility != "" {
+						t.Errorf("%s: account state leaked in the author block: %+v", path, author)
+					}
+				}
+			}
+		})
 	}
 }

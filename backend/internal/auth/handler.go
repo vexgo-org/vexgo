@@ -335,6 +335,10 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	user, err := h.svc.UpdateProfile(c.Request.Context(), userID, UpdateProfileRequest(req))
 	if err != nil {
+		if errors.Is(err, ErrInvalidAvatar) {
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
+			return
+		}
 		if errors.Is(err, ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 			return

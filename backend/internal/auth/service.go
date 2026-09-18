@@ -42,6 +42,7 @@ var (
 	ErrCreateUser           = errors.New("failed to create user")
 
 	ErrUserNotFound    = errors.New("user does not exist")
+	ErrInvalidAvatar   = errors.New("avatar must be an /uploads/ path or an http(s) URL")
 	ErrWrongPassword   = errors.New("current password is incorrect")
 	ErrEncryptPassword = errors.New("failed to encrypt password")
 	ErrSaveSettings    = errors.New("failed to save settings")
@@ -463,16 +464,24 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		return nil, err
 	}
 
-	// If updating avatar, delete the old avatar file — but only when it maps
-	// to a media record owned by this user. The stored URL is
-	// client-controlled (set by a previous profile update), and
-	// Storage.Delete resolves it back to a storage key (for S3, any key in
-	// the bucket), so deleting on faith would let a user wipe arbitrary
-	// objects by first pointing their avatar at them.
-	if req.Avatar != nil && *req.Avatar != user.Avatar && user.Avatar != "" {
-		s.deleteOldAvatar(ctx, userID, user.Avatar)
-		user.Avatar = *req.Avatar
-	} else if req.Avatar != nil {
+	if req.Avatar != nil {
+		// The value is rendered as an <img src> by the public pages and by
+		// the theme's comment widget, which writes it straight to the DOM;
+		// anything the browser would resolve as a script is refused here
+		// (see isSafeAvatarURL) instead of being stored for those sinks.
+		if !isSafeAvatarURL(*req.Avatar) {
+			return nil, ErrInvalidAvatar
+		}
+
+		// Delete the old avatar file — but only when it maps to a media
+		// record owned by this user. The stored URL is client-controlled
+		// (set by a previous profile update), and Storage.Delete resolves it
+		// back to a storage key (for S3, any key in the bucket), so deleting
+		// on faith would let a user wipe arbitrary objects by first pointing
+		// their avatar at them.
+		if *req.Avatar != user.Avatar && user.Avatar != "" {
+			s.deleteOldAvatar(ctx, userID, user.Avatar)
+		}
 		user.Avatar = *req.Avatar
 	}
 

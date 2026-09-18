@@ -48,15 +48,26 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]model.Post, int64, e
 	}
 
 	s.populateCounts(ctx, posts, q.UserID)
-
-	// Apply privacy filtering to author information
-	for i := range posts {
-		if !model.IsAdmin(q.UserRole) && posts[i].AuthorID != q.UserID {
-			auth.FilterUserByPrivacy(&posts[i].Author, q.UserID, q.UserRole)
-		}
-	}
+	filterAuthorsForViewer(posts, q.UserID, q.UserRole)
 
 	return posts, total, nil
+}
+
+// filterAuthorForViewer strips everything the viewer may not see from a
+// post's author block. Every read path that serializes a post outside the
+// admin console MUST go through this: an unfiltered author hands out the
+// email address, the account role and the privacy settings of every author,
+// and the paths that forgot to filter were exactly how that leak happened.
+func filterAuthorForViewer(post *model.Post, viewerID uint, viewerRole string) {
+	auth.FilterUserByPrivacy(&post.Author, viewerID, viewerRole)
+}
+
+// filterAuthorsForViewer applies filterAuthorForViewer to a whole page of
+// posts in place.
+func filterAuthorsForViewer(posts []model.Post, viewerID uint, viewerRole string) {
+	for i := range posts {
+		filterAuthorForViewer(&posts[i], viewerID, viewerRole)
+	}
 }
 
 // Get returns a single post by numeric ID with privacy filtering, view-count
@@ -114,9 +125,7 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 		return nil, ErrPostNotFound
 	}
 
-	if !model.IsAdmin(currentUserRole) && post.AuthorID != currentUserID {
-		auth.FilterUserByPrivacy(&post.Author, currentUserID, currentUserRole)
-	}
+	filterAuthorForViewer(post, currentUserID, currentUserRole)
 
 	// Increment view count (best-effort)
 	if err := s.repo.IncrementViewCount(ctx, post.ID); err != nil {
@@ -477,8 +486,22 @@ func (s *Service) UserPosts(ctx context.Context, q UserPostsQuery) ([]model.Post
 		return nil, 0, ErrBadRequest
 	}
 
+	// Checked before the lookup below: when guest viewing is off, an
+	// anonymous caller must not be able to probe which accounts exist.
 	if q.CurrentUserRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, 0, nil
+	}
+
+	// An unknown author is a missing resource, not an empty page: reporting
+	// both as an empty list made the two indistinguishable to a client and
+	// hid typos from callers. Existence is public anyway — the profile page
+	// answers 404 for ids that are not in use.
+	exists, err := s.repo.UserExists(ctx, uint(uid))
+	if err != nil {
+		return nil, 0, err
+	}
+	if !exists {
+		return nil, 0, ErrAuthorNotFound
 	}
 
 	posts, total, err := s.repo.UserPosts(
@@ -490,19 +513,13 @@ func (s *Service) UserPosts(ctx context.Context, q UserPostsQuery) ([]model.Post
 	}
 
 	s.populateCounts(ctx, posts, q.CurrentUserID)
-
-	// Apply privacy filtering to author information
-	for i := range posts {
-		if !model.IsAdmin(q.CurrentUserRole) && uint(uid) != q.CurrentUserID {
-			auth.FilterUserByPrivacy(&posts[i].Author, q.CurrentUserID, q.CurrentUserRole)
-		}
-	}
+	filterAuthorsForViewer(posts, q.CurrentUserID, q.CurrentUserRole)
 
 	return posts, total, nil
 }
 
 // Popular returns the top posts by likes*5 + views, limited to published posts.
-func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]model.Post, error) {
+func (s *Service) Popular(ctx context.Context, viewerID uint, userRole string, limit int) ([]model.Post, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return nil, ErrGuestViewDenied
 	}
@@ -537,16 +554,25 @@ func (s *Service) Popular(ctx context.Context, userRole string, limit int) ([]mo
 		posts = posts[:limit]
 	}
 
+	filterAuthorsForViewer(posts, viewerID, userRole)
+
 	return posts, nil
 }
 
 // Latest returns the most recent published posts.
-func (s *Service) Latest(ctx context.Context, userRole string, limit int) ([]model.Post, error) {
+func (s *Service) Latest(ctx context.Context, viewerID uint, userRole string, limit int) ([]model.Post, error) {
 	if userRole == "" && !s.allowGuestView(ctx) {
 		return []model.Post{}, nil
 	}
 
-	return s.repo.Latest(ctx, limit)
+	posts, err := s.repo.Latest(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	filterAuthorsForViewer(posts, viewerID, userRole)
+
+	return posts, nil
 }
 
 // populateCounts fills like/comment counts and the current user's like status
