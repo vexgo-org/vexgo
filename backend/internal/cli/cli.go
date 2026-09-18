@@ -22,11 +22,21 @@ func Execute(version string, args []string) (*config.Config, error) {
 	root := newRootCmd(version)
 	root.SetArgs(args)
 
-	server, state := newServerCmd()
+	server, serverState := newServerCmd()
 	root.AddCommand(server)
+
+	dev, devState := newDevCmd()
+	root.AddCommand(dev)
 
 	if err := root.Execute(); err != nil {
 		return nil, err
 	}
-	return state.cfg, nil
+
+	// Both subcommands populate their own runState; return whichever one the
+	// user invoked, so `vexgo dev` hands its config (with --theme-dir applied)
+	// back to main.go just like `vexgo server` does.
+	if devState.cfg != nil {
+		return devState.cfg, nil
+	}
+	return serverState.cfg, nil
 }
