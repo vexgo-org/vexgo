@@ -109,11 +109,17 @@ type Config struct {
 	TrustedProxies     []string `mapstructure:"trusted_proxies"`      // List of trusted proxy IPs/CIDRs (empty = trust none)
 	BehindReverseProxy bool     `mapstructure:"behind_reverse_proxy"` // Whether the server is behind a reverse proxy (default: false)
 
+	// ThemeDir overrides the directory used for public page rendering. When
+	// set, templates and assets are read from this path instead of the
+	// embedded default theme or data/theme/<id>. It is set by `vexgo dev` so
+	// a developer can iterate on a theme without rebuilding the embed.
+	ThemeDir    string `mapstructure:"theme_dir"`
+	FrontendURL string `mapstructure:"frontend_url"`
+
 	// Runtime secrets (JWTSecret is resolved like every other key; see
 	// ComputeJWTSecret for the development fallback)
-	JWTSecret   []byte    `mapstructure:"-"`
-	FrontendURL string    `mapstructure:"frontend_url"`
-	SSO         SSOConfig `mapstructure:"-"`
+	JWTSecret []byte    `mapstructure:"-"`
+	SSO       SSOConfig `mapstructure:"-"`
 
 	// S3 configuration
 	S3Enabled                  bool   `mapstructure:"s3_enabled"`                      // Enable S3 storage
@@ -194,6 +200,7 @@ var keyDefaults = map[string]any{
 
 	"jwt_secret":   "",
 	"frontend_url": "",
+	"theme_dir":    "",
 }
 
 // Load resolves the configuration into a *Config using the given viper
