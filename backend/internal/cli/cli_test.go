@@ -49,6 +49,20 @@ func runServerCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, 
 	return &out, state.cfg, err
 }
 
+// runDevCmd builds a fresh `vexgo dev` command per call, captures its output,
+// runs the given args, and returns stdout, the resolved config, and the
+// execution error.
+func runDevCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, error) {
+	t.Helper()
+	var out bytes.Buffer
+	root, state := newDevCmd()
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs(args)
+	err := root.Execute()
+	return &out, state.cfg, err
+}
+
 func TestLongSpellings(t *testing.T) {
 	path := writeConfig(t, "")
 	_, cfg, err := runServerCmd(t, "--config", path, "--addr", "10.0.0.1", "--port", "8080", "--data", "/tmp/data")
@@ -429,5 +443,82 @@ func TestVersionRejectsPositionalArgs(t *testing.T) {
 	_, err := runRootCmd(t, "--version", "foo")
 	if err == nil {
 		t.Fatal("version command should reject positional arguments")
+	}
+}
+
+// =============================================================================
+// vexgo dev — the dev-only --theme-dir flag.
+// =============================================================================
+
+func TestDevCommandExists(t *testing.T) {
+	out, _, err := runDevCmd(t, "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Usage:") {
+		t.Fatalf("dev --help should print usage, got %q", out.String())
+	}
+	for _, want := range []string{"dev", "--theme-dir"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("dev help should contain %q, got:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestDevCommandRejectsPositionalArgs(t *testing.T) {
+	_, _, err := runDevCmd(t, "serve")
+	if err == nil {
+		t.Fatal("dev should reject positional arguments")
+	}
+}
+
+func TestDevThemeDirOverridesConfigFile(t *testing.T) {
+	path := writeConfig(t, "theme_dir: from-config-file\n")
+	_, cfg, err := runDevCmd(t, "-c", path, "--theme-dir", "../vexgo-default-theme/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "../vexgo-default-theme/" {
+		t.Fatalf("--theme-dir should override the config file, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestDevThemeDirAbsentKeepsConfigFile(t *testing.T) {
+	path := writeConfig(t, "theme_dir: from-config-file\n")
+	_, cfg, err := runDevCmd(t, "-c", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "from-config-file" {
+		t.Fatalf("absent --theme-dir should keep the config file value, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestDevThemeDirEmptyIsNoop(t *testing.T) {
+	_, cfg, err := runDevCmd(t, "--theme-dir", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "" {
+		t.Fatalf("explicit empty --theme-dir should leave ThemeDir empty, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestDevHelpDoesNotResolveConfig(t *testing.T) {
+	_, cfg, err := runDevCmd(t, "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg != nil {
+		t.Fatal("--help should not resolve a config")
 	}
 }
