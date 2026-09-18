@@ -66,6 +66,7 @@ func (h *Handler) GetPages(c *gin.Context) {
 
 	pages, total, err := h.svc.List(c.Request.Context(), ListQuery{
 		Status: status, Search: search, Page: page, Limit: limit,
+		ViewerID: u.ID, ViewerRole: u.Role,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch pages"})
@@ -96,7 +97,7 @@ func (h *Handler) GetPages(c *gin.Context) {
 func (h *Handler) GetPage(c *gin.Context) {
 	slug := c.Param("slug")
 	u, _ := middleware.CurrentUser(c)
-	page, err := h.svc.GetBySlug(c.Request.Context(), slug, u.Role)
+	page, err := h.svc.GetBySlug(c.Request.Context(), slug, u.ID, u.Role)
 	if err != nil {
 		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Page does not exist"})
 		return
