@@ -403,11 +403,14 @@ just server
 ```sh
 just format            # gofumpt -w -extra . && prettier --write
 just lint              # golangci-lint + prettier --check + gofumpt check + oxlint
+just theme <dir>       # 启动服务器并从本地主题目录渲染公开页面
 go build -v ./...      # 构建后端
 go test -v ./...       # 运行后端测试
 ```
 
 前端构建产物写入 `backend/internal/public/dist` 并嵌入后端二进制，因此修改前端后需要重新构建。
+
+`just theme <dir>` 即 `vexgo dev --theme-dir <dir>`：启动服务器并从本地主题目录渲染公开页面，而不是使用已激活的主题，让开发者无需重新构建内置主题或重新上传即可迭代主题。例如 `just theme ../vexgo-default-theme/dist/`。
 
 ---
 

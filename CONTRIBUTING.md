@@ -99,7 +99,9 @@ just server
 
 `just server` starts the server. `just run *args` passes arguments to the CLI, for example `just run server -c examples/config.yml` or `just run --version`; `just run` without arguments prints help. For the binary, use `vexgo server` to start, `vexgo server --help` for server flags (`--config/-c`, `--addr/-a`, `--port/-p`, `--data/-d`), and `vexgo --version` for the root-only version flag.
 
-`vexgo dev` is the development entry point: it starts the server like `vexgo server` and adds a `--theme-dir` flag that overrides the active theme with a local directory, so a developer can iterate on a theme without rebuilding the embedded default theme. For example, `vexgo dev --theme-dir ../vexgo-default-theme/` renders public pages from the standalone theme checkout.
+`vexgo dev` is the development entry point: it starts the server like `vexgo server` and adds a `--theme-dir` flag that overrides the active theme with a local directory, so a developer can iterate on a theme without rebuilding the embedded default theme. For example, `vexgo dev --theme-dir ../vexgo-default-theme/dist/` renders public pages from the standalone theme checkout. The `justfile` wraps this as `just theme <dir>`.
+
+`just theme <dir>` starts the server with a theme directory, e.g. `just theme ../vexgo-default-theme/dist/`.
 
 Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password` — change it on your profile page.
 

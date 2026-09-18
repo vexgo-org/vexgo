@@ -20,6 +20,12 @@ Editing a theme means uploading it every time to see the change, which is slow. 
 vexgo dev --theme-dir ../vexgo-default-theme/dist/
 ```
 
+The `justfile` wraps this as the `theme` recipe, which takes the directory as an argument:
+
+```bash
+just theme ../vexgo-default-theme/dist/
+```
+
 The directory is treated as the theme root: `index.html`, `post.html`, `page.html`, `user.html`, `404.html`, any `<slug>.html` file, `assets/` and `i18n/` are read straight from it. Assets keep working through the stable `/theme-assets/` prefix, and templates are re-read from disk on every request — no restart, no rebuild, no upload. This is also the fastest loop for the built-in theme: point `--theme-dir` at the standalone `vexgo-default-theme` checkout (or its `dist/` build) and edit there.
 
 ## Step 1: Create a minimal theme
