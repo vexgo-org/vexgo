@@ -24,24 +24,6 @@
         --input: 240 5.9% 90%;
         --ring: 240 5.9% 10%;
         --radius: 0.625rem;
-        --sidebar-background: 0 0% 98%;
-        --sidebar-foreground: 240 5.3% 26.1%;
-        --sidebar-primary: 240 5.9% 10%;
-        --sidebar-primary-foreground: 0 0% 98%;
-        --sidebar-accent: 240 4.8% 95.9%;
-        --sidebar-accent-foreground: 240 5.9% 10%;
-        --sidebar-border: 220 13% 91%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
-        /* MDXEditor CodeMirror theme variables */
-        --mdxeditor-background: 255 255% 255%;
-        --mdxeditor-foreground: 0 0% 0%;
-        --mdxeditor-gutter-background: 248 100% 98%;
-        --mdxeditor-gutter-foreground: 0 0% 50%;
-        --mdxeditor-cursor: 0 0% 0%;
-        --mdxeditor-selection-background: 210 100% 85%;
-        --mdxeditor-active-line-background: 0 0% 96%;
-        --mdxeditor-line-number-color: 0 0% 50%;
-        --mdxeditor-matching-bracket-background: 210 100% 85%;
     }
 
     .dark {
@@ -64,24 +46,6 @@
         --border: 240 3.7% 15.9%;
         --input: 240 3.7% 15.9%;
         --ring: 240 4.9% 83.9%;
-        --sidebar-background: 240 5.9% 10%;
-        --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 224.3 76.3% 48%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 240 3.7% 15.9%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 3.7% 15.9%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
-        /* MDXEditor CodeMirror dark theme variables */
-        --mdxeditor-background: 240 10% 3.9%;
-        --mdxeditor-foreground: 0 0% 98%;
-        --mdxeditor-gutter-background: 240 10% 3.9%;
-        --mdxeditor-gutter-foreground: 240 5% 65%;
-        --mdxeditor-cursor: 0 0% 98%;
-        --mdxeditor-selection-background: 217.2 91.2% 59.8%;
-        --mdxeditor-active-line-background: 240 3.7% 20%;
-        --mdxeditor-line-number-color: 240 5% 65%;
-        --mdxeditor-matching-bracket-background: 217.2 91.2% 59.8%;
     }
 }
 
@@ -156,22 +120,6 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
-
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-}
-
-/* Editor placeholder styles */
-.ProseMirror p.is-editor-empty:first-child::before {
-    content: attr(data-placeholder);
-    float: left;
-    color: #adb5bd;
-    pointer-events: none;
-    height: 0;
 }
 
 /* Scrollbar styles */
