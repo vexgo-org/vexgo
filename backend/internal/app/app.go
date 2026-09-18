@@ -108,6 +108,14 @@ func New(cfg *config.Config) (*App, error) {
 
 	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
 	renderer.SetJWTSecret(cfg.JWTSecret)
+
+	// A configured theme_dir (set by `vexgo dev --theme-dir`) overrides the
+	// active theme with a local directory so a developer can iterate on a
+	// theme without rebuilding the embed.
+	if cfg.ThemeDir != "" {
+		renderer.SetThemeDir(cfg.ThemeDir)
+		slog.Info("dev theme directory configured", "dir", cfg.ThemeDir)
+	}
 	// Theme-owned seed pages (e.g. the default theme's timeline/links) are
 	// created for missing slugs only; user edits are never overwritten.
 	if n, err := renderer.EnsureThemeSeeds(context.Background(), renderer.ActiveThemeID()); err != nil {
