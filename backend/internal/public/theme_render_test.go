@@ -1,6 +1,7 @@
 package public
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -226,6 +227,91 @@ func TestRenderCustomTheme_MissingPage(t *testing.T) {
 
 	if _, err := r.renderTheme("minimal", PostTemplate, PostData{}); err == nil {
 		t.Fatal("expected error rendering a page the theme does not provide")
+	}
+}
+
+// TestDevThemeDirOverridesActiveTheme guards the `vexgo dev --theme-dir`
+// workflow: an injected local directory wins over the database's active theme
+// and is re-read from disk on every request so developer edits are served
+// without a restart.
+func TestDevThemeDirOverridesActiveTheme(t *testing.T) {
+	r := newTestRenderer(t)
+
+	devDir := filepath.Join(t.TempDir(), "dev-theme")
+	if err := os.MkdirAll(devDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(devDir, IndexTemplate), []byte("DEV {{.Site.Name}}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r.SetThemeDir(devDir)
+
+	// The dev directory wins over the configured data/theme layout.
+	if got := r.activeTheme(); got != DevTheme {
+		t.Fatalf("active theme should be DevTheme, got %q", got)
+	}
+
+	out, err := r.renderTheme(r.activeTheme(), IndexTemplate, IndexData{
+		Site: &SiteData{Name: "Dev Site"},
+	})
+	if err != nil {
+		t.Fatalf("render dev theme: %v", err)
+	}
+	if !strings.Contains(string(out), "DEV Dev Site") {
+		t.Errorf("dev theme should render the local template, got %q", out)
+	}
+}
+
+// TestDevThemeDirReflectsEdits guards the no-cache contract: editing the dev
+// theme's template on disk is visible to the next render without restarting
+// the server or invalidating any cache.
+func TestDevThemeDirReflectsEdits(t *testing.T) {
+	r := newTestRenderer(t)
+
+	devDir := filepath.Join(t.TempDir(), "dev-theme")
+	if err := os.MkdirAll(devDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(devDir, IndexTemplate), []byte("v1 {{.Site.Name}}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r.SetThemeDir(devDir)
+
+	out, err := r.renderTheme(DevTheme, IndexTemplate, IndexData{Site: &SiteData{Name: "S"}})
+	if err != nil {
+		t.Fatalf("render v1: %v", err)
+	}
+	if !strings.Contains(string(out), "v1 S") {
+		t.Errorf("expected v1 render, got %q", out)
+	}
+
+	// Rewrite the template on disk; the next render must pick it up.
+	if err := os.WriteFile(filepath.Join(devDir, IndexTemplate), []byte("v2 {{.Site.Name}}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err = r.renderTheme(DevTheme, IndexTemplate, IndexData{Site: &SiteData{Name: "S"}})
+	if err != nil {
+		t.Fatalf("render v2: %v", err)
+	}
+	if !strings.Contains(string(out), "v2 S") {
+		t.Errorf("expected v2 render after edit, got %q", out)
+	}
+}
+
+// TestDevThemeDirMissingTemplate reports ErrNoThemeTemplates when the injected
+// directory ships no templates, so a misconfigured --theme-dir fails loudly
+// instead of rendering the default theme silently.
+func TestDevThemeDirMissingTemplate(t *testing.T) {
+	r := newTestRenderer(t)
+
+	devDir := filepath.Join(t.TempDir(), "empty-theme")
+	if err := os.MkdirAll(devDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.SetThemeDir(devDir)
+
+	if _, err := r.renderTheme(DevTheme, IndexTemplate, IndexData{}); !errors.Is(err, ErrNoThemeTemplates) {
+		t.Fatalf("expected ErrNoThemeTemplates, got %v", err)
 	}
 }
 
