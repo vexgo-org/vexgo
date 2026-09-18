@@ -104,11 +104,6 @@
             "allowExportNames": [
               "badgeVariants",
               "buttonVariants",
-              "buttonGroupVariants",
-              "toggleVariants",
-              "navigationMenuTriggerStyle",
-              "useFormField",
-              "useSidebar",
               "useAuth",
               "useNotifications",
               "useTranslation"
