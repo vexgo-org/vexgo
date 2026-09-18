@@ -31,6 +31,11 @@ server:
     just ensure-dist
     go run backend/cmd/vexgo/main.go server
 
+theme path:
+    # Start VexGo server with a theme directory.
+    just ensure-dist
+    go run backend/cmd/vexgo/main.go dev --theme-dir {{path}}
+
 build:
     # Build VexGo.
     just build-frontend
