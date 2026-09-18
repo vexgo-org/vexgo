@@ -6,6 +6,7 @@ package auth
 import (
 	"net/url"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -19,11 +20,19 @@ import (
 // never reach a rendered object (account takeover via leaked links). This is
 // defense in depth on top of `json:"-"` in the model, guarding render paths
 // that bypass encoding/json.
-//
-// The avatar is normalized for every viewer as well: a value a browser would
+// // The avatar is normalized for every viewer as well: a value a browser would
 // resolve as a scriptable URI is dropped here, so rows written before
 // UpdateProfile rejected them cannot reach an <img src> sink.
+//
+// A viewer who is neither the account owner nor an administrator receives a
+// public profile only. Account state — role, verification flag, last login
+// time, and the owner's own privacy switches — is cleared, because none of it
+// is needed to render a post or a comment and all of it helps an attacker
+// pick targets. The email address is personal data: an anonymous caller never
+// receives it, and a signed-in caller only while the owner left the address
+// public.
 func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
+	// Fields that never belong in a rendered object, whatever the viewer is.
 	user.VerificationToken = ""
 	user.TokenExpiresAt = nil
 	user.PendingEmail = ""
@@ -31,30 +40,34 @@ func FilterUserByPrivacy(user *model.User, viewerID uint, viewerRole string) {
 		user.Avatar = ""
 	}
 
-	// Check if viewer is the user themselves or an admin
-	isSelf := viewerID == user.ID
-	isAdmin := model.IsAdmin(viewerRole)
+	// The owner and administrators see the account as it is. A zero user id
+	// is not the owner of anything: an author block that failed to preload
+	// must not be mistaken for "self" just because the viewer is anonymous.
+	if user.ID != 0 && (viewerID == user.ID || model.IsAdmin(viewerRole)) {
+		return
+	}
 
-	// If not self and not admin, filter according to privacy settings
-	if !isSelf && !isAdmin {
-		// First check profile visibility setting
-		if user.ProfileVisibility == model.ProfileVisibilityPrivate {
-			// If set to private, hide all personal information
-			user.Email = ""
-			user.Birthday = ""
-			user.Bio = ""
-		} else {
-			// If public, filter according to individual hide settings
-			if user.HideEmail {
-				user.Email = ""
-			}
-			if user.HideBirthday {
-				user.Birthday = ""
-			}
-			if user.HideBio {
-				user.Bio = ""
-			}
-		}
+	// The owner's switches decide what happens to the profile fields below,
+	// so read them before the account state is cleared.
+	isPrivate := user.ProfileVisibility == model.ProfileVisibilityPrivate
+	hideEmail, hideBirthday, hideBio := user.HideEmail, user.HideBirthday, user.HideBio
+
+	user.Role = ""
+	user.EmailVerified = false
+	user.LastLoginAt = time.Time{}
+	user.ProfileVisibility = ""
+	user.HideEmail = false
+	user.HideBirthday = false
+	user.HideBio = false
+
+	if viewerID == 0 || isPrivate || hideEmail {
+		user.Email = ""
+	}
+	if isPrivate || hideBirthday {
+		user.Birthday = ""
+	}
+	if isPrivate || hideBio {
+		user.Bio = ""
 	}
 }
 

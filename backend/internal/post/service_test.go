@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -1305,6 +1306,131 @@ func TestLists_IncludePostCounts(t *testing.T) {
 	if tagCounts["golang"] != 2 || tagCounts["lonely"] != 0 {
 		t.Errorf("expected golang=2 lonely=0, got %v", tagCounts)
 	}
+}
+
+// A list request for an author id that is not in use is a missing resource,
+// not an empty page; an existing author without posts still gets an empty
+// page and no error.
+func TestUserPosts_UnknownAuthor(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+
+	_, _, err := svc.UserPosts(ctx, UserPostsQuery{
+		UserIDStr:       idString(author.ID),
+		CurrentUserRole: model.RoleGuest,
+		Page:            1,
+		Limit:           10,
+	})
+	if err != nil {
+		t.Fatalf("existing author without posts must not fail: %v", err)
+	}
+
+	_, _, err = svc.UserPosts(ctx, UserPostsQuery{
+		UserIDStr:       "99999",
+		CurrentUserRole: model.RoleGuest,
+		Page:            1,
+		Limit:           10,
+	})
+	if !errors.Is(err, ErrAuthorNotFound) {
+		t.Fatalf("expected ErrAuthorNotFound, got %v", err)
+	}
+}
+
+// The author block is filtered for the viewer on every public list path —
+// including the two that used to hand out the raw row: the latest and popular
+// post feeds.
+func TestPublicPostFeedsRedactAuthor(t *testing.T) {
+	ctx := context.Background()
+
+	seed := func(t *testing.T, hideEmail bool) (*Service, model.User) {
+		t.Helper()
+		svc, _, _, db := newTestService(t)
+		author := seedUser(t, db, "author", model.RoleAuthor)
+		author.Email = "author@example.com"
+		author.EmailVerified = true
+		author.HideEmail = hideEmail
+		author.ProfileVisibility = model.ProfileVisibilityPublic
+		author.LastLoginAt = time.Now()
+		if err := db.Save(&author).Error; err != nil {
+			t.Fatalf("failed to save author: %v", err)
+		}
+		if _, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+			Slug:     "published-post",
+			Title:    "Published",
+			Content:  "body",
+			Category: "1",
+			Status:   model.PostStatusPublished,
+		}); err != nil {
+			t.Fatalf("Create error: %v", err)
+		}
+		return svc, author
+	}
+
+	check := func(t *testing.T, label string, posts []model.Post, wantEmail string) {
+		t.Helper()
+		if len(posts) != 1 {
+			t.Fatalf("%s: expected 1 post, got %d", label, len(posts))
+		}
+		author := posts[0].Author
+		if author.Username == "" {
+			t.Fatalf("%s: test setup lost the author block", label)
+		}
+		if author.Email != wantEmail {
+			t.Errorf("%s: expected email %q, got %q", label, wantEmail, author.Email)
+		}
+		if author.Role != "" || author.EmailVerified || !author.LastLoginAt.IsZero() || author.ProfileVisibility != "" {
+			t.Errorf("%s: account state leaked in the author block: %+v", label, author)
+		}
+	}
+
+	t.Run("anonymous viewer", func(t *testing.T) {
+		svc, _ := seed(t, false)
+
+		latest, err := svc.Latest(ctx, 0, "", 5)
+		if err != nil {
+			t.Fatalf("Latest error: %v", err)
+		}
+		check(t, "Latest", latest, "")
+
+		popular, err := svc.Popular(ctx, 0, "", 5)
+		if err != nil {
+			t.Fatalf("Popular error: %v", err)
+		}
+		check(t, "Popular", popular, "")
+	})
+
+	t.Run("signed-in reader", func(t *testing.T) {
+		svc, _ := seed(t, false)
+
+		latest, err := svc.Latest(ctx, 999, model.RoleGuest, 5)
+		if err != nil {
+			t.Fatalf("Latest error: %v", err)
+		}
+		check(t, "Latest", latest, "author@example.com")
+	})
+
+	t.Run("signed-in reader, address hidden", func(t *testing.T) {
+		svc, _ := seed(t, true)
+
+		popular, err := svc.Popular(ctx, 999, model.RoleGuest, 5)
+		if err != nil {
+			t.Fatalf("Popular error: %v", err)
+		}
+		check(t, "Popular", popular, "")
+	})
+
+	t.Run("owner keeps their own account", func(t *testing.T) {
+		svc, author := seed(t, false)
+
+		latest, err := svc.Latest(ctx, author.ID, author.Role, 5)
+		if err != nil {
+			t.Fatalf("Latest error: %v", err)
+		}
+		if latest[0].Author.Role != model.RoleAuthor {
+			t.Errorf("the owner must see their own role, got %+v", latest[0].Author)
+		}
+	})
 }
 
 func idString(id uint) string {

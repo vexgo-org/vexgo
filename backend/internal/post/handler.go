@@ -416,6 +416,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 //	@Param			limit	query		int		false	"page size"				default(10)
 //	@Success		200		{object}	PostListResponse
 //	@Failure		400		{object}	api.ErrorResponse	"invalid user id"
+//	@Failure		404		{object}	api.ErrorResponse	"author not found"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/posts/user/{id} [get]
 func (h *Handler) GetUserPosts(c *gin.Context) {
@@ -435,6 +436,10 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrBadRequest) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid user ID"})
+			return
+		}
+		if errors.Is(err, ErrAuthorNotFound) {
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: err.Error()})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch posts"})
@@ -473,7 +478,7 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 	userRole := u.Role
 	_, limit := middleware.ParsePagination(c, 5)
 
-	posts, err := h.svc.Popular(c.Request.Context(), userRole, limit)
+	posts, err := h.svc.Popular(c.Request.Context(), u.ID, userRole, limit)
 	if err != nil {
 		if errors.Is(err, ErrGuestViewDenied) {
 			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "You must be logged in to view popular posts"})
@@ -502,7 +507,7 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 	userRole := u.Role
 	_, limit := middleware.ParsePagination(c, 5)
 
-	posts, err := h.svc.Latest(c.Request.Context(), userRole, limit)
+	posts, err := h.svc.Latest(c.Request.Context(), u.ID, userRole, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch latest posts"})
 		return

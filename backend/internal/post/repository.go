@@ -43,6 +43,10 @@ type Repository interface {
 	Drafts(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error)
 	// UserPosts queries a user's posts with role-based visibility.
 	UserPosts(ctx context.Context, authorID uint, userRole string, currentUserID uint, f ListFilter) ([]model.Post, int64, error)
+	// UserExists reports whether an account with this id exists, so a list
+	// request for an unknown author can be answered "not found" instead of
+	// with an empty page.
+	UserExists(ctx context.Context, userID uint) (bool, error)
 	// Popular returns all published posts; scoring/sorting happens in the service.
 	Popular(ctx context.Context) ([]model.Post, error)
 	// Latest returns the most recent published posts.
@@ -277,6 +281,16 @@ func (r *gormRepository) Drafts(ctx context.Context, userRole string, userID uin
 func (r *gormRepository) UserPosts(ctx context.Context, authorID uint, userRole string, currentUserID uint, f ListFilter) ([]model.Post, int64, error) {
 	query := applyUserPostsVisibility(r.baseQuery(ctx).Where("author_id = ?", authorID), userRole, authorID, currentUserID)
 	return r.listPage(query, f.Page, f.Limit)
+}
+
+// UserExists counts the account row behind an id. A count keeps the query to
+// a single column and avoids loading an account just to answer yes or no.
+func (r *gormRepository) UserExists(ctx context.Context, userID uint) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *gormRepository) Popular(ctx context.Context) ([]model.Post, error) {
