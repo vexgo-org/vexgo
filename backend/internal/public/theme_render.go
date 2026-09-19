@@ -46,7 +46,10 @@ const (
 var ThemeTemplateNames = []string{IndexTemplate, PostTemplate, PageTemplate, UserTemplate, NotFoundTemplate}
 
 // ErrNoThemeTemplates reports a theme that provides no template files at all.
-var ErrNoThemeTemplates = errors.New("theme has no template files")
+var (
+	ErrNoThemeTemplates = errors.New("theme has no template files")
+	ErrDevTheme         = errors.New("dev theme error")
+)
 
 // gold parses post markdown into HTML for server-side rendering. Raw HTML in
 // the markdown is escaped (safe defaults, matching the client-side renderer),
@@ -825,11 +828,15 @@ func RenderPageContent(src string) template.HTML {
 func (r *Renderer) themeFS(themeID string) (fs.FS, error) {
 	if themeID == DevTheme {
 		if r.themeDir == "" {
-			return nil, errors.New("no dev theme directory configured")
+			return nil, fmt.Errorf("%w: no dev theme directory configured", ErrDevTheme)
 		}
 
-		if _, err := os.Stat(r.themeDir); err != nil {
-			return nil, fmt.Errorf("theme dir does not exist: %w", err)
+		info, err := os.Stat(r.themeDir)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrDevTheme, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("%w: %v is not a directory", ErrDevTheme, info.Name())
 		}
 
 		return os.DirFS(r.themeDir), nil

@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -119,6 +120,11 @@ func New(cfg *config.Config) (*App, error) {
 	// Theme-owned seed pages (e.g. the default theme's timeline/links) are
 	// created for missing slugs only; user edits are never overwritten.
 	if n, err := renderer.EnsureThemeSeeds(context.Background(), renderer.ActiveThemeID()); err != nil {
+		if errors.Is(err, public.ErrDevTheme) {
+			slog.Error("failed to load dev theme", "err", err)
+			os.Exit(1)
+		}
+
 		slog.Warn("failed to ensure theme seed pages", "err", err)
 	} else if n > 0 {
 		slog.Info("created theme seed pages", "count", n)

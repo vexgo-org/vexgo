@@ -324,7 +324,7 @@ func TestDevThemeDirNotExist(t *testing.T) {
 
 	if _, err := r.themeFS(DevTheme); err == nil {
 		t.Fatal("themeFS should reject a non-existent dev theme dir")
-	} else if !strings.Contains(err.Error(), "does not exist") {
+	} else if !strings.Contains(err.Error(), "no such file or directory") {
 		t.Fatalf("expected a 'does not exist' error, got %v", err)
 	}
 }
