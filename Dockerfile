@@ -12,7 +12,7 @@ RUN bun run build
 # The default theme lives in its own repository
 # (https://github.com/vexgo-org/vexgo-default-theme); build it from source
 # and copy its dist output to the path the backend embeds.
-ARG DEFAULT_THEME_REF=main
+ARG DEFAULT_THEME_REF=v0.1.0
 WORKDIR /tmp/vexgo-default-theme
 RUN apk add --no-cache git && \
     git clone --depth 1 --branch "${DEFAULT_THEME_REF}" https://github.com/vexgo-org/vexgo-default-theme.git . && \

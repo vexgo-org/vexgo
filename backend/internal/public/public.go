@@ -134,10 +134,10 @@ func (r *Renderer) GetAvailableThemes() []ThemeInfo {
 	themes = append(themes, ThemeInfo{
 		ID:          DefaultTheme,
 		Name:        "vexgo default theme",
-		Author:      "vexgo",
-		Version:     "1.0.0",
+		Author:      "vexgo-org",
+		Version:     "0.1.0",
 		Description: "vexgo default theme",
-		URL:         "https://github.com/vexgo-org/vexgo",
+		URL:         "https://github.com/vexgo-org/vexgo-default-theme",
 	})
 
 	// Scan themes directory
