@@ -58,62 +58,6 @@
     }
 }
 
-/* Custom styles */
-@layer utilities {
-    /* Rich text editor content styles */
-    .prose {
-        @apply text-foreground;
-    }
-
-    .prose h1 {
-        @apply text-3xl font-bold mt-8 mb-4 text-foreground;
-    }
-
-    .prose h2 {
-        @apply text-2xl font-bold mt-6 mb-3 text-foreground;
-    }
-
-    .prose h3 {
-        @apply text-xl font-bold mt-4 mb-2 text-foreground;
-    }
-
-    .prose p {
-        @apply mb-4 leading-relaxed text-foreground;
-    }
-
-    .prose ul {
-        @apply list-disc pl-6 mb-4 text-foreground;
-    }
-
-    .prose ol {
-        @apply list-decimal pl-6 mb-4 text-foreground;
-    }
-
-    .prose blockquote {
-        @apply border-l-4 border-muted pl-4 italic my-4 text-foreground;
-    }
-
-    .prose code {
-        @apply bg-muted px-1 py-0.5 rounded text-sm font-mono text-foreground;
-    }
-
-    .prose pre {
-        @apply bg-gray-900 text-white p-4 rounded-lg overflow-x-auto my-4;
-    }
-
-    .prose pre code {
-        @apply bg-transparent text-white p-0;
-    }
-
-    .prose img {
-        @apply max-w-full h-auto rounded-lg my-4;
-    }
-
-    .prose a {
-        @apply text-primary hover:underline;
-    }
-}
-
 /* Scrollbar styles */
 ::-webkit-scrollbar {
     width: 8px;
@@ -133,84 +77,169 @@
     background: #a8a8a8;
 }
 
-/* ========== MDXEditor Theme Integration ========== */
+/* ========== Markdown editor (CodeMirror 6) ========== */
 /*
- * MDXEditor dark mode is activated by adding the `dark-theme` class to the
- * MDXEditor root element (alongside `dark-editor`). This switches the full
- * Radix UI color palette used by the toolbar and all editor UI.
- * The `dark-editor` class below handles only the CodeMirror source/diff
- * panels, keeping them in sync with the app's own design tokens.
+ * Structural styling for the editor lives in the CodeMirror theme
+ * (src/components/editor/extensions/theme.ts), where it can outrank
+ * CodeMirror's own base styles. What remains here is the typography that
+ * depends on the editing mode plus the widgets CodeMirror renders itself.
  */
 
-/* --- CodeMirror source & diff panels (dark mode only) --- */
-.dark-theme.dark-editor .mdxeditor-source-editor,
-.dark-theme.dark-editor .mdxeditor-diff-editor,
-.dark-theme.dark-editor .mdxeditor-source-editor *,
-.dark-theme.dark-editor .mdxeditor-diff-editor * {
-    background-color: hsl(var(--background)) !important;
-    color: hsl(var(--foreground)) !important;
-    border-color: hsl(var(--border)) !important;
+/* The rich surface reads like an article, the source surface like code. */
+.vexgo-md-rich .cm-scroller {
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.75;
 }
 
-/* CodeMirror core */
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-editor,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-editor,
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-scroller,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-scroller,
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-content,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-content {
-    background-color: hsl(var(--background)) !important;
-    color: hsl(var(--foreground)) !important;
+.vexgo-md-source .cm-scroller {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+        "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.65;
 }
 
-/* Gutter / line numbers */
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-gutters,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-gutters {
-    background-color: hsl(var(--muted) / 0.3) !important;
-    color: hsl(var(--muted-foreground)) !important;
-    border-right: 1px solid hsl(var(--border)) !important;
+/* --- list bullets --- */
+.vexgo-md-bullet {
+    display: inline-block;
+    width: 1.1em;
+    color: hsl(var(--muted-foreground));
 }
 
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-lineNumbers,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-lineNumbers {
-    color: hsl(var(--muted-foreground)) !important;
+/* --- task list checkboxes --- */
+.vexgo-md-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    height: 1.1em;
+    margin-right: 0.4em;
+    border: 1px solid hsl(var(--border));
+    border-radius: 3px;
+    background-color: hsl(var(--background));
+    vertical-align: -0.18em;
+    cursor: pointer;
 }
 
-/* Cursor */
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-cursor,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-cursor {
-    border-left-color: hsl(var(--foreground)) !important;
+.vexgo-md-checkbox:hover {
+    border-color: hsl(var(--primary));
 }
 
-/* Selection */
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-selectionBackground,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-selectionBackground {
-    background-color: hsl(var(--ring) / 0.3) !important;
+.vexgo-md-checkbox.is-checked {
+    background-color: hsl(var(--primary));
+    border-color: hsl(var(--primary));
 }
 
-/* Active line */
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-activeLine,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-activeLine {
-    background-color: hsl(var(--accent) / 0.1) !important;
+.vexgo-md-checkbox.is-checked .vexgo-md-checkbox-box::after {
+    content: "";
+    display: block;
+    width: 0.3em;
+    height: 0.55em;
+    border: solid hsl(var(--primary-foreground));
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-0.03em, -0.08em);
 }
 
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-activeLineGutter,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-activeLineGutter {
-    background-color: hsl(var(--muted) / 0.3) !important;
+/* --- images --- */
+.vexgo-md-image {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
 }
 
-/* Matching bracket */
-.dark-theme.dark-editor .mdxeditor-source-editor .cm-matchingBracket,
-.dark-theme.dark-editor .mdxeditor-diff-editor .cm-matchingBracket {
-    background-color: hsl(var(--accent) / 0.2) !important;
+.vexgo-md-image img {
+    display: block;
+    max-width: 100%;
+    max-height: 480px;
+    margin: 0 auto;
+    border-radius: 6px;
 }
 
-/* Diff source wrapper */
-.dark-theme.dark-editor .mdxeditor-diff-source-wrapper,
-.dark-theme.dark-editor .mdxeditor-diff-source-wrapper * {
-    background-color: hsl(var(--background)) !important;
-    color: hsl(var(--foreground)) !important;
-    border-color: hsl(var(--border)) !important;
+.vexgo-md-image-broken {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px dashed hsl(var(--destructive));
+    border-radius: 4px;
+    color: hsl(var(--destructive));
+    font-size: 0.85em;
+}
+
+/* --- code block language picker --- */
+.vexgo-md-lang {
+    margin-left: 8px;
+    padding: 1px 4px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+    background-color: hsl(var(--background));
+    color: hsl(var(--muted-foreground));
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+/* --- tables (rich mode renders them as real tables) --- */
+.vexgo-md-table {
+    margin: 8px 0;
+    overflow-x: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: 6px;
+    background-color: hsl(var(--background));
+    cursor: text;
+}
+
+.vexgo-md-table:hover {
+    border-color: hsl(var(--primary) / 0.45);
+}
+
+.vexgo-md-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+}
+
+.vexgo-md-table th,
+.vexgo-md-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid hsl(var(--border));
+    vertical-align: top;
+}
+
+.vexgo-md-table th {
+    background-color: hsl(var(--muted) / 0.6);
+    font-weight: 600;
+}
+
+.vexgo-md-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.vexgo-md-table code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background-color: hsl(var(--muted));
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+        "Liberation Mono", monospace;
+    font-size: 0.9em;
+}
+
+.vexgo-md-table a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.vexgo-md-table strong {
+    font-weight: 700;
+}
+
+.vexgo-md-table em {
+    font-style: italic;
+}
+
+.vexgo-md-table del {
+    text-decoration: line-through;
 }
 
 /* Slider captcha (go-captcha-react) theme mapping.

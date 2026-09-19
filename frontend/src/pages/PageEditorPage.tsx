@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { MarkdownEditor } from "@/components/editor";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 
 export function PageEditorPage() {
@@ -214,8 +214,8 @@ export function PageEditorPage() {
           </div>
           <div>
             <Label>{t("pageEditorPage.content")}</Label>
-            <RichTextEditor
-              content={content}
+            <MarkdownEditor
+              value={content}
               onChange={setContent}
               placeholder={t("pageEditorPage.contentPlaceholder")}
             />
