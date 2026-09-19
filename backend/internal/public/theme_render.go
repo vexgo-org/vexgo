@@ -836,7 +836,7 @@ func (r *Renderer) themeFS(themeID string) (fs.FS, error) {
 			return nil, fmt.Errorf("%w: %w", ErrDevTheme, err)
 		}
 		if !info.IsDir() {
-			return nil, fmt.Errorf("%w: %v is not a directory", ErrDevTheme, info.Name())
+			return nil, fmt.Errorf("%w: %q is not a directory", ErrDevTheme, r.themeDir)
 		}
 
 		return os.DirFS(r.themeDir), nil
