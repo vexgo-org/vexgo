@@ -536,3 +536,72 @@ func TestDevHelpDoesNotResolveConfig(t *testing.T) {
 		t.Fatal("--help should not resolve a config")
 	}
 }
+
+func TestServerRejectsThemeDirFlag(t *testing.T) {
+	_, cfg, err := runServerCmd(t, "--theme-dir", "/tmp/theme")
+	if err == nil {
+		t.Fatal("server should reject --theme-dir")
+	}
+	if cfg != nil {
+		t.Fatal("--theme-dir on server should not resolve a config")
+	}
+}
+
+// =============================================================================
+// Execute dispatch — server vs dev runState selection.
+// =============================================================================
+
+func TestExecuteDevResolvesThemeDir(t *testing.T) {
+	cfg, err := Execute("test-version", []string{"dev", "--theme-dir", "/tmp/dev-theme"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "/tmp/dev-theme" {
+		t.Fatalf("--theme-dir should flow through Execute, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestExecuteServerLeavesThemeDirEmpty(t *testing.T) {
+	cfg, err := Execute("test-version", []string{"server", "--port", "7000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "" {
+		t.Fatalf("server should leave ThemeDir empty, got %q", cfg.ThemeDir)
+	}
+	if cfg.Port != 7000 {
+		t.Fatalf("server flags should apply through Execute, got %d", cfg.Port)
+	}
+}
+
+func TestExecuteServerRejectsThemeDirFlag(t *testing.T) {
+	cfg, err := Execute("test-version", []string{"server", "--theme-dir", "/tmp/theme"})
+	if err == nil {
+		t.Fatal("server should reject --theme-dir through Execute")
+	}
+	if cfg != nil {
+		t.Fatal("rejected flags should not resolve a config")
+	}
+}
+
+func TestExecuteHelpReturnsNilConfig(t *testing.T) {
+	for _, args := range [][]string{
+		{"--help"},
+		{"server", "--help"},
+		{"dev", "--help"},
+	} {
+		cfg, err := Execute("test-version", args)
+		if err != nil {
+			t.Fatalf("Execute(%v) should not error: %v", args, err)
+		}
+		if cfg != nil {
+			t.Fatalf("Execute(%v) --help should return nil config", args)
+		}
+	}
+}
