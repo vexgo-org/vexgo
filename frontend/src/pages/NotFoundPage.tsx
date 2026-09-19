@@ -6,10 +6,12 @@ export function NotFoundPage() {
   const { t } = useTranslation();
 
   return (
-    <div className="container mx-auto px-4 py-16 max-w-4xl text-center">
-      <h1 className="text-6xl font-bold text-muted-foreground/30 mb-4">404</h1>
-      <p className="text-muted-foreground mb-8">{t("errors.notFound")}</p>
-      <Button asChild>
+    <div className="bg-background flex min-h-screen flex-col items-center justify-center gap-2 px-4 text-center">
+      <p className="text-muted-foreground font-mono text-[13px]">404</p>
+      <h1 className="text-lg font-semibold tracking-[-0.01em]">
+        {t("errors.notFound")}
+      </h1>
+      <Button variant="outline" asChild className="mt-3">
         <Link to="/admin">{t("postDetailPage.backToHome")}</Link>
       </Button>
     </div>

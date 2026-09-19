@@ -3,7 +3,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 
 interface CreatorApplication {
   id?: number;
@@ -71,10 +74,9 @@ export function CreatorApplicationReviewPage() {
   // Show loading state while auth is loading
   if (isAuthLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-40 rounded-lg" />
       </div>
     );
   }
@@ -85,16 +87,12 @@ export function CreatorApplicationReviewPage() {
     (currentUser.role !== "admin" && currentUser.role !== "super_admin")
   ) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <h2 className="text-xl font-bold mb-4">
-              {t("common.accessDenied")}
-            </h2>
-            <p className="text-muted-foreground">
-              {t("common.insufficientPermissions")}
-            </p>
-          </CardContent>
+      <div className="mx-auto max-w-lg">
+        <Card className="py-10 text-center">
+          <p className="text-sm font-semibold">{t("common.accessDenied")}</p>
+          <p className="text-muted-foreground mt-1 text-[13px]">
+            {t("common.insufficientPermissions")}
+          </p>
         </Card>
       </div>
     );
@@ -155,22 +153,19 @@ export function CreatorApplicationReviewPage() {
     switch (status) {
       case "pending":
         return (
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+          <Badge variant="outline-warning">
             {t("creatorApplication.status.pending")}
           </Badge>
         );
       case "approved":
         return (
-          <Badge variant="default" className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3" />
+          <Badge variant="outline-success">
             {t("creatorApplication.status.approved")}
           </Badge>
         );
       case "rejected":
         return (
-          <Badge variant="destructive" className="flex items-center gap-1">
-            <XCircle className="w-3 h-3" />
+          <Badge variant="outline-destructive">
             {t("creatorApplication.status.rejected")}
           </Badge>
         );
@@ -181,57 +176,37 @@ export function CreatorApplicationReviewPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6" />
-            {t("creatorApplication.reviewTitle")}
-          </h1>
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-4 bg-muted rounded w-1/4"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-24 rounded-lg" />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="w-6 h-6" />
-          {t("creatorApplication.reviewTitle")}
-        </h1>
-        <div className="text-sm text-muted-foreground">
-          {t("creatorApplication.pendingCount", { count: applications.length })}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("creatorApplication.reviewTitle")}
+        description={t("creatorApplication.pendingCount", {
+          count: applications.length,
+        })}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("creatorApplication.pendingApplications")}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card className="py-0">
+        <div className="border-border border-b px-5 py-3">
+          <p className="text-[13px] font-semibold">
+            {t("creatorApplication.pendingApplications")}
+          </p>
+        </div>
+        <div className="px-5 py-4">
           {applications.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">
-                {t("creatorApplication.noPendingApplications")}
-              </h3>
-              <p className="text-muted-foreground">
-                {t("creatorApplication.noPendingApplicationsDesc")}
-              </p>
-            </div>
+            <EmptyState
+              icon={CheckCircle}
+              title={t("creatorApplication.noPendingApplications")}
+              description={t("creatorApplication.noPendingApplicationsDesc")}
+            />
           ) : (
             <div className="space-y-4">
               {applications.map((application) => (
@@ -241,10 +216,8 @@ export function CreatorApplicationReviewPage() {
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-primary font-medium">
-                          {(application.username || "").charAt(0).toUpperCase()}
-                        </span>
+                      <div className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-medium">
+                        {(application.username || "").charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <h3 className="font-medium">
@@ -306,7 +279,7 @@ export function CreatorApplicationReviewPage() {
               ))}
             </div>
           )}
-        </CardContent>
+        </div>
       </Card>
 
       {/* Approve Confirmation Dialog */}

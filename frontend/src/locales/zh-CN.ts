@@ -18,6 +18,9 @@ export const zhCN = {
     unknownError: "未知错误",
     custom: "自定义",
     noDescription: "暂无描述",
+    date: "日期",
+    actions: "操作",
+    preview: "预览",
     overview: "总览",
     optional: "可选",
     compatible: "兼容",
@@ -101,12 +104,6 @@ export const zhCN = {
   // 设置页面
   settings: {
     title: "设置",
-    displaySettings: "显示设置",
-    theme: "主题",
-    light: "浅色",
-    dark: "深色",
-    system: "跟随系统",
-    language: "语言",
     privacySettings: "隐私设置",
     privacySettingsDesc: "管理您的个人资料和信息的可见性",
     profileVisibility: "个人资料可见性",
@@ -648,7 +645,29 @@ export const zhCN = {
     settings: "设置",
     logout: "退出登录",
     viewSite: "查看站点",
-    allRightsReserved: "© 2026 {siteName}. All rights reserved.",
+    // 后台导航：先分组标题，再叶子菜单
+    navOverview: "概览",
+    navContent: "内容",
+    // 与 navPosts/navComments 区分：审核队列与评论设置是两个目的地，
+    // 若共用同一个标签，导航栏会出现两条同名菜单。
+    navPosts: "内容审核",
+    navModeration: "审核",
+    navComments: "评论审核",
+    navCommentSettings: "评论设置",
+    navCreatorApplications: "创作者申请",
+    navSystem: "系统",
+    navUsers: "用户",
+    navThemes: "主题",
+    navSettings: "设置",
+    navGeneral: "常规",
+    navAI: "AI",
+    navEmail: "邮件",
+    navAccount: "账户",
+    navPreferences: "偏好设置",
+    openNavigation: "打开导航",
+    toggleNavigation: "切换导航栏",
+    toggleTheme: "切换主题",
+    language: "语言",
   },
 
   // 登录页面扩展
@@ -790,6 +809,7 @@ export const zhCN = {
   // 个人资料页面扩展
   profilePage: {
     profile: "个人资料",
+    profileDescription: "你的账号信息、头像与密码。",
     memberSince: "注册时间",
     birthday: "生日",
     bio: "个性签名",
@@ -1001,6 +1021,9 @@ export const zhCN = {
     published: "已发布",
     draft: "草稿",
     inNav: "导航显示",
+    inNavWithOrder: "导航 · #{order}",
+    slug: "URL 别名",
+    navigation: "导航",
     noPages: "暂无页面",
     confirmDelete: "确认删除页面？",
     cannotUndo: "此操作不可撤销，页面将被永久删除。",

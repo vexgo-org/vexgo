@@ -14,15 +14,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SliderCaptcha } from "@/components/ui/slider-captcha";
-import {
-  Loader2,
-  Mail,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  CheckCircle,
-} from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useSSOProviders, type SSOProvider } from "@/hooks/useSSOProviders";
 
@@ -125,28 +118,12 @@ interface ProviderConfig {
   id: SSOProvider;
   label: string;
   icon: React.ReactNode;
-  className: string;
 }
 
 const ALL_PROVIDERS: ProviderConfig[] = [
-  {
-    id: "github",
-    label: "GitHub",
-    icon: <GitHubIcon />,
-    className: "border-gray-300 hover:bg-gray-50 text-gray-700",
-  },
-  {
-    id: "google",
-    label: "Google",
-    icon: <GoogleIcon />,
-    className: "border-gray-300 hover:bg-gray-50 text-gray-700",
-  },
-  {
-    id: "oidc",
-    label: "SSO",
-    icon: <OIDCIcon />,
-    className: "border-gray-300 hover:bg-gray-50 text-gray-700",
-  },
+  { id: "github", label: "GitHub", icon: <GitHubIcon /> },
+  { id: "google", label: "Google", icon: <GoogleIcon /> },
+  { id: "oidc", label: "SSO", icon: <OIDCIcon /> },
 ];
 
 export function RegisterPage() {
@@ -322,10 +299,10 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16 flex justify-center">
-      <Card className="w-full max-w-md">
+    <>
+      <Card>
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">
+          <CardTitle className="text-lg">
             {t("registerPage.createAccount")}
           </CardTitle>
           <CardDescription>{t("registerPage.joinVexgo")}</CardDescription>
@@ -337,65 +314,76 @@ export function RegisterPage() {
                 {t("registerPage.usernameLabel")}
               </Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <User className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                 <Input
                   id="username"
                   type="text"
                   placeholder={t("registerPage.usernamePlaceholder")}
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="pl-10"
+                  aria-invalid={Boolean(usernameError)}
+                  className="pl-9"
                 />
               </div>
               {usernameError && (
-                <div className="text-red-500 text-sm mt-1">{usernameError}</div>
+                <p className="text-destructive text-[11px]">{usernameError}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">{t("auth.email")}</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                 <Input
                   id="email"
                   type="email"
                   placeholder={t("registerPage.emailPlaceholder")}
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
+                  aria-invalid={Boolean(emailError)}
+                  className="pl-9"
                 />
               </div>
               {emailError && (
-                <div className="text-red-500 text-sm mt-1">{emailError}</div>
+                <p className="text-destructive text-[11px]">{emailError}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">{t("auth.password")}</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder={t("registerPage.passwordPlaceholder")}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
+                  aria-invalid={Boolean(passwordError)}
+                  className="pr-9 pl-9"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={
+                    showPassword
+                      ? t("registerPage.hidePassword")
+                      : t("registerPage.showPassword")
+                  }
+                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
+                    <EyeOff className="size-4" />
                   ) : (
-                    <Eye className="w-4 h-4" />
+                    <Eye className="size-4" />
                   )}
                 </button>
               </div>
               {passwordError && (
-                <div className="text-red-500 text-sm mt-1">{passwordError}</div>
+                <p className="text-destructive text-[11px]">{passwordError}</p>
               )}
             </div>
 
@@ -404,20 +392,22 @@ export function RegisterPage() {
                 {t("registerPage.confirmPasswordLabel")}
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                 <Input
                   id="confirmPassword"
                   type={showPassword ? "text" : "password"}
                   placeholder={t("registerPage.confirmPasswordPlaceholder")}
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-10"
+                  aria-invalid={Boolean(confirmPasswordError)}
+                  className="pl-9"
                 />
               </div>
               {confirmPasswordError && (
-                <div className="text-red-500 text-sm mt-1">
+                <p className="text-destructive text-[11px]">
                   {confirmPasswordError}
-                </div>
+                </p>
               )}
             </div>
 
@@ -429,17 +419,17 @@ export function RegisterPage() {
                     {t("registerPage.securityVerification")}
                   </Label>
                   {isCaptchaVerified && (
-                    <span className="text-xs text-green-600 dark:text-green-400 flex items-center">
-                      <CheckCircle className="h-3 w-3 mr-1" />
+                    <span className="text-success flex items-center gap-1 text-[11px]">
+                      <CheckCircle className="size-3" />
                       {t("registerPage.verifiedBadge")}
                     </span>
                   )}
                 </div>
-                <div className="border rounded-lg p-3 bg-muted/50">
+                <div className="bg-muted/60 rounded-md border p-3">
                   {isCaptchaVerified ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-                        <CheckCircle className="h-4 w-4 mr-2" />
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-success flex items-center gap-2 text-[13px]">
+                        <CheckCircle className="size-4" />
                         {t("registerPage.captchaCompleted")}
                       </div>
                       <Button
@@ -447,14 +437,13 @@ export function RegisterPage() {
                         variant="ghost"
                         size="sm"
                         onClick={resetCaptcha}
-                        className="text-xs h-7"
                       >
                         {t("auth.reverify")}
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground text-[13px]">
                         {t("registerPage.completeSlider")}
                       </span>
                       <Button
@@ -462,7 +451,6 @@ export function RegisterPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setIsCaptchaModalOpen(true)}
-                        className="text-xs h-7"
                       >
                         {t("registerPage.verifyButton")}
                       </Button>
@@ -474,12 +462,12 @@ export function RegisterPage() {
 
             <Button
               type="submit"
-              className="w-full mt-4"
+              className="mt-2 w-full"
               disabled={loading || (captchaEnabled && !isCaptchaVerified)}
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner className="size-4" />
                   {t("registerPage.registering")}
                 </>
               ) : (
@@ -495,8 +483,8 @@ export function RegisterPage() {
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
                 </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-background px-2 text-muted-foreground">
+                <div className="relative flex justify-center text-[11px]">
+                  <span className="bg-card text-muted-foreground px-2">
                     {t("registerPage.orContinueWith")}
                   </span>
                 </div>
@@ -509,12 +497,11 @@ export function RegisterPage() {
                     key={provider.id}
                     type="button"
                     variant="outline"
-                    className={`flex items-center justify-center gap-2 text-sm ${provider.className}`}
                     disabled={ssoLoading !== null}
                     onClick={() => handleSSOLogin(provider.id)}
                   >
                     {ssoLoading === provider.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Spinner className="size-4" />
                     ) : (
                       provider.icon
                     )}
@@ -525,11 +512,12 @@ export function RegisterPage() {
             </div>
           )}
 
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">
-              {t("registerPage.haveAccount")}
-            </span>{" "}
-            <Link to="/admin/login" className="text-primary hover:underline">
+          <div className="text-muted-foreground mt-5 text-center text-[13px]">
+            {t("registerPage.haveAccount")}{" "}
+            <Link
+              to="/admin/login"
+              className="text-accent-blue rounded-sm underline-offset-4 hover:underline"
+            >
               {t("registerPage.loginNow")}
             </Link>
           </div>
@@ -545,6 +533,6 @@ export function RegisterPage() {
         }}
         onSuccess={handleCaptchaSuccess}
       />
-    </div>
+    </>
   );
 }

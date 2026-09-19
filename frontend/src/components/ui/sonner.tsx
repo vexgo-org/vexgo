@@ -5,15 +5,19 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
+import { useIsDark } from "@/hooks/useIsDark";
+
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  // Read the resolved theme off <html> rather than next-themes: the console
+  // has no next-themes provider, so toasts would otherwise follow the OS
+  // while the rest of the app follows the stored preference.
+  const isDark = useIsDark();
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={isDark ? "dark" : "light"}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

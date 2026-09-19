@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/PageHeader";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
 
@@ -15,20 +18,36 @@ import { CreatorApplicationButton } from "@/components/CreatorApplicationButton"
 
 import {
   Bell,
-  MessageSquare,
-  AlertCircle,
-  UserPlus,
   CheckCircle,
+  MessageSquare,
   ThumbsUp,
-  FileText,
-  ArrowRight,
   Trash2,
-  Eye,
+  UserPlus,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 
 // Notification types
 type NotificationType = "comment" | "like" | "reply" | "review" | "role";
+
+const TAB_VALUES = [
+  "all",
+  "unread",
+  "comment",
+  "like",
+  "review",
+  "role",
+] as const;
+
+type TabValue = (typeof TAB_VALUES)[number];
+
+const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
+  comment: MessageSquare,
+  reply: MessageSquare,
+  like: ThumbsUp,
+  review: CheckCircle,
+  role: UserPlus,
+};
 
 type Notification = {
   id: string;
@@ -47,12 +66,46 @@ type Notification = {
   };
 };
 
+/**
+ * The filter for a tab is a pure function of the tab and the notification, so
+ * the whole list is derived once and every tab renders the same component
+ * with the visible subset.
+ */
+function notificationsForTab(
+  notifications: Notification[],
+  tab: TabValue,
+): Notification[] {
+  switch (tab) {
+    case "all":
+      return notifications;
+    case "unread":
+      return notifications.filter((notification) => !notification.isRead);
+    case "comment":
+      return notifications.filter(
+        (notification) =>
+          notification.type === "comment" || notification.type === "reply",
+      );
+    case "like":
+      return notifications.filter(
+        (notification) => notification.type === "like",
+      );
+    case "review":
+      return notifications.filter(
+        (notification) => notification.type === "review",
+      );
+    case "role":
+      return notifications.filter(
+        (notification) => notification.type === "role",
+      );
+  }
+}
+
 export function NotificationCenterPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { decrementUnreadCount, clearUnreadCount } = useNotifications();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<TabValue>("all");
 
   // Notification data
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -108,18 +161,6 @@ export function NotificationCenterPage() {
 
     fetchNotifications();
   }, [t]);
-
-  // Filter notifications by tab
-  const filteredNotifications = notifications.filter((notification) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "unread") return !notification.isRead;
-    if (activeTab === "comment")
-      return notification.type === "comment" || notification.type === "reply";
-    if (activeTab === "like") return notification.type === "like";
-    if (activeTab === "review") return notification.type === "review";
-    if (activeTab === "role") return notification.type === "role";
-    return true;
-  });
 
   // Mark a notification as read
   const markAsRead = async (id: string) => {
@@ -211,684 +252,178 @@ export function NotificationCenterPage() {
     }
   };
 
-  // Get the status icon for a notification type
-  const getStatusIcon = (type: NotificationType) => {
-    switch (type) {
-      case "review":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "role":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      default:
-        return null;
+  const openNotification = (notification: Notification) => {
+    markAsRead(notification.id);
+    if (notification.relatedId) {
+      navigateToRelated(
+        notification.relatedId,
+        notification.relatedType,
+        notification.relatedPostId,
+      );
     }
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">{t("notificationCenter.title")}</h1>
-        <div className="flex items-center gap-2">
-          {isGuest && <CreatorApplicationButton />}
-          {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/admin/creator-applications")}
-            >
-              <Users className="w-4 h-4 mr-2" />
-              {t("creatorApplication.reviewApplications")}
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={markAllAsRead}>
-            {t("notificationCenter.markAllAsRead")}
-          </Button>
-        </div>
-      </div>
+  const formatDate = (value: string) => {
+    const date = new Date(value);
+    return date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="all">
-            {t("notificationCenter.tabs.all")}
-          </TabsTrigger>
-          <TabsTrigger value="unread">
-            {t("notificationCenter.tabs.unread")}
-          </TabsTrigger>
-          <TabsTrigger value="comment">
-            {t("notificationCenter.tabs.comment")}
-          </TabsTrigger>
-          <TabsTrigger value="like">
-            {t("notificationCenter.tabs.like")}
-          </TabsTrigger>
-          <TabsTrigger value="review">
-            {t("notificationCenter.tabs.review")}
-          </TabsTrigger>
-          <TabsTrigger value="role">
-            {t("notificationCenter.tabs.role")}
-          </TabsTrigger>
+  // Called as a function, not rendered as a component: defining a component
+  // inside the parent would give it a new identity every render and remount
+  // the whole list.
+  const renderNotificationList = (items: Notification[]) => {
+    if (items.length === 0) {
+      return (
+        <Card className="py-0">
+          <EmptyState
+            icon={Bell}
+            title={t("notificationCenter.empty.noNotifications")}
+            description={t("notificationCenter.empty.noNotificationsDesc")}
+          />
+        </Card>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {items.map((notification) => {
+          const TypeIcon = TYPE_ICONS[notification.type];
+          const canOpen = notification.type !== "role";
+
+          return (
+            <div
+              key={notification.id}
+              className="bg-card flex items-stretch rounded-lg border"
+            >
+              <button
+                type="button"
+                onClick={() => openNotification(notification)}
+                className="hover:bg-muted/40 focus-visible:ring-ring/25 flex min-w-0 flex-1 items-start gap-3 rounded-l-lg p-3 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
+              >
+                {notification.sender ? (
+                  <Avatar className="size-8 shrink-0">
+                    <AvatarImage src={notification.sender.avatar} alt="" />
+                    <AvatarFallback className="text-[11px]">
+                      {notification.sender.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <span
+                    className="bg-muted text-muted-foreground mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md"
+                    aria-hidden="true"
+                  >
+                    <TypeIcon className="size-3.5" />
+                  </span>
+                )}
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-[13px] font-medium">
+                      {notification.title}
+                    </span>
+                    <time
+                      className="text-muted-foreground shrink-0 text-[11px]"
+                      dateTime={notification.createdAt}
+                    >
+                      {formatDate(notification.createdAt)}
+                    </time>
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-[13px] leading-relaxed">
+                    {notification.content}
+                  </span>
+                  {!notification.isRead && (
+                    <Badge variant="outline-info" className="mt-2">
+                      {t("notificationCenter.unreadBadge")}
+                    </Badge>
+                  )}
+                </span>
+              </button>
+
+              <div className="flex items-center gap-0.5 pr-2">
+                {canOpen && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openNotification(notification)}
+                  >
+                    {t("notificationCenter.view")}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t("common.delete")}
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteNotification(notification.id)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const currentTabItems = notificationsForTab(notifications, activeTab);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={t("notificationCenter.title")}
+        actions={
+          <>
+            {isGuest && <CreatorApplicationButton />}
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/admin/creator-applications")}
+              >
+                <Users className="size-4" />
+                {t("creatorApplication.reviewApplications")}
+              </Button>
+            )}
+            <Button variant="outline" onClick={markAllAsRead}>
+              {t("notificationCenter.markAllAsRead")}
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as TabValue)}
+        className="w-full"
+      >
+        <TabsList className="overflow-x-auto">
+          {TAB_VALUES.map((tab) => (
+            <TabsTrigger key={tab} value={tab}>
+              {t(`notificationCenter.tabs.${tab}`)}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {t("notificationCenter.empty.noNotifications")}
-                </h3>
-                <p className="text-muted-foreground">
-                  {t("notificationCenter.empty.noNotificationsDesc")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
-                onClick={() => {
-                  markAsRead(notification.id);
-                  if (notification.relatedId) {
-                    navigateToRelated(
-                      notification.relatedId,
-                      notification.relatedType,
-                      notification.relatedPostId,
-                    );
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      {notification.sender ? (
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={notification.sender.avatar}
-                            alt={notification.sender.username}
-                          />
-                          <AvatarFallback>
-                            {notification.sender.username
-                              .charAt(0)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <AlertCircle className="w-5 h-5 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">
-                          {notification.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.content}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {!notification.isRead && (
-                            <Badge variant="secondary" className="text-xs">
-                              {t("notificationCenter.unreadBadge")}
-                            </Badge>
-                          )}
-                          {getStatusIcon(notification.type)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {notification.type !== "role" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (notification.relatedId) {
-                                  navigateToRelated(
-                                    notification.relatedId,
-                                    notification.relatedType,
-                                    notification.relatedPostId,
-                                  );
-                                }
-                              }}
-                            >
-                              {t("notificationCenter.view")}{" "}
-                              <ArrowRight className="w-3 h-3 ml-1" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(notification.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        {/* Other tab contents */}
-        <TabsContent value="unread" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Eye className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {t("notificationCenter.empty.noUnreadNotifications")}
-                </h3>
-                <p className="text-muted-foreground">
-                  {t("notificationCenter.empty.allRead")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className="border-l-4 border-primary cursor-pointer transition-all duration-200 hover:shadow-md"
-                onClick={() => {
-                  markAsRead(notification.id);
-                  if (notification.relatedId) {
-                    navigateToRelated(
-                      notification.relatedId,
-                      notification.relatedType,
-                      notification.relatedPostId,
-                    );
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      {notification.sender ? (
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={notification.sender.avatar}
-                            alt={notification.sender.username}
-                          />
-                          <AvatarFallback>
-                            {notification.sender.username
-                              .charAt(0)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <AlertCircle className="w-5 h-5 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">
-                          {notification.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.content}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="text-xs">
-                          {t("notificationCenter.unreadBadge")}
-                        </Badge>
-                        <div className="flex items-center gap-2">
-                          {notification.type !== "role" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (notification.relatedId) {
-                                  navigateToRelated(
-                                    notification.relatedId,
-                                    notification.relatedType,
-                                    notification.relatedPostId,
-                                  );
-                                }
-                              }}
-                            >
-                              {t("notificationCenter.view")}{" "}
-                              <ArrowRight className="w-3 h-3 ml-1" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(notification.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="comment" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {t("notificationCenter.empty.noCommentNotifications")}
-                </h3>
-                <p className="text-muted-foreground">
-                  {t("notificationCenter.empty.noCommentNotificationsDesc")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
-                onClick={() => {
-                  markAsRead(notification.id);
-                  if (notification.relatedId) {
-                    navigateToRelated(
-                      notification.relatedId,
-                      notification.relatedType,
-                      notification.relatedPostId,
-                    );
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      {notification.sender ? (
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={notification.sender.avatar}
-                            alt={notification.sender.username}
-                          />
-                          <AvatarFallback>
-                            {notification.sender.username
-                              .charAt(0)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <MessageSquare className="w-5 h-5 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">
-                          {notification.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.content}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        {!notification.isRead && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("notificationCenter.unreadBadge")}
-                          </Badge>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (notification.relatedId) {
-                                navigateToRelated(
-                                  notification.relatedId,
-                                  notification.relatedType,
-                                  notification.relatedPostId,
-                                );
-                              }
-                            }}
-                          >
-                            {t("notificationCenter.view")}{" "}
-                            <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(notification.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="like" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <ThumbsUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {t("notificationCenter.empty.noLikeNotifications")}
-                </h3>
-                <p className="text-muted-foreground">
-                  {t("notificationCenter.empty.noLikeNotificationsDesc")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
-                onClick={() => {
-                  markAsRead(notification.id);
-                  if (notification.relatedId) {
-                    navigateToRelated(
-                      notification.relatedId,
-                      notification.relatedType,
-                      notification.relatedPostId,
-                    );
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      {notification.sender ? (
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={notification.sender.avatar}
-                            alt={notification.sender.username}
-                          />
-                          <AvatarFallback>
-                            {notification.sender.username
-                              .charAt(0)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <ThumbsUp className="w-5 h-5 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">
-                          {notification.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.content}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        {!notification.isRead && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("notificationCenter.unreadBadge")}
-                          </Badge>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (notification.relatedId) {
-                                navigateToRelated(
-                                  notification.relatedId,
-                                  notification.relatedType,
-                                  notification.relatedPostId,
-                                );
-                              }
-                            }}
-                          >
-                            {t("notificationCenter.view")}{" "}
-                            <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(notification.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="review" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {t("notificationCenter.empty.noReviewNotifications")}
-                </h3>
-                <p className="text-muted-foreground">
-                  {t("notificationCenter.empty.noReviewNotificationsDesc")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
-                onClick={() => {
-                  markAsRead(notification.id);
-                  if (notification.relatedId) {
-                    navigateToRelated(
-                      notification.relatedId,
-                      notification.relatedType,
-                      notification.relatedPostId,
-                    );
-                  }
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-primary" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">
-                          {notification.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.content}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        {!notification.isRead && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("notificationCenter.unreadBadge")}
-                          </Badge>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (notification.relatedId) {
-                                navigateToRelated(
-                                  notification.relatedId,
-                                  notification.relatedType,
-                                  notification.relatedPostId,
-                                );
-                              }
-                            }}
-                          >
-                            {t("notificationCenter.view")}{" "}
-                            <ArrowRight className="w-3 h-3 ml-1" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteNotification(notification.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="role" className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <UserPlus className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {t("notificationCenter.empty.noRoleNotifications")}
-                </h3>
-                <p className="text-muted-foreground">
-                  {t("notificationCenter.empty.noRoleNotificationsDesc")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${notification.isRead ? "" : "border-l-4 border-primary"}`}
-                onClick={() => {
-                  markAsRead(notification.id);
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <UserPlus className="w-5 h-5 text-primary" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-medium text-sm">
-                          {notification.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.content}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        {!notification.isRead && (
-                          <Badge variant="secondary" className="text-xs">
-                            {t("notificationCenter.unreadBadge")}
-                          </Badge>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNotification(notification.id);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
+        {/* One list, six filters: every tab renders the same rows. */}
+        {TAB_VALUES.map((tab) => (
+          <TabsContent key={tab} value={tab}>
+            {loading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-[86px] rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              renderNotificationList(currentTabItems)
+            )}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

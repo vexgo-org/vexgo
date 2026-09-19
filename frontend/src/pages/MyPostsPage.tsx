@@ -8,9 +8,17 @@ import type { Post } from "@/types";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,18 +38,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  PenLine,
-  Edit,
-  Trash2,
-  Eye,
-  Clock,
-  FileX,
-  Plus,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-} from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Edit, Eye, PenLine, Plus, Trash2 } from "lucide-react";
 import { normalizeTagsArray } from "@/lib/utils";
 
 export function MyPostsPage() {
@@ -108,7 +107,11 @@ export function MyPostsPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Paging to the top is disorienting under reduced motion.
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
   };
 
   const formatDate = (dateString: string) => {
@@ -120,216 +123,156 @@ export function MyPostsPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "published":
-        return {
-          variant: "default" as const,
-          label: t("myPostsPage.published"),
-          icon: CheckCircle,
-          className: "bg-green-600 hover:bg-green-700",
-        };
-      case "draft":
-        return {
-          variant: "secondary" as const,
-          label: t("myPostsPage.draft"),
-          icon: FileX,
-          className: "",
-        };
-      case "pending":
-        return {
-          variant: "outline" as const,
-          label: t("myPostsPage.pending"),
-          icon: Clock,
-          className: "text-yellow-600 border-yellow-600",
-        };
-      case "rejected":
-        return {
-          variant: "destructive" as const,
-          label: t("myPostsPage.rejected"),
-          icon: XCircle,
-          className: "",
-        };
-      default:
-        return {
-          variant: "secondary" as const,
-          label: status,
-          icon: AlertCircle,
-          className: "",
-        };
-    }
-  };
-
   if (loading && posts.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center justify-between mb-6">
-          <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-10 w-24" />
-        </div>
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="mb-4">
-            <CardContent className="p-6">
-              <Skeleton className="h-6 w-3/4 mb-4" />
-              <Skeleton className="h-4 w-1/2" />
-            </CardContent>
-          </Card>
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-40" />
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-12 rounded-sm" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <PenLine className="w-6 h-6" />
-          {t("myPostsPage.myPosts")}
-        </h1>
-        {user?.role !== "guest" && (
-          <Button asChild>
-            <Link to="/admin/write">
-              <Plus className="w-4 h-4 mr-2" />
-              {t("myPostsPage.writePost")}
-            </Link>
-          </Button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("myPostsPage.myPosts")}
+        actions={
+          user?.role !== "guest" ? (
+            <Button asChild>
+              <Link to="/admin/write">
+                <Plus className="size-4" />
+                {t("myPostsPage.writePost")}
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {/* Post list */}
       {posts.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileX className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">
-              {t("myPostsPage.noPosts")}
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {t("myPostsPage.noPostsDesc")}
-            </p>
-            {user?.role !== "guest" && (
-              <Button asChild>
-                <Link to="/admin/write">
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t("myPostsPage.writePost")}
-                </Link>
-              </Button>
-            )}
-          </CardContent>
+        <Card className="py-0">
+          <EmptyState
+            icon={PenLine}
+            title={t("myPostsPage.noPosts")}
+            description={t("myPostsPage.noPostsDesc")}
+            action={
+              user?.role !== "guest" ? (
+                <Button asChild>
+                  <Link to="/admin/write">
+                    <Plus className="size-4" />
+                    {t("myPostsPage.writePost")}
+                  </Link>
+                </Button>
+              ) : undefined
+            }
+          />
         </Card>
       ) : (
         <>
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <Card key={post.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      {/* Status badge */}
-                      <div className="flex items-center gap-2 mb-2">
-                        {(() => {
-                          const status = getStatusBadge(post.status || "");
-                          const IconComponent = status.icon;
-                          return (
-                            <Badge
-                              variant={status.variant}
-                              className={status.className}
-                            >
-                              <IconComponent className="w-3 h-3 mr-1" />
-                              {status.label}
-                            </Badge>
-                          );
-                        })()}
-                        <span className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatDate(post.createdAt || "")}
-                        </span>
-                      </div>
-
-                      {/* Title — the post page is served by the public theme */}
-                      <a href={`/post/${post.slug}`}>
-                        <h2 className="text-lg font-semibold mb-2 hover:text-primary transition-colors">
-                          {post.title}
-                        </h2>
+          <div className="bg-card overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{t("posts.title")}</TableHead>
+                  <TableHead className="w-28">{t("posts.status")}</TableHead>
+                  <TableHead className="w-40">{t("posts.tags")}</TableHead>
+                  <TableHead className="w-28">{t("common.date")}</TableHead>
+                  <TableHead className="w-28 text-right">
+                    {t("common.actions")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {posts.map((post) => (
+                  <TableRow key={post.id}>
+                    <TableCell className="max-w-0">
+                      {/* The post page is served by the public theme. */}
+                      <a
+                        href={`/post/${post.slug}`}
+                        className="block truncate font-medium hover:underline"
+                        title={post.title}
+                      >
+                        {post.title}
                       </a>
-
-                      {/* Excerpt */}
-                      <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
-                        {post.excerpt}
-                      </p>
-
-                      {/* Tags */}
-                      {post.tags && post.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {post.tags.slice(0, 3).map((tag) => (
-                            <Badge
-                              key={tag}
-                              variant="outline"
-                              className="text-xs"
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={post.status} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-0">
+                      <span className="block truncate">
+                        {(post.tags ?? []).slice(0, 3).join(", ")}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {formatDate(post.createdAt || "")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-0.5">
+                        <Button variant="ghost" size="icon-sm" asChild>
+                          <a
+                            href={`/post/${post.slug}`}
+                            aria-label={t("posts.list")}
+                          >
+                            <Eye className="size-4" />
+                          </a>
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" asChild>
+                          <Link
+                            to={`/admin/edit-post/${post.id}`}
+                            aria-label={t("posts.edit")}
+                          >
+                            <Edit className="size-4" />
+                          </Link>
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={t("posts.delete")}
                             >
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex flex-col gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={`/post/${post.slug}`}>
-                          <Eye className="w-4 h-4" />
-                        </a>
-                      </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/admin/edit-post/${post.id}`}>
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              {t("myPostsPage.confirmDelete")}
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {t("myPostsPage.cannotUndo")}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>
-                              {t("myPostsPage.cancel")}
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeletePost(String(post.id))}
-                              className="bg-destructive"
-                            >
-                              {t("myPostsPage.delete")}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                {t("myPostsPage.confirmDelete")}
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {t("myPostsPage.cannotUndo")}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>
+                                {t("myPostsPage.cancel")}
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  handleDeletePost(String(post.id))
+                                }
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {t("myPostsPage.delete")}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
 
-          {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <Pagination className="mt-6">
+            <Pagination className="justify-end">
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
+                    label={t("common.previous")}
                     onClick={() => handlePageChange(currentPage - 1)}
                     className={
                       currentPage === 1
@@ -349,7 +292,9 @@ export function MyPostsPage() {
                   .map((page, index, array) => (
                     <div key={page} className="flex items-center">
                       {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="px-2 text-muted-foreground">...</span>
+                        <span className="text-muted-foreground px-2 text-[13px]">
+                          …
+                        </span>
                       )}
                       <PaginationItem>
                         <PaginationLink
@@ -364,6 +309,7 @@ export function MyPostsPage() {
 
                 <PaginationItem>
                   <PaginationNext
+                    label={t("common.next")}
                     onClick={() => handlePageChange(currentPage + 1)}
                     className={
                       currentPage === pagination.totalPages

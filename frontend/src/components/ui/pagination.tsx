@@ -55,9 +55,10 @@ function PaginationLink({
       data-active={isActive}
       className={cn(
         buttonVariants({
-          variant: isActive ? "outline" : "ghost",
+          variant: isActive ? "default" : "ghost",
           size,
         }),
+        "text-[13px]",
         className,
       )}
       {...props}
@@ -65,10 +66,13 @@ function PaginationLink({
   );
 }
 
+// `label` overrides the visible text so callers can localize it; the icon and
+// the aria-label stay with the primitive.
 function PaginationPrevious({
   className,
+  label = "Previous",
   ...props
-}: React.ComponentProps<typeof PaginationLink>) {
+}: React.ComponentProps<typeof PaginationLink> & { label?: string }) {
   return (
     <PaginationLink
       aria-label="Go to previous page"
@@ -77,15 +81,16 @@ function PaginationPrevious({
       {...props}
     >
       <ChevronLeftIcon />
-      <span className="hidden sm:block">Previous</span>
+      <span className="hidden sm:block">{label}</span>
     </PaginationLink>
   );
 }
 
 function PaginationNext({
   className,
+  label = "Next",
   ...props
-}: React.ComponentProps<typeof PaginationLink>) {
+}: React.ComponentProps<typeof PaginationLink> & { label?: string }) {
   return (
     <PaginationLink
       aria-label="Go to next page"
@@ -93,7 +98,7 @@ function PaginationNext({
       className={cn("gap-1 px-2.5 sm:pr-2.5", className)}
       {...props}
     >
-      <span className="hidden sm:block">Next</span>
+      <span className="hidden sm:block">{label}</span>
       <ChevronRightIcon />
     </PaginationLink>
   );
@@ -107,7 +112,10 @@ function PaginationEllipsis({
     <span
       aria-hidden
       data-slot="pagination-ellipsis"
-      className={cn("flex size-9 items-center justify-center", className)}
+      className={cn(
+        "text-muted-foreground flex size-9 items-center justify-center text-[13px]",
+        className,
+      )}
       {...props}
     >
       <MoreHorizontalIcon className="size-4" />

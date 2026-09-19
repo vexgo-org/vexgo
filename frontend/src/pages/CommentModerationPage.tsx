@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/PageHeader";
 import { CheckCircle, XCircle, Clock, User } from "lucide-react";
 import { toast } from "sonner";
 import { getVexGoAPI } from "@/api/generated/endpoints";
@@ -95,18 +96,14 @@ export function CommentModerationPage() {
   const comments = getCurrentComments();
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{t("commentModeration.title")}</h1>
-          <p className="text-muted-foreground">
-            {t("adminData.manageComments")}
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("commentModeration.title")}
+        description={t("adminData.manageComments")}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
+        <TabsList className="w-full">
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             {t("moderation.pending")}

@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarkdownEditor } from "@/components/editor";
 import ImageCropper from "@/components/image/ImageCropper";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Loader2,
   Save,
@@ -419,16 +420,18 @@ export function WritePostPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="mx-auto max-w-3xl">
       {/* Form */}
       <div className="space-y-6">
-        {/* Title */}
+        {/* The title is the document's headline, so it is set as one: a bare
+            rule that gains a visible focus underline instead of a box. */}
         <div>
           <Input
             placeholder={t("writePostPage.titlePlaceholder")}
+            aria-label={t("writePostPage.titlePlaceholder")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="text-2xl font-bold border-0 border-b rounded-none px-0 focus-visible:ring-0"
+            className="focus-visible:border-ring rounded-none border-0 border-b bg-transparent px-0 text-xl font-semibold focus-visible:ring-0"
           />
         </div>
 
@@ -461,7 +464,7 @@ export function WritePostPage() {
                 <img
                   src={coverImage}
                   alt={t("writePostPage.coverImageAlt")}
-                  className="w-full h-48 object-fill rounded-lg"
+                  className="h-48 w-full rounded-md border object-cover"
                 />
                 <Button
                   variant="destructive"
@@ -473,7 +476,7 @@ export function WritePostPage() {
                 </Button>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+              <div className="border-border rounded-md border border-dashed p-8 text-center">
                 <input
                   type="file"
                   accept="image/*"
@@ -486,16 +489,16 @@ export function WritePostPage() {
                   className="cursor-pointer flex flex-col items-center"
                 >
                   {uploadingImage ? (
-                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
+                    <Spinner className="text-muted-foreground mb-2 size-5" />
                   ) : (
-                    <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                    <ImageIcon className="text-muted-foreground mb-2 size-5" />
                   )}
-                  <span className="text-sm text-gray-500">
+                  <span className="text-[13px]">
                     {uploadingImage
                       ? t("writePostPage.uploading")
                       : t("writePostPage.uploadCover")}
                   </span>
-                  <span className="text-xs text-gray-400 mt-1">
+                  <span className="text-muted-foreground mt-1 text-[11px]">
                     {t("writePostPage.imageFormat")}
                   </span>
                 </label>

@@ -18,6 +18,9 @@ export const enUS = {
     unknownError: "Unknown error",
     custom: "Custom",
     noDescription: "No description",
+    date: "Date",
+    actions: "Actions",
+    preview: "Preview",
     overview: "Overview",
     optional: "Optional",
     compatible: "compatible",
@@ -105,12 +108,6 @@ export const enUS = {
   // Settings
   settings: {
     title: "Settings",
-    displaySettings: "Display Settings",
-    theme: "Theme",
-    light: "Light",
-    dark: "Dark",
-    system: "System",
-    language: "Language",
     privacySettings: "Privacy Settings",
     privacySettingsDesc:
       "Manage the visibility of your profile and personal information",
@@ -680,7 +677,30 @@ export const enUS = {
     settings: "Settings",
     logout: "Logout",
     viewSite: "View Site",
-    allRightsReserved: "© 2026 {siteName}. All rights reserved.",
+    // Console navigation: group headings first, then the leaf labels.
+    navOverview: "Overview",
+    navContent: "Content",
+    // Distinct from navPosts/navComments: the moderation queue and the
+    // comment settings screen are different destinations, so they cannot
+    // share a label or the rail shows two identical entries.
+    navPosts: "Content moderation",
+    navModeration: "Moderation",
+    navComments: "Comment moderation",
+    navCommentSettings: "Comment settings",
+    navCreatorApplications: "Creator Applications",
+    navSystem: "System",
+    navUsers: "Users",
+    navThemes: "Themes",
+    navSettings: "Settings",
+    navGeneral: "General",
+    navAI: "AI",
+    navEmail: "Email",
+    navAccount: "Account",
+    navPreferences: "Preferences",
+    openNavigation: "Open navigation",
+    toggleNavigation: "Toggle navigation",
+    toggleTheme: "Toggle theme",
+    language: "Language",
   },
 
   // Login Page Extended
@@ -825,6 +845,7 @@ export const enUS = {
   // Profile Page Extended
   profilePage: {
     profile: "Profile",
+    profileDescription: "Your account details, avatar, and password.",
     memberSince: "Member since",
     birthday: "Birthday",
     bio: "Bio",
@@ -1054,6 +1075,9 @@ export const enUS = {
     published: "Published",
     draft: "Draft",
     inNav: "In nav",
+    inNavWithOrder: "In nav · #{order}",
+    slug: "Slug",
+    navigation: "Navigation",
     noPages: "No pages yet",
     confirmDelete: "Confirm delete page?",
     cannotUndo:

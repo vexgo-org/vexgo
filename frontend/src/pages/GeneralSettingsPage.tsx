@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -23,11 +22,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Settings, Save, Upload, Trash2 } from "lucide-react";
+import { Save, Settings, Upload, Trash2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
 export function GeneralSettingsPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -133,43 +133,19 @@ export function GeneralSettingsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-6">
-          <div className="h-8 w-48 bg-muted rounded animate-pulse mb-2" />
-          <div className="h-4 w-64 bg-muted rounded animate-pulse" />
-        </div>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-muted rounded animate-pulse" />
-            ))}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/admin")}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t("generalSettings.backToAdmin")}
-        </Button>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Settings className="w-8 h-8" />
-          {t("generalSettings.title")}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {t("generalSettings.description")}
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("generalSettings.title")}
+        description={t("generalSettings.description")}
+      />
 
       <Card>
         <CardHeader>
@@ -313,7 +289,7 @@ export function GeneralSettingsPage() {
             {themeLanguages.length > 0 &&
               config.siteLanguage &&
               !themeLanguages.includes(config.siteLanguage) && (
-                <p className="text-xs text-amber-600">
+                <p className="text-warning text-[11px]">
                   {t("generalSettings.siteLanguageMissing")}
                 </p>
               )}
@@ -379,7 +355,7 @@ export function GeneralSettingsPage() {
       </Card>
 
       {/* Save button */}
-      <div className="mt-6 flex justify-end">
+      <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving} size="lg">
           {saving ? (
             <>{t("generalSettings.saving")}</>

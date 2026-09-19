@@ -12,16 +12,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
-  CheckCircle,
-  XCircle,
-  Clock,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PageHeader } from "@/components/PageHeader";
+import {
   AlertCircle,
-  Search,
-  Eye,
+  CheckCircle,
+  Clock,
   Edit,
+  Eye,
+  Search,
   Send,
-  MessageSquare,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -165,58 +174,51 @@ export function ModerationPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">{t("moderation.title")}</h1>
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-4 bg-muted rounded w-1/4"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-40" />
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-24 rounded-lg" />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">{t("moderation.title")}</h1>
-        <div className="relative w-64">
-          <Input
-            type="text"
-            placeholder={t("moderation.searchPlaceholder")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyUp={handleKeyPress}
-            className="pl-10"
-          />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-            onClick={handleSearch}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("moderation.title")}
+        actions={
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-56">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Input
+                type="search"
+                placeholder={t("moderation.searchPlaceholder")}
+                aria-label={t("moderation.searchPlaceholder")}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyUp={handleKeyPress}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleSearch}
+              aria-label={t("moderation.searchPlaceholder")}
+            >
+              <Search className="size-4" />
+            </Button>
+          </div>
+        }
+      />
 
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="w-full">
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             {t("moderation.pending")} ({pendingPosts.length})
@@ -231,22 +233,20 @@ export function ModerationPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending" className="mt-6">
+        <TabsContent value="pending">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-yellow-500" />
+                <AlertCircle className="text-warning size-4" />
                 {t("moderation.pendingPosts")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {pendingPosts.length === 0 ? (
-                <div className="text-center py-12">
-                  <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {t("moderation.noPendingPosts")}
-                  </p>
-                </div>
+                <EmptyState
+                  icon={Clock}
+                  title={t("moderation.noPendingPosts")}
+                />
               ) : (
                 <div className="space-y-4">
                   {pendingPosts.map((post) => (
@@ -275,8 +275,8 @@ export function ModerationPage() {
                           </p>
                         )}
                         {post.rejectionReason && (
-                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                            <p className="text-sm text-red-800">
+                          <div className="border-destructive/35 bg-destructive/10 mt-2 rounded-md border p-2">
+                            <p className="text-destructive text-[13px]">
                               <span className="font-medium">
                                 {t("moderation.rejectionReasonInPost")}
                               </span>
@@ -304,8 +304,6 @@ export function ModerationPage() {
                         <div className="flex gap-1">
                           <Button
                             size="sm"
-                            variant="default"
-                            className="bg-green-600 hover:bg-green-700"
                             onClick={() => handleApprovePost(post.id)}
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />
@@ -329,22 +327,20 @@ export function ModerationPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="approved" className="mt-6">
+        <TabsContent value="approved">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-500" />
+                <CheckCircle className="text-success size-4" />
                 {t("moderation.approvedPosts")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {approvedPosts.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {t("moderation.noApprovedPosts")}
-                  </p>
-                </div>
+                <EmptyState
+                  icon={CheckCircle}
+                  title={t("moderation.noApprovedPosts")}
+                />
               ) : (
                 <div className="space-y-4">
                   {approvedPosts.map((post) => (
@@ -354,7 +350,7 @@ export function ModerationPage() {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="default" className="bg-green-500">
+                          <Badge variant="success">
                             {t("moderation.approved")}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
@@ -390,22 +386,20 @@ export function ModerationPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="rejected" className="mt-6">
+        <TabsContent value="rejected">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-red-500" />
+                <XCircle className="text-destructive size-4" />
                 {t("moderation.rejectedPosts")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {rejectedPosts.length === 0 ? (
-                <div className="text-center py-12">
-                  <XCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {t("moderation.noRejectedPosts")}
-                  </p>
-                </div>
+                <EmptyState
+                  icon={XCircle}
+                  title={t("moderation.noRejectedPosts")}
+                />
               ) : (
                 <div className="space-y-4">
                   {rejectedPosts.map((post) => (
@@ -449,11 +443,10 @@ export function ModerationPage() {
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           {t("moderation.view")}
-                        </Button>
+                        </Button>{" "}
                         <Button
                           size="sm"
-                          variant="default"
-                          className="bg-yellow-600 hover:bg-yellow-700"
+                          variant="outline"
                           onClick={() => handleResubmitPost(post.id)}
                         >
                           <Send className="w-4 h-4 mr-1" />
@@ -469,40 +462,38 @@ export function ModerationPage() {
         </TabsContent>
       </Tabs>
 
-      {showRejectDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-red-500" />
-              {t("moderation.rejectPost")}
-            </h2>
-            <div className="mb-4">
-              <Label
-                htmlFor="rejectionReason"
-                className="block text-sm font-medium mb-2"
-              >
-                {t("moderation.rejectionReasonLabel")}
-              </Label>
-              <Textarea
-                id="rejectionReason"
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder={t("moderation.rejectionReasonPlaceholder")}
-                rows={4}
-                className="w-full"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={cancelRejectPost}>
-                {t("moderation.cancel")}
-              </Button>
-              <Button variant="destructive" onClick={confirmRejectPost}>
-                {t("moderation.confirmReject")}
-              </Button>
-            </div>
+      <Dialog
+        open={showRejectDialog}
+        onOpenChange={(open) => {
+          if (!open) cancelRejectPost();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("moderation.rejectPost")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rejectionReason">
+              {t("moderation.rejectionReasonLabel")}
+            </Label>
+            <Textarea
+              id="rejectionReason"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder={t("moderation.rejectionReasonPlaceholder")}
+              rows={4}
+            />
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelRejectPost}>
+              {t("moderation.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={confirmRejectPost}>
+              {t("moderation.confirmReject")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

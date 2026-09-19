@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -24,7 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Cpu, Save, TestTube, RefreshCw } from "lucide-react";
+import { Save, TestTube, RefreshCw } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
 interface ApiErrorResponse {
@@ -32,7 +33,6 @@ interface ApiErrorResponse {
 }
 
 export function AISettingsPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -153,18 +153,9 @@ export function AISettingsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-6">
-          <div className="h-8 w-48 bg-muted rounded animate-pulse mb-2" />
-          <div className="h-4 w-64 bg-muted rounded animate-pulse" />
-        </div>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-muted rounded animate-pulse" />
-            ))}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
@@ -173,26 +164,11 @@ export function AISettingsPage() {
   const selectedModel = models.find((m) => m.id === config.modelName);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/admin")}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t("aiSettings.backToAdmin")}
-        </Button>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Cpu className="w-8 h-8" />
-          {t("aiSettings.title")}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {t("aiSettings.description")}
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("aiSettings.title")}
+        description={t("aiSettings.description")}
+      />
 
       <Card>
         <CardHeader>
@@ -263,7 +239,7 @@ export function AISettingsPage() {
           <div className="space-y-2">
             <Label htmlFor="apiKey">
               {t("aiSettings.apiKey")}{" "}
-              {config.enabled && <span className="text-red-500">*</span>}
+              {config.enabled && <span className="text-destructive">*</span>}
             </Label>
             <Input
               id="apiKey"
@@ -287,7 +263,7 @@ export function AISettingsPage() {
             <div className="flex items-center justify-between">
               <Label htmlFor="modelName">
                 {t("aiSettings.modelName")}{" "}
-                {config.enabled && <span className="text-red-500">*</span>}
+                {config.enabled && <span className="text-destructive">*</span>}
               </Label>
               <Button
                 type="button"
@@ -359,7 +335,7 @@ export function AISettingsPage() {
                 })}
               </span>
               {selectedModel && (
-                <span className="text-green-600">
+                <span className="text-success">
                   {t("aiSettings.selectedModel", { model: selectedModel.id })}
                 </span>
               )}
@@ -388,7 +364,7 @@ export function AISettingsPage() {
       </Card>
 
       {/* Help info */}
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base">
             {t("aiSettings.helpInfo.title")}

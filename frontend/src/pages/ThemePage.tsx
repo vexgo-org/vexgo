@@ -9,6 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/PageHeader";
+import { RouteFallback } from "@/components/RouteFallback";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +24,6 @@ import {
   Loader2,
   Check,
   AlertCircle,
-  Palette,
   Upload,
   Eye,
   Trash2,
@@ -265,62 +267,42 @@ export function ThemePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
+    return <RouteFallback />;
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="max-w-6xl">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Palette className="w-8 h-8" />
-              {t("themePage.title")}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {t("themePage.description")}
-            </p>
-          </div>
-          <Button
-            onClick={handleUploadClick}
-            disabled={uploading}
-            className="flex items-center gap-2"
-          >
-            {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-            <Upload className="w-4 h-4" />
-            {t("themePage.uploadTheme")}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
+        <PageHeader
+          title={t("themePage.title")}
+          description={t("themePage.description")}
+          actions={
+            <>
+              <Button onClick={handleUploadClick} disabled={uploading}>
+                {uploading ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  <Upload className="size-4" />
+                )}
+                {t("themePage.uploadTheme")}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </>
+          }
+        />
 
         {message && (
           <Alert
-            className={cn(
-              message.type === "success"
-                ? "border-green-500/50 bg-green-500/10"
-                : "border-red-500/50 bg-red-500/10",
-            )}
+            variant={message.type === "success" ? "success" : "destructive"}
           >
-            {message.type === "success" ? (
-              <Check className="w-4 h-4 text-green-500" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-red-500" />
-            )}
-            <AlertDescription
-              className={cn(
-                message.type === "success" ? "text-green-500" : "text-red-500",
-              )}
-            >
+            {message.type === "success" ? <Check /> : <AlertCircle />}
+            <AlertDescription className="text-current">
               {message.text}
             </AlertDescription>
           </Alert>
@@ -345,7 +327,7 @@ export function ThemePage() {
                   <DialogTrigger asChild>
                     <div
                       className={cn(
-                        "cursor-pointer transition-all hover:shadow-md rounded-lg overflow-hidden bg-card border",
+                        "bg-card cursor-pointer overflow-hidden rounded-lg border transition-colors hover:border-foreground/25",
                         isActive ? "border-primary border-2" : "border-border",
                       )}
                       onClick={() => setSelectedTheme(theme)}

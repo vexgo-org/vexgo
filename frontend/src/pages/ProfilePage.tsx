@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,14 +30,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Spinner } from "@/components/ui/spinner";
 import {
-  Loader2,
   User,
   Mail,
   Key,
   Check,
   Calendar,
-  UserPlus,
   Eye,
   EyeOff,
   Camera,
@@ -44,6 +44,61 @@ import {
 import { Badge } from "@/components/ui/badge";
 import ImageCropper from "@/components/image/ImageCropper";
 import { isAxiosError } from "axios";
+
+/**
+ * The password inputs are identical except for their target state, so they
+ * share one component instead of three copies of the same markup.
+ */
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  visible,
+  onToggleVisibility,
+  autoComplete,
+  minLength,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  visible: boolean;
+  onToggleVisibility: () => void;
+  autoComplete?: string;
+  minLength?: number;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Key className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <Input
+          id={id}
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="pr-9 pl-9"
+          autoComplete={autoComplete}
+          minLength={minLength}
+          required
+        />
+        <button
+          type="button"
+          onClick={onToggleVisibility}
+          aria-label={
+            visible ? t("loginPage.hidePassword") : t("loginPage.showPassword")
+          }
+          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+        >
+          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -246,32 +301,36 @@ export function ProfilePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("profilePage.profile")}
+        description={t("profilePage.profileDescription")}
+      />
       <Card>
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
+        <CardHeader className="items-center text-center">
+          <div className="mb-1 flex justify-center">
             <div
               className="relative cursor-pointer"
               onClick={handleAvatarClick}
             >
-              <Avatar className="w-24 h-24">
+              <Avatar className="size-20">
                 {user?.avatar ? (
                   <img
                     src={user.avatar}
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
+                    alt=""
+                    className="size-full object-cover"
                   />
                 ) : (
-                  <AvatarFallback className="bg-primary/10 text-primary text-3xl">
+                  <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
                     {user?.username?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 )}
               </Avatar>
-              <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <div className="bg-foreground/40 absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-opacity hover:opacity-100">
                 {avatarLoading ? (
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                  <Spinner className="size-6 text-background" />
                 ) : (
-                  <Camera className="w-8 h-8 text-white" />
+                  <Camera className="size-6 text-background" />
                 )}
               </div>
               <input
@@ -283,22 +342,15 @@ export function ProfilePage() {
               />
             </div>
           </div>
-          <CardTitle className="text-2xl">{user?.username}</CardTitle>
+          <CardTitle className="text-lg">{user?.username}</CardTitle>
           <CardDescription>{user?.email}</CardDescription>
-          <Badge
-            variant={
-              user?.role === "admin" || user?.role === "super_admin"
-                ? "default"
-                : "secondary"
-            }
-            className="mt-2"
-          >
+          <Badge variant="secondary" className="mt-1">
             {getRoleLabel(user?.role)}
           </Badge>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="w-full">
               <TabsTrigger value="profile">
                 {t("profilePage.profileInfo")}
               </TabsTrigger>
@@ -308,11 +360,11 @@ export function ProfilePage() {
             </TabsList>
 
             <TabsContent value="profile">
-              <form onSubmit={handleUpdateProfile} className="space-y-4 mt-4">
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
                 {success && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <Check className="w-4 h-4 text-green-600" />
-                    <AlertDescription className="text-green-600">
+                  <Alert variant="success">
+                    <Check />
+                    <AlertDescription className="text-current">
                       {success}
                     </AlertDescription>
                   </Alert>
@@ -326,16 +378,16 @@ export function ProfilePage() {
                 <div className="space-y-2">
                   <Label htmlFor="email">{t("profilePage.emailLabel")}</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                     <Input
                       id="email"
                       type="email"
                       value={user?.email}
                       disabled
-                      className="pl-10 bg-muted"
+                      className="bg-muted pl-9"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-[11px]">
                     {t("profilePage.changeEmailTip")}
                   </p>
                   <Button
@@ -353,13 +405,13 @@ export function ProfilePage() {
                     {t("profilePage.usernameLabel")}
                   </Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <User className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                     <Input
                       id="username"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="pl-10"
+                      className="pl-9"
                       minLength={3}
                     />
                   </div>
@@ -370,36 +422,32 @@ export function ProfilePage() {
                     {t("profilePage.birthdayLabel")}
                   </Label>
                   <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Calendar className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                     <Input
                       id="birthday"
                       type="date"
                       value={birthday}
                       onChange={(e) => setBirthday(e.target.value)}
-                      className="pl-10"
+                      className="pl-9"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="bio">{t("profilePage.bioLabel")}</Label>
-                  <div className="relative">
-                    <UserPlus className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <Textarea
-                      id="bio"
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
-                      placeholder={t("profilePage.bioPlaceholder")}
-                      className="pl-10"
-                      rows={3}
-                    />
-                  </div>
+                  <Textarea
+                    id="bio"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder={t("profilePage.bioPlaceholder")}
+                    rows={3}
+                  />
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Spinner className="size-4" />
                       {t("profilePage.saving")}
                     </>
                   ) : (
@@ -410,11 +458,11 @@ export function ProfilePage() {
             </TabsContent>
 
             <TabsContent value="password">
-              <form onSubmit={handleChangePassword} className="space-y-4 mt-4">
+              <form onSubmit={handleChangePassword} className="space-y-4">
                 {success && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <Check className="w-4 h-4 text-green-600" />
-                    <AlertDescription className="text-green-600">
+                  <Alert variant="success">
+                    <Check />
+                    <AlertDescription className="text-current">
                       {success}
                     </AlertDescription>
                   </Alert>
@@ -425,92 +473,42 @@ export function ProfilePage() {
                   </Alert>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="oldPassword">
-                    {t("profilePage.currentPassword")}
-                  </Label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="oldPassword"
-                      type={showOldPassword ? "text" : "password"}
-                      value={oldPassword}
-                      onChange={(e) => setOldPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowOldPassword(!showOldPassword)}
-                    >
-                      {showOldPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <PasswordField
+                  id="oldPassword"
+                  label={t("profilePage.currentPassword")}
+                  value={oldPassword}
+                  onChange={setOldPassword}
+                  visible={showOldPassword}
+                  onToggleVisibility={() =>
+                    setShowOldPassword(!showOldPassword)
+                  }
+                  autoComplete="current-password"
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">
-                    {t("profilePage.newPassword")}
-                  </Label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="newPassword"
-                      type={showNewPassword ? "text" : "password"}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                      minLength={6}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                    >
-                      {showNewPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <PasswordField
+                  id="newPassword"
+                  label={t("profilePage.newPassword")}
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  visible={showNewPassword}
+                  onToggleVisibility={() =>
+                    setShowNewPassword(!showNewPassword)
+                  }
+                  autoComplete="new-password"
+                  minLength={6}
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">
-                    {t("profilePage.confirmPassword")}
-                  </Label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() =>
-                        setShowConfirmPassword(!showConfirmPassword)
-                      }
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <PasswordField
+                  id="confirmPassword"
+                  label={t("profilePage.confirmPassword")}
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  visible={showConfirmPassword}
+                  onToggleVisibility={() =>
+                    setShowConfirmPassword(!showConfirmPassword)
+                  }
+                  autoComplete="new-password"
+                />
 
                 <Button
                   type="submit"
@@ -519,7 +517,7 @@ export function ProfilePage() {
                 >
                   {passwordLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Spinner className="size-4" />
                       {t("profilePage.saving")}
                     </>
                   ) : (
@@ -547,20 +545,18 @@ export function ProfilePage() {
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <div className="space-y-2">
-              <Label htmlFor="newEmailInput">{t("profilePage.newEmail")}</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="newEmailInput"
-                  type="email"
-                  placeholder={t("profilePage.enterNewEmail")}
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="newEmailInput">{t("profilePage.newEmail")}</Label>
+            <div className="relative">
+              <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Input
+                id="newEmailInput"
+                type="email"
+                placeholder={t("profilePage.enterNewEmail")}
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="pl-9"
+              />
             </div>
           </div>
           <AlertDialogFooter>
@@ -576,7 +572,7 @@ export function ProfilePage() {
             >
               {emailLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner className="size-4" />
                   {t("profilePage.saving")}
                 </>
               ) : (

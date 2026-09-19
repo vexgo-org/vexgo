@@ -19,8 +19,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Shield, Key, Bot } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import { Save, Shield, Key, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -28,7 +29,6 @@ import { unwrap } from "@/lib/api";
 import type { CommentModerationConfig } from "@/types";
 
 export function CommentConfigPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,37 +105,25 @@ export function CommentConfigPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center py-8 text-muted-foreground">
-          {t("common.loading")}
-        </div>
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin")}
-          >
-            <ArrowLeft className="h-5 w-5" />
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("commentConfig.title")}
+        description={t("commentConfig.description")}
+        actions={
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="size-4" />
+            {saving ? t("commentConfig.saving") : t("commentConfig.saveConfig")}
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{t("commentConfig.title")}</h1>
-            <p className="text-muted-foreground">
-              {t("commentConfig.description")}
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? t("commentConfig.saving") : t("commentConfig.saveConfig")}
-        </Button>
-      </div>
+        }
+      />
 
       <div className="grid gap-6">
         <Card>
