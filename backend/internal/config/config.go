@@ -113,7 +113,7 @@ type Config struct {
 	// set, templates and assets are read from this path instead of the
 	// embedded default theme or data/theme/<id>. It is set by `vexgo dev` so
 	// a developer can iterate on a theme without rebuilding the embed.
-	ThemeDir    string `mapstructure:"theme_dir"`
+	ThemeDir    string `mapstructure:"-"`
 	FrontendURL string `mapstructure:"frontend_url"`
 
 	// Runtime secrets (JWTSecret is resolved like every other key; see

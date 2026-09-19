@@ -446,6 +446,20 @@ func TestVersionRejectsPositionalArgs(t *testing.T) {
 	}
 }
 
+func TestServerDontUseConfigFileThemeDir(t *testing.T) {
+	path := writeConfig(t, "theme_dir: from-config-file\n")
+	_, cfg, err := runServerCmd(t, "-c", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir == "from-config-file" {
+		t.Fatal("theme_dir in config file should not be used")
+	}
+}
+
 // =============================================================================
 // vexgo dev — the dev-only --theme-dir flag.
 // =============================================================================
@@ -486,7 +500,7 @@ func TestDevThemeDirOverridesConfigFile(t *testing.T) {
 	}
 }
 
-func TestDevThemeDirAbsentKeepsConfigFile(t *testing.T) {
+func TestDevDontUseConfigFileThemeDir(t *testing.T) {
 	path := writeConfig(t, "theme_dir: from-config-file\n")
 	_, cfg, err := runDevCmd(t, "-c", path)
 	if err != nil {
@@ -495,8 +509,8 @@ func TestDevThemeDirAbsentKeepsConfigFile(t *testing.T) {
 	if cfg == nil {
 		t.Fatal("expected a resolved config")
 	}
-	if cfg.ThemeDir != "from-config-file" {
-		t.Fatalf("absent --theme-dir should keep the config file value, got %q", cfg.ThemeDir)
+	if cfg.ThemeDir == "from-config-file" {
+		t.Fatal("theme_dir in config file should not be used")
 	}
 }
 
