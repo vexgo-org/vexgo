@@ -46,7 +46,10 @@ const (
 var ThemeTemplateNames = []string{IndexTemplate, PostTemplate, PageTemplate, UserTemplate, NotFoundTemplate}
 
 // ErrNoThemeTemplates reports a theme that provides no template files at all.
-var ErrNoThemeTemplates = errors.New("theme has no template files")
+var (
+	ErrNoThemeTemplates = errors.New("theme has no template files")
+	ErrDevTheme         = errors.New("dev theme error")
+)
 
 // gold parses post markdown into HTML for server-side rendering. Raw HTML in
 // the markdown is escaped (safe defaults, matching the client-side renderer),
@@ -819,9 +822,25 @@ func RenderPageContent(src string) template.HTML {
 }
 
 // themeFS resolves a theme id to its file system root: the embedded default
-// theme for the built-in id, a directory under data/theme for uploaded ones.
-// Untrusted ids are rejected before touching the file system.
+// theme for the built-in id, a directory under data/theme for uploaded ones,
+// and the injected dev directory for DevTheme (the `vexgo dev --theme-dir`
+// workflow). Untrusted ids are rejected before touching the file system.
 func (r *Renderer) themeFS(themeID string) (fs.FS, error) {
+	if themeID == DevTheme {
+		if r.themeDir == "" {
+			return nil, fmt.Errorf("%w: no dev theme directory configured", ErrDevTheme)
+		}
+
+		info, err := os.Stat(r.themeDir)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrDevTheme, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("%w: %q is not a directory", ErrDevTheme, r.themeDir)
+		}
+
+		return os.DirFS(r.themeDir), nil
+	}
 	if themeID == DefaultTheme {
 		// The embed keeps the defaulttheme/ directory prefix; expose the
 		// theme root so all paths are relative to it.
@@ -894,6 +913,12 @@ func (r *Renderer) loadThemeSources(themeID string) (map[string]string, error) {
 	themeSourcesCache.Lock()
 	defer themeSourcesCache.Unlock()
 
+	// A dev theme is edited constantly; never cache it, always re-read from
+	// disk so a developer sees their changes without restarting the server.
+	if themeID == DevTheme {
+		return r.readThemeSources(themeID)
+	}
+
 	if cached, ok := themeSourcesCache.themes[themeID]; ok {
 		if themeID == DefaultTheme {
 			return cached.files, nil
@@ -903,15 +928,37 @@ func (r *Renderer) loadThemeSources(themeID string) (map[string]string, error) {
 		}
 	}
 
+	files, err := r.readThemeSources(themeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// A failed mod sum leaves the cache entry unable to match on the next
+	// lookup, so the theme is re-parsed every request. That is correct output at
+	// a large cost, which is why it is recorded — at debug level, since the
+	// signal is cache effectiveness and this sits on the render path.
+	modSum, err := r.templateModSum(themeID)
+	if err != nil {
+		slog.Debug("failed to compute theme mod sum; caching disabled", "theme", themeID, "err", err)
+	}
+	themeSourcesCache.store(themeID, themeSources{files: files, modSum: modSum})
+	return files, nil
+}
+
+// readThemeSources reads every template file the theme provides into memory,
+// bypassing the cache. It is the uncached half of loadThemeSources and is used
+// for the dev theme, which is edited constantly and must always reflect the
+// current files on disk.
+func (r *Renderer) readThemeSources(themeID string) (map[string]string, error) {
 	base, err := r.themeFS(themeID)
 	if err != nil {
 		return nil, err
 	}
 	known := map[string]struct{}{}
-	names := append([]string{}, ThemeTemplateNames...)
 	for _, name := range ThemeTemplateNames {
 		known[name] = struct{}{}
 	}
+	names := append([]string{}, ThemeTemplateNames...)
 	names = append(names, listExtraPageTemplates(base, known)...)
 	files := make(map[string]string, len(names))
 	for _, name := range names {
@@ -924,15 +971,6 @@ func (r *Renderer) loadThemeSources(themeID string) (map[string]string, error) {
 	if len(files) == 0 {
 		return nil, ErrNoThemeTemplates
 	}
-	// A failed mod sum leaves the cache entry unable to match on the next
-	// lookup, so the theme is re-parsed every request. That is correct output at
-	// a large cost, which is why it is recorded — at debug level, since the
-	// signal is cache effectiveness and this sits on the render path.
-	modSum, err := r.templateModSum(themeID)
-	if err != nil {
-		slog.Debug("failed to compute theme mod sum; caching disabled", "theme", themeID, "err", err)
-	}
-	themeSourcesCache.store(themeID, themeSources{files: files, modSum: modSum})
 	return files, nil
 }
 
@@ -1061,6 +1099,16 @@ func (r *Renderer) templateModSum(themeID string) (time.Time, error) {
 // themes whenever one of their template files changes on disk. The embedded
 // default theme is parsed once and cached forever.
 func (r *Renderer) loadTheme(themeID string) (*template.Template, error) {
+	// A dev theme is edited constantly; never cache it, always re-parse so a
+	// developer sees their changes without restarting the server.
+	if themeID == DevTheme {
+		tmpl, err := r.parseThemeTemplates(themeID)
+		if err != nil {
+			return nil, err
+		}
+		return tmpl, nil
+	}
+
 	themeCache.Lock()
 	defer themeCache.Unlock()
 

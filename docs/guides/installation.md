@@ -403,11 +403,14 @@ just server
 ```sh
 just format            # gofumpt -w -extra . && prettier --write
 just lint              # golangci-lint + prettier --check + gofumpt check + oxlint
+just theme <dir>       # start the server rendering public pages from a local theme directory
 go build -v ./...      # build the backend
 go test -v ./...       # run backend tests
 ```
 
 The frontend build output is written to `backend/internal/public/dist` and embedded into the backend binary, so rebuild the frontend after changing it.
+
+`just theme <dir>` is `vexgo dev --theme-dir <dir>`: it starts the server and renders public pages from a local theme directory instead of the active theme, so a developer can iterate on a theme without rebuilding the embedded default theme or uploading it. For example, `just theme ../vexgo-default-theme/dist/`.
 
 ---
 

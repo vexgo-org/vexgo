@@ -12,6 +12,22 @@ You need:
 
 The best reference implementation is the built-in default theme. Its source lives in the standalone [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) repository (React components that emit the templates at build time); `scripts/fetch-default-theme.sh` copies its `dist/` build output to `backend/internal/public/default-theme/` for embedding. Read it for patterns, but note that the generated `.html` files are minified into a single line and are **build output** — do not edit them, and prefer writing your templates by hand.
 
+### Iterate with `vexgo dev`
+
+Editing a theme means uploading it every time to see the change, which is slow. `vexgo dev` renders public pages from a local directory instead of the active theme:
+
+```bash
+vexgo dev --theme-dir ../vexgo-default-theme/dist/
+```
+
+The `justfile` wraps this as the `theme` recipe, which takes the directory as an argument:
+
+```bash
+just theme ../vexgo-default-theme/dist/
+```
+
+The directory is treated as the theme root: `index.html`, `post.html`, `page.html`, `user.html`, `404.html`, any `<slug>.html` file, `assets/` and `i18n/` are read straight from it. Assets keep working through the stable `/theme-assets/` prefix, and templates are re-read from disk on every request — no restart, no rebuild, no upload. This is also the fastest loop for the built-in theme: point `--theme-dir` at the standalone `vexgo-default-theme` checkout (or its `dist/` build) and edit there.
+
 ## Step 1: Create a minimal theme
 
 The smallest theme that installs and renders has one manifest and one template:

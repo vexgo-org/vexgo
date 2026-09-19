@@ -12,6 +12,22 @@
 
 最好的参考实现是内置的默认主题。它的源码在独立的 [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) 仓库（构建时由 React 组件生成模板）；`scripts/fetch-default-theme.sh` 会把它的 `dist/` 构建产物复制到 `backend/internal/public/default-theme/` 以便嵌入。可以读它的写法找思路，但要注意生成的 `.html` 被压缩成了单行，并且是**构建产物**——不要直接改它，也不建议照搬，手写自己的模板更好。
 
+### 使用 `vexgo dev` 迭代
+
+每次改完主题都要重新上传才能看到效果，比较慢。`vexgo dev` 可以从本地目录渲染公开页面，无需使用已激活的主题：
+
+```bash
+vexgo dev --theme-dir ../vexgo-default-theme/dist/
+```
+
+`justfile` 将其封装为 `theme` 接收目录作为参数：
+
+```bash
+just theme ../vexgo-default-theme/dist/
+```
+
+该目录被视为主题根目录：`index.html`、`post.html`、`page.html`、`user.html`、`404.html`、任意 `<slug>.html` 文件、`assets/` 和 `i18n/` 都会直接从其中读取。资源文件仍通过稳定的 `/theme-assets/` 前缀提供，且模板在每次请求时都会从磁盘重新读取——无需重启、无需重新构建、无需上传。这也是内置主题最快的迭代方式：将 `--theme-dir` 指向独立的 `vexgo-default-theme` 检出目录（或其 `dist/` 构建产物）并在其中修改即可。
+
 ## 第 1 步：创建最小主题
 
 能装能渲染的最小主题只需要一个清单和一个模板：

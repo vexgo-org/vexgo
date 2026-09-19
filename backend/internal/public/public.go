@@ -58,6 +58,12 @@ const (
 	FaviconFile   = "favicon.ico"
 	DefaultTheme  = "default"
 	ThemeMetaFile = "vexgo-theme.json"
+
+	// DevTheme is the id used when a local theme directory is injected via
+	// SetThemeDir (the `vexgo dev --theme-dir` workflow). It is not a real
+	// installed theme: themeFS resolves it straight from disk, bypassing the
+	// data/theme layout and the embedded default theme.
+	DevTheme = "dev"
 )
 
 // Renderer serves static files and themes using the injected database, base
@@ -66,6 +72,7 @@ type Renderer struct {
 	db        *gorm.DB
 	baseURL   string
 	dataDir   string
+	themeDir  string // non-empty overrides the default theme with a local directory
 	jwtSecret []byte
 }
 
@@ -84,6 +91,15 @@ func NewRenderer(db *gorm.DB, baseURL, dataDir string) *Renderer {
 // SetJWTSecret configures the JWT secret used for draft page previews.
 func (r *Renderer) SetJWTSecret(secret []byte) {
 	r.jwtSecret = secret
+}
+
+// SetThemeDir configures a local directory to serve as the theme for public
+// page rendering, overriding the embedded default theme and any uploaded
+// theme. It is used by `vexgo dev --theme-dir` so a developer can iterate on
+// a theme without rebuilding the embed. An empty path restores normal theme
+// resolution.
+func (r *Renderer) SetThemeDir(dir string) {
+	r.themeDir = dir
 }
 
 // BaseURL returns the configured site base URL used for SSR links.
@@ -196,8 +212,12 @@ func (r *Renderer) InvalidateThemeCache(themeID string) {
 }
 
 // activeTheme returns the currently active theme from the database, falling
-// back to the default theme.
+// back to the default theme. When a dev theme directory is injected, it wins
+// over the database so `vexgo dev --theme-dir` renders the local copy.
 func (r *Renderer) activeTheme() string {
+	if r.themeDir != "" {
+		return DevTheme
+	}
 	var config model.ThemeConfig
 	if err := r.db.First(&config).Error; err != nil {
 		return DefaultTheme

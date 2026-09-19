@@ -49,6 +49,20 @@ func runServerCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, 
 	return &out, state.cfg, err
 }
 
+// runDevCmd builds a fresh `vexgo dev` command per call, captures its output,
+// runs the given args, and returns stdout, the resolved config, and the
+// execution error.
+func runDevCmd(t *testing.T, args ...string) (*bytes.Buffer, *config.Config, error) {
+	t.Helper()
+	var out bytes.Buffer
+	root, state := newDevCmd()
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs(args)
+	err := root.Execute()
+	return &out, state.cfg, err
+}
+
 func TestLongSpellings(t *testing.T) {
 	path := writeConfig(t, "")
 	_, cfg, err := runServerCmd(t, "--config", path, "--addr", "10.0.0.1", "--port", "8080", "--data", "/tmp/data")
@@ -429,5 +443,165 @@ func TestVersionRejectsPositionalArgs(t *testing.T) {
 	_, err := runRootCmd(t, "--version", "foo")
 	if err == nil {
 		t.Fatal("version command should reject positional arguments")
+	}
+}
+
+func TestServerDontUseConfigFileThemeDir(t *testing.T) {
+	path := writeConfig(t, "theme_dir: from-config-file\n")
+	_, cfg, err := runServerCmd(t, "-c", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir == "from-config-file" {
+		t.Fatal("theme_dir in config file should not be used")
+	}
+}
+
+// =============================================================================
+// vexgo dev — the dev-only --theme-dir flag.
+// =============================================================================
+
+func TestDevCommandExists(t *testing.T) {
+	out, _, err := runDevCmd(t, "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Usage:") {
+		t.Fatalf("dev --help should print usage, got %q", out.String())
+	}
+	for _, want := range []string{"dev", "--theme-dir"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("dev help should contain %q, got:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestDevCommandRejectsPositionalArgs(t *testing.T) {
+	_, _, err := runDevCmd(t, "serve")
+	if err == nil {
+		t.Fatal("dev should reject positional arguments")
+	}
+}
+
+func TestDevThemeDirOverridesConfigFile(t *testing.T) {
+	path := writeConfig(t, "theme_dir: from-config-file\n")
+	_, cfg, err := runDevCmd(t, "-c", path, "--theme-dir", "../vexgo-default-theme/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "../vexgo-default-theme/" {
+		t.Fatalf("--theme-dir should override the config file, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestDevDontUseConfigFileThemeDir(t *testing.T) {
+	path := writeConfig(t, "theme_dir: from-config-file\n")
+	_, cfg, err := runDevCmd(t, "-c", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir == "from-config-file" {
+		t.Fatal("theme_dir in config file should not be used")
+	}
+}
+
+func TestDevThemeDirEmptyIsNoop(t *testing.T) {
+	_, cfg, err := runDevCmd(t, "--theme-dir", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "" {
+		t.Fatalf("explicit empty --theme-dir should leave ThemeDir empty, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestDevHelpDoesNotResolveConfig(t *testing.T) {
+	_, cfg, err := runDevCmd(t, "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg != nil {
+		t.Fatal("--help should not resolve a config")
+	}
+}
+
+func TestServerRejectsThemeDirFlag(t *testing.T) {
+	_, cfg, err := runServerCmd(t, "--theme-dir", "/tmp/theme")
+	if err == nil {
+		t.Fatal("server should reject --theme-dir")
+	}
+	if cfg != nil {
+		t.Fatal("--theme-dir on server should not resolve a config")
+	}
+}
+
+// =============================================================================
+// Execute dispatch — server vs dev runState selection.
+// =============================================================================
+
+func TestExecuteDevResolvesThemeDir(t *testing.T) {
+	cfg, err := Execute("test-version", []string{"dev", "--theme-dir", "/tmp/dev-theme"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "/tmp/dev-theme" {
+		t.Fatalf("--theme-dir should flow through Execute, got %q", cfg.ThemeDir)
+	}
+}
+
+func TestExecuteServerLeavesThemeDirEmpty(t *testing.T) {
+	cfg, err := Execute("test-version", []string{"server", "--port", "7000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("expected a resolved config")
+	}
+	if cfg.ThemeDir != "" {
+		t.Fatalf("server should leave ThemeDir empty, got %q", cfg.ThemeDir)
+	}
+	if cfg.Port != 7000 {
+		t.Fatalf("server flags should apply through Execute, got %d", cfg.Port)
+	}
+}
+
+func TestExecuteServerRejectsThemeDirFlag(t *testing.T) {
+	cfg, err := Execute("test-version", []string{"server", "--theme-dir", "/tmp/theme"})
+	if err == nil {
+		t.Fatal("server should reject --theme-dir through Execute")
+	}
+	if cfg != nil {
+		t.Fatal("rejected flags should not resolve a config")
+	}
+}
+
+func TestExecuteHelpReturnsNilConfig(t *testing.T) {
+	for _, args := range [][]string{
+		{"--help"},
+		{"server", "--help"},
+		{"dev", "--help"},
+	} {
+		cfg, err := Execute("test-version", args)
+		if err != nil {
+			t.Fatalf("Execute(%v) should not error: %v", args, err)
+		}
+		if cfg != nil {
+			t.Fatalf("Execute(%v) --help should return nil config", args)
+		}
 	}
 }
