@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"log/slog"
-
 	"github.com/spf13/cobra"
 
 	"github.com/vexgo-org/vexgo/backend/internal/config"
@@ -64,7 +62,6 @@ func resolveDevConfig(cmd *cobra.Command, configFile, themeDir string) (*config.
 
 	if themeDir != "" {
 		cfg.ThemeDir = themeDir
-		slog.Info("dev theme directory configured", "dir", themeDir)
 	}
 	return cfg, nil
 }
