@@ -2,6 +2,7 @@ package public
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -317,14 +318,19 @@ func TestDevThemeDirMissingTemplate(t *testing.T) {
 
 // TestDevThemeDirNotExist rejects a --theme-dir that points at a path which
 // does not exist, so a typo fails loudly instead of falling through to the
-// embedded default theme or exposing whatever the process can read.
+// embedded default theme or exposing whatever the process can read. It matches
+// fs.ErrNotExist rather than the OS wording, which differs between Unix
+// ("no such file or directory") and Windows ("The system cannot find the file
+// specified.").
 func TestDevThemeDirNotExist(t *testing.T) {
 	r := newTestRenderer(t)
 	r.SetThemeDir(filepath.Join(t.TempDir(), "no-such-theme"))
 
 	if _, err := r.themeFS(DevTheme); err == nil {
 		t.Fatal("themeFS should reject a non-existent dev theme dir")
-	} else if !strings.Contains(err.Error(), "no such file or directory") {
+	} else if !errors.Is(err, ErrDevTheme) {
+		t.Fatalf("expected the error to wrap ErrDevTheme, got %v", err)
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("expected a 'does not exist' error, got %v", err)
 	}
 }
