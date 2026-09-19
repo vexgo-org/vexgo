@@ -121,8 +121,7 @@ func New(cfg *config.Config) (*App, error) {
 	// created for missing slugs only; user edits are never overwritten.
 	if n, err := renderer.EnsureThemeSeeds(context.Background(), renderer.ActiveThemeID()); err != nil {
 		if errors.Is(err, public.ErrDevTheme) {
-			slog.Error("failed to load dev theme", "err", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("load dev theme: %w", err)
 		}
 
 		slog.Warn("failed to ensure theme seed pages", "err", err)
