@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { MarkdownEditor } from "@/components/editor";
 import ImageCropper from "@/components/image/ImageCropper";
 import {
   Loader2,
@@ -83,7 +83,6 @@ export function WritePostPage() {
   const [slug, setSlug] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [originalContent, setOriginalContent] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -148,7 +147,6 @@ export function WritePostPage() {
       setSlug(post.slug || "");
       setTitle(post.title);
       setContent(post.content || "");
-      setOriginalContent(post.content || "");
       setExcerpt(post.excerpt || "");
       // The backend category may be numeric or a string; resolve it to the matching category name
       if (post.category) {
@@ -644,11 +642,10 @@ export function WritePostPage() {
           <Label className="block mb-2">
             {t("writePostPage.contentLabel")} *
           </Label>
-          <RichTextEditor
-            content={content}
+          <MarkdownEditor
+            value={content}
             onChange={setContent}
             placeholder={t("writePostPage.contentPlaceholder")}
-            originalContent={originalContent}
           />
         </div>
         {showCropper && selectedFile && (

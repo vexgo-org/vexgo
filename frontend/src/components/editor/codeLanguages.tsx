@@ -1,0 +1,45 @@
+/**
+ * Languages offered by the fenced-code language selector.
+ *
+ * Highlighting itself is resolved by `@codemirror/language-data`, so this list
+ * only controls what the dropdown offers. `""` means "plain text".
+ */
+export const CODE_LANGUAGES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "js", label: "JavaScript" },
+  { value: "jsx", label: "JavaScript (React)" },
+  { value: "ts", label: "TypeScript" },
+  { value: "tsx", label: "TypeScript (React)" },
+  { value: "json", label: "JSON" },
+  { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
+  { value: "scss", label: "SCSS" },
+  { value: "vue", label: "Vue" },
+  { value: "python", label: "Python" },
+  { value: "go", label: "Go" },
+  { value: "rust", label: "Rust" },
+  { value: "java", label: "Java" },
+  { value: "kotlin", label: "Kotlin" },
+  { value: "c", label: "C" },
+  { value: "cpp", label: "C++" },
+  { value: "csharp", label: "C#" },
+  { value: "php", label: "PHP" },
+  { value: "ruby", label: "Ruby" },
+  { value: "swift", label: "Swift" },
+  { value: "sql", label: "SQL" },
+  { value: "yaml", label: "YAML" },
+  { value: "toml", label: "TOML" },
+  { value: "xml", label: "XML" },
+  { value: "bash", label: "Bash" },
+  { value: "shell", label: "Shell" },
+  { value: "powershell", label: "PowerShell" },
+  { value: "dockerfile", label: "Dockerfile" },
+  { value: "markdown", label: "Markdown" },
+  { value: "diff", label: "Diff" },
+  { value: "ini", label: "INI" },
+  { value: "http", label: "HTTP" },
+  { value: "graphql", label: "GraphQL" },
+  { value: "lua", label: "Lua" },
+  { value: "r", label: "R" },
+  { value: "dart", label: "Dart" },
+  { value: "scala", label: "Scala" },
+];
