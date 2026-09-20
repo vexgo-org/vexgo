@@ -147,7 +147,7 @@ export function PageEditorPage() {
         >
           <ArrowLeft className="size-4" />
         </Button>
-        <h1 className="text-lg leading-tight font-semibold tracking-[-0.01em]">
+        <h1 className="display text-title">
           {isEditMode
             ? t("pageEditorPage.editPage")
             : t("pageEditorPage.newPage")}
@@ -178,7 +178,7 @@ export function PageEditorPage() {
                 {t("pageEditorPage.generateSlug")}
               </Button>
             </div>
-            <p className="text-muted-foreground mt-1.5 text-[11px]">
+            <p className="text-muted-foreground mt-1.5 font-mono text-2xs">
               /{normalizePageSlug(slug) || "slug"}
             </p>
           </div>

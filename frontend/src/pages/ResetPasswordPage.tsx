@@ -7,13 +7,6 @@ import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
@@ -105,20 +98,23 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-lg">
+    <div>
+      {/* Same bare masthead as sign-in and registration: one job per screen,
+       * so no card around it. */}
+      <header className="rule-ink mb-7 pb-3">
+        <p className="eyebrow">{t("resetPasswordPage.resetPassword")}</p>
+        <h1 className="display mt-1.5 text-title">
           {step === "request"
             ? t("resetPasswordPage.findPassword")
             : t("resetPasswordPage.resetPassword")}
-        </CardTitle>
-        <CardDescription>
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           {step === "request"
             ? t("resetPasswordPage.resetInstruction")
             : t("resetPasswordPage.newPasswordInstruction")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </header>
+      <div>
         <div className="space-y-4">
           {error && (
             <Alert variant="destructive">
@@ -240,14 +236,14 @@ export function ResetPasswordPage() {
             <button
               type="button"
               onClick={() => navigate("/admin/login")}
-              className="text-accent-blue focus-visible:ring-ring/25 mx-auto flex items-center justify-center gap-1 text-[13px] underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+              className="text-accent-ink focus-visible:ring-ring/25 mx-auto flex items-center justify-center gap-1 text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
             >
               <ArrowLeft className="size-3.5" />
               {t("resetPasswordPage.backToLogin")}
             </button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

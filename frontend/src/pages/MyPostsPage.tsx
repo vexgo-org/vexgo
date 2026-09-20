@@ -8,8 +8,7 @@ import type { Post } from "@/types";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -126,10 +125,8 @@ export function MyPostsPage() {
   if (loading && posts.length === 0) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-40" />
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-12 rounded-sm" />
-        ))}
+        <PageHeader title={t("myPostsPage.myPosts")} />
+        <SkeletonRows rows={5} />
       </div>
     );
   }
@@ -140,37 +137,33 @@ export function MyPostsPage() {
         title={t("myPostsPage.myPosts")}
         actions={
           user?.role !== "guest" ? (
-            <Button asChild>
-              <Link to="/admin/write">
-                <Plus className="size-4" />
-                {t("myPostsPage.writePost")}
-              </Link>
+            <Button render={<Link to="/admin/write" />}>
+              <Plus className="size-4" />
+              {t("myPostsPage.writePost")}
             </Button>
           ) : undefined
         }
       />
 
       {posts.length === 0 ? (
-        <Card className="py-0">
+        <div className="border-t border-border">
           <EmptyState
             icon={PenLine}
             title={t("myPostsPage.noPosts")}
             description={t("myPostsPage.noPostsDesc")}
             action={
               user?.role !== "guest" ? (
-                <Button asChild>
-                  <Link to="/admin/write">
-                    <Plus className="size-4" />
-                    {t("myPostsPage.writePost")}
-                  </Link>
+                <Button render={<Link to="/admin/write" />}>
+                  <Plus className="size-4" />
+                  {t("myPostsPage.writePost")}
                 </Button>
               ) : undefined
             }
           />
-        </Card>
+        </div>
       ) : (
         <>
-          <div className="bg-card overflow-hidden rounded-lg border">
+          <div className="bg-card overflow-hidden rounded-md border border-border">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -209,31 +202,33 @@ export function MyPostsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-0.5">
-                        <Button variant="ghost" size="icon-sm" asChild>
-                          <a
-                            href={`/post/${post.slug}`}
-                            aria-label={t("posts.list")}
-                          >
-                            <Eye className="size-4" />
-                          </a>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={t("posts.list")}
+                          render={<a href={`/post/${post.slug}`} />}
+                        >
+                          <Eye className="size-4" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" asChild>
-                          <Link
-                            to={`/admin/edit-post/${post.id}`}
-                            aria-label={t("posts.edit")}
-                          >
-                            <Edit className="size-4" />
-                          </Link>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={t("posts.edit")}
+                          render={<Link to={`/admin/edit-post/${post.id}`} />}
+                        >
+                          <Edit className="size-4" />
                         </Button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={t("posts.delete")}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
+                          <AlertDialogTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={t("posts.delete")}
+                              />
+                            }
+                          >
+                            <Trash2 className="size-4" />
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
@@ -292,7 +287,7 @@ export function MyPostsPage() {
                   .map((page, index, array) => (
                     <div key={page} className="flex items-center">
                       {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="text-muted-foreground px-2 text-[13px]">
+                        <span className="text-muted-foreground px-2 text-xs tabular-nums">
                           …
                         </span>
                       )}

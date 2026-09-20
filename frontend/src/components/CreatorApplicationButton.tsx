@@ -82,16 +82,16 @@ export function CreatorApplicationButton({
   return (
     <>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button className={className} variant="outline" size="sm">
-            <UserPlus className="w-4 h-4 mr-2" />
-            {user?.role === "guest"
-              ? t("creatorApplication.applyButton")
-              : t("creatorApplication.applyButton") +
-                " (" +
-                t("roles.contributor") +
-                ")"}
-          </Button>
+        <DialogTrigger
+          render={<Button className={className} variant="outline" size="sm" />}
+        >
+          <UserPlus className="size-4" />
+          {user?.role === "guest"
+            ? t("creatorApplication.applyButton")
+            : t("creatorApplication.applyButton") +
+              " (" +
+              t("roles.contributor") +
+              ")"}
         </DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -128,7 +128,7 @@ export function CreatorApplicationButton({
               {t("common.cancel")}
             </Button>
             <Button onClick={openConfirmation} disabled={isLoading}>
-              <Send className="w-4 h-4 mr-2" />
+              <Send className="size-4" />
               {isLoading
                 ? t("creatorApplication.submitting")
                 : t("creatorApplication.submit")}

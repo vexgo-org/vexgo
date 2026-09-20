@@ -1,149 +1,411 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /*
- * Design tokens — neutral console.
- *
- * Three surfaces, one accent. `--background` is the gray canvas the content
- * sits on, `--card`/`--popover` are the white (or near-black) surfaces placed
- * on top of it, and `--sidebar` is the navigation rail. Surfaces are told
- * apart by luminance and a hairline border, never by shadow or gradient.
- *
- * `--primary` is ink rather than a brand hue: the main action in a CMS is
- * "save"/"publish", which should read as decisive, not branded. The single
- * accent (`--accent-blue`) is reserved for links, the active nav item, and
- * informational state. `--success`/`--warning`/`--destructive` exist so pages
- * can express state through tokens instead of hardcoded Tailwind shades.
+ * The console ships a manual light/dark switch on <html>, so the `dark`
+ * variant has to key off a class instead of the OS preference.
  */
-@layer base {
-  :root {
-    --background: 0 0% 96.5%;
-    --foreground: 0 0% 9%;
+@custom-variant dark (&:where(.dark, .dark *));
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+/* ============================================================================
+ * VexGo console — "Editorial" design language
+ *
+ * The console is the back office of a publication, so it is set like one.
+ * Four rules carry the whole language:
+ *
+ * 1. Type does the work. A serif display face (masthead, page titles, figures)
+ *    against a neutral sans for everything functional, separated by an
+ *    uppercase letterspaced micro-label rather than a box.
+ * 2. Rules, not cards. Structure is a 1px hairline or a 2px ink rule, never a
+ *    shadow, gradient, or floating panel.
+ * 3. Corners are 2px. Every radius token resolves to the same near-square
+ *    value, so no component can accidentally read as a "rounded card".
+ * 4. Paper, not white. Surfaces are a warm off-white (or warm charcoal) so the
+ *    ink sits on paper instead of on a screen.
+ *
+ * Colours stay HSL triplets (`H S% L%`) because the CodeMirror theme and the
+ * slider captcha consume them as `hsl(var(--token))`.
+ * ========================================================================= */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
+:root {
+  color-scheme: light;
 
-    --sidebar: 0 0% 100%;
-    --sidebar-foreground: 0 0% 32%;
+  /* — paper ——————————————————————————————————————————————— */
+  --background: 40 14% 96.5%;
+  --foreground: 30 8% 12%;
 
-    --primary: 0 0% 12%;
-    --primary-foreground: 0 0% 98%;
+  --card: 40 22% 99.3%;
+  --card-foreground: 30 8% 12%;
 
-    --secondary: 0 0% 95%;
-    --secondary-foreground: 0 0% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 30 8% 12%;
 
-    --muted: 0 0% 95.5%;
-    --muted-foreground: 0 0% 42%;
+  --sidebar: 40 16% 94%;
+  --sidebar-foreground: 30 6% 34%;
 
-    --accent: 0 0% 94%;
-    --accent-foreground: 0 0% 12%;
+  --muted: 40 12% 91.5%;
+  /* 40% is the lightest value that still clears 4.5:1 on every surface this
+   * text sits on — muted, accent (a hover fill), sidebar, and card. At the
+   * original 42% the avatar and cover fallbacks read at 4.37:1. */
+  --muted-foreground: 30 6% 40%;
 
-    --accent-blue: 212 62% 42%;
-    --accent-blue-foreground: 0 0% 100%;
+  /* Hover/selected tint. `--accent-ink` is the one visible accent colour. */
+  --accent: 40 14% 90%;
+  --accent-foreground: 30 8% 14%;
+  --accent-ink: 216 48% 38%;
 
-    --success: 152 45% 30%;
-    --success-foreground: 0 0% 100%;
+  --primary: 30 10% 14%;
+  --primary-foreground: 40 25% 99%;
 
-    --warning: 35 75% 32%;
-    --warning-foreground: 0 0% 100%;
+  --secondary: 40 12% 93%;
+  --secondary-foreground: 30 8% 16%;
 
-    --info: 212 62% 42%;
-    --info-foreground: 0 0% 100%;
+  --border: 36 13% 84%;
+  --input: 36 13% 78%;
+  /* The heavy black rule under a page title or masthead. */
+  --rule: 30 9% 16%;
+  --ring: 30 10% 18%;
 
-    --destructive: 0 65% 45%;
-    --destructive-foreground: 0 0% 100%;
+  /* Print inks: deeper and less saturated than a UI palette's 500 steps. */
+  --info: 216 48% 38%;
+  --info-foreground: 0 0% 100%;
+  --success: 150 35% 29%;
+  --success-foreground: 0 0% 100%;
+  --warning: 32 68% 35%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 6 62% 43%;
+  --destructive-foreground: 0 0% 100%;
+}
 
-    --border: 0 0% 89%;
-    --input: 0 0% 85%;
-    --ring: 0 0% 20%;
+.dark {
+  color-scheme: dark;
 
-    --radius: 0.375rem;
-  }
+  --background: 30 5% 10%;
+  --foreground: 40 12% 94%;
 
-  .dark {
-    --background: 0 0% 8%;
-    --foreground: 0 0% 96%;
+  --card: 30 5% 12.5%;
+  --card-foreground: 40 12% 94%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 96%;
+  --popover: 30 5% 14.5%;
+  --popover-foreground: 40 12% 94%;
 
-    --popover: 0 0% 14%;
-    --popover-foreground: 0 0% 96%;
+  --sidebar: 30 5% 11.5%;
+  --sidebar-foreground: 40 8% 66%;
 
-    --sidebar: 0 0% 10%;
-    --sidebar-foreground: 0 0% 68%;
+  --muted: 30 5% 17.5%;
+  --muted-foreground: 38 8% 62%;
 
-    --primary: 0 0% 94%;
-    --primary-foreground: 0 0% 10%;
+  --accent: 30 5% 19%;
+  --accent-foreground: 40 12% 94%;
+  --accent-ink: 214 52% 68%;
 
-    --secondary: 0 0% 17%;
-    --secondary-foreground: 0 0% 96%;
+  --primary: 40 12% 92%;
+  --primary-foreground: 30 5% 10%;
 
-    --muted: 0 0% 17%;
-    --muted-foreground: 0 0% 63%;
+  --secondary: 30 5% 18%;
+  --secondary-foreground: 40 12% 94%;
 
-    --accent: 0 0% 19%;
-    --accent-foreground: 0 0% 96%;
+  --border: 30 5% 21%;
+  --input: 30 5% 27%;
+  --rule: 40 12% 88%;
+  --ring: 40 12% 84%;
 
-    --accent-blue: 212 65% 65%;
-    --accent-blue-foreground: 0 0% 10%;
+  --info: 214 52% 68%;
+  --info-foreground: 30 5% 10%;
+  --success: 150 32% 56%;
+  --success-foreground: 30 5% 10%;
+  --warning: 36 58% 62%;
+  --warning-foreground: 30 5% 10%;
+  --destructive: 6 55% 62%;
+  --destructive-foreground: 30 5% 10%;
+}
 
-    --success: 152 40% 58%;
-    --success-foreground: 0 0% 10%;
+@theme inline {
+  /* — families ————————————————————————————————————————————
+   * The display face is a system serif (New York / Iowan / Palatino / Songti).
+   * An admin visited daily should not pay for a webfont, and a serif that is
+   * already installed is exactly what a masthead wants. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-serif:
+    ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    "Times New Roman", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC",
+    "SimSun", serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 
-    --warning: 38 70% 62%;
-    --warning-foreground: 0 0% 10%;
+  /* — palette ————————————————————————————————————————————— */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-ink: hsl(var(--accent-ink));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-rule: hsl(var(--rule));
+  --color-ring: hsl(var(--ring));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
 
-    --info: 212 65% 65%;
-    --info-foreground: 0 0% 10%;
+  /* — type scale ——————————————————————————————————————————
+   * Seven steps, and pages are expected to name any size they need here
+   * rather than reaching for `text-[13px]` — that is how a design system
+   * quietly grows a seventh, eighth and ninth body size.
+   *
+   *   micro     11px uppercase label  (tracked)
+   *   2xs       11px fine data       (counts, dates, meta)
+   *   xs        12px secondary meta
+   *   sm        13px the admin workhorse
+   *   base      14px body
+   *   subtitle  15px panel heading   (display face)
+   *   title     22px page title      (display face)
+   *   display   30px masthead        (display face)
+   *   figure    36px counters        (display face)
+   */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-micro--letter-spacing: 0.09em;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: normal;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.0625rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.4375rem;
+  --text-subtitle: 0.9375rem;
+  --text-subtitle--line-height: 1.375rem;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.2;
+  --text-display: 1.875rem;
+  --text-display--line-height: 1.1;
+  --text-figure: 2.25rem;
+  --text-figure--line-height: 1;
 
-    --destructive: 0 60% 58%;
-    --destructive-foreground: 0 0% 10%;
-
-    --border: 0 0% 18%;
-    --input: 0 0% 26%;
-    --ring: 0 0% 70%;
-  }
+  /* — geometry —
+   * One near-square radius for every step, so a stray `rounded-lg` cannot
+   * reintroduce the soft template look. */
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Base UI renders popups into body-level portals; `isolation: isolate` on
+   * the app shell keeps them above page content without z-index wars. */
+  #root {
+    isolation: isolate;
+  }
+
+  /* Required by Base UI's backdrop on iOS 26+ Safari, which reveals content
+   * beneath the browser chrome unless the body establishes a containing block. */
   body {
-    @apply bg-background text-foreground antialiased;
-    /* System UI stack keeps the console dependency-free and instant to
-         * paint; a webfont buys nothing in an admin they visit daily. */
-    font-family:
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      "Segoe UI",
-      Roboto,
-      "Helvetica Neue",
-      Arial,
-      "Noto Sans",
-      sans-serif;
+    position: relative;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern" 1;
   }
+
+  /* A visible focus ring is never removed; it is only restyled. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
+  }
+
   /* Numerals line up in tables, counters, and dates. */
   table,
   time,
-  [data-slot="badge"],
   [data-tabular-nums] {
     font-variant-numeric: tabular-nums;
   }
+
+  ::selection {
+    background-color: hsl(var(--accent-ink) / 0.22);
+  }
 }
 
-/* Compact controls are hard to hit; never hide the focus indicator. */
-:focus-visible {
-  outline: none;
+/* Tailwind v4's `transition-colors` includes `outline-color`, so every control
+ * that carries it fades its focus ring in from whatever colour it happened to
+ * have — a keyboard user sees the ring arrive late and in the wrong hue. The
+ * ring is a state, not an affordance: colours transition, the ring appears.
+ * Unlayered on purpose, because a utility in the `utilities` layer outranks
+ * every layered rule. */
+.transition-colors {
+  transition-property:
+    color, background-color, border-color, text-decoration-color, fill, stroke;
 }
 
-/* Scrollbar styles — token-driven so they follow the theme. */
+@layer components {
+  /* ---------------------------------------------------------------- type */
+
+  /* The eyebrow above a page title, a table header, a nav group. Uppercase
+   * and letterspaced so it reads as a label rather than as content. */
+  .eyebrow {
+    font-size: var(--text-micro);
+    line-height: var(--text-micro--line-height);
+    letter-spacing: var(--text-micro--letter-spacing);
+    text-transform: uppercase;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Display type: the masthead, page titles, and large figures. */
+  .display {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.011em;
+  }
+
+  /* --------------------------------------------------------------- rules */
+
+  /* The heavy rule that closes a masthead or page header. */
+  .rule-ink {
+    border-bottom: 2px solid hsl(var(--rule));
+  }
+
+  /* ------------------------------------------------------------- popups */
+
+  /* Shared entry/exit for every Base UI popup. A 2px travel plus a faint
+   * scale reads as "attached to the trigger" without the zoom-and-bloom of a
+   * template animation, and 140ms keeps it out of the way of typing. */
+  .ui-popup {
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity 140ms ease-out,
+      transform 140ms ease-out;
+  }
+  .ui-popup[data-starting-style],
+  .ui-popup[data-ending-style] {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.99);
+  }
+
+  .ui-backdrop {
+    transition: opacity 160ms ease-out;
+  }
+  .ui-backdrop[data-starting-style],
+  .ui-backdrop[data-ending-style] {
+    opacity: 0;
+  }
+
+  /* Base UI leaves dialog positioning to the consumer, so the centred
+   * transform lives here and the entry animation has to compose with it
+   * rather than replace it. */
+  .ui-popup-dialog {
+    transform: translate(-50%, -50%);
+    transition:
+      opacity 160ms ease-out,
+      transform 160ms ease-out;
+  }
+  .ui-popup-dialog[data-starting-style],
+  .ui-popup-dialog[data-ending-style] {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 6px)) scale(0.995);
+  }
+
+  /* A nav drawer slides in from the edge it is anchored to. */
+  .ui-popup-drawer {
+    transform: translateX(0);
+    transition: transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .ui-popup-drawer[data-starting-style],
+  .ui-popup-drawer[data-ending-style] {
+    transform: translateX(-100%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-popup,
+    .ui-popup-dialog,
+    .ui-popup-drawer,
+    .ui-backdrop {
+      transition-duration: 1ms;
+    }
+    .ui-popup[data-starting-style],
+    .ui-popup[data-ending-style] {
+      transform: none;
+    }
+    .ui-popup-dialog[data-starting-style],
+    .ui-popup-dialog[data-ending-style] {
+      transform: translate(-50%, -50%);
+    }
+    .ui-popup-drawer[data-starting-style],
+    .ui-popup-drawer[data-ending-style] {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* ------------------------------------------------------------ loading */
+
+  /* A single travelling sheen instead of a pulsing opacity block. */
+  .skeleton {
+    background-color: hsl(var(--muted));
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--muted-foreground) / 0.12) 50%,
+      transparent 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 40% 100%;
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-sweep {
+    0% {
+      background-position: -60% 0;
+    }
+    100% {
+      background-position: 160% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      background-image: none;
+      animation: none;
+    }
+  }
+}
+
+/* Scrollbars — token-driven so they follow the theme. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -154,14 +416,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-radius: 6px;
   background-clip: content-box;
-  background-color: hsl(var(--foreground) / 0.2);
+  background-color: hsl(var(--foreground) / 0.18);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--foreground) / 0.32);
+  background-color: hsl(var(--foreground) / 0.3);
 }
 
 /* ========== Markdown editor (CodeMirror 6) ========== */
@@ -203,7 +465,7 @@
   height: 1.1em;
   margin-right: 0.4em;
   border: 1px solid hsl(var(--border));
-  border-radius: 3px;
+  border-radius: 2px;
   background-color: hsl(var(--background));
   vertical-align: -0.18em;
   cursor: pointer;
@@ -240,14 +502,14 @@
   max-width: 100%;
   max-height: 480px;
   margin: 0 auto;
-  border-radius: 6px;
+  border-radius: 2px;
 }
 
 .vexgo-md-image-broken {
   display: inline-block;
   padding: 2px 8px;
   border: 1px dashed hsl(var(--destructive));
-  border-radius: 4px;
+  border-radius: 2px;
   color: hsl(var(--destructive));
   font-size: 0.85em;
 }
@@ -257,7 +519,7 @@
   margin-left: 8px;
   padding: 1px 4px;
   border: 1px solid hsl(var(--border));
-  border-radius: 4px;
+  border-radius: 2px;
   background-color: hsl(var(--background));
   color: hsl(var(--muted-foreground));
   font-family: inherit;
@@ -272,7 +534,7 @@
   margin: 8px 0;
   overflow-x: auto;
   border: 1px solid hsl(var(--border));
-  border-radius: 6px;
+  border-radius: 2px;
   background-color: hsl(var(--background));
   cursor: text;
 }
@@ -305,7 +567,7 @@
 
 .vexgo-md-table code {
   padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: 2px;
   background-color: hsl(var(--muted));
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
@@ -314,7 +576,7 @@
 }
 
 .vexgo-md-table a {
-  color: hsl(var(--primary));
+  color: hsl(var(--accent-ink));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -333,7 +595,7 @@
 
 /* Slider captcha (go-captcha-react) theme mapping.
  * The component reads every color from --go-captcha-theme-* variables, so
- * scoping them to .slider-captcha lets the widget follow the shadcn theme
+ * scoping them to .slider-captcha lets the widget follow the console theme
  * instead of its built-in light defaults. */
 .slider-captcha {
   --go-captcha-theme-text-color: hsl(var(--foreground));

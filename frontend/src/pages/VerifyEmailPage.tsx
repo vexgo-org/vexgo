@@ -4,13 +4,6 @@ import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -64,16 +57,17 @@ export function VerifyEmailPage() {
   }, [token, t]);
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-lg">{t("verifyEmail.title")}</CardTitle>
-        <CardDescription>
+    <div>
+      {/* Bare masthead, like the rest of the auth screens. */}
+      <header className="rule-ink mb-7 pb-3">
+        <h1 className="display text-title">{t("verifyEmail.title")}</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           {status === "loading" && t("verifyEmail.verifying")}
           {status === "success" && t("verifyEmail.success")}
           {status === "error" && t("verifyEmail.failed")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </p>
+      </header>
+      <div className="space-y-4">
         {status === "loading" ? (
           <div className="flex justify-center py-2">
             <Spinner className="text-muted-foreground size-5" />
@@ -97,18 +91,22 @@ export function VerifyEmailPage() {
             </Button>
           ) : (
             <>
-              <Button asChild className="flex-1">
-                <Link to="/admin/login">{t("verifyEmail.goToLogin")}</Link>
+              <Button className="flex-1" render={<Link to="/admin/login" />}>
+                {t("verifyEmail.goToLogin")}
               </Button>
               {status === "error" && (
-                <Button variant="outline" asChild className="flex-1">
-                  <Link to="/admin">{t("verifyEmail.backToHome")}</Link>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  render={<Link to="/admin" />}
+                >
+                  {t("verifyEmail.backToHome")}
                 </Button>
               )}
             </>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

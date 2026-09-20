@@ -1,30 +1,37 @@
-"use client";
-
 import * as React from "react";
-import * as SwitchPrimitive from "@radix-ui/react-switch";
+import { Switch as BaseSwitch } from "@base-ui/react/switch";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * A squared switch. The pill track is the single most recognisable piece of
+ * template UI there is; a rectangle with a square thumb says the same thing —
+ * off or on — and belongs to the same geometry as the rest of the console.
+ */
 function Switch({
   className,
   ...props
-}: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+}: React.ComponentProps<typeof BaseSwitch.Root>) {
   return (
-    <SwitchPrimitive.Root
+    <BaseSwitch.Root
       data-slot="switch"
       className={cn(
-        "peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/25 inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full border border-transparent transition-colors outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-5 w-9 shrink-0 items-center rounded-sm border border-input bg-input p-0.5 transition-colors",
+        "data-checked:border-primary data-checked:bg-primary",
+        "data-disabled:cursor-not-allowed data-disabled:opacity-50",
         className,
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb
+      <BaseSwitch.Thumb
         data-slot="switch-thumb"
         className={cn(
-          "bg-background pointer-events-none block size-4 rounded-full transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0 dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground",
+          "pointer-events-none block size-3.5 rounded-xs bg-card shadow-none transition-transform",
+          "data-checked:translate-x-4 data-unchecked:translate-x-0",
+          "dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground",
         )}
       />
-    </SwitchPrimitive.Root>
+    </BaseSwitch.Root>
   );
 }
 

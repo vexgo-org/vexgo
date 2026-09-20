@@ -23,7 +23,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Save, Settings, Upload, Trash2 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonForm } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
@@ -134,8 +134,11 @@ export function GeneralSettingsPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-80 rounded-lg" />
+        <PageHeader
+          title={t("generalSettings.title")}
+          description={t("generalSettings.description")}
+        />
+        <SkeletonForm rows={5} />
       </div>
     );
   }
@@ -188,23 +191,25 @@ export function GeneralSettingsPage() {
             <Label>{t("generalSettings.siteIcon")}</Label>
             <div className="flex items-center gap-4">
               {config.siteIcon ? (
-                <div className="relative w-16 h-16 rounded-lg border overflow-hidden">
+                <div className="border-border relative size-16 overflow-hidden rounded-sm border">
                   <img
                     src={config.siteIcon}
-                    alt="Site Icon"
-                    className="w-full h-full object-cover"
+                    alt={t("generalSettings.siteIcon")}
+                    className="size-full object-cover"
                   />
                   <button
                     type="button"
                     onClick={handleRemoveIcon}
-                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                    aria-label={t("common.remove")}
+                    title={t("common.remove")}
+                    className="bg-destructive text-destructive-foreground focus-visible:ring-ring/35 absolute -top-1.5 -right-1.5 rounded-sm p-1 outline-none focus-visible:ring-[3px]"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="size-3" />
                   </button>
                 </div>
               ) : (
-                <div className="w-16 h-16 rounded-lg border border-dashed flex items-center justify-center bg-muted/30">
-                  <Settings className="w-6 h-6 text-muted-foreground" />
+                <div className="border-border bg-muted/30 flex size-16 items-center justify-center rounded-sm border border-dashed">
+                  <Settings className="size-5 text-muted-foreground" />
                 </div>
               )}
               <div>
@@ -214,7 +219,7 @@ export function GeneralSettingsPage() {
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
+                  <Upload />
                   {t("generalSettings.iconUpload")}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -289,14 +294,14 @@ export function GeneralSettingsPage() {
             {themeLanguages.length > 0 &&
               config.siteLanguage &&
               !themeLanguages.includes(config.siteLanguage) && (
-                <p className="text-warning text-[11px]">
+                <p className="text-warning text-2xs">
                   {t("generalSettings.siteLanguageMissing")}
                 </p>
               )}
           </div>
 
           {/* Enable slider captcha */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="border-border flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="captchaEnabled">
                 {t("generalSettings.captcha")}
@@ -315,7 +320,7 @@ export function GeneralSettingsPage() {
           </div>
 
           {/* Allow registration */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="border-border flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="registrationEnabled">
                 {t("generalSettings.registration")}
@@ -334,7 +339,7 @@ export function GeneralSettingsPage() {
           </div>
 
           {/* Allow guests to view posts */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="border-border flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="allowGuestViewPosts">
                 {t("generalSettings.allowGuestViewPosts")}
@@ -361,7 +366,7 @@ export function GeneralSettingsPage() {
             <>{t("generalSettings.saving")}</>
           ) : (
             <>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4" />
               {t("generalSettings.saveSettings")}
             </>
           )}

@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/I18nContext";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 
 type Props = {
   file: File;
@@ -154,19 +156,31 @@ export const ImageCropper: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded shadow-lg p-4 max-w-4xl w-full flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between mb-3 shrink-0">
-          <h3 className="text-lg font-medium">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 dark:bg-black/60">
+      {/* The same paper sheet, hairline and squared corners as every dialog in
+       * the console — this panel used to be the one remaining white box with a
+       * drop shadow, and its two buttons referenced `.btn` classes that were
+       * never defined anywhere, so they rendered as raw browser buttons. */}
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-md border border-border bg-card p-4">
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+          <h3 className="display text-subtitle">
             {circle
               ? t("imageCropper.cropMode.cropProfilePictureCircle")
               : t("imageCropper.cropMode.cropCoverImage")}
           </h3>
-          <div className="flex gap-2">
-            <button className="btn" onClick={onCancel}>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
               {t("common.cancel")}
             </button>
-            <button className="btn btn-primary" onClick={() => doCrop()}>
+            <button
+              type="button"
+              onClick={() => doCrop()}
+              className={buttonVariants({ size: "sm" })}
+            >
               {t("imageCropper.confirm")}
             </button>
           </div>
@@ -178,7 +192,7 @@ export const ImageCropper: React.FC<Props> = ({
         >
           <div
             ref={containerRef}
-            className="flex-1 relative bg-gray-50 rounded"
+            className={cn("relative flex-1 rounded-md bg-muted")}
             style={{
               width: "100%",
               minHeight: "360px",

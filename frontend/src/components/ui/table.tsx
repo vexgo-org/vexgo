@@ -6,6 +6,10 @@ import { cn } from "@/lib/utils";
  * A compact data table. Admin screens are mostly lists of things, and a list
  * of things is a table — not a stack of cards, which turns ten rows into ten
  * screens of scrolling and makes column comparison impossible.
+ *
+ * The header carries a full ink rule while body rows are separated by
+ * hairlines. That weight difference is the whole reason the header reads as a
+ * header at a glance, without a background fill.
  */
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -15,7 +19,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-[13px]", className)}
+        className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
     </div>
@@ -26,7 +30,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("[&_tr]:border-b [&_tr]:border-rule", className)}
       {...props}
     />
   );
@@ -47,7 +51,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
     <tfoot
       data-slot="table-footer"
       className={cn(
-        "bg-muted/50 border-t font-medium [&>tr]:last:border-0",
+        "border-t border-rule bg-muted/40 font-medium [&>tr]:last:border-0",
         className,
       )}
       {...props}
@@ -60,7 +64,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-border transition-colors hover:bg-muted/50 data-[state=selected]:bg-accent",
+        "border-b border-border transition-colors hover:bg-accent/60 data-[state=selected]:bg-accent",
         className,
       )}
       {...props}
@@ -73,7 +77,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 px-3 text-left align-middle text-[11px] font-medium tracking-wide text-muted-foreground uppercase whitespace-nowrap",
+        "eyebrow h-9 px-3 text-left align-middle whitespace-nowrap",
         className,
       )}
       {...props}
@@ -98,7 +102,7 @@ function TableCaption({
   return (
     <caption
       data-slot="table-caption"
-      className={cn("text-muted-foreground mt-3 text-[13px]", className)}
+      className={cn("mt-3 text-sm text-muted-foreground", className)}
       {...props}
     />
   );

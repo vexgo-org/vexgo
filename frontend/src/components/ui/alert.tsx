@@ -4,21 +4,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Inline feedback. Each tone is a tinted surface plus a colored border and
- * icon — never a solid block of saturated color, and never a colored bar
+ * Inline feedback. Each tone is a faintly tinted paper with a matching hairline
+ * and icon — never a solid block of saturated colour, and never a coloured bar
  * down the left edge (that pattern means nothing to a reader).
  */
 const alertVariants = cva(
-  "relative w-full rounded-md border px-3.5 py-2.5 text-[13px] grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-2.5 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  [
+    "relative grid w-full items-start gap-x-2.5 gap-y-0.5 rounded-md border px-3.5 py-2.5 text-sm",
+    "has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr]",
+    "[&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-card text-card-foreground",
-        muted: "bg-muted text-foreground border-border",
-        info: "bg-info/10 border-info/35 text-info",
-        success: "bg-success/10 border-success/35 text-success",
-        warning: "bg-warning/10 border-warning/35 text-warning",
-        destructive: "bg-destructive/10 border-destructive/35 text-destructive",
+        default: "border-border bg-card text-card-foreground",
+        muted: "border-border bg-muted text-foreground",
+        info: "border-info/35 bg-info/8 text-info",
+        success: "border-success/35 bg-success/8 text-success",
+        warning: "border-warning/35 bg-warning/8 text-warning",
+        destructive: "border-destructive/35 bg-destructive/8 text-destructive",
       },
     },
     defaultVariants: {

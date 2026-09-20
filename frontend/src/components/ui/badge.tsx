@@ -1,41 +1,47 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Badges are square-ish labels, not pills — a pill reads as decoration, a
- * rectangle reads as data. `success`/`warning`/`info` exist so state is
- * expressed through tokens instead of hardcoded Tailwind shades.
+ * A badge is a micro-label, not a pill: squared corners, uppercase, and
+ * letterspaced so it reads as an annotation printed beside the value rather
+ * than as decoration. `success`/`warning`/`info` map to the print-ink tokens
+ * so state is never expressed through a hardcoded Tailwind shade.
  */
 const badgeVariants = cva(
-  "inline-flex items-center justify-center gap-1 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium leading-4 w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 [&>svg]:pointer-events-none transition-colors overflow-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25",
+  [
+    "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden",
+    "rounded-sm border px-1.5 py-[3px]",
+    "text-micro font-medium uppercase whitespace-nowrap",
+    "transition-colors",
+    "[&>svg]:pointer-events-none [&>svg]:size-3",
+  ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/85",
+          "border border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/85",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/70",
+          "border border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-muted",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90",
+          "border border-transparent bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/88",
         success:
-          "border-transparent bg-success text-success-foreground [a&]:hover:bg-success/90",
+          "border border-transparent bg-success text-success-foreground [a&]:hover:bg-success/88",
         warning:
-          "border-transparent bg-warning text-warning-foreground [a&]:hover:bg-warning/90",
-        info: "border-transparent bg-info text-info-foreground [a&]:hover:bg-info/90",
+          "border border-transparent bg-warning text-warning-foreground [a&]:hover:bg-warning/88",
+        info: "border border-transparent bg-info text-info-foreground [a&]:hover:bg-info/88",
         outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+          "border border-input text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         /* Tinted outline: state at a glance without a solid block of color. */
         "outline-success":
-          "border-success/40 text-success bg-success/10 [a&]:hover:bg-success/20",
+          "border-success/40 bg-success/10 text-success [a&]:hover:bg-success/18",
         "outline-warning":
-          "border-warning/40 text-warning bg-warning/10 [a&]:hover:bg-warning/20",
+          "border-warning/40 bg-warning/10 text-warning [a&]:hover:bg-warning/18",
         "outline-info":
-          "border-info/40 text-info bg-info/10 [a&]:hover:bg-info/20",
+          "border-info/40 bg-info/10 text-info [a&]:hover:bg-info/18",
         "outline-destructive":
-          "border-destructive/40 text-destructive bg-destructive/10 [a&]:hover:bg-destructive/20",
+          "border-destructive/40 bg-destructive/10 text-destructive [a&]:hover:bg-destructive/18",
       },
     },
     defaultVariants: {
@@ -47,14 +53,10 @@ const badgeVariants = cva(
 function Badge({
   className,
   variant,
-  asChild = false,
   ...props
-}: React.ComponentProps<"span"> &
-  VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "span";
-
+}: React.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
   return (
-    <Comp
+    <span
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}
       {...props}

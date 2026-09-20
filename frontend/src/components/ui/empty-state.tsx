@@ -14,7 +14,9 @@ interface EmptyStateProps {
 
 /**
  * One empty state for the whole console, so "nothing here yet" always looks
- * the same and always offers the next step.
+ * the same and always offers the next step. The title is set in the display
+ * face with an ink rule above it, which reads as the end of a section rather
+ * than as a broken screen.
  */
 export function EmptyState({
   icon: Icon,
@@ -26,19 +28,19 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-1.5 px-6 py-14 text-center",
+        "flex flex-col items-center justify-center gap-2 px-6 py-16 text-center",
         className,
       )}
     >
       {Icon && (
         <Icon
-          className="text-muted-foreground/60 mb-1 size-5"
+          className="mb-1 size-4 text-muted-foreground/70"
           aria-hidden="true"
         />
       )}
-      <p className="text-sm font-medium">{title}</p>
+      <p className="display text-subtitle text-foreground">{title}</p>
       {description && (
-        <p className="text-muted-foreground max-w-sm text-[13px] leading-relaxed">
+        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
       )}

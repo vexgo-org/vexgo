@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Save, TestTube, RefreshCw } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonForm } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
@@ -154,8 +154,11 @@ export function AISettingsPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-80 rounded-lg" />
+        <PageHeader
+          title={t("aiSettings.title")}
+          description={t("aiSettings.description")}
+        />
+        <SkeletonForm rows={5} />
       </div>
     );
   }
@@ -273,7 +276,7 @@ export function AISettingsPage() {
                 disabled={fetchingModels || !config.enabled || !config.apiKey}
               >
                 <RefreshCw
-                  className={`w-4 h-4 mr-2 ${fetchingModels ? "animate-spin" : ""}`}
+                  className={`size-4 ${fetchingModels ? "animate-spin" : ""}`}
                 />
                 {fetchingModels
                   ? t("aiSettings.fetchingModels")
@@ -290,17 +293,21 @@ export function AISettingsPage() {
                 disabled={saving}
               >
                 <SelectTrigger>
+                  {/* `Select.Value` renders its children as a render function,
+                    not as nodes — a `ReactNode` child here would be ignored. */}
                   <SelectValue placeholder={t("aiSettings.selectModel")}>
-                    {selectedModel ? (
-                      <div className="flex items-center gap-2">
-                        <span>{selectedModel.id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({selectedModel.owned_by})
+                    {(value: string) => {
+                      const model = models.find((item) => item.id === value);
+                      if (!model) return value;
+                      return (
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{model.id}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            ({model.owned_by})
+                          </span>
                         </span>
-                      </div>
-                    ) : (
-                      config.modelName
-                    )}
+                      );
+                    }}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -345,7 +352,7 @@ export function AISettingsPage() {
           {/* Action buttons */}
           <div className="flex gap-3 pt-4 border-t">
             <Button onClick={handleSave} disabled={saving} className="flex-1">
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4" />
               {saving
                 ? t("aiSettings.saving")
                 : t("generalSettings.saveSettings")}
@@ -356,43 +363,51 @@ export function AISettingsPage() {
               disabled={testing || !config.enabled}
               className="flex-1"
             >
-              <TestTube className="w-4 h-4 mr-2" />
+              <TestTube className="size-4" />
               {testing ? t("aiSettings.testing") : t("aiSettings.testAI")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Help info */}
+      {/* Reference prose, set as an appendix: a micro-caps heading per group
+       * and the facts as plain lines, rather than bullet glyphs under bold
+       * labels. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {t("aiSettings.helpInfo.title")}
-          </CardTitle>
+          <CardTitle>{t("aiSettings.helpInfo.title")}</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <div>
-            <strong>{t("aiSettings.helpInfo.openai.title")}</strong>
-            <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-              <li>{t("aiSettings.helpInfo.openai.baseUrl")}</li>
-              <li>{t("aiSettings.helpInfo.openai.apiKey")}</li>
-              <li>{t("aiSettings.helpInfo.openai.supportedModels")}</li>
-            </ul>
-          </div>
-          <div className="pt-2">
-            <strong>{t("aiSettings.helpInfo.custom.title")}</strong>
-            <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-              <li>{t("aiSettings.helpInfo.custom.compatible")}</li>
-              <li>{t("aiSettings.helpInfo.custom.examples")}</li>
-              <li>{t("aiSettings.helpInfo.custom.endpoint")}</li>
-            </ul>
-          </div>
-          <div className="pt-2">
-            <strong>{t("aiSettings.helpInfo.test.title")}</strong>
-            <p className="text-muted-foreground mt-1">
+        <CardContent className="space-y-4">
+          <section className="space-y-1">
+            <h3 className="eyebrow">{t("aiSettings.helpInfo.openai.title")}</h3>
+            <p className="text-sm leading-relaxed">
+              {t("aiSettings.helpInfo.openai.baseUrl")}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {t("aiSettings.helpInfo.openai.apiKey")}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {t("aiSettings.helpInfo.openai.supportedModels")}
+            </p>
+          </section>
+          <section className="space-y-1 border-t border-border pt-4">
+            <h3 className="eyebrow">{t("aiSettings.helpInfo.custom.title")}</h3>
+            <p className="text-sm leading-relaxed">
+              {t("aiSettings.helpInfo.custom.compatible")}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {t("aiSettings.helpInfo.custom.examples")}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {t("aiSettings.helpInfo.custom.endpoint")}
+            </p>
+          </section>
+          <section className="space-y-1 border-t border-border pt-4">
+            <h3 className="eyebrow">{t("aiSettings.helpInfo.test.title")}</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {t("aiSettings.helpInfo.test.description")}
             </p>
-          </div>
+          </section>
         </CardContent>
       </Card>
     </div>

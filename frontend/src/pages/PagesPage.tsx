@@ -3,9 +3,8 @@ import { Link } from "react-router-dom";
 import { pagesAPI, type PageItem } from "@/lib/pages";
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -77,8 +76,8 @@ export function PagesPage() {
   if (loading && pages.length === 0) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-48 rounded-lg" />
+        <PageHeader title={t("pagesPage.title")} />
+        <SkeletonRows rows={5} />
       </div>
     );
   }
@@ -88,11 +87,9 @@ export function PagesPage() {
       <PageHeader
         title={t("pagesPage.title")}
         actions={
-          <Button asChild>
-            <Link to="/admin/pages/new">
-              <Plus className="size-4" />
-              {t("pagesPage.newPage")}
-            </Link>
+          <Button render={<Link to="/admin/pages/new" />}>
+            <Plus className="size-4" />
+            {t("pagesPage.newPage")}
           </Button>
         }
       />
@@ -120,22 +117,20 @@ export function PagesPage() {
       </div>
 
       {pages.length === 0 ? (
-        <Card className="py-0">
+        <div className="border-t border-border">
           <EmptyState
             icon={Files}
             title={t("pagesPage.noPages")}
             action={
-              <Button variant="outline" asChild>
-                <Link to="/admin/pages/new">
-                  <Plus className="size-4" />
-                  {t("pagesPage.newPage")}
-                </Link>
+              <Button variant="outline" render={<Link to="/admin/pages/new" />}>
+                <Plus className="size-4" />
+                {t("pagesPage.newPage")}
               </Button>
             }
           />
-        </Card>
+        </div>
       ) : (
-        <div className="bg-card overflow-hidden rounded-lg border">
+        <div className="bg-card overflow-hidden rounded-md border border-border">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -163,12 +158,12 @@ export function PagesPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    <code className="text-[12px]">/{page.slug}</code>
+                    <code className="font-mono text-xs">/{page.slug}</code>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={page.status} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-[12px]">
+                  <TableCell className="text-muted-foreground text-xs">
                     {page.showInNav
                       ? t("pagesPage.inNavWithOrder", {
                           order: page.sortOrder,
@@ -177,33 +172,39 @@ export function PagesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-0.5">
-                      <Button variant="ghost" size="icon-sm" asChild>
-                        <a
-                          href={`/${page.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={t("common.preview")}
-                        >
-                          <Eye className="size-4" />
-                        </a>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("common.preview")}
+                        render={
+                          <a
+                            href={`/${page.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          />
+                        }
+                      >
+                        <Eye className="size-4" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" asChild>
-                        <Link
-                          to={`/admin/pages/${page.id}`}
-                          aria-label={t("common.edit")}
-                        >
-                          <Edit className="size-4" />
-                        </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("common.edit")}
+                        render={<Link to={`/admin/pages/${page.id}`} />}
+                      >
+                        <Edit className="size-4" />
                       </Button>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={t("pagesPage.delete")}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={t("pagesPage.delete")}
+                            />
+                          }
+                        >
+                          <Trash2 className="size-4" />
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>

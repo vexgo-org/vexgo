@@ -8,13 +8,6 @@ import { unwrap } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SliderCaptcha } from "@/components/ui/slider-captcha";
 import { Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
@@ -105,13 +98,13 @@ interface ProviderConfig {
 }
 
 const GitHubIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+  <svg className="size-4" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
   </svg>
 );
 
 const GoogleIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24">
+  <svg className="size-4" viewBox="0 0 24 24">
     <path
       fill="#4285F4"
       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -133,7 +126,7 @@ const GoogleIcon = () => (
 
 const OIDCIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="size-4"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -337,14 +330,19 @@ export function LoginPage() {
 
   return (
     <>
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-lg">
+      <div>
+        {/* The form is not boxed. On a screen with exactly one job, a card
+         * around it is a frame around nothing. */}
+        <header className="rule-ink mb-7 pb-3">
+          <p className="eyebrow">{t("loginPage.loginButton")}</p>
+          <h1 className="display mt-1.5 text-title">
             {t("loginPage.welcomeBack")}
-          </CardTitle>
-          <CardDescription>{t("loginPage.loginVexgo")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {t("loginPage.loginVexgo")}
+          </p>
+        </header>
+        <div>
           {allowLocalLogin && (
             <form onSubmit={handleSubmit} className="space-y-4">
               {registrationMessage && (
@@ -445,7 +443,7 @@ export function LoginPage() {
                       {t("loginPage.securityVerification")}
                     </Label>
                     {isCaptchaVerified && (
-                      <span className="text-success flex items-center gap-1 text-[11px]">
+                      <span className="text-success flex items-center gap-1 text-micro">
                         <CheckCircle className="size-3" />
                         {t("loginPage.verifiedBadge")}
                       </span>
@@ -454,7 +452,7 @@ export function LoginPage() {
                   <div className="bg-muted/60 rounded-md border p-3">
                     {isCaptchaVerified ? (
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-success flex items-center gap-2 text-[13px]">
+                        <div className="text-success flex items-center gap-2 text-sm">
                           <CheckCircle className="size-4" />
                           {t("loginPage.captchaCompleted")}
                         </div>
@@ -469,7 +467,7 @@ export function LoginPage() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground text-[13px]">
+                        <span className="text-sm text-muted-foreground">
                           {t("loginPage.completeSlider")}
                         </span>
                         <Button
@@ -505,16 +503,13 @@ export function LoginPage() {
 
           {/* ── SSO / third-party login ── */}
           {!ssoConfigLoading && enabledProviders.length > 0 && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-[11px]">
-                  <span className="bg-card text-muted-foreground px-2">
-                    {t("loginPage.orContinueWith") ?? "Or continue with"}
-                  </span>
-                </div>
+            <div className="mt-7">
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-border" />
+                <span className="eyebrow">
+                  {t("loginPage.orContinueWith") ?? "Or continue with"}
+                </span>
+                <span className="h-px flex-1 bg-border" />
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2">
@@ -540,27 +535,27 @@ export function LoginPage() {
             </div>
           )}
 
-          <div className="mt-4 text-center">
+          <div className="mt-5 text-center">
             <button
               type="button"
               onClick={() => navigate("/admin/reset-password")}
-              className="text-accent-blue focus-visible:ring-ring/25 rounded-sm text-[13px] underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+              className="text-sm text-accent-ink underline-offset-4 hover:underline"
             >
               {t("loginPage.forgotPassword")}
             </button>
           </div>
 
-          <div className="text-muted-foreground mt-5 text-center text-[13px]">
+          <div className="mt-8 border-t border-border pt-4 text-center text-sm text-muted-foreground">
             {t("loginPage.noAccount")}{" "}
             <Link
               to="/admin/register"
-              className="text-accent-blue rounded-sm underline-offset-4 hover:underline"
+              className="text-accent-ink underline-offset-4 hover:underline"
             >
               {t("loginPage.registerNow")}
             </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <SliderCaptcha
         isOpen={isCaptchaModalOpen}

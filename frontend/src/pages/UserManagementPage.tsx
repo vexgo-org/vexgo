@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -155,8 +155,12 @@ export function UserManagementPage() {
       );
       toast.success(response.message);
 
-      // Remove the deleted user from the local list
-      setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+      // The handler is called with `String(user.id)` while `user.id` is a
+      // number, so a strict comparison never matched and the deleted row stayed
+      // on screen until a reload.
+      setUsers((prevUsers) =>
+        prevUsers.filter((user) => String(user.id) !== userId),
+      );
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast.error(t("userManagement.deleteUserFailed"));
@@ -186,10 +190,8 @@ export function UserManagementPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-40" />
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-16 rounded-lg" />
-        ))}
+        <PageHeader title={t("userManagement.title")} />
+        <SkeletonRows rows={5} />
       </div>
     );
   }
@@ -224,7 +226,7 @@ export function UserManagementPage() {
         }
       />
 
-      <div className="bg-card overflow-hidden rounded-lg border">
+      <div className="bg-card overflow-hidden rounded-md border border-border">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -243,14 +245,14 @@ export function UserManagementPage() {
               <TableRow key={user.id}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <span className="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-medium">
+                    <span className="border-border bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-sm border text-2xs font-medium">
                       {user.username.charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
                         {user.username}
                       </span>
-                      <span className="text-muted-foreground block truncate text-[11px]">
+                      <span className="text-muted-foreground block truncate text-2xs">
                         {user.email}
                       </span>
                     </span>
@@ -309,14 +311,16 @@ export function UserManagementPage() {
 
                     {canDeleteUser(user) && (
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={t("userManagement.delete")}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={t("userManagement.delete")}
+                            />
+                          }
+                        >
+                          <Trash2 className="size-4" />
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -353,7 +357,7 @@ export function UserManagementPage() {
 
       {totalPages > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-muted-foreground text-[13px]">
+          <div className="text-muted-foreground text-xs tabular-nums">
             {t("userManagement.page", { page: currentPage, totalPages })}
           </div>
           <div className="flex gap-2">

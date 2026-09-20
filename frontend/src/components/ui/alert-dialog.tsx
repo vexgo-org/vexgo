@@ -1,42 +1,21 @@
 import * as React from "react";
-import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
+import { AlertDialog as BaseAlertDialog } from "@base-ui/react/alert-dialog";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
-function AlertDialog({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
-  return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
+function AlertDialog(props: BaseAlertDialog.Root.Props) {
+  return <BaseAlertDialog.Root data-slot="alert-dialog" {...props} />;
 }
 
 function AlertDialogTrigger({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Trigger>) {
-  return (
-    <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
-  );
-}
-
-function AlertDialogPortal({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Portal>) {
-  return (
-    <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />
-  );
-}
-
-function AlertDialogOverlay({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
+}: React.ComponentProps<typeof BaseAlertDialog.Trigger>) {
   return (
-    <AlertDialogPrimitive.Overlay
-      data-slot="alert-dialog-overlay"
-      className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className,
-      )}
+    <BaseAlertDialog.Trigger
+      data-slot="alert-dialog-trigger"
+      className={cn("select-none", className)}
       {...props}
     />
   );
@@ -44,20 +23,27 @@ function AlertDialogOverlay({
 
 function AlertDialogContent({
   className,
+  children,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+}: React.ComponentProps<typeof BaseAlertDialog.Popup>) {
   return (
-    <AlertDialogPortal>
-      <AlertDialogOverlay />
-      <AlertDialogPrimitive.Content
+    <BaseAlertDialog.Portal>
+      <BaseAlertDialog.Backdrop
+        data-slot="alert-dialog-backdrop"
+        className="ui-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/60"
+      />
+      <BaseAlertDialog.Popup
         data-slot="alert-dialog-content"
         className={cn(
-          "bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-5 shadow-lg duration-200 sm:max-w-lg",
+          "ui-popup-dialog fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md gap-4",
+          "rounded-md border border-border bg-card p-5 text-card-foreground outline-none",
           className,
         )}
         {...props}
-      />
-    </AlertDialogPortal>
+      >
+        {children}
+      </BaseAlertDialog.Popup>
+    </BaseAlertDialog.Portal>
   );
 }
 
@@ -68,7 +54,7 @@ function AlertDialogHeader({
   return (
     <div
       data-slot="alert-dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      className={cn("flex flex-col gap-2", className)}
       {...props}
     />
   );
@@ -93,11 +79,11 @@ function AlertDialogFooter({
 function AlertDialogTitle({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {
+}: React.ComponentProps<typeof BaseAlertDialog.Title>) {
   return (
-    <AlertDialogPrimitive.Title
+    <BaseAlertDialog.Title
       data-slot="alert-dialog-title"
-      className={cn("text-base font-semibold tracking-[-0.005em]", className)}
+      className={cn("display text-lg text-foreground", className)}
       {...props}
     />
   );
@@ -106,23 +92,34 @@ function AlertDialogTitle({
 function AlertDialogDescription({
   className,
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Description>) {
+}: React.ComponentProps<typeof BaseAlertDialog.Description>) {
   return (
-    <AlertDialogPrimitive.Description
+    <BaseAlertDialog.Description
       data-slot="alert-dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />
   );
 }
 
+/**
+ * The confirm control is a `<Close>` part so the dialog dismisses itself after
+ * the caller's handler runs — the behaviour callers already rely on from the
+ * Radix primitive this replaces.
+ */
 function AlertDialogAction({
   className,
+  variant = "default",
+  size = "default",
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Action>) {
+}: React.ComponentProps<typeof BaseAlertDialog.Close> & {
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost";
+  size?: "default" | "sm" | "lg";
+}) {
   return (
-    <AlertDialogPrimitive.Action
-      className={cn(buttonVariants(), className)}
+    <BaseAlertDialog.Close
+      data-slot="alert-dialog-action"
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   );
@@ -130,11 +127,17 @@ function AlertDialogAction({
 
 function AlertDialogCancel({
   className,
+  variant = "outline",
+  size = "default",
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
+}: React.ComponentProps<typeof BaseAlertDialog.Close> & {
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost";
+  size?: "default" | "sm" | "lg";
+}) {
   return (
-    <AlertDialogPrimitive.Cancel
-      className={cn(buttonVariants({ variant: "outline" }), className)}
+    <BaseAlertDialog.Close
+      data-slot="alert-dialog-cancel"
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   );
@@ -142,14 +145,12 @@ function AlertDialogCancel({
 
 export {
   AlertDialog,
-  AlertDialogPortal,
-  AlertDialogOverlay,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 };

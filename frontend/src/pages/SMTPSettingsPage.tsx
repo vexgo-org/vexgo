@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Save, TestTube } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonForm } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
@@ -124,8 +124,11 @@ export function SMTPSettingsPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-80 rounded-lg" />
+        <PageHeader
+          title={t("smtpSettings.title")}
+          description={t("smtpSettings.description")}
+        />
+        <SkeletonForm rows={5} />
       </div>
     );
   }
@@ -281,7 +284,7 @@ export function SMTPSettingsPage() {
           {/* Action buttons */}
           <div className="flex gap-3 pt-4 border-t">
             <Button onClick={handleSave} disabled={saving} className="flex-1">
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4" />
               {saving ? t("smtpSettings.saving") : t("smtpSettings.saveConfig")}
             </Button>
             <Button
@@ -290,7 +293,7 @@ export function SMTPSettingsPage() {
               disabled={testing || !config.enabled}
               className="flex-1"
             >
-              <TestTube className="w-4 h-4 mr-2" />
+              <TestTube className="size-4" />
               {testing
                 ? t("smtpSettings.testing")
                 : t("smtpSettings.sendTestEmail")}
@@ -299,26 +302,24 @@ export function SMTPSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Help info */}
+      {/* Host reference, one line per provider, separated by rules. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {t("smtpSettings.commonExamples")}
-          </CardTitle>
+          <CardTitle>{t("smtpSettings.commonExamples")}</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <div>
-            <strong>{t("smtpSettings.gmailExample")}</strong>
-          </div>
-          <div>
-            <strong>{t("smtpSettings.qqExample")}</strong>
-          </div>
-          <div>
-            <strong>{t("smtpSettings.neteaseExample")}</strong>
-          </div>
-          <div>
-            <strong>{t("smtpSettings.outlookExample")}</strong>
-          </div>
+        <CardContent className="divide-y divide-border">
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.gmailExample")}
+          </p>
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.qqExample")}
+          </p>
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.neteaseExample")}
+          </p>
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.outlookExample")}
+          </p>
         </CardContent>
       </Card>
     </div>

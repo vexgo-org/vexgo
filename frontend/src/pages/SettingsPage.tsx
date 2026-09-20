@@ -3,13 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import type { User } from "@/types";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -23,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/ui/spinner";
-import { Check, Shield } from "lucide-react";
+import { Check } from "lucide-react";
 
 export function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -103,21 +97,22 @@ export function SettingsPage() {
       {/* Display preferences (theme, language) live in the console's utility
           bar, so this page only owns what the account itself controls. */}
       <Card>
+        {/* The panel repeats neither its own title nor the page standfirst:
+         * one screen, one heading, and the sub-groups below are named by
+         * micro-caps labels rather than by another heading style. */}
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            {t("settings.privacySettings")}
-          </CardTitle>
-          <CardDescription>{t("settings.privacySettingsDesc")}</CardDescription>
+          <CardTitle>{t("settings.privacySettings")}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label>{t("settings.profileVisibility")}</Label>
             <Select
               value={profileVisibility}
-              onValueChange={(value: "public" | "private") =>
-                setProfileVisibility(value)
-              }
+              onValueChange={(value) => {
+                if (value === "public" || value === "private") {
+                  setProfileVisibility(value);
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("settings.profileVisibility")} />
@@ -134,12 +129,12 @@ export function SettingsPage() {
             </p>
           </div>
 
-          <div className="space-y-4 pt-2">
-            <h3 className="text-sm font-medium">
+          <div className="space-y-4">
+            <h3 className="eyebrow border-t border-border pt-5">
               {t("settings.personalInfoVisibility")}
             </h3>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <Label>{t("settings.hideEmail")}</Label>
                 <p className="text-sm text-muted-foreground">
@@ -149,7 +144,7 @@ export function SettingsPage() {
               <Switch checked={hideEmail} onCheckedChange={setHideEmail} />
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
               <div>
                 <Label>{t("settings.hideBirthday")}</Label>
                 <p className="text-sm text-muted-foreground">
@@ -162,7 +157,7 @@ export function SettingsPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
               <div>
                 <Label>{t("settings.hideBio")}</Label>
                 <p className="text-sm text-muted-foreground">
@@ -179,7 +174,7 @@ export function SettingsPage() {
         <Button onClick={handleSave} disabled={loading}>
           {loading ? (
             <>
-              <Spinner className="mr-2" />
+              <Spinner />
               {t("common.saving")}
             </>
           ) : (

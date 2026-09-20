@@ -299,23 +299,23 @@ export function NotificationCenterPage() {
           return (
             <div
               key={notification.id}
-              className="bg-card flex items-stretch rounded-lg border"
+              className="bg-card flex items-stretch rounded-md border border-border"
             >
               <button
                 type="button"
                 onClick={() => openNotification(notification)}
-                className="hover:bg-muted/40 focus-visible:ring-ring/25 flex min-w-0 flex-1 items-start gap-3 rounded-l-lg p-3 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
+                className="hover:bg-accent focus-visible:ring-ring/25 flex min-w-0 flex-1 items-start gap-3 rounded-l-md p-3 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
               >
                 {notification.sender ? (
                   <Avatar className="size-8 shrink-0">
                     <AvatarImage src={notification.sender.avatar} alt="" />
-                    <AvatarFallback className="text-[11px]">
+                    <AvatarFallback className="text-2xs">
                       {notification.sender.username.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 ) : (
                   <span
-                    className="bg-muted text-muted-foreground mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md"
+                    className="bg-muted text-muted-foreground mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm"
                     aria-hidden="true"
                   >
                     <TypeIcon className="size-3.5" />
@@ -324,17 +324,17 @@ export function NotificationCenterPage() {
 
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-3">
-                    <span className="truncate text-[13px] font-medium">
+                    <span className="truncate text-sm font-medium">
                       {notification.title}
                     </span>
                     <time
-                      className="text-muted-foreground shrink-0 text-[11px]"
+                      className="text-muted-foreground shrink-0 text-2xs tabular-nums"
                       dateTime={notification.createdAt}
                     >
                       {formatDate(notification.createdAt)}
                     </time>
                   </span>
-                  <span className="text-muted-foreground mt-0.5 block text-[13px] leading-relaxed">
+                  <span className="text-muted-foreground mt-1 block text-sm leading-relaxed">
                     {notification.content}
                   </span>
                   {!notification.isRead && (
@@ -345,7 +345,7 @@ export function NotificationCenterPage() {
                 </span>
               </button>
 
-              <div className="flex items-center gap-0.5 pr-2">
+              <div className="flex items-center gap-1 pr-2">
                 {canOpen && (
                   <Button
                     variant="ghost"
@@ -414,9 +414,15 @@ export function NotificationCenterPage() {
         {TAB_VALUES.map((tab) => (
           <TabsContent key={tab} value={tab}>
             {loading ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-[86px] rounded-lg" />
+                  <div key={i} className="flex items-start gap-3">
+                    <Skeleton className="size-8 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-3/5" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (

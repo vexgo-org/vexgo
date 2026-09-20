@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
@@ -306,229 +299,218 @@ export function ProfilePage() {
         title={t("profilePage.profile")}
         description={t("profilePage.profileDescription")}
       />
-      <Card>
-        <CardHeader className="items-center text-center">
-          <div className="mb-1 flex justify-center">
-            <div
-              className="relative cursor-pointer"
-              onClick={handleAvatarClick}
-            >
-              <Avatar className="size-20">
-                {user?.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
-                    {user?.username?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div className="bg-foreground/40 absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-opacity hover:opacity-100">
-                {avatarLoading ? (
-                  <Spinner className="size-6 text-background" />
-                ) : (
-                  <Camera className="size-6 text-background" />
-                )}
-              </div>
-              <input
-                type="file"
-                id="avatar-upload"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
+      {/* The masthead is left-aligned on the page rather than centred inside a
+       * card: a face, a name and a role, set the way a byline is. */}
+      <div className="flex items-center gap-4">
+        <div
+          className="relative shrink-0 cursor-pointer"
+          onClick={handleAvatarClick}
+        >
+          <Avatar className="size-16">
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt=""
+                className="size-full object-cover"
               />
-            </div>
+            ) : (
+              <AvatarFallback className="bg-muted text-muted-foreground text-xl">
+                {user?.username?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <div className="bg-foreground/40 absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
+            {avatarLoading ? (
+              <Spinner className="size-5 text-background" />
+            ) : (
+              <Camera className="size-5 text-background" />
+            )}
           </div>
-          <CardTitle className="text-lg">{user?.username}</CardTitle>
-          <CardDescription>{user?.email}</CardDescription>
-          <Badge variant="secondary" className="mt-1">
+          <input
+            type="file"
+            id="avatar-upload"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="display text-subtitle truncate">{user?.username}</p>
+          <p className="text-muted-foreground truncate text-sm">
+            {user?.email}
+          </p>
+          <Badge variant="outline" className="mt-1.5">
             {getRoleLabel(user?.role)}
           </Badge>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="profile">
-                {t("profilePage.profileInfo")}
-              </TabsTrigger>
-              <TabsTrigger value="password">
-                {t("profilePage.changePassword")}
-              </TabsTrigger>
-            </TabsList>
+        </div>
+      </div>
 
-            <TabsContent value="profile">
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                {success && (
-                  <Alert variant="success">
-                    <Check />
-                    <AlertDescription className="text-current">
-                      {success}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="w-full">
+          <TabsTrigger value="profile">
+            {t("profilePage.profileInfo")}
+          </TabsTrigger>
+          <TabsTrigger value="password">
+            {t("profilePage.changePassword")}
+          </TabsTrigger>
+        </TabsList>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t("profilePage.emailLabel")}</Label>
-                  <div className="relative">
-                    <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={user?.email}
-                      disabled
-                      className="bg-muted pl-9"
-                    />
-                  </div>
-                  <p className="text-muted-foreground text-[11px]">
-                    {t("profilePage.changeEmailTip")}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={openEmailChangeDialog}
-                  >
-                    {t("profilePage.changeEmailButton")}
-                  </Button>
-                </div>
+        <TabsContent value="profile">
+          <form onSubmit={handleUpdateProfile} className="space-y-4">
+            {success && (
+              <Alert variant="success">
+                <Check />
+                <AlertDescription className="text-current">
+                  {success}
+                </AlertDescription>
+              </Alert>
+            )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="username">
-                    {t("profilePage.usernameLabel")}
-                  </Label>
-                  <div className="relative">
-                    <User className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-                    <Input
-                      id="username"
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="pl-9"
-                      minLength={3}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="birthday">
-                    {t("profilePage.birthdayLabel")}
-                  </Label>
-                  <div className="relative">
-                    <Calendar className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-                    <Input
-                      id="birthday"
-                      type="date"
-                      value={birthday}
-                      onChange={(e) => setBirthday(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio">{t("profilePage.bioLabel")}</Label>
-                  <Textarea
-                    id="bio"
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder={t("profilePage.bioPlaceholder")}
-                    rows={3}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Spinner className="size-4" />
-                      {t("profilePage.saving")}
-                    </>
-                  ) : (
-                    t("profilePage.saveChanges")
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="password">
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                {success && (
-                  <Alert variant="success">
-                    <Check />
-                    <AlertDescription className="text-current">
-                      {success}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <PasswordField
-                  id="oldPassword"
-                  label={t("profilePage.currentPassword")}
-                  value={oldPassword}
-                  onChange={setOldPassword}
-                  visible={showOldPassword}
-                  onToggleVisibility={() =>
-                    setShowOldPassword(!showOldPassword)
-                  }
-                  autoComplete="current-password"
+            <div className="space-y-2">
+              <Label htmlFor="email">{t("profilePage.emailLabel")}</Label>
+              <div className="relative">
+                <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={user?.email}
+                  disabled
+                  className="bg-muted pl-9"
                 />
+              </div>
+              <p className="text-muted-foreground text-2xs leading-relaxed">
+                {t("profilePage.changeEmailTip")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={openEmailChangeDialog}
+              >
+                {t("profilePage.changeEmailButton")}
+              </Button>
+            </div>
 
-                <PasswordField
-                  id="newPassword"
-                  label={t("profilePage.newPassword")}
-                  value={newPassword}
-                  onChange={setNewPassword}
-                  visible={showNewPassword}
-                  onToggleVisibility={() =>
-                    setShowNewPassword(!showNewPassword)
-                  }
-                  autoComplete="new-password"
-                  minLength={6}
+            <div className="space-y-2">
+              <Label htmlFor="username">{t("profilePage.usernameLabel")}</Label>
+              <div className="relative">
+                <User className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="pl-9"
+                  minLength={3}
                 />
+              </div>
+            </div>
 
-                <PasswordField
-                  id="confirmPassword"
-                  label={t("profilePage.confirmPassword")}
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  visible={showConfirmPassword}
-                  onToggleVisibility={() =>
-                    setShowConfirmPassword(!showConfirmPassword)
-                  }
-                  autoComplete="new-password"
+            <div className="space-y-2">
+              <Label htmlFor="birthday">{t("profilePage.birthdayLabel")}</Label>
+              <div className="relative">
+                <Calendar className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Input
+                  id="birthday"
+                  type="date"
+                  value={birthday}
+                  onChange={(e) => setBirthday(e.target.value)}
+                  className="pl-9"
                 />
+              </div>
+            </div>
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={passwordLoading}
-                >
-                  {passwordLoading ? (
-                    <>
-                      <Spinner className="size-4" />
-                      {t("profilePage.saving")}
-                    </>
-                  ) : (
-                    t("profilePage.changePassword")
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              <Label htmlFor="bio">{t("profilePage.bioLabel")}</Label>
+              <Textarea
+                id="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder={t("profilePage.bioPlaceholder")}
+                rows={3}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Spinner className="size-4" />
+                  {t("profilePage.saving")}
+                </>
+              ) : (
+                t("profilePage.saveChanges")
+              )}
+            </Button>
+          </form>
+        </TabsContent>
+
+        <TabsContent value="password">
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            {success && (
+              <Alert variant="success">
+                <Check />
+                <AlertDescription className="text-current">
+                  {success}
+                </AlertDescription>
+              </Alert>
+            )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <PasswordField
+              id="oldPassword"
+              label={t("profilePage.currentPassword")}
+              value={oldPassword}
+              onChange={setOldPassword}
+              visible={showOldPassword}
+              onToggleVisibility={() => setShowOldPassword(!showOldPassword)}
+              autoComplete="current-password"
+            />
+
+            <PasswordField
+              id="newPassword"
+              label={t("profilePage.newPassword")}
+              value={newPassword}
+              onChange={setNewPassword}
+              visible={showNewPassword}
+              onToggleVisibility={() => setShowNewPassword(!showNewPassword)}
+              autoComplete="new-password"
+              minLength={6}
+            />
+
+            <PasswordField
+              id="confirmPassword"
+              label={t("profilePage.confirmPassword")}
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              visible={showConfirmPassword}
+              onToggleVisibility={() =>
+                setShowConfirmPassword(!showConfirmPassword)
+              }
+              autoComplete="new-password"
+            />
+
+            <Button type="submit" className="w-full" disabled={passwordLoading}>
+              {passwordLoading ? (
+                <>
+                  <Spinner className="size-4" />
+                  {t("profilePage.saving")}
+                </>
+              ) : (
+                t("profilePage.changePassword")
+              )}
+            </Button>
+          </form>
+        </TabsContent>
+      </Tabs>
 
       {/* Email change confirmation dialog */}
       <AlertDialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>

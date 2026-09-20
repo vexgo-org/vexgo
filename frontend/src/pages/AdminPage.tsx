@@ -10,7 +10,7 @@ import type { Post, Category, Tag as TagType } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -248,13 +248,16 @@ export function AdminPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
+        <PageHeader title={t("admin.title")} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-[76px] rounded-lg" />
+            <div key={i} className="border-t-2 border-rule space-y-2 pt-3">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-8 w-12" />
+            </div>
           ))}
         </div>
-        <Skeleton className="h-64 rounded-lg" />
+        <SkeletonRows rows={4} />
       </div>
     );
   }
@@ -276,7 +279,7 @@ export function AdminPage() {
         description={t("adminData.noRecords")}
       />
     ) : (
-      <div className="bg-card overflow-hidden rounded-lg border">
+      <div className="bg-card overflow-hidden rounded-md border border-border">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -314,14 +317,16 @@ export function AdminPage() {
                 <TableCell className="text-right">
                   <div className="flex justify-end">
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={t("posts.delete")}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                      <AlertDialogTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("posts.delete")}
+                          />
+                        }
+                      >
+                        <Trash2 className="size-4" />
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
@@ -359,25 +364,21 @@ export function AdminPage() {
       <PageHeader
         title={t("admin.title")}
         actions={
-          <Button asChild>
-            <Link to="/admin/write">
-              <PenLine className="size-4" />
-              {t("layout.writePost")}
-            </Link>
+          <Button render={<Link to="/admin/write" />}>
+            <PenLine className="size-4" />
+            {t("layout.writePost")}
           </Button>
         }
       />
 
-      {/* Counters, not dashboards: five numbers with no chart to misread. */}
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Counters, not dashboards: five numbers with no chart to misread. Each
+       * one is a figure over a rule with a caption under it, which is how a
+       * printed report states a total — no box, no tint. */}
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
         {statItems.map((item) => (
-          <div key={item.label} className="bg-card rounded-lg border px-4 py-3">
-            <dt className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-              {item.label}
-            </dt>
-            <dd className="mt-1 text-2xl leading-none font-semibold tabular-nums">
-              {item.value}
-            </dd>
+          <div key={item.label} className="border-t-2 border-rule pt-3">
+            <dd className="display text-figure tabular-nums">{item.value}</dd>
+            <dt className="eyebrow mt-2">{item.label}</dt>
           </div>
         ))}
       </dl>
@@ -402,32 +403,33 @@ export function AdminPage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <Card className="gap-0 overflow-hidden py-0">
+          <ul className="divide-y divide-border border-y border-border">
             {ADMIN_LINKS.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="border-border hover:bg-muted/50 focus-visible:ring-ring/25 flex items-center gap-3 border-b px-4 py-3 transition-colors last:border-b-0 outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
-              >
-                <link.icon
-                  className="text-muted-foreground size-4 shrink-0"
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-medium">
-                    {t(link.labelKey)}
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  className="hover:bg-accent focus-visible:ring-ring/25 flex items-center gap-3 px-1 py-3 transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
+                >
+                  <link.icon
+                    className="text-muted-foreground size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      {t(link.labelKey)}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-2xs">
+                      {t(link.descriptionKey)}
+                    </span>
                   </span>
-                  <span className="text-muted-foreground block truncate text-[11px]">
-                    {t(link.descriptionKey)}
-                  </span>
-                </span>
-                <ChevronRight
-                  className="text-muted-foreground/60 size-4 shrink-0"
-                  aria-hidden="true"
-                />
-              </Link>
+                  <ChevronRight
+                    className="text-muted-foreground/60 size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
             ))}
-          </Card>
+          </ul>
         </TabsContent>
 
         <TabsContent value="posts">
@@ -440,7 +442,7 @@ export function AdminPage() {
 
         <TabsContent value="categories" className="space-y-4">
           {actionError && (
-            <p className="text-destructive text-[13px]">{actionError}</p>
+            <p className="text-destructive text-sm">{actionError}</p>
           )}
           <Card className="py-4">
             <div className="flex flex-col gap-2 px-5 sm:flex-row">
@@ -466,11 +468,11 @@ export function AdminPage() {
           </Card>
 
           {categories.length === 0 ? (
-            <Card className="py-0">
+            <div className="border-t border-border">
               <EmptyState title={t("adminData.noRecords")} />
-            </Card>
+            </div>
           ) : (
-            <div className="bg-card overflow-hidden rounded-lg border">
+            <div className="bg-card overflow-hidden rounded-md border border-border">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -527,15 +529,15 @@ export function AdminPage() {
         </TabsContent>
 
         <TabsContent value="tags" className="space-y-4">
-          <p className="text-muted-foreground text-[13px]">
+          <p className="text-muted-foreground text-xs">
             {t("adminData.tagsHint")}
           </p>
           {tags.length === 0 ? (
-            <Card className="py-0">
+            <div className="border-t border-border">
               <EmptyState title={t("adminData.noRecords")} />
-            </Card>
+            </div>
           ) : (
-            <div className="bg-card overflow-hidden rounded-lg border">
+            <div className="bg-card overflow-hidden rounded-md border border-border">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
