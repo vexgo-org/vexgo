@@ -9,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/PageHeader";
+import { MetaList, MetaRow } from "@/components/MetaList";
+import { RouteFallback } from "@/components/RouteFallback";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +22,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Loader2,
   Check,
   AlertCircle,
-  Palette,
   Upload,
   Eye,
   Trash2,
@@ -59,12 +61,12 @@ function ThemeCover({
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center gap-1 bg-muted text-muted-foreground",
+          "flex flex-col items-center justify-center gap-1.5 bg-muted text-muted-foreground",
           className,
         )}
       >
-        <ImageIcon className="w-8 h-8" />
-        <span className="text-xs">{t("themePage.noPreview")}</span>
+        <ImageIcon className="size-4" aria-hidden="true" />
+        <span className="eyebrow">{t("themePage.noPreview")}</span>
       </div>
     );
   }
@@ -119,7 +121,6 @@ export function ThemePage() {
       ]);
       setThemes((themesRes.themes || []) as ThemeInfo[]);
       setActiveTheme(configRes.activeTheme || "default");
-      console.log("activeTheme from API:", configRes.activeTheme);
     } catch (error) {
       console.error("Failed to load theme data:", error);
       setMessage({ type: "error", text: t("themePage.loadFailed") });
@@ -150,11 +151,6 @@ export function ThemePage() {
         type: "success",
         text: t("themePage.applySuccess", { themeName }),
       });
-
-      // Reload the page after a short delay so the new theme takes effect
-      // setTimeout(() => {
-      //   window.location.reload();
-      // }, 1500);
     } catch (error) {
       console.error("Failed to apply theme:", error);
       setMessage({ type: "error", text: t("themePage.applyFailed") });
@@ -265,343 +261,288 @@ export function ThemePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
+    return <RouteFallback />;
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Palette className="w-8 h-8" />
-              {t("themePage.title")}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {t("themePage.description")}
-            </p>
-          </div>
-          <Button
-            onClick={handleUploadClick}
-            disabled={uploading}
-            className="flex items-center gap-2"
-          >
-            {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-            <Upload className="w-4 h-4" />
-            {t("themePage.uploadTheme")}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+    <div className="max-w-6xl space-y-6">
+      <PageHeader
+        title={t("themePage.title")}
+        description={t("themePage.description")}
+        actions={
+          <>
+            <Button onClick={handleUploadClick} disabled={uploading}>
+              {uploading ? <Spinner className="size-4" /> : <Upload />}
+              {t("themePage.uploadTheme")}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </>
+        }
+      />
+
+      {message && (
+        <Alert variant={message.type === "success" ? "success" : "destructive"}>
+          {message.type === "success" ? <Check /> : <AlertCircle />}
+          <AlertDescription className="text-current">
+            {message.text}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {themes.length === 0 ? (
+        <div className="border-t border-border py-16 text-center">
+          <p className="display text-subtitle">
+            {t("themePage.noThemesFound")}
+          </p>
         </div>
-
-        {message && (
-          <Alert
-            className={cn(
-              message.type === "success"
-                ? "border-green-500/50 bg-green-500/10"
-                : "border-red-500/50 bg-red-500/10",
-            )}
-          >
-            {message.type === "success" ? (
-              <Check className="w-4 h-4 text-green-500" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-red-500" />
-            )}
-            <AlertDescription
-              className={cn(
-                message.type === "success" ? "text-green-500" : "text-red-500",
-              )}
-            >
-              {message.text}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
-          {themes.length === 0 ? (
-            <Card className="col-span-full">
-              <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">
-                  {t("themePage.noThemesFound")}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            themes.map((theme) => {
-              const isActive = activeTheme === theme.id;
-              const isDefault = theme.id === "default";
-              const canDelete = !isDefault && !isActive && deleting === null;
-              return (
-                <Dialog key={theme.id}>
-                  <DialogTrigger asChild>
-                    <div
-                      className={cn(
-                        "cursor-pointer transition-all hover:shadow-md rounded-lg overflow-hidden bg-card border",
-                        isActive ? "border-primary border-2" : "border-border",
+      ) : (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
+          {themes.map((theme) => {
+            const isActive = activeTheme === theme.id;
+            const isDefault = theme.id === "default";
+            const canDelete = !isDefault && !isActive && deleting === null;
+            return (
+              <Dialog key={theme.id}>
+                <DialogTrigger
+                  nativeButton={false}
+                  render={<div />}
+                  className={cn(
+                    "group flex cursor-pointer flex-col overflow-hidden rounded-md border bg-card text-left transition-colors",
+                    isActive
+                      ? "border-rule"
+                      : "border-border hover:border-foreground/35",
+                  )}
+                  onClick={() => setSelectedTheme(theme)}
+                >
+                  <ThemeCover
+                    theme={theme}
+                    alt={`${theme.name} preview`}
+                    className="h-44 w-full border-b border-border"
+                  />
+                  <div className="flex flex-1 flex-col gap-3 p-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 className="display text-subtitle min-w-0 truncate">
+                        {theme.name}
+                      </h3>
+                      {isActive && (
+                        <Badge variant="outline">
+                          {t("themePage.currentBadge")}
+                        </Badge>
                       )}
-                      onClick={() => setSelectedTheme(theme)}
-                    >
-                      <ThemeCover
-                        theme={theme}
-                        alt={`${theme.name} preview`}
-                        className="w-full h-48"
-                      />
-                      <div className="p-4">
-                        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                          <h3 className="font-semibold text-sm">
-                            {theme.name}
-                          </h3>
-                          {isActive && (
-                            <Badge className="bg-primary text-primary-foreground text-xs">
-                              {t("themePage.currentBadge")}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="space-y-1 text-xs text-muted-foreground mb-4">
-                          <p>
-                            <span className="font-semibold">
-                              {t("themePage.author")}:
-                            </span>{" "}
-                            {theme.author}
-                          </p>
-                          <p>
-                            <span className="font-semibold">
-                              {t("themePage.version")}:
-                            </span>{" "}
-                            {theme.version}
-                          </p>
-                          {theme.description && (
-                            <p className="line-clamp-2">
-                              <span className="font-semibold">
-                                {t("themePage.themeDescription")}:
-                              </span>{" "}
-                              {theme.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap justify-between items-center gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="flex items-center gap-1 text-xs"
-                          >
-                            <Eye className="w-3 h-3" />
-                            {t("themePage.viewDetails")}
-                          </Button>
-                          <div className="flex flex-wrap items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs px-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePreviewTheme(theme.id);
-                              }}
-                            >
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              {t("themePage.previewTheme")}
-                            </Button>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleApplyTheme(theme.id);
-                              }}
-                              disabled={isActive || applying !== null}
-                              variant={isActive ? "secondary" : "default"}
-                              size="sm"
-                              className="text-xs"
-                            >
-                              {applying === theme.id && (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              )}
-                              {isActive
-                                ? t("themePage.applied")
-                                : t("themePage.applyTheme")}
-                            </Button>
-                          </div>
-                        </div>
-                        {!isDefault && (
-                          <div className="mt-2 flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs text-destructive hover:text-destructive px-2"
-                              disabled={!canDelete}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteTheme(theme);
-                              }}
-                            >
-                              {deleting === theme.id ? (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3 h-3 mr-1" />
-                              )}
-                              {t("themePage.deleteTheme")}
-                            </Button>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    {selectedTheme && selectedTheme.id === theme.id && (
-                      <>
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center justify-between">
-                            {selectedTheme.name}
-                          </DialogTitle>
-                          <DialogDescription>
-                            <div className="space-y-2 text-sm">
-                              <p>
-                                <span className="font-semibold">
-                                  {t("themePage.author")}:
-                                </span>{" "}
-                                {selectedTheme.author}
-                              </p>
-                              <p>
-                                <span className="font-semibold">
-                                  {t("themePage.version")}:
-                                </span>{" "}
-                                {selectedTheme.version}
-                              </p>
-                              {selectedTheme.description && (
-                                <p>
-                                  <span className="font-semibold">
-                                    {t("themePage.themeDescription")}:
-                                  </span>{" "}
-                                  {selectedTheme.description}
-                                </p>
-                              )}
-                              {selectedTheme.url && (
-                                <p>
-                                  <span className="font-semibold">
-                                    {t("themePage.link")}:
-                                  </span>
-                                  <a
-                                    href={selectedTheme.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary hover:underline break-all"
-                                  >
-                                    {selectedTheme.url}
-                                  </a>
-                                </p>
-                              )}
-                            </div>
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-4">
-                          <p className="text-xs font-semibold mb-1">
-                            {t("themePage.previewCover")}
-                          </p>
-                          <ThemeCover
-                            theme={selectedTheme}
-                            alt={`${selectedTheme.name} preview`}
-                            className="w-full aspect-video rounded-md"
-                          />
-                        </div>
-                        <div className="mt-6 flex justify-end gap-2 flex-wrap">
-                          <Button
-                            variant="secondary"
-                            onClick={() => handlePreviewTheme(selectedTheme.id)}
-                          >
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            {t("themePage.previewTheme")}
-                          </Button>
-                          {selectedTheme.id !== "default" && (
-                            <Button
-                              variant="destructive"
-                              onClick={() => handleDeleteTheme(selectedTheme)}
-                              disabled={
-                                activeTheme === selectedTheme.id ||
-                                deleting !== null
-                              }
+                    <MetaList>
+                      <MetaRow label={t("themePage.author")}>
+                        <span className="block truncate">{theme.author}</span>
+                      </MetaRow>
+                      <MetaRow label={t("themePage.version")}>
+                        <span className="tabular-nums">{theme.version}</span>
+                      </MetaRow>
+                      {theme.description && (
+                        <MetaRow label={t("themePage.themeDescription")}>
+                          <span className="line-clamp-2">
+                            {theme.description}
+                          </span>
+                        </MetaRow>
+                      )}
+                    </MetaList>
+                  </div>
+                  {/* The destructive action moved into the detail sheet, where
+                   * it sits next to the theme it deletes; a gallery tile is
+                   * for choosing, not for destroying. */}
+                  <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
+                    <Button variant="ghost" size="sm">
+                      <Eye />
+                      {t("themePage.viewDetails")}
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewTheme(theme.id);
+                        }}
+                      >
+                        <ExternalLink />
+                        {t("themePage.previewTheme")}
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApplyTheme(theme.id);
+                        }}
+                        disabled={isActive || applying !== null}
+                        variant={isActive ? "outline" : "default"}
+                        size="sm"
+                      >
+                        {applying === theme.id && (
+                          <Spinner className="size-3.5" />
+                        )}
+                        {isActive
+                          ? t("themePage.applied")
+                          : t("themePage.applyTheme")}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  {selectedTheme && selectedTheme.id === theme.id && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle className="display text-subtitle">
+                          {selectedTheme.name}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {t("themePage.description")}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <MetaList className="space-y-2">
+                        <MetaRow label={t("themePage.author")}>
+                          {selectedTheme.author}
+                        </MetaRow>
+                        <MetaRow label={t("themePage.version")}>
+                          {selectedTheme.version}
+                        </MetaRow>
+                        {selectedTheme.description && (
+                          <MetaRow label={t("themePage.themeDescription")}>
+                            {selectedTheme.description}
+                          </MetaRow>
+                        )}
+                        {selectedTheme.url && (
+                          <MetaRow label={t("themePage.link")}>
+                            <a
+                              href={selectedTheme.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-accent-ink break-all hover:underline"
                             >
-                              {deleting === selectedTheme.id && (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              )}
-                              {t("themePage.deleteTheme")}
-                            </Button>
-                          )}
+                              {selectedTheme.url}
+                            </a>
+                          </MetaRow>
+                        )}
+                      </MetaList>
+                      <div>
+                        <p className="eyebrow mb-2">
+                          {t("themePage.previewCover")}
+                        </p>
+                        <ThemeCover
+                          theme={selectedTheme}
+                          alt={`${selectedTheme.name} preview`}
+                          className="aspect-video w-full rounded-md"
+                        />
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => handlePreviewTheme(selectedTheme.id)}
+                        >
+                          <ExternalLink />
+                          {t("themePage.previewTheme")}
+                        </Button>
+                        {!isDefault && (
                           <Button
-                            onClick={() => handleApplyTheme(selectedTheme.id)}
+                            variant="outline"
+                            onClick={() => handleDeleteTheme(selectedTheme)}
                             disabled={
                               activeTheme === selectedTheme.id ||
-                              applying !== null
-                            }
-                            variant={
-                              activeTheme === selectedTheme.id
-                                ? "secondary"
-                                : "default"
+                              !canDelete ||
+                              deleting !== null
                             }
                           >
-                            {applying === selectedTheme.id && (
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {deleting === selectedTheme.id ? (
+                              <Spinner className="size-4" />
+                            ) : (
+                              <Trash2 />
                             )}
-                            {activeTheme === selectedTheme.id
-                              ? t("themePage.applied")
-                              : t("themePage.applyTheme")}
+                            {t("themePage.deleteTheme")}
                           </Button>
-                        </div>
-                      </>
-                    )}
-                  </DialogContent>
-                </Dialog>
-              );
-            })
-          )}
+                        )}
+                        <Button
+                          onClick={() => handleApplyTheme(selectedTheme.id)}
+                          disabled={
+                            activeTheme === selectedTheme.id ||
+                            applying !== null
+                          }
+                          variant={
+                            activeTheme === selectedTheme.id
+                              ? "outline"
+                              : "default"
+                          }
+                        >
+                          {applying === selectedTheme.id && (
+                            <Spinner className="size-4" />
+                          )}
+                          {activeTheme === selectedTheme.id
+                            ? t("themePage.applied")
+                            : t("themePage.applyTheme")}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
+            );
+          })}
         </div>
+      )}
 
-        <Card className="bg-muted border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">
-              {t("themePage.installationInstructions")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-foreground space-y-2">
-            <p>
-              <strong>{t("themePage.method1.title")}</strong>
+      {/* The install notes are reference prose, so they read as an appendix:
+       * two numbered methods separated by a rule, with the paths set in the
+       * mono face rather than in a tinted box inside a tinted box. */}
+      <Card>
+        <CardHeader className="border-b border-border pb-4">
+          <CardTitle>{t("themePage.installationInstructions")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <section className="space-y-1">
+            <h3 className="eyebrow">{t("themePage.method1.title")}</h3>
+            <p className="text-sm leading-relaxed">
+              {t("themePage.method1.step1")}
             </p>
-            <p>{t("themePage.method1.step1")}</p>
-            <p>{t("themePage.method1.step2")}</p>
-            <p>{t("themePage.method1.step3")}</p>
-            <p className="mt-4">
-              <strong>{t("themePage.method2.title")}</strong>
+            <p className="text-sm leading-relaxed">
+              {t("themePage.method1.step2")}
             </p>
-            <p>
-              1. {t("themePage.instruction1")}{" "}
-              <code className="bg-muted px-2 py-1 rounded">./data/theme/</code>{" "}
+            <p className="text-sm leading-relaxed">
+              {t("themePage.method1.step3")}
+            </p>
+          </section>
+          <section className="space-y-1 border-t border-border pt-4">
+            <h3 className="eyebrow">{t("themePage.method2.title")}</h3>
+            <p className="text-sm leading-relaxed">
+              1. {t("themePage.instruction1")} <Code>./data/theme/</Code>{" "}
               {t("themePage.instruction2")}
             </p>
-            <p>
-              2. {t("themePage.instruction3")}{" "}
-              <code className="bg-muted px-2 py-1 rounded">
-                vexgo-theme.json
-              </code>{" "}
+            <p className="text-sm leading-relaxed">
+              2. {t("themePage.instruction3")} <Code>vexgo-theme.json</Code>{" "}
               {t("themePage.instruction4")}
             </p>
-            <p className="text-sm text-muted-foreground">
-              {t("themePage.metaRequirements")}
-            </p>
-            <p>
-              3. {t("themePage.instruction5")}{" "}
-              <code className="bg-muted px-2 py-1 rounded">dist/</code>{" "}
+            <p className="text-sm leading-relaxed">
+              3. {t("themePage.instruction5")} <Code>dist/</Code>{" "}
               {t("themePage.instruction6")}
             </p>
-            <p>4. {t("themePage.instruction7")}</p>
-          </CardContent>
-        </Card>
-      </div>
+            <p className="text-sm leading-relaxed">
+              4. {t("themePage.instruction7")}
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t("themePage.metaRequirements")}
+            </p>
+          </section>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function Code({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+      {children}
+    </code>
   );
 }

@@ -19,8 +19,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Shield, Key, Bot } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { SkeletonForm } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import { Bot, Save } from "lucide-react";
 import { toast } from "sonner";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -28,7 +29,6 @@ import { unwrap } from "@/lib/api";
 import type { CommentModerationConfig } from "@/types";
 
 export function CommentConfigPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,51 +105,39 @@ export function CommentConfigPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="text-center py-8 text-muted-foreground">
-          {t("common.loading")}
-        </div>
+      <div className="space-y-6">
+        <PageHeader
+          title={t("commentConfig.title")}
+          description={t("commentConfig.description")}
+        />
+        <SkeletonForm rows={5} />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin")}
-          >
-            <ArrowLeft className="h-5 w-5" />
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("commentConfig.title")}
+        description={t("commentConfig.description")}
+        actions={
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="size-4" />
+            {saving ? t("commentConfig.saving") : t("commentConfig.saveConfig")}
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{t("commentConfig.title")}</h1>
-            <p className="text-muted-foreground">
-              {t("commentConfig.description")}
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? t("commentConfig.saving") : t("commentConfig.saveConfig")}
-        </Button>
-      </div>
+        }
+      />
 
       <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              {t("commentConfig.basicSettings")}
-            </CardTitle>
+            <CardTitle>{t("commentConfig.basicSettings")}</CardTitle>
             <CardDescription>
               {t("commentConfig.basicSettingsDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div className="space-y-0.5">
                 <Label>{t("commentConfig.manualReview")}</Label>
                 <p className="text-sm text-muted-foreground">
@@ -163,7 +151,7 @@ export function CommentConfigPage() {
                 }
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
               <div className="space-y-0.5">
                 <Label>{t("commentConfig.keywordFilter")}</Label>
                 <p className="text-sm text-muted-foreground">
@@ -177,7 +165,7 @@ export function CommentConfigPage() {
                 }
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
               <div className="space-y-0.5">
                 <Label>{t("commentConfig.llmReview")}</Label>
                 <p className="text-sm text-muted-foreground">
@@ -199,10 +187,7 @@ export function CommentConfigPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              {t("commentConfig.apiConfig")}
-            </CardTitle>
+            <CardTitle>{t("commentConfig.apiConfig")}</CardTitle>
             <CardDescription>
               {t("commentConfig.apiConfigDesc")}
             </CardDescription>
@@ -273,7 +258,7 @@ export function CommentConfigPage() {
                 onClick={handleTestConnection}
                 disabled={testing}
               >
-                <Bot className="h-4 w-4 mr-2" />
+                <Bot className="size-4" />
                 {testing
                   ? t("commentConfig.testing")
                   : t("commentConfig.testConnection")}
@@ -287,10 +272,7 @@ export function CommentConfigPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              {t("commentConfig.moderationRules")}
-            </CardTitle>
+            <CardTitle>{t("commentConfig.moderationRules")}</CardTitle>
             <CardDescription>
               {t("commentConfig.moderationRulesDesc")}
             </CardDescription>

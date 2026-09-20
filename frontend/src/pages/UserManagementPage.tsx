@@ -4,7 +4,6 @@ import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
 import type { User } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,8 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { SkeletonRows } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
-import { Users, UserCheck, Trash2, Search } from "lucide-react";
+import { Trash2, Search } from "lucide-react";
 import { getLocale } from "@/lib/i18n";
 import {
   AlertDialog,
@@ -146,8 +155,12 @@ export function UserManagementPage() {
       );
       toast.success(response.message);
 
-      // Remove the deleted user from the local list
-      setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+      // The handler is called with `String(user.id)` while `user.id` is a
+      // number, so a strict comparison never matched and the deleted row stayed
+      // on screen until a reload.
+      setUsers((prevUsers) =>
+        prevUsers.filter((user) => String(user.id) !== userId),
+      );
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast.error(t("userManagement.deleteUserFailed"));
@@ -176,115 +189,114 @@ export function UserManagementPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6" />
-            {t("userManagement.title")}
-          </h1>
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-4 bg-muted rounded w-1/4"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="space-y-6">
+        <PageHeader title={t("userManagement.title")} />
+        <SkeletonRows rows={5} />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="w-6 h-6" />
-          {t("userManagement.title")}
-        </h1>
-        <div className="relative w-64">
-          <Input
-            type="text"
-            placeholder={t("userManagement.searchPlaceholder")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={handleKeyPress}
-            className="pl-10"
-          />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-            onClick={handleSearch}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("userManagement.title")}
+        actions={
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-56">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Input
+                type="search"
+                placeholder={t("userManagement.searchPlaceholder")}
+                aria-label={t("userManagement.searchPlaceholder")}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleKeyPress}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleSearch}
+              aria-label={t("userManagement.searchPlaceholder")}
+            >
+              <Search className="size-4" />
+            </Button>
+          </div>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCheck className="w-5 h-5" />
-            {t("userManagement.userList")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+      <div className="bg-card overflow-hidden rounded-md border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>{t("userManagement.userList")}</TableHead>
+              <TableHead className="w-28">{t("userManagement.role")}</TableHead>
+              <TableHead className="w-32">
+                {t("userManagement.registered")}
+              </TableHead>
+              <TableHead className="w-56 text-right">
+                {t("common.actions")}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {users.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary font-medium">
-                        {user.username.charAt(0).toUpperCase()}
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div className="flex items-center gap-2.5">
+                    <span className="border-border bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-sm border text-2xs font-medium">
+                      {user.username.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {user.username}
                       </span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{user.username}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <span className="text-muted-foreground block truncate text-2xs">
                         {user.email}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>
-                      {t("userManagement.registered")}:{" "}
-                      {user.createdAt
-                        ? formatDate(user.createdAt)
-                        : t("userManagement.unknown")}
+                      </span>
                     </span>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-4">
+                </TableCell>
+                <TableCell>
                   <Badge
                     variant={roleDisplayMap[user.role]?.variant || "outline"}
                   >
                     {roleDisplayMap[user.role]?.label || user.role}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground tabular-nums">
+                  {user.createdAt
+                    ? formatDate(user.createdAt)
+                    : t("userManagement.unknown")}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {currentUser?.id === user.id && (
+                      <Badge variant="secondary">
+                        {t("userManagement.currentUser")}
+                      </Badge>
+                    )}
 
-                  {currentUser?.id !== user.id &&
-                    !(
-                      currentUser?.role === "admin" && user.role === "admin"
-                    ) && (
-                      <div className="flex items-center gap-2">
+                    {currentUser?.id !== user.id &&
+                      currentUser?.role === "admin" &&
+                      user.role === "admin" && (
+                        <Badge variant="secondary">
+                          {t("userManagement.sameLevel")}
+                        </Badge>
+                      )}
+
+                    {currentUser?.id !== user.id &&
+                      !(
+                        currentUser?.role === "admin" && user.role === "admin"
+                      ) && (
                         <Select
                           value={user.role}
                           onValueChange={(value) =>
                             handleRoleChange(String(user.id), value)
                           }
                         >
-                          <SelectTrigger className="w-32">
+                          <SelectTrigger className="w-28" size="sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -295,90 +307,81 @@ export function UserManagementPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                      )}
+
+                    {canDeleteUser(user) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={t("userManagement.delete")}
+                            />
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {t("userManagement.deleteConfirmation")}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t("userManagement.deleteDescription", {
+                                username: user.username,
+                              })}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>
+                              {t("common.cancel")}
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteUser(String(user.id))}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {t("userManagement.delete")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
-
-                  {canDeleteUser(user) && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          {t("userManagement.delete")}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {t("userManagement.deleteConfirmation")}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {t("userManagement.deleteDescription", {
-                              username: user.username,
-                            })}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>
-                            {t("common.cancel")}
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteUser(String(user.id))}
-                          >
-                            {t("userManagement.delete")}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-
-                  {currentUser?.id !== user.id &&
-                    currentUser?.role === "admin" &&
-                    user.role === "admin" && (
-                      <Badge variant="secondary">
-                        {t("userManagement.sameLevel")}
-                      </Badge>
-                    )}
-
-                  {currentUser?.id === user.id && (
-                    <Badge variant="secondary">
-                      {t("userManagement.currentUser")}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+                  </div>
+                </TableCell>
+              </TableRow>
             ))}
-          </div>
+          </TableBody>
+        </Table>
+      </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-muted-foreground">
-                {t("userManagement.page", { page: currentPage, totalPages })}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  {t("userManagement.previousPage")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage(Math.min(totalPages, currentPage + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  {t("userManagement.nextPage")}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {totalPages > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-muted-foreground text-xs tabular-nums">
+            {t("userManagement.page", { page: currentPage, totalPages })}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+            >
+              {t("userManagement.previousPage")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
+              disabled={currentPage === totalPages}
+            >
+              {t("userManagement.nextPage")}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

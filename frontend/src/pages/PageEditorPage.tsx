@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/editor";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 export function PageEditorPage() {
   const { t } = useTranslation();
@@ -136,13 +137,17 @@ export function PageEditorPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex items-center gap-2 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          {t("pageEditorPage.goBack")}
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => navigate(-1)}
+          aria-label={t("pageEditorPage.goBack")}
+        >
+          <ArrowLeft className="size-4" />
         </Button>
-        <h1 className="text-2xl font-bold">
+        <h1 className="display text-title">
           {isEditMode
             ? t("pageEditorPage.editPage")
             : t("pageEditorPage.newPage")}
@@ -150,7 +155,7 @@ export function PageEditorPage() {
       </div>
 
       <Card>
-        <CardContent className="p-6 space-y-4">
+        <CardContent className="space-y-4">
           <div>
             <Label htmlFor="page-title">{t("pageEditorPage.title")}</Label>
             <Input
@@ -173,7 +178,7 @@ export function PageEditorPage() {
                 {t("pageEditorPage.generateSlug")}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1.5 font-mono text-2xs">
               /{normalizePageSlug(slug) || "slug"}
             </p>
           </div>
@@ -223,9 +228,9 @@ export function PageEditorPage() {
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button onClick={handleSave} disabled={saving}>
             {saving ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Spinner className="size-4" />
             ) : (
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4" />
             )}
             {t("pageEditorPage.save")}
           </Button>

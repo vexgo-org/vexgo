@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -16,11 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mail, Save, TestTube } from "lucide-react";
+import { Save, TestTube } from "lucide-react";
+import { SkeletonForm } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
 export function SMTPSettingsPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -123,43 +123,22 @@ export function SMTPSettingsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-6">
-          <div className="h-8 w-48 bg-muted rounded animate-pulse mb-2" />
-          <div className="h-4 w-64 bg-muted rounded animate-pulse" />
-        </div>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-muted rounded animate-pulse" />
-            ))}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <PageHeader
+          title={t("smtpSettings.title")}
+          description={t("smtpSettings.description")}
+        />
+        <SkeletonForm rows={5} />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/admin")}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t("smtpSettings.backToAdmin")}
-        </Button>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Mail className="w-8 h-8" />
-          {t("smtpSettings.title")}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {t("smtpSettings.description")}
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("smtpSettings.title")}
+        description={t("smtpSettings.description")}
+      />
 
       <Card>
         <CardHeader>
@@ -234,7 +213,7 @@ export function SMTPSettingsPage() {
           <div className="space-y-2">
             <Label htmlFor="password">
               {t("smtpSettings.emailPassword")}{" "}
-              {config.enabled && <span className="text-red-500">*</span>}
+              {config.enabled && <span className="text-destructive">*</span>}
             </Label>
             <Input
               id="password"
@@ -305,7 +284,7 @@ export function SMTPSettingsPage() {
           {/* Action buttons */}
           <div className="flex gap-3 pt-4 border-t">
             <Button onClick={handleSave} disabled={saving} className="flex-1">
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4" />
               {saving ? t("smtpSettings.saving") : t("smtpSettings.saveConfig")}
             </Button>
             <Button
@@ -314,7 +293,7 @@ export function SMTPSettingsPage() {
               disabled={testing || !config.enabled}
               className="flex-1"
             >
-              <TestTube className="w-4 h-4 mr-2" />
+              <TestTube className="size-4" />
               {testing
                 ? t("smtpSettings.testing")
                 : t("smtpSettings.sendTestEmail")}
@@ -323,26 +302,24 @@ export function SMTPSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Help info */}
-      <Card className="mt-6">
+      {/* Host reference, one line per provider, separated by rules. */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {t("smtpSettings.commonExamples")}
-          </CardTitle>
+          <CardTitle>{t("smtpSettings.commonExamples")}</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <div>
-            <strong>{t("smtpSettings.gmailExample")}</strong>
-          </div>
-          <div>
-            <strong>{t("smtpSettings.qqExample")}</strong>
-          </div>
-          <div>
-            <strong>{t("smtpSettings.neteaseExample")}</strong>
-          </div>
-          <div>
-            <strong>{t("smtpSettings.outlookExample")}</strong>
-          </div>
+        <CardContent className="divide-y divide-border">
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.gmailExample")}
+          </p>
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.qqExample")}
+          </p>
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.neteaseExample")}
+          </p>
+          <p className="py-2.5 text-sm leading-relaxed first:pt-0 last:pb-0">
+            {t("smtpSettings.outlookExample")}
+          </p>
         </CardContent>
       </Card>
     </div>

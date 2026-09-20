@@ -7,15 +7,9 @@ import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Mail, Lock, ArrowLeft } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
 
 export function ResetPasswordPage() {
   const { t } = useTranslation();
@@ -104,30 +98,33 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16 flex justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">
-            {step === "request"
-              ? t("resetPasswordPage.findPassword")
-              : t("resetPasswordPage.resetPassword")}
-          </CardTitle>
-          <CardDescription>
-            {step === "request"
-              ? t("resetPasswordPage.resetInstruction")
-              : t("resetPasswordPage.newPasswordInstruction")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div>
+      {/* Same bare masthead as sign-in and registration: one job per screen,
+       * so no card around it. */}
+      <header className="rule-ink mb-7 pb-3">
+        <p className="eyebrow">{t("resetPasswordPage.resetPassword")}</p>
+        <h1 className="display mt-1.5 text-title">
+          {step === "request"
+            ? t("resetPasswordPage.findPassword")
+            : t("resetPasswordPage.resetPassword")}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {step === "request"
+            ? t("resetPasswordPage.resetInstruction")
+            : t("resetPasswordPage.newPasswordInstruction")}
+        </p>
+      </header>
+      <div>
+        <div className="space-y-4">
           {error && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           {success && (
-            <Alert variant="default" className="mb-4">
-              <AlertDescription>
+            <Alert variant="success">
+              <AlertDescription className="text-current">
                 {step === "request"
                   ? t("resetPasswordPage.resetLinkSent")
                   : t("resetPasswordPage.resetSuccess")}
@@ -148,14 +145,14 @@ export function ResetPasswordPage() {
                     {t("resetPasswordPage.emailLabel")}
                   </Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                     <Input
                       id="email"
                       type="email"
                       placeholder={t("resetPasswordPage.emailPlaceholder")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
+                      className="pl-9"
                       required
                     />
                   </div>
@@ -167,26 +164,31 @@ export function ResetPasswordPage() {
                       {t("resetPasswordPage.newPassword")}
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder={t("resetPasswordPage.passwordPlaceholder")}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10"
+                        className="pr-9 pl-9"
                         required
                         minLength={6}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={
+                          showPassword
+                            ? t("loginPage.hidePassword")
+                            : t("loginPage.showPassword")
+                        }
+                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
                       >
                         {showPassword ? (
-                          <span className="text-sm">{t("common.hide")}</span>
+                          <EyeOff className="size-4" />
                         ) : (
-                          <span className="text-sm">{t("common.show")}</span>
+                          <Eye className="size-4" />
                         )}
                       </button>
                     </div>
@@ -197,14 +199,14 @@ export function ResetPasswordPage() {
                       {t("resetPasswordPage.confirmPassword")}
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                       <Input
                         id="confirmPassword"
                         type={showPassword ? "text" : "password"}
                         placeholder={t("resetPasswordPage.confirmPlaceholder")}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10"
+                        className="pl-9"
                         required
                         minLength={6}
                       />
@@ -216,7 +218,7 @@ export function ResetPasswordPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner className="size-4" />
                     {step === "request"
                       ? t("resetPasswordPage.sending")
                       : t("resetPasswordPage.resetting")}
@@ -230,18 +232,18 @@ export function ResetPasswordPage() {
             </form>
           )}
 
-          <div className="mt-6 text-center text-sm">
+          <div className="text-center">
             <button
               type="button"
               onClick={() => navigate("/admin/login")}
-              className="text-primary hover:underline focus:outline-none flex items-center justify-center mx-auto"
+              className="text-accent-ink focus-visible:ring-ring/25 mx-auto flex items-center justify-center gap-1 text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
             >
-              <ArrowLeft className="w-4 h-4 mr-1" />
+              <ArrowLeft className="size-3.5" />
               {t("resetPasswordPage.backToLogin")}
             </button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

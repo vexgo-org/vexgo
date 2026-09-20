@@ -1,4 +1,5 @@
 import path from "path";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { inspectAttr } from "kimi-plugin-inspect-react";
@@ -8,7 +9,7 @@ export default defineConfig({
   // The admin SPA lives entirely under /admin/; public pages are served by
   // the active theme (vexgo-default-theme build) so the SPA must not claim root.
   base: "/admin/",
-  plugins: [inspectAttr(), react()],
+  plugins: [tailwindcss(), inspectAttr(), react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -27,10 +28,10 @@ export default defineConfig({
         manualChunks: {
           // Bundle React-related libraries separately
           "react-vendor": ["react", "react-dom", "react-router-dom"],
-          // Bundle the UI component library separately
+          // Bundle the unstyled component primitives separately
           "ui-vendor": [
-            "@radix-ui/react-slot",
-            "class-variance-authority",
+            "@base-ui/react",
+            "sonner",
             "clsx",
             "tailwind-merge",
             "lucide-react",

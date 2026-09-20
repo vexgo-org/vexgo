@@ -3,10 +3,17 @@ import { Link } from "react-router-dom";
 import { pagesAPI, type PageItem } from "@/lib/pages";
 import { useTranslation } from "@/lib/I18nContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Plus, Edit, Trash2, Eye, Clock } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Files, Plus, Edit, Trash2, Eye } from "lucide-react";
 
 export function PagesPage() {
   const { t } = useTranslation();
@@ -66,44 +75,35 @@ export function PagesPage() {
 
   if (loading && pages.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <Skeleton className="h-8 w-40 mb-6" />
-        {[1, 2].map((i) => (
-          <Card key={i} className="mb-4">
-            <CardContent className="p-6">
-              <Skeleton className="h-6 w-3/4 mb-4" />
-              <Skeleton className="h-4 w-1/2" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-6">
+        <PageHeader title={t("pagesPage.title")} />
+        <SkeletonRows rows={5} />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FileText className="w-6 h-6" />
-          {t("pagesPage.title")}
-        </h1>
-        <Button asChild>
-          <Link to="/admin/pages/new">
-            <Plus className="w-4 h-4 mr-2" />
+    <div className="space-y-6">
+      <PageHeader
+        title={t("pagesPage.title")}
+        actions={
+          <Button render={<Link to="/admin/pages/new" />}>
+            <Plus className="size-4" />
             {t("pagesPage.newPage")}
-          </Link>
-        </Button>
-      </div>
+          </Button>
+        }
+      />
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           placeholder={t("pagesPage.searchPlaceholder")}
+          aria-label={t("pagesPage.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
+          className="sm:max-w-xs"
         />
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-full sm:w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -117,94 +117,123 @@ export function PagesPage() {
       </div>
 
       {pages.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground mb-4">
-              {t("pagesPage.noPages")}
-            </p>
-            <Button asChild>
-              <Link to="/admin/pages/new">
-                <Plus className="w-4 h-4 mr-2" />
+        <div className="border-t border-border">
+          <EmptyState
+            icon={Files}
+            title={t("pagesPage.noPages")}
+            action={
+              <Button variant="outline" render={<Link to="/admin/pages/new" />}>
+                <Plus className="size-4" />
                 {t("pagesPage.newPage")}
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+              </Button>
+            }
+          />
+        </div>
       ) : (
-        <div className="space-y-4">
-          {pages.map((page) => (
-            <Card key={page.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge
-                        variant={
-                          page.status === "published" ? "default" : "secondary"
+        <div className="bg-card overflow-hidden rounded-md border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>{t("posts.title")}</TableHead>
+                <TableHead className="w-48">{t("pagesPage.slug")}</TableHead>
+                <TableHead className="w-28">{t("posts.status")}</TableHead>
+                <TableHead className="w-32">
+                  {t("pagesPage.navigation")}
+                </TableHead>
+                <TableHead className="w-28 text-right">
+                  {t("common.actions")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pages.map((page) => (
+                <TableRow key={page.id}>
+                  <TableCell className="max-w-0">
+                    <Link
+                      to={`/admin/pages/${page.id}`}
+                      className="block truncate font-medium hover:underline"
+                      title={page.title}
+                    >
+                      {page.title}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <code className="font-mono text-xs">/{page.slug}</code>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={page.status} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {page.showInNav
+                      ? t("pagesPage.inNavWithOrder", {
+                          order: page.sortOrder,
+                        })
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("common.preview")}
+                        render={
+                          <a
+                            href={`/${page.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          />
                         }
                       >
-                        {page.status === "published"
-                          ? t("pagesPage.published")
-                          : t("pagesPage.draft")}
-                      </Badge>
-                      {page.showInNav && (
-                        <Badge variant="outline">{t("pagesPage.inNav")}</Badge>
-                      )}
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />/{page.slug} · #
-                        {page.sortOrder}
-                      </span>
-                    </div>
-                    <h2 className="text-lg font-semibold mb-1">{page.title}</h2>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <a
-                        href={`/${page.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
+                        <Eye className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("common.edit")}
+                        render={<Link to={`/admin/pages/${page.id}`} />}
                       >
-                        <Eye className="w-4 h-4" />
-                      </a>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/admin/pages/${page.id}`}>
-                        <Edit className="w-4 h-4" />
-                      </Link>
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {t("pagesPage.confirmDelete")}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {t("pagesPage.cannotUndo")}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>
-                            {t("pagesPage.cancel")}
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(page.id)}
-                            className="bg-destructive"
-                          >
-                            {t("pagesPage.delete")}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                        <Edit className="size-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={t("pagesPage.delete")}
+                            />
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {t("pagesPage.confirmDelete")}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t("pagesPage.cannotUndo")}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>
+                              {t("pagesPage.cancel")}
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(page.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {t("pagesPage.delete")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

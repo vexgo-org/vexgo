@@ -8,16 +8,10 @@ import { unwrap } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SliderCaptcha } from "@/components/ui/slider-captcha";
-import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useSSOProviders, type SSOProvider } from "@/hooks/useSSOProviders";
 
 // ── SSO helpers ──────────────────────────────────────────────────────────────
@@ -101,17 +95,16 @@ interface ProviderConfig {
   id: SSOProvider;
   label: string;
   icon: React.ReactNode;
-  className: string;
 }
 
 const GitHubIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+  <svg className="size-4" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
   </svg>
 );
 
 const GoogleIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24">
+  <svg className="size-4" viewBox="0 0 24 24">
     <path
       fill="#4285F4"
       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -133,7 +126,7 @@ const GoogleIcon = () => (
 
 const OIDCIcon = () => (
   <svg
-    className="w-4 h-4"
+    className="size-4"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -151,19 +144,16 @@ const ALL_PROVIDERS: ProviderConfig[] = [
     id: "github",
     label: "GitHub",
     icon: <GitHubIcon />,
-    className: "border-gray-300 hover:bg-gray-50 text-gray-700",
   },
   {
     id: "google",
     label: "Google",
     icon: <GoogleIcon />,
-    className: "border-gray-300 hover:bg-gray-50 text-gray-700",
   },
   {
     id: "oidc",
     label: "SSO",
     icon: <OIDCIcon />,
-    className: "border-gray-300 hover:bg-gray-50 text-gray-700",
   },
 ];
 
@@ -339,35 +329,43 @@ export function LoginPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16 flex justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">
+    <>
+      <div>
+        {/* The form is not boxed. On a screen with exactly one job, a card
+         * around it is a frame around nothing. */}
+        <header className="rule-ink mb-7 pb-3">
+          <p className="eyebrow">{t("loginPage.loginButton")}</p>
+          <h1 className="display mt-1.5 text-title">
             {t("loginPage.welcomeBack")}
-          </CardTitle>
-          <CardDescription>{t("loginPage.loginVexgo")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {t("loginPage.loginVexgo")}
+          </p>
+        </header>
+        <div>
           {allowLocalLogin && (
             <form onSubmit={handleSubmit} className="space-y-4">
               {registrationMessage && (
-                <Alert variant="default" className="mb-4">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{registrationMessage}</AlertDescription>
+                <Alert variant="success">
+                  <CheckCircle />
+                  <AlertDescription className="text-current">
+                    {registrationMessage}
+                  </AlertDescription>
                 </Alert>
               )}
 
               {resendMessage && (
-                <Alert variant="default" className="mb-4">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>{resendMessage}</AlertDescription>
+                <Alert variant="success">
+                  <CheckCircle />
+                  <AlertDescription className="text-current">
+                    {resendMessage}
+                  </AlertDescription>
                 </Alert>
               )}
 
               {error && (
                 <Alert
-                  variant={emailVerified === false ? "default" : "destructive"}
-                  className="mb-4"
+                  variant={emailVerified === false ? "warning" : "destructive"}
                 >
                   <AlertDescription className="space-y-2">
                     <p className="font-medium">{error}</p>
@@ -391,14 +389,15 @@ export function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="email">{t("auth.email")}</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="your@email.com"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    className="pl-9"
                     required
                   />
                 </div>
@@ -407,25 +406,31 @@ export function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="password">{t("auth.password")}</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder={t("auth.password")}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    className="pr-9 pl-9"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={
+                      showPassword
+                        ? t("loginPage.hidePassword")
+                        : t("loginPage.showPassword")
+                    }
+                    className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
                   >
                     {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
+                      <EyeOff className="size-4" />
                     ) : (
-                      <Eye className="w-4 h-4" />
+                      <Eye className="size-4" />
                     )}
                   </button>
                 </div>
@@ -438,17 +443,17 @@ export function LoginPage() {
                       {t("loginPage.securityVerification")}
                     </Label>
                     {isCaptchaVerified && (
-                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center">
-                        <CheckCircle className="h-3 w-3 mr-1" />
+                      <span className="text-success flex items-center gap-1 text-micro">
+                        <CheckCircle className="size-3" />
                         {t("loginPage.verifiedBadge")}
                       </span>
                     )}
                   </div>
-                  <div className="border rounded-lg p-3 bg-muted/50">
+                  <div className="bg-muted/60 rounded-md border p-3">
                     {isCaptchaVerified ? (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-                          <CheckCircle className="h-4 w-4 mr-2" />
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-success flex items-center gap-2 text-sm">
+                          <CheckCircle className="size-4" />
                           {t("loginPage.captchaCompleted")}
                         </div>
                         <Button
@@ -456,13 +461,12 @@ export function LoginPage() {
                           variant="ghost"
                           size="sm"
                           onClick={resetCaptcha}
-                          className="text-xs h-7"
                         >
                           {t("auth.reverify")}
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <span className="text-sm text-muted-foreground">
                           {t("loginPage.completeSlider")}
                         </span>
@@ -471,7 +475,6 @@ export function LoginPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setIsCaptchaModalOpen(true)}
-                          className="text-xs h-7"
                         >
                           {t("loginPage.verifyButton")}
                         </Button>
@@ -483,12 +486,12 @@ export function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full mt-4"
+                className="mt-2 w-full"
                 disabled={loading || (captchaEnabled && !isCaptchaVerified)}
               >
                 {loading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner className="size-4" />
                     {t("loginPage.loggingIn")}
                   </>
                 ) : (
@@ -500,16 +503,13 @@ export function LoginPage() {
 
           {/* ── SSO / third-party login ── */}
           {!ssoConfigLoading && enabledProviders.length > 0 && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    {t("loginPage.orContinueWith") ?? "Or continue with"}
-                  </span>
-                </div>
+            <div className="mt-7">
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-border" />
+                <span className="eyebrow">
+                  {t("loginPage.orContinueWith") ?? "Or continue with"}
+                </span>
+                <span className="h-px flex-1 bg-border" />
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2">
@@ -520,12 +520,11 @@ export function LoginPage() {
                     key={provider.id}
                     type="button"
                     variant="outline"
-                    className={`flex items-center justify-center gap-2 text-sm ${provider.className}`}
                     disabled={ssoLoading !== null}
                     onClick={() => handleSSOLogin(provider.id)}
                   >
                     {ssoLoading === provider.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Spinner className="size-4" />
                     ) : (
                       provider.icon
                     )}
@@ -536,32 +535,33 @@ export function LoginPage() {
             </div>
           )}
 
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-5 text-center">
             <button
               type="button"
               onClick={() => navigate("/admin/reset-password")}
-              className="text-primary hover:underline focus:outline-none"
+              className="text-sm text-accent-ink underline-offset-4 hover:underline"
             >
               {t("loginPage.forgotPassword")}
             </button>
           </div>
 
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">
-              {t("loginPage.noAccount")}
-            </span>{" "}
-            <Link to="/admin/register" className="text-primary hover:underline">
+          <div className="mt-8 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+            {t("loginPage.noAccount")}{" "}
+            <Link
+              to="/admin/register"
+              className="text-accent-ink underline-offset-4 hover:underline"
+            >
               {t("loginPage.registerNow")}
             </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <SliderCaptcha
         isOpen={isCaptchaModalOpen}
         onClose={() => setIsCaptchaModalOpen(false)}
         onSuccess={handleCaptchaSuccess}
       />
-    </div>
+    </>
   );
 }

@@ -23,8 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { MarkdownEditor } from "@/components/editor";
 import ImageCropper from "@/components/image/ImageCropper";
+import { Spinner } from "@/components/ui/spinner";
 import {
-  Loader2,
   Save,
   Send,
   X,
@@ -419,16 +419,24 @@ export function WritePostPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Form */}
+    <div className="mx-auto max-w-3xl space-y-5">
+      {/* The screen has no heading of its own: its heading is the title field.
+          A micro-caps label above it names the screen for the document
+          outline without putting a second display-size line over the title. */}
+      <h1 className="eyebrow">
+        {isEditMode ? t("writePostPage.editPost") : t("layout.writePost")}
+      </h1>
+
       <div className="space-y-6">
-        {/* Title */}
+        {/* The title is the document's headline, so it is set as one: a bare
+            rule that gains a visible focus underline instead of a box. */}
         <div>
           <Input
             placeholder={t("writePostPage.titlePlaceholder")}
+            aria-label={t("writePostPage.titlePlaceholder")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="text-2xl font-bold border-0 border-b rounded-none px-0 focus-visible:ring-0"
+            className="display focus-visible:border-ring h-auto rounded-none border-0 border-b bg-transparent px-0 py-1 text-title focus-visible:ring-0"
           />
         </div>
 
@@ -461,7 +469,7 @@ export function WritePostPage() {
                 <img
                   src={coverImage}
                   alt={t("writePostPage.coverImageAlt")}
-                  className="w-full h-48 object-fill rounded-lg"
+                  className="h-48 w-full rounded-md border object-cover"
                 />
                 <Button
                   variant="destructive"
@@ -469,11 +477,11 @@ export function WritePostPage() {
                   className="absolute top-2 right-2"
                   onClick={() => setCoverImage("")}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="size-4" />
                 </Button>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+              <div className="border-border rounded-md border border-dashed p-8 text-center">
                 <input
                   type="file"
                   accept="image/*"
@@ -486,16 +494,16 @@ export function WritePostPage() {
                   className="cursor-pointer flex flex-col items-center"
                 >
                   {uploadingImage ? (
-                    <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
+                    <Spinner className="text-muted-foreground mb-2 size-5" />
                   ) : (
-                    <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                    <ImageIcon className="text-muted-foreground mb-2 size-5" />
                   )}
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm">
                     {uploadingImage
                       ? t("writePostPage.uploading")
                       : t("writePostPage.uploadCover")}
                   </span>
-                  <span className="text-xs text-gray-400 mt-1">
+                  <span className="text-muted-foreground mt-1 text-2xs">
                     {t("writePostPage.imageFormat")}
                   </span>
                 </label>
@@ -543,11 +551,7 @@ export function WritePostPage() {
                   onClick={handleCreateCategory}
                   disabled={creatingCategory}
                 >
-                  {creatingCategory ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4 mr-2" />
-                  )}
+                  {creatingCategory ? <Spinner /> : <Plus className="size-4" />}
                   {t("writePostPage.createCategory")}
                 </Button>
                 <span
@@ -564,9 +568,9 @@ export function WritePostPage() {
                     disabled={deletingCategory || !canDeleteSelected}
                   >
                     {deletingCategory ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Spinner />
                     ) : (
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="size-4" />
                     )}
                   </Button>
                 </span>
@@ -593,7 +597,7 @@ export function WritePostPage() {
                 }}
               />
               <Button type="button" onClick={handleAddTag} variant="outline">
-                <Plus className="w-4 h-4" />
+                <Plus className="size-4" />
               </Button>
             </div>
           </div>
@@ -615,7 +619,7 @@ export function WritePostPage() {
                     onClick={() => handleRemoveTag(display)}
                     className="ml-1 hover:text-destructive"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="size-3" />
                   </button>
                 </Badge>
               );
@@ -662,7 +666,7 @@ export function WritePostPage() {
       {/* Footer */}
       <div className="flex items-center justify-between mt-4">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft className="size-4" />
           {t("writePostPage.goBack")}
         </Button>
         <div className="flex items-center gap-2">
@@ -671,26 +675,18 @@ export function WritePostPage() {
             onClick={() => handleSubmit("draft")}
             disabled={saving}
           >
-            <Save className="w-4 h-4 mr-2" />
+            <Save className="size-4" />
             {t("writePostPage.saveDraft")}
           </Button>
           {/* Contributors can only submit posts for review, not publish directly */}
           {isContributor ? (
             <Button onClick={() => handleSubmit("pending")} disabled={saving}>
-              {saving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 mr-2" />
-              )}
+              {saving ? <Spinner /> : <Send className="size-4" />}
               {t("writePostPage.submitReview")}
             </Button>
           ) : (
             <Button onClick={() => handleSubmit("published")} disabled={saving}>
-              {saving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 mr-2" />
-              )}
+              {saving ? <Spinner /> : <Send className="size-4" />}
               {isEditMode
                 ? t("writePostPage.update")
                 : t("writePostPage.publish")}

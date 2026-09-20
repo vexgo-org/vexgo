@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
@@ -23,11 +22,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Settings, Save, Upload, Trash2 } from "lucide-react";
+import { Save, Settings, Upload, Trash2 } from "lucide-react";
+import { SkeletonForm } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
 export function GeneralSettingsPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -133,43 +133,22 @@ export function GeneralSettingsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-6">
-          <div className="h-8 w-48 bg-muted rounded animate-pulse mb-2" />
-          <div className="h-4 w-64 bg-muted rounded animate-pulse" />
-        </div>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-muted rounded animate-pulse" />
-            ))}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <PageHeader
+          title={t("generalSettings.title")}
+          description={t("generalSettings.description")}
+        />
+        <SkeletonForm rows={5} />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/admin")}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t("generalSettings.backToAdmin")}
-        </Button>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Settings className="w-8 h-8" />
-          {t("generalSettings.title")}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {t("generalSettings.description")}
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        title={t("generalSettings.title")}
+        description={t("generalSettings.description")}
+      />
 
       <Card>
         <CardHeader>
@@ -212,23 +191,25 @@ export function GeneralSettingsPage() {
             <Label>{t("generalSettings.siteIcon")}</Label>
             <div className="flex items-center gap-4">
               {config.siteIcon ? (
-                <div className="relative w-16 h-16 rounded-lg border overflow-hidden">
+                <div className="border-border relative size-16 overflow-hidden rounded-sm border">
                   <img
                     src={config.siteIcon}
-                    alt="Site Icon"
-                    className="w-full h-full object-cover"
+                    alt={t("generalSettings.siteIcon")}
+                    className="size-full object-cover"
                   />
                   <button
                     type="button"
                     onClick={handleRemoveIcon}
-                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                    aria-label={t("common.remove")}
+                    title={t("common.remove")}
+                    className="bg-destructive text-destructive-foreground focus-visible:ring-ring/35 absolute -top-1.5 -right-1.5 rounded-sm p-1 outline-none focus-visible:ring-[3px]"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="size-3" />
                   </button>
                 </div>
               ) : (
-                <div className="w-16 h-16 rounded-lg border border-dashed flex items-center justify-center bg-muted/30">
-                  <Settings className="w-6 h-6 text-muted-foreground" />
+                <div className="border-border bg-muted/30 flex size-16 items-center justify-center rounded-sm border border-dashed">
+                  <Settings className="size-5 text-muted-foreground" />
                 </div>
               )}
               <div>
@@ -238,7 +219,7 @@ export function GeneralSettingsPage() {
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
+                  <Upload />
                   {t("generalSettings.iconUpload")}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -313,14 +294,14 @@ export function GeneralSettingsPage() {
             {themeLanguages.length > 0 &&
               config.siteLanguage &&
               !themeLanguages.includes(config.siteLanguage) && (
-                <p className="text-xs text-amber-600">
+                <p className="text-warning text-2xs">
                   {t("generalSettings.siteLanguageMissing")}
                 </p>
               )}
           </div>
 
           {/* Enable slider captcha */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="border-border flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="captchaEnabled">
                 {t("generalSettings.captcha")}
@@ -339,7 +320,7 @@ export function GeneralSettingsPage() {
           </div>
 
           {/* Allow registration */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="border-border flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="registrationEnabled">
                 {t("generalSettings.registration")}
@@ -358,7 +339,7 @@ export function GeneralSettingsPage() {
           </div>
 
           {/* Allow guests to view posts */}
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="border-border flex items-center justify-between border-t pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="allowGuestViewPosts">
                 {t("generalSettings.allowGuestViewPosts")}
@@ -379,13 +360,13 @@ export function GeneralSettingsPage() {
       </Card>
 
       {/* Save button */}
-      <div className="mt-6 flex justify-end">
+      <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving} size="lg">
           {saving ? (
             <>{t("generalSettings.saving")}</>
           ) : (
             <>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4" />
               {t("generalSettings.saveSettings")}
             </>
           )}

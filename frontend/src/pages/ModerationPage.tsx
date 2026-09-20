@@ -1,29 +1,95 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/lib/I18nContext";
 import { getLocale } from "@/lib/i18n";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
 import type { Post } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type badgeVariants } from "@/components/ui/badge";
+import type { VariantProps } from "class-variance-authority";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PageHeader } from "@/components/PageHeader";
 import {
   CheckCircle,
-  XCircle,
   Clock,
-  AlertCircle,
-  Search,
-  Eye,
   Edit,
+  Eye,
+  Search,
   Send,
-  MessageSquare,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+
+type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
+
+/**
+ * One queued post. The row sits directly on the page rule instead of inside
+ * its own bordered box: the queue is a list of items to get through, and
+ * boxing each one nested a card inside the panel that already had a border.
+ * The title takes the display face so scanning the queue reads like scanning
+ * a table of contents.
+ */
+function ReviewRow({
+  post,
+  status,
+  variant,
+  date,
+  actions,
+}: {
+  post: Post;
+  status: string;
+  variant: BadgeVariant;
+  date: string;
+  actions: ReactNode;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <li className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <Badge variant={variant}>{status}</Badge>
+          <span className="text-2xs text-muted-foreground tabular-nums">
+            {date}
+          </span>
+        </div>
+        <h3 className="display text-subtitle mt-2">{post.title}</h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          {t("moderation.author")}: {post.author?.username}
+        </p>
+        {post.excerpt && (
+          <p className="text-sm leading-relaxed text-muted-foreground mt-2 line-clamp-2">
+            {post.excerpt}
+          </p>
+        )}
+        {post.rejectionReason && (
+          <p className="border-destructive mt-3 border-l-2 pl-3 text-xs leading-relaxed text-muted-foreground">
+            <span className="text-destructive font-medium">
+              {t("moderation.rejectionReasonInPost")}
+            </span>{" "}
+            {post.rejectionReason}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+        {actions}
+      </div>
+    </li>
+  );
+}
 
 export function ModerationPage() {
   const navigate = useNavigate();
@@ -163,23 +229,35 @@ export function ModerationPage() {
     });
   };
 
+  const viewButton = (post: Post) => (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => handleViewPost(String(post.slug))}
+    >
+      <Eye />
+      {t("moderation.view")}
+    </Button>
+  );
+
+  const editButton = (post: Post) => (
+    <Button variant="outline" size="sm" onClick={() => handleEditPost(post.id)}>
+      <Edit />
+      {t("moderation.edit")}
+    </Button>
+  );
+
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">{t("moderation.title")}</h1>
-        </div>
-        <div className="space-y-4">
+      <div className="space-y-6">
+        <PageHeader title={t("moderation.title")} />
+        <div className="border-t border-border">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-4 bg-muted rounded w-1/4"></div>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={i} className="space-y-3 border-b border-border py-5">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-5 w-2/5" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
           ))}
         </div>
       </div>
@@ -187,322 +265,187 @@ export function ModerationPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">{t("moderation.title")}</h1>
-        <div className="relative w-64">
-          <Input
-            type="text"
-            placeholder={t("moderation.searchPlaceholder")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyUp={handleKeyPress}
-            className="pl-10"
-          />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-            onClick={handleSearch}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("moderation.title")}
+        actions={
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-56">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Input
+                type="search"
+                placeholder={t("moderation.searchPlaceholder")}
+                aria-label={t("moderation.searchPlaceholder")}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyUp={handleKeyPress}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleSearch}
+              aria-label={t("moderation.searchPlaceholder")}
+            >
+              <Search />
+            </Button>
+          </div>
+        }
+      />
 
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
-          <TabsTrigger value="pending" className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            {t("moderation.pending")} ({pendingPosts.length})
+        <TabsList className="w-full">
+          <TabsTrigger value="pending" className="gap-2">
+            <Clock />
+            {t("moderation.pending")}
+            <span className="text-2xs text-muted-foreground tabular-nums">
+              {pendingPosts.length}
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="approved" className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" />
+          <TabsTrigger value="approved" className="gap-2">
+            <CheckCircle />
             {t("moderation.approved")}
           </TabsTrigger>
-          <TabsTrigger value="rejected" className="flex items-center gap-2">
-            <XCircle className="w-4 h-4" />
+          <TabsTrigger value="rejected" className="gap-2">
+            <XCircle />
             {t("moderation.rejected")}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-yellow-500" />
-                {t("moderation.pendingPosts")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {pendingPosts.length === 0 ? (
-                <div className="text-center py-12">
-                  <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {t("moderation.noPendingPosts")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pendingPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary">
-                            {t("moderation.pending")}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt || "")}
-                          </span>
-                        </div>
-                        <h3 className="font-medium text-lg mb-1">
-                          {post.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {t("moderation.author")}: {post.author?.username}
-                        </p>
-                        {post.excerpt && (
-                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                            {post.excerpt}
-                          </p>
-                        )}
-                        {post.rejectionReason && (
-                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                            <p className="text-sm text-red-800">
-                              <span className="font-medium">
-                                {t("moderation.rejectionReasonInPost")}
-                              </span>
-                              {post.rejectionReason}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-2 ml-4">
-                        <Button
-                          size="sm"
-                          onClick={() => handleViewPost(String(post.slug))}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          {t("moderation.view")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditPost(post.id)}
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          {t("moderation.edit")}
-                        </Button>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="bg-green-600 hover:bg-green-700"
-                            onClick={() => handleApprovePost(post.id)}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            {t("moderation.approve")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleRejectPost(post.id)}
-                          >
-                            <XCircle className="w-4 h-4 mr-1" />
-                            {t("moderation.reject")}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="pending">
+          {pendingPosts.length === 0 ? (
+            <EmptyState icon={Clock} title={t("moderation.noPendingPosts")} />
+          ) : (
+            <ul className="divide-y divide-border">
+              {pendingPosts.map((post) => (
+                <ReviewRow
+                  key={post.id}
+                  post={post}
+                  status={t("moderation.pending")}
+                  variant="outline-warning"
+                  date={formatDate(post.createdAt || "")}
+                  actions={
+                    <>
+                      {viewButton(post)}
+                      {editButton(post)}
+                      <Button
+                        size="sm"
+                        onClick={() => handleApprovePost(post.id)}
+                      >
+                        <CheckCircle />
+                        {t("moderation.approve")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleRejectPost(post.id)}
+                      >
+                        <XCircle />
+                        {t("moderation.reject")}
+                      </Button>
+                    </>
+                  }
+                />
+              ))}
+            </ul>
+          )}
         </TabsContent>
 
-        <TabsContent value="approved" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                {t("moderation.approvedPosts")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {approvedPosts.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {t("moderation.noApprovedPosts")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {approvedPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="default" className="bg-green-500">
-                            {t("moderation.approved")}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt || "")}
-                          </span>
-                        </div>
-                        <h3 className="font-medium text-lg mb-1">
-                          {post.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {t("moderation.author")}: {post.author?.username}
-                        </p>
-                        {post.excerpt && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {post.excerpt}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-2 ml-4">
-                        <Button
-                          size="sm"
-                          onClick={() => handleViewPost(String(post.slug))}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          {t("moderation.view")}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="approved">
+          {approvedPosts.length === 0 ? (
+            <EmptyState
+              icon={CheckCircle}
+              title={t("moderation.noApprovedPosts")}
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {approvedPosts.map((post) => (
+                <ReviewRow
+                  key={post.id}
+                  post={post}
+                  status={t("moderation.approved")}
+                  variant="outline-success"
+                  date={formatDate(post.createdAt || "")}
+                  actions={viewButton(post)}
+                />
+              ))}
+            </ul>
+          )}
         </TabsContent>
 
-        <TabsContent value="rejected" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-red-500" />
-                {t("moderation.rejectedPosts")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {rejectedPosts.length === 0 ? (
-                <div className="text-center py-12">
-                  <XCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {t("moderation.noRejectedPosts")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {rejectedPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="destructive">
-                            {t("moderation.rejected")}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt || "")}
-                          </span>
-                        </div>
-                        <h3 className="font-medium text-lg mb-1">
-                          {post.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {t("moderation.author")}: {post.author?.username}
-                        </p>
-                        {post.excerpt && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {post.excerpt}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-2 ml-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditPost(post.id)}
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          {t("moderation.edit")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleViewPost(String(post.slug))}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          {t("moderation.view")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-yellow-600 hover:bg-yellow-700"
-                          onClick={() => handleResubmitPost(post.id)}
-                        >
-                          <Send className="w-4 h-4 mr-1" />
-                          {t("moderation.resubmit")}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="rejected">
+          {rejectedPosts.length === 0 ? (
+            <EmptyState
+              icon={XCircle}
+              title={t("moderation.noRejectedPosts")}
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {rejectedPosts.map((post) => (
+                <ReviewRow
+                  key={post.id}
+                  post={post}
+                  status={t("moderation.rejected")}
+                  variant="outline-destructive"
+                  date={formatDate(post.createdAt || "")}
+                  actions={
+                    <>
+                      {editButton(post)}
+                      {viewButton(post)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleResubmitPost(post.id)}
+                      >
+                        <Send />
+                        {t("moderation.resubmit")}
+                      </Button>
+                    </>
+                  }
+                />
+              ))}
+            </ul>
+          )}
         </TabsContent>
       </Tabs>
 
-      {showRejectDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-red-500" />
-              {t("moderation.rejectPost")}
-            </h2>
-            <div className="mb-4">
-              <Label
-                htmlFor="rejectionReason"
-                className="block text-sm font-medium mb-2"
-              >
-                {t("moderation.rejectionReasonLabel")}
-              </Label>
-              <Textarea
-                id="rejectionReason"
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder={t("moderation.rejectionReasonPlaceholder")}
-                rows={4}
-                className="w-full"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={cancelRejectPost}>
-                {t("moderation.cancel")}
-              </Button>
-              <Button variant="destructive" onClick={confirmRejectPost}>
-                {t("moderation.confirmReject")}
-              </Button>
-            </div>
+      <Dialog
+        open={showRejectDialog}
+        onOpenChange={(open) => {
+          if (!open) cancelRejectPost();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("moderation.rejectPost")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rejectionReason">
+              {t("moderation.rejectionReasonLabel")}
+            </Label>
+            <Textarea
+              id="rejectionReason"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder={t("moderation.rejectionReasonPlaceholder")}
+              rows={4}
+            />
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelRejectPost}>
+              {t("moderation.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={confirmRejectPost}>
+              {t("moderation.confirmReject")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

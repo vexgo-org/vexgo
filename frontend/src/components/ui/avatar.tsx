@@ -1,17 +1,21 @@
 import * as React from "react";
-import * as AvatarPrimitive from "@radix-ui/react-avatar";
+import { Avatar as BaseAvatar } from "@base-ui/react/avatar";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * The one element in the console that stays round: it holds a face, and a
+ * square crop of a person reads as a placeholder rather than as a portrait.
+ */
 function Avatar({
   className,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Root>) {
+}: React.ComponentProps<typeof BaseAvatar.Root>) {
   return (
-    <AvatarPrimitive.Root
+    <BaseAvatar.Root
       data-slot="avatar"
       className={cn(
-        "relative flex size-8 shrink-0 overflow-hidden rounded-full",
+        "relative flex size-8 shrink-0 overflow-hidden rounded-full select-none",
         className,
       )}
       {...props}
@@ -22,11 +26,11 @@ function Avatar({
 function AvatarImage({
   className,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+}: React.ComponentProps<typeof BaseAvatar.Image>) {
   return (
-    <AvatarPrimitive.Image
+    <BaseAvatar.Image
       data-slot="avatar-image"
-      className={cn("aspect-square size-full", className)}
+      className={cn("aspect-square size-full object-cover", className)}
       {...props}
     />
   );
@@ -35,12 +39,12 @@ function AvatarImage({
 function AvatarFallback({
   className,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Fallback>) {
+}: React.ComponentProps<typeof BaseAvatar.Fallback>) {
   return (
-    <AvatarPrimitive.Fallback
+    <BaseAvatar.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "bg-muted flex size-full items-center justify-center rounded-full",
+        "grid size-full place-content-center bg-muted text-xs font-medium text-muted-foreground",
         className,
       )}
       {...props}

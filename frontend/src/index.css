@@ -1,80 +1,429 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 240 10% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 240 10% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 240 10% 3.9%;
-        --primary: 240 5.9% 10%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 240 4.8% 95.9%;
-        --secondary-foreground: 240 5.9% 10%;
-        --muted: 240 4.8% 95.9%;
-        --muted-foreground: 240 3.8% 46.1%;
-        --accent: 240 4.8% 95.9%;
-        --accent-foreground: 240 5.9% 10%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 240 5.9% 90%;
-        --input: 240 5.9% 90%;
-        --ring: 240 5.9% 10%;
-        --radius: 0.625rem;
-    }
+/*
+ * The console ships a manual light/dark switch on <html>, so the `dark`
+ * variant has to key off a class instead of the OS preference.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
 
-    .dark {
-        --background: 240 10% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 240 10% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 240 10% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 240 5.9% 10%;
-        --secondary: 240 3.7% 15.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 240 3.7% 15.9%;
-        --muted-foreground: 240 5% 85%;
-        --accent: 240 3.7% 15.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 240 3.7% 15.9%;
-        --input: 240 3.7% 15.9%;
-        --ring: 240 4.9% 83.9%;
-    }
+/* ============================================================================
+ * VexGo console — "Editorial" design language
+ *
+ * The console is the back office of a publication, so it is set like one.
+ * Four rules carry the whole language:
+ *
+ * 1. Type does the work. A serif display face (masthead, page titles, figures)
+ *    against a neutral sans for everything functional, separated by an
+ *    uppercase letterspaced micro-label rather than a box.
+ * 2. Rules, not cards. Structure is a 1px hairline or a 2px ink rule, never a
+ *    shadow, gradient, or floating panel.
+ * 3. Corners are 2px. Every radius token resolves to the same near-square
+ *    value, so no component can accidentally read as a "rounded card".
+ * 4. Paper, not white. Surfaces are a warm off-white (or warm charcoal) so the
+ *    ink sits on paper instead of on a screen.
+ *
+ * Colours stay HSL triplets (`H S% L%`) because the CodeMirror theme and the
+ * slider captcha consume them as `hsl(var(--token))`.
+ * ========================================================================= */
+
+:root {
+  color-scheme: light;
+
+  /* — paper ——————————————————————————————————————————————— */
+  --background: 40 14% 96.5%;
+  --foreground: 30 8% 12%;
+
+  --card: 40 22% 99.3%;
+  --card-foreground: 30 8% 12%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 30 8% 12%;
+
+  --sidebar: 40 16% 94%;
+  --sidebar-foreground: 30 6% 34%;
+
+  --muted: 40 12% 91.5%;
+  /* 40% is the lightest value that still clears 4.5:1 on every surface this
+   * text sits on — muted, accent (a hover fill), sidebar, and card. At the
+   * original 42% the avatar and cover fallbacks read at 4.37:1. */
+  --muted-foreground: 30 6% 40%;
+
+  /* Hover/selected tint. `--accent-ink` is the one visible accent colour. */
+  --accent: 40 14% 90%;
+  --accent-foreground: 30 8% 14%;
+  --accent-ink: 216 48% 38%;
+
+  --primary: 30 10% 14%;
+  --primary-foreground: 40 25% 99%;
+
+  --secondary: 40 12% 93%;
+  --secondary-foreground: 30 8% 16%;
+
+  --border: 36 13% 84%;
+  --input: 36 13% 78%;
+  /* The heavy black rule under a page title or masthead. */
+  --rule: 30 9% 16%;
+  --ring: 30 10% 18%;
+
+  /* Print inks: deeper and less saturated than a UI palette's 500 steps. */
+  --info: 216 48% 38%;
+  --info-foreground: 0 0% 100%;
+  --success: 150 35% 29%;
+  --success-foreground: 0 0% 100%;
+  --warning: 32 68% 35%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 6 62% 43%;
+  --destructive-foreground: 0 0% 100%;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: 30 5% 10%;
+  --foreground: 40 12% 94%;
+
+  --card: 30 5% 12.5%;
+  --card-foreground: 40 12% 94%;
+
+  --popover: 30 5% 14.5%;
+  --popover-foreground: 40 12% 94%;
+
+  --sidebar: 30 5% 11.5%;
+  --sidebar-foreground: 40 8% 66%;
+
+  --muted: 30 5% 17.5%;
+  --muted-foreground: 38 8% 62%;
+
+  --accent: 30 5% 19%;
+  --accent-foreground: 40 12% 94%;
+  --accent-ink: 214 52% 68%;
+
+  --primary: 40 12% 92%;
+  --primary-foreground: 30 5% 10%;
+
+  --secondary: 30 5% 18%;
+  --secondary-foreground: 40 12% 94%;
+
+  --border: 30 5% 21%;
+  --input: 30 5% 27%;
+  --rule: 40 12% 88%;
+  --ring: 40 12% 84%;
+
+  --info: 214 52% 68%;
+  --info-foreground: 30 5% 10%;
+  --success: 150 32% 56%;
+  --success-foreground: 30 5% 10%;
+  --warning: 36 58% 62%;
+  --warning-foreground: 30 5% 10%;
+  --destructive: 6 55% 62%;
+  --destructive-foreground: 30 5% 10%;
+}
+
+@theme inline {
+  /* — families ————————————————————————————————————————————
+   * The display face is a system serif (New York / Iowan / Palatino / Songti).
+   * An admin visited daily should not pay for a webfont, and a serif that is
+   * already installed is exactly what a masthead wants. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-serif:
+    ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    "Times New Roman", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC",
+    "SimSun", serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* — palette ————————————————————————————————————————————— */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-ink: hsl(var(--accent-ink));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-rule: hsl(var(--rule));
+  --color-ring: hsl(var(--ring));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  /* — type scale ——————————————————————————————————————————
+   * Seven steps, and pages are expected to name any size they need here
+   * rather than reaching for `text-[13px]` — that is how a design system
+   * quietly grows a seventh, eighth and ninth body size.
+   *
+   *   micro     11px uppercase label  (tracked)
+   *   2xs       11px fine data       (counts, dates, meta)
+   *   xs        12px secondary meta
+   *   sm        13px the admin workhorse
+   *   base      14px body
+   *   subtitle  15px panel heading   (display face)
+   *   title     22px page title      (display face)
+   *   display   30px masthead        (display face)
+   *   figure    36px counters        (display face)
+   */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-micro--letter-spacing: 0.09em;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: normal;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.0625rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.4375rem;
+  --text-subtitle: 0.9375rem;
+  --text-subtitle--line-height: 1.375rem;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.2;
+  --text-display: 1.875rem;
+  --text-display--line-height: 1.1;
+  --text-figure: 2.25rem;
+  --text-figure--line-height: 1;
+
+  /* — geometry —
+   * One near-square radius for every step, so a stray `rounded-lg` cannot
+   * reintroduce the soft template look. */
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-    }
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Base UI renders popups into body-level portals; `isolation: isolate` on
+   * the app shell keeps them above page content without z-index wars. */
+  #root {
+    isolation: isolate;
+  }
+
+  /* Required by Base UI's backdrop on iOS 26+ Safari, which reveals content
+   * beneath the browser chrome unless the body establishes a containing block. */
+  body {
+    position: relative;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern" 1;
+  }
+
+  /* A visible focus ring is never removed; it is only restyled. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
+  }
+
+  /* Numerals line up in tables, counters, and dates. */
+  table,
+  time,
+  [data-tabular-nums] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: hsl(var(--accent-ink) / 0.22);
+  }
 }
 
-/* Scrollbar styles */
+/* Tailwind v4's `transition-colors` includes `outline-color`, so every control
+ * that carries it fades its focus ring in from whatever colour it happened to
+ * have — a keyboard user sees the ring arrive late and in the wrong hue. The
+ * ring is a state, not an affordance: colours transition, the ring appears.
+ * Unlayered on purpose, because a utility in the `utilities` layer outranks
+ * every layered rule. */
+.transition-colors {
+  transition-property:
+    color, background-color, border-color, text-decoration-color, fill, stroke;
+}
+
+@layer components {
+  /* ---------------------------------------------------------------- type */
+
+  /* The eyebrow above a page title, a table header, a nav group. Uppercase
+   * and letterspaced so it reads as a label rather than as content. */
+  .eyebrow {
+    font-size: var(--text-micro);
+    line-height: var(--text-micro--line-height);
+    letter-spacing: var(--text-micro--letter-spacing);
+    text-transform: uppercase;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Display type: the masthead, page titles, and large figures. */
+  .display {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.011em;
+  }
+
+  /* --------------------------------------------------------------- rules */
+
+  /* The heavy rule that closes a masthead or page header. */
+  .rule-ink {
+    border-bottom: 2px solid hsl(var(--rule));
+  }
+
+  /* ------------------------------------------------------------- popups */
+
+  /* Shared entry/exit for every Base UI popup. A 2px travel plus a faint
+   * scale reads as "attached to the trigger" without the zoom-and-bloom of a
+   * template animation, and 140ms keeps it out of the way of typing. */
+  .ui-popup {
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity 140ms ease-out,
+      transform 140ms ease-out;
+  }
+  .ui-popup[data-starting-style],
+  .ui-popup[data-ending-style] {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.99);
+  }
+
+  .ui-backdrop {
+    transition: opacity 160ms ease-out;
+  }
+  .ui-backdrop[data-starting-style],
+  .ui-backdrop[data-ending-style] {
+    opacity: 0;
+  }
+
+  /* Base UI leaves dialog positioning to the consumer, so the centred
+   * transform lives here and the entry animation has to compose with it
+   * rather than replace it. */
+  .ui-popup-dialog {
+    transform: translate(-50%, -50%);
+    transition:
+      opacity 160ms ease-out,
+      transform 160ms ease-out;
+  }
+  .ui-popup-dialog[data-starting-style],
+  .ui-popup-dialog[data-ending-style] {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 6px)) scale(0.995);
+  }
+
+  /* A nav drawer slides in from the edge it is anchored to. */
+  .ui-popup-drawer {
+    transform: translateX(0);
+    transition: transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .ui-popup-drawer[data-starting-style],
+  .ui-popup-drawer[data-ending-style] {
+    transform: translateX(-100%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-popup,
+    .ui-popup-dialog,
+    .ui-popup-drawer,
+    .ui-backdrop {
+      transition-duration: 1ms;
+    }
+    .ui-popup[data-starting-style],
+    .ui-popup[data-ending-style] {
+      transform: none;
+    }
+    .ui-popup-dialog[data-starting-style],
+    .ui-popup-dialog[data-ending-style] {
+      transform: translate(-50%, -50%);
+    }
+    .ui-popup-drawer[data-starting-style],
+    .ui-popup-drawer[data-ending-style] {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* ------------------------------------------------------------ loading */
+
+  /* A single travelling sheen instead of a pulsing opacity block. */
+  .skeleton {
+    background-color: hsl(var(--muted));
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--muted-foreground) / 0.12) 50%,
+      transparent 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 40% 100%;
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-sweep {
+    0% {
+      background-position: -60% 0;
+    }
+    100% {
+      background-position: 160% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      background-image: none;
+      animation: none;
+    }
+  }
+}
+
+/* Scrollbars — token-driven so they follow the theme. */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: content-box;
+  background-color: hsl(var(--foreground) / 0.18);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+  background-color: hsl(var(--foreground) / 0.3);
 }
 
 /* ========== Markdown editor (CodeMirror 6) ========== */
@@ -87,198 +436,200 @@
 
 /* The rich surface reads like an article, the source surface like code. */
 .vexgo-md-rich .cm-scroller {
-    font-family: inherit;
-    font-size: 15px;
-    line-height: 1.75;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .vexgo-md-source .cm-scroller {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-        "Liberation Mono", monospace;
-    font-size: 13px;
-    line-height: 1.65;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 /* --- list bullets --- */
 .vexgo-md-bullet {
-    display: inline-block;
-    width: 1.1em;
-    color: hsl(var(--muted-foreground));
+  display: inline-block;
+  width: 1.1em;
+  color: hsl(var(--muted-foreground));
 }
 
 /* --- task list checkboxes --- */
 .vexgo-md-checkbox {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.1em;
-    height: 1.1em;
-    margin-right: 0.4em;
-    border: 1px solid hsl(var(--border));
-    border-radius: 3px;
-    background-color: hsl(var(--background));
-    vertical-align: -0.18em;
-    cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.4em;
+  border: 1px solid hsl(var(--border));
+  border-radius: 2px;
+  background-color: hsl(var(--background));
+  vertical-align: -0.18em;
+  cursor: pointer;
 }
 
 .vexgo-md-checkbox:hover {
-    border-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
 }
 
 .vexgo-md-checkbox.is-checked {
-    background-color: hsl(var(--primary));
-    border-color: hsl(var(--primary));
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
 }
 
 .vexgo-md-checkbox.is-checked .vexgo-md-checkbox-box::after {
-    content: "";
-    display: block;
-    width: 0.3em;
-    height: 0.55em;
-    border: solid hsl(var(--primary-foreground));
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg) translate(-0.03em, -0.08em);
+  content: "";
+  display: block;
+  width: 0.3em;
+  height: 0.55em;
+  border: solid hsl(var(--primary-foreground));
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-0.03em, -0.08em);
 }
 
 /* --- images --- */
 .vexgo-md-image {
-    display: inline-block;
-    max-width: 100%;
-    vertical-align: top;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
 }
 
 .vexgo-md-image img {
-    display: block;
-    max-width: 100%;
-    max-height: 480px;
-    margin: 0 auto;
-    border-radius: 6px;
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  margin: 0 auto;
+  border-radius: 2px;
 }
 
 .vexgo-md-image-broken {
-    display: inline-block;
-    padding: 2px 8px;
-    border: 1px dashed hsl(var(--destructive));
-    border-radius: 4px;
-    color: hsl(var(--destructive));
-    font-size: 0.85em;
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px dashed hsl(var(--destructive));
+  border-radius: 2px;
+  color: hsl(var(--destructive));
+  font-size: 0.85em;
 }
 
 /* --- code block language picker --- */
 .vexgo-md-lang {
-    margin-left: 8px;
-    padding: 1px 4px;
-    border: 1px solid hsl(var(--border));
-    border-radius: 4px;
-    background-color: hsl(var(--background));
-    color: hsl(var(--muted-foreground));
-    font-family: inherit;
-    font-size: 11px;
-    line-height: 1.4;
-    vertical-align: middle;
-    cursor: pointer;
+  margin-left: 8px;
+  padding: 1px 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 2px;
+  background-color: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.4;
+  vertical-align: middle;
+  cursor: pointer;
 }
 
 /* --- tables (rich mode renders them as real tables) --- */
 .vexgo-md-table {
-    margin: 8px 0;
-    overflow-x: auto;
-    border: 1px solid hsl(var(--border));
-    border-radius: 6px;
-    background-color: hsl(var(--background));
-    cursor: text;
+  margin: 8px 0;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 2px;
+  background-color: hsl(var(--background));
+  cursor: text;
 }
 
 .vexgo-md-table:hover {
-    border-color: hsl(var(--primary) / 0.45);
+  border-color: hsl(var(--primary) / 0.45);
 }
 
 .vexgo-md-table table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.92em;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
 }
 
 .vexgo-md-table th,
 .vexgo-md-table td {
-    padding: 7px 12px;
-    border-bottom: 1px solid hsl(var(--border));
-    vertical-align: top;
+  padding: 7px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  vertical-align: top;
 }
 
 .vexgo-md-table th {
-    background-color: hsl(var(--muted) / 0.6);
-    font-weight: 600;
+  background-color: hsl(var(--muted) / 0.6);
+  font-weight: 600;
 }
 
 .vexgo-md-table tbody tr:last-child td {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .vexgo-md-table code {
-    padding: 1px 4px;
-    border-radius: 4px;
-    background-color: hsl(var(--muted));
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-        "Liberation Mono", monospace;
-    font-size: 0.9em;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background-color: hsl(var(--muted));
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 0.9em;
 }
 
 .vexgo-md-table a {
-    color: hsl(var(--primary));
-    text-decoration: underline;
-    text-underline-offset: 2px;
+  color: hsl(var(--accent-ink));
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .vexgo-md-table strong {
-    font-weight: 700;
+  font-weight: 700;
 }
 
 .vexgo-md-table em {
-    font-style: italic;
+  font-style: italic;
 }
 
 .vexgo-md-table del {
-    text-decoration: line-through;
+  text-decoration: line-through;
 }
 
 /* Slider captcha (go-captcha-react) theme mapping.
  * The component reads every color from --go-captcha-theme-* variables, so
- * scoping them to .slider-captcha lets the widget follow the shadcn theme
+ * scoping them to .slider-captcha lets the widget follow the console theme
  * instead of its built-in light defaults. */
 .slider-captcha {
-    --go-captcha-theme-text-color: hsl(var(--foreground));
-    --go-captcha-theme-bg-color: hsl(var(--card));
-    --go-captcha-theme-btn-color: hsl(var(--primary-foreground));
-    --go-captcha-theme-btn-bg-color: hsl(var(--primary));
-    --go-captcha-theme-btn-border-color: hsl(var(--primary));
-    --go-captcha-theme-btn-disabled-color: hsl(var(--primary) / 0.5);
-    --go-captcha-theme-active-color: hsl(var(--primary));
-    --go-captcha-theme-border-color: hsl(var(--border));
-    --go-captcha-theme-icon-color: hsl(var(--foreground));
-    --go-captcha-theme-drag-bar-color: hsl(var(--muted));
-    --go-captcha-theme-drag-bg-color: hsl(var(--primary));
-    --go-captcha-theme-drag-icon-color: hsl(var(--primary-foreground));
-    --go-captcha-theme-round-color: hsl(var(--muted));
-    --go-captcha-theme-loading-icon-color: hsl(var(--primary));
-    --go-captcha-theme-body-bg-color: hsl(var(--muted));
-    --go-captcha-theme-dot-color: hsl(var(--primary-foreground));
-    --go-captcha-theme-dot-bg-color: hsl(var(--primary));
-    --go-captcha-theme-dot-border-color: hsl(var(--background));
-    --go-captcha-theme-default-color: hsl(var(--primary));
-    --go-captcha-theme-default-bg-color: hsl(var(--accent));
-    --go-captcha-theme-default-border-color: hsl(var(--primary));
-    --go-captcha-theme-default-hover-color: hsl(var(--accent));
-    --go-captcha-theme-error-color: hsl(var(--destructive));
-    --go-captcha-theme-error-bg-color: hsl(var(--destructive) / 0.1);
-    --go-captcha-theme-error-border-color: hsl(var(--destructive) / 0.5);
+  --go-captcha-theme-text-color: hsl(var(--foreground));
+  --go-captcha-theme-bg-color: hsl(var(--card));
+  --go-captcha-theme-btn-color: hsl(var(--primary-foreground));
+  --go-captcha-theme-btn-bg-color: hsl(var(--primary));
+  --go-captcha-theme-btn-border-color: hsl(var(--primary));
+  --go-captcha-theme-btn-disabled-color: hsl(var(--primary) / 0.5);
+  --go-captcha-theme-active-color: hsl(var(--primary));
+  --go-captcha-theme-border-color: hsl(var(--border));
+  --go-captcha-theme-icon-color: hsl(var(--foreground));
+  --go-captcha-theme-drag-bar-color: hsl(var(--muted));
+  --go-captcha-theme-drag-bg-color: hsl(var(--primary));
+  --go-captcha-theme-drag-icon-color: hsl(var(--primary-foreground));
+  --go-captcha-theme-round-color: hsl(var(--muted));
+  --go-captcha-theme-loading-icon-color: hsl(var(--primary));
+  --go-captcha-theme-body-bg-color: hsl(var(--muted));
+  --go-captcha-theme-dot-color: hsl(var(--primary-foreground));
+  --go-captcha-theme-dot-bg-color: hsl(var(--primary));
+  --go-captcha-theme-dot-border-color: hsl(var(--background));
+  --go-captcha-theme-default-color: hsl(var(--primary));
+  --go-captcha-theme-default-bg-color: hsl(var(--accent));
+  --go-captcha-theme-default-border-color: hsl(var(--primary));
+  --go-captcha-theme-default-hover-color: hsl(var(--accent));
+  --go-captcha-theme-error-color: hsl(var(--destructive));
+  --go-captcha-theme-error-bg-color: hsl(var(--destructive) / 0.1);
+  --go-captcha-theme-error-border-color: hsl(var(--destructive) / 0.5);
 }
 
 .dark .slider-captcha {
-    --go-captcha-theme-warn-color: #fbbf24;
-    --go-captcha-theme-warn-bg-color: #451a03;
-    --go-captcha-theme-warn-border-color: #b45309;
-    --go-captcha-theme-success-color: #4ade80;
-    --go-captcha-theme-success-bg-color: #052e16;
-    --go-captcha-theme-success-border-color: #22c55e;
+  --go-captcha-theme-warn-color: #fbbf24;
+  --go-captcha-theme-warn-bg-color: #451a03;
+  --go-captcha-theme-warn-border-color: #b45309;
+  --go-captcha-theme-success-color: #4ade80;
+  --go-captcha-theme-success-bg-color: #052e16;
+  --go-captcha-theme-success-border-color: #22c55e;
 }

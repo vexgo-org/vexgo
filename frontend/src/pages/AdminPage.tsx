@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
@@ -7,32 +7,105 @@ import { getLocale } from "@/lib/i18n";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
 import type { Post, Category, Tag as TagType } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 
 import {
-  Users,
-  FileText,
-  MessageSquare,
-  Tag,
-  Plus,
-  Trash2,
-  BarChart3,
-  Edit,
-  Shield,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  FileX,
-  Mail,
-  Settings,
+  ChevronRight,
   Cpu,
+  Mail,
+  MessageSquare,
   Palette,
+  PenLine,
+  Plus,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  Users,
+  type LucideIcon,
 } from "lucide-react";
+
+/** The admin menu: the same routes as the rail, described for a first visit. */
+const ADMIN_LINKS: {
+  to: string;
+  labelKey: string;
+  descriptionKey: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    to: "/admin/general-settings",
+    labelKey: "generalSettings.title",
+    descriptionKey: "adminData.configGeneralSettings",
+    icon: Settings,
+  },
+  {
+    to: "/admin/theme",
+    labelKey: "themeSettings.title",
+    descriptionKey: "adminData.manageThemes",
+    icon: Palette,
+  },
+  {
+    to: "/admin/moderation",
+    labelKey: "moderation.title",
+    descriptionKey: "adminData.manageModeration",
+    icon: ShieldCheck,
+  },
+  {
+    to: "/admin/comment-moderation",
+    labelKey: "commentModeration.title",
+    descriptionKey: "adminData.manageComments",
+    icon: MessageSquare,
+  },
+  {
+    to: "/admin/comment-config",
+    labelKey: "commentConfig.title",
+    descriptionKey: "commentConfig.description",
+    icon: MessageSquare,
+  },
+  {
+    to: "/admin/users",
+    labelKey: "userManagement.title",
+    descriptionKey: "adminData.manageUsers",
+    icon: Users,
+  },
+  {
+    to: "/admin/smtp",
+    labelKey: "smtpSettings.title",
+    descriptionKey: "adminData.configEmail",
+    icon: Mail,
+  },
+  {
+    to: "/admin/ai-settings",
+    labelKey: "aiSettings.title",
+    descriptionKey: "adminData.configAI",
+    icon: Cpu,
+  },
+];
 
 export function AdminPage() {
   const navigate = useNavigate();
@@ -172,147 +245,144 @@ export function AdminPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
-    type IconComponent = typeof CheckCircle;
-    const statusMap: Record<
-      string,
-      {
-        label: string;
-        variant: BadgeVariant;
-        icon: IconComponent;
-        className: string;
-      }
-    > = {
-      published: {
-        label: t("posts.published"),
-        variant: "default",
-        icon: CheckCircle,
-        className: "bg-green-600 hover:bg-green-700",
-      },
-      draft: {
-        label: t("posts.draft"),
-        variant: "secondary",
-        icon: FileX,
-        className: "",
-      },
-      pending: {
-        label: t("posts.pending"),
-        variant: "outline",
-        icon: Clock,
-        className: "text-yellow-600 border-yellow-600",
-      },
-      rejected: {
-        label: t("posts.rejected"),
-        variant: "destructive",
-        icon: XCircle,
-        className: "",
-      },
-    };
-    return (
-      statusMap[status] || {
-        variant: "secondary" as BadgeVariant,
-        label: status,
-        icon: AlertCircle,
-        className: "",
-      }
-    );
-  };
-
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse h-16 bg-muted rounded" />
-              </CardContent>
-            </Card>
+      <div className="space-y-6">
+        <PageHeader title={t("admin.title")} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="border-t-2 border-rule space-y-2 pt-3">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-8 w-12" />
+            </div>
           ))}
         </div>
+        <SkeletonRows rows={4} />
       </div>
     );
   }
 
+  const statItems = [
+    { label: t("admin.totalPosts"), value: stats.posts },
+    { label: t("adminData.categories"), value: stats.categories },
+    { label: t("adminData.tags"), value: stats.tags },
+    { label: t("admin.totalUsers"), value: stats.users },
+    { label: t("adminData.comments"), value: stats.comments },
+  ];
+
+  /** Shared by the posts and drafts tabs — the only difference is the rows. */
+  const renderPostTable = (rows: Post[], emptyLabel: string) =>
+    rows.length === 0 ? (
+      <EmptyState
+        icon={PenLine}
+        title={emptyLabel}
+        description={t("adminData.noRecords")}
+      />
+    ) : (
+      <div className="bg-card overflow-hidden rounded-md border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>{t("posts.title")}</TableHead>
+              <TableHead className="w-28">{t("posts.status")}</TableHead>
+              <TableHead className="w-32">{t("posts.author")}</TableHead>
+              <TableHead className="w-28">{t("common.date")}</TableHead>
+              <TableHead className="w-20 text-right">
+                <span className="sr-only">{t("posts.edit")}</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((post) => (
+              <TableRow key={post.id}>
+                <TableCell className="max-w-0">
+                  <button
+                    type="button"
+                    onClick={() => handleEditPost(String(post.id))}
+                    className="block max-w-full truncate text-left font-medium hover:underline"
+                    title={post.title}
+                  >
+                    {post.title}
+                  </button>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge status={post.status} />
+                </TableCell>
+                <TableCell className="text-muted-foreground truncate">
+                  {post.author?.username ?? "—"}
+                </TableCell>
+                <TableCell className="text-muted-foreground tabular-nums">
+                  {formatDate(post.createdAt || "")}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end">
+                    <AlertDialog>
+                      <AlertDialogTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("posts.delete")}
+                          />
+                        }
+                      >
+                        <Trash2 className="size-4" />
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {t("posts.deleteConfirm")}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {t("myPostsPage.cannotUndo")}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>
+                            {t("myPostsPage.cancel")}
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeletePost(String(post.id))}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {t("myPostsPage.delete")}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BarChart3 className="w-6 h-6" />
-          {t("admin.title")}
-        </h1>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("admin.title")}
+        actions={
+          <Button render={<Link to="/admin/write" />}>
+            <PenLine className="size-4" />
+            {t("layout.writePost")}
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {t("admin.totalPosts")}
-                </p>
-                <p className="text-3xl font-bold">{stats.posts}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Counters, not dashboards: five numbers with no chart to misread. Each
+       * one is a figure over a rule with a caption under it, which is how a
+       * printed report states a total — no box, no tint. */}
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+        {statItems.map((item) => (
+          <div key={item.label} className="border-t-2 border-rule pt-3">
+            <dd className="display text-figure tabular-nums">{item.value}</dd>
+            <dt className="eyebrow mt-2">{item.label}</dt>
+          </div>
+        ))}
+      </dl>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {t("admin.totalUsers")}
-                </p>
-                <p className="text-3xl font-bold">{stats.users}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {t("admin.pendingPosts")}
-                </p>
-                <p className="text-3xl font-bold">{stats.comments}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {t("admin.quickStats")}
-                </p>
-                <p className="text-3xl font-bold">
-                  {stats.categories}/{stats.tags}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Tag className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Management Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={(v) =>
@@ -322,7 +392,7 @@ export function AdminPage() {
         }
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList>
           <TabsTrigger value="overview">{t("adminData.overview")}</TabsTrigger>
           <TabsTrigger value="posts">{t("adminData.posts")}</TabsTrigger>
           <TabsTrigger value="drafts">{t("adminData.draftPosts")}</TabsTrigger>
@@ -332,378 +402,187 @@ export function AdminPage() {
           <TabsTrigger value="tags">{t("adminData.allTags")}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/general-settings")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  {t("generalSettings.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.configGeneralSettings")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/moderation")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="w-5 h-5" />
-                  {t("moderation.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.manageModeration")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/comment-moderation")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  {t("commentModeration.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.manageComments")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/users")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  {t("userManagement.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.manageUsers")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/smtp")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="w-5 h-5" />
-                  {t("smtpSettings.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.configEmail")}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/ai-settings")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Cpu className="w-5 h-5" />
-                  {t("aiSettings.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.configAI")}
-                </p>
-              </CardContent>
-            </Card>
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/comment-config")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  {t("commentConfig.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("commentConfig.description")}
-                </p>
-              </CardContent>
-            </Card>
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate("/admin/theme")}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="w-5 h-5" />
-                  {t("themeSettings.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t("adminData.manageThemes")}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="posts" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminData.recentPosts")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {(() => {
-                          const status = getStatusBadge(post.status || "");
-                          const IconComponent = status.icon;
-                          return (
-                            <Badge
-                              variant={status.variant}
-                              className={status.className}
-                            >
-                              <IconComponent className="w-3 h-3 mr-1" />
-                              {status.label}
-                            </Badge>
-                          );
-                        })()}
-                        <span className="text-sm text-muted-foreground">
-                          {formatDate(post.createdAt || "")}
-                        </span>
-                      </div>
-                      <h3 className="font-medium">{post.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t("posts.author")}: {post.author?.username || ""}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditPost(String(post.id))}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeletePost(post.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="drafts" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminData.draftPosts")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {draftPosts.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">
-                    {t("adminData.noRecords")}
-                  </p>
-                ) : (
-                  draftPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="secondary">{t("posts.draft")}</Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(post.createdAt || "")}
-                          </span>
-                        </div>
-                        <h3 className="font-medium">{post.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {t("posts.author")}: {post.author?.username || ""}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditPost(String(post.id))}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeletePost(post.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="categories" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminData.allCategories")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {actionError && (
-                <p className="mb-4 text-sm text-destructive">{actionError}</p>
-              )}
-              {/* Add New Category */}
-              <div className="flex gap-4 mb-6">
-                <div className="flex-1">
-                  <Input
-                    placeholder={t("adminData.categoryName")}
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
+        <TabsContent value="overview">
+          <ul className="divide-y divide-border border-y border-border">
+            {ADMIN_LINKS.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  className="hover:bg-accent focus-visible:ring-ring/25 flex items-center gap-3 px-1 py-3 transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
+                >
+                  <link.icon
+                    className="text-muted-foreground size-4 shrink-0"
+                    aria-hidden="true"
                   />
-                </div>
-                <div className="flex-1">
-                  <Input
-                    placeholder={t("adminData.categoryDescription")}
-                    value={newCategoryDesc}
-                    onChange={(e) => setNewCategoryDesc(e.target.value)}
-                  />
-                </div>
-                <Button onClick={handleCreateCategory}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t("adminData.add")}
-                </Button>
-              </div>
-
-              {/* Category List */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {categories.map((category) => (
-                  <div
-                    key={category.id}
-                    className="p-4 border rounded-lg flex items-start justify-between gap-4"
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-medium">{category.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {category.description || t("common.noDescription")}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {t("adminData.postCount", {
-                          count: category.postCount ?? 0,
-                        })}
-                      </p>
-                    </div>
-                    <span
-                      title={
-                        (category.postCount ?? 0) > 0
-                          ? t("adminData.inUseHint")
-                          : t("adminData.deleteCategory")
-                      }
-                    >
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={(category.postCount ?? 0) > 0}
-                        onClick={() => handleDeleteCategory(category.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      {t(link.labelKey)}
                     </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    <span className="text-muted-foreground block truncate text-2xs">
+                      {t(link.descriptionKey)}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    className="text-muted-foreground/60 size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
         </TabsContent>
 
-        <TabsContent value="tags" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("adminData.allTags")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                {t("adminData.tagsHint")}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {tags.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">
-                    {t("adminData.noRecords")}
-                  </p>
-                ) : (
-                  tags.map((tag) => (
-                    <div
-                      key={tag.id}
-                      className="p-4 border rounded-lg flex items-start justify-between gap-4"
-                    >
-                      <div>
-                        <h3 className="font-medium">{tag.name}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {t("adminData.postCount", {
-                            count: tag.postCount ?? 0,
-                          })}
-                        </p>
-                      </div>
-                      <span
-                        title={
-                          (tag.postCount ?? 0) > 0
-                            ? t("adminData.inUseHint")
-                            : t("adminData.deleteTag")
-                        }
-                      >
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          disabled={(tag.postCount ?? 0) > 0}
-                          onClick={() => handleDeleteTag(tag.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
+        <TabsContent value="posts">
+          {renderPostTable(posts, t("adminData.recentPosts"))}
+        </TabsContent>
+
+        <TabsContent value="drafts">
+          {renderPostTable(draftPosts, t("adminData.draftPosts"))}
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          {actionError && (
+            <p className="text-destructive text-sm">{actionError}</p>
+          )}
+          <Card className="py-4">
+            <div className="flex flex-col gap-2 px-5 sm:flex-row">
+              <Input
+                placeholder={t("adminData.categoryName")}
+                aria-label={t("adminData.categoryName")}
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="sm:flex-1"
+              />
+              <Input
+                placeholder={t("adminData.categoryDescription")}
+                aria-label={t("adminData.categoryDescription")}
+                value={newCategoryDesc}
+                onChange={(e) => setNewCategoryDesc(e.target.value)}
+                className="sm:flex-1"
+              />
+              <Button onClick={handleCreateCategory}>
+                <Plus className="size-4" />
+                {t("adminData.add")}
+              </Button>
+            </div>
           </Card>
+
+          {categories.length === 0 ? (
+            <div className="border-t border-border">
+              <EmptyState title={t("adminData.noRecords")} />
+            </div>
+          ) : (
+            <div className="bg-card overflow-hidden rounded-md border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{t("adminData.categoryName")}</TableHead>
+                    <TableHead>{t("adminData.categoryDescription")}</TableHead>
+                    <TableHead className="w-28">
+                      {t("adminData.posts")}
+                    </TableHead>
+                    <TableHead className="w-20 text-right">
+                      <span className="sr-only">
+                        {t("adminData.deleteCategory")}
+                      </span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categories.map((category) => (
+                    <TableRow key={category.id}>
+                      <TableCell className="font-medium">
+                        {category.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-0">
+                        <span className="block truncate">
+                          {category.description || t("common.noDescription")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {category.postCount ?? 0}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={(category.postCount ?? 0) > 0}
+                            title={
+                              (category.postCount ?? 0) > 0
+                                ? t("adminData.inUseHint")
+                                : t("adminData.deleteCategory")
+                            }
+                            aria-label={t("adminData.deleteCategory")}
+                            onClick={() => handleDeleteCategory(category.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="tags" className="space-y-4">
+          <p className="text-muted-foreground text-xs">
+            {t("adminData.tagsHint")}
+          </p>
+          {tags.length === 0 ? (
+            <div className="border-t border-border">
+              <EmptyState title={t("adminData.noRecords")} />
+            </div>
+          ) : (
+            <div className="bg-card overflow-hidden rounded-md border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{t("adminData.tags")}</TableHead>
+                    <TableHead className="w-28">
+                      {t("adminData.posts")}
+                    </TableHead>
+                    <TableHead className="w-20 text-right">
+                      <span className="sr-only">
+                        {t("adminData.deleteTag")}
+                      </span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tags.map((tag) => (
+                    <TableRow key={tag.id}>
+                      <TableCell className="font-medium">{tag.name}</TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {tag.postCount ?? 0}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={(tag.postCount ?? 0) > 0}
+                            title={
+                              (tag.postCount ?? 0) > 0
+                                ? t("adminData.inUseHint")
+                                : t("adminData.deleteTag")
+                            }
+                            aria-label={t("adminData.deleteTag")}
+                            onClick={() => handleDeleteTag(tag.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

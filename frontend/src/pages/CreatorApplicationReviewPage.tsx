@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
+import { getLocale } from "@/lib/i18n";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/PageHeader";
+import { MetaList, MetaRow } from "@/components/MetaList";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -18,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Users, CheckCircle, XCircle, Clock } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 
 interface CreatorApplication {
   id?: number;
@@ -71,9 +76,15 @@ export function CreatorApplicationReviewPage() {
   // Show loading state while auth is loading
   if (isAuthLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <PageHeader title={t("creatorApplication.reviewTitle")} />
+        <div className="border-t border-border">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-3 border-b border-border py-5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -85,17 +96,13 @@ export function CreatorApplicationReviewPage() {
     (currentUser.role !== "admin" && currentUser.role !== "super_admin")
   ) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <h2 className="text-xl font-bold mb-4">
-              {t("common.accessDenied")}
-            </h2>
-            <p className="text-muted-foreground">
-              {t("common.insufficientPermissions")}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-lg">
+        <div className="rule-ink pb-3">
+          <h1 className="display text-title">{t("common.accessDenied")}</h1>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {t("common.insufficientPermissions")}
+        </p>
       </div>
     );
   }
@@ -148,29 +155,26 @@ export function CreatorApplicationReviewPage() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString(getLocale());
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
         return (
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+          <Badge variant="outline-warning">
             {t("creatorApplication.status.pending")}
           </Badge>
         );
       case "approved":
         return (
-          <Badge variant="default" className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3" />
+          <Badge variant="outline-success">
             {t("creatorApplication.status.approved")}
           </Badge>
         );
       case "rejected":
         return (
-          <Badge variant="destructive" className="flex items-center gap-1">
-            <XCircle className="w-3 h-3" />
+          <Badge variant="outline-destructive">
             {t("creatorApplication.status.rejected")}
           </Badge>
         );
@@ -181,24 +185,15 @@ export function CreatorApplicationReviewPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6" />
-            {t("creatorApplication.reviewTitle")}
-          </h1>
-        </div>
-        <div className="space-y-4">
+      <div className="space-y-6">
+        <PageHeader title={t("creatorApplication.reviewTitle")} />
+        <div className="border-t border-border">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-6 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-4 bg-muted rounded w-1/4"></div>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={i} className="space-y-3 border-b border-border py-5">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-3 w-64" />
+              <Skeleton className="h-3 w-2/5" />
+            </div>
           ))}
         </div>
       </div>
@@ -206,108 +201,95 @@ export function CreatorApplicationReviewPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="w-6 h-6" />
-          {t("creatorApplication.reviewTitle")}
-        </h1>
-        <div className="text-sm text-muted-foreground">
-          {t("creatorApplication.pendingCount", { count: applications.length })}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("creatorApplication.reviewTitle")}
+        description={t("creatorApplication.pendingCount", {
+          count: applications.length,
+        })}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("creatorApplication.pendingApplications")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {applications.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">
-                {t("creatorApplication.noPendingApplications")}
-              </h3>
-              <p className="text-muted-foreground">
-                {t("creatorApplication.noPendingApplicationsDesc")}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {applications.map((application) => (
-                <div
-                  key={application.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-primary font-medium">
-                          {(application.username || "").charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="font-medium">
-                          {application.username || "-"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {application.email || "-"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>
-                          {t("creatorApplication.currentRole")}:{" "}
-                          {t(`roles.${application.currentRole || "guest"}`)}
-                        </span>
-                        <span>
-                          {t("creatorApplication.appliedAt")}:{" "}
-                          {formatDate(
-                            application.createdAt || new Date().toISOString(),
-                          )}
-                        </span>
-                      </div>
-                      {application.reason && (
-                        <div className="text-sm">
-                          <span className="font-medium">
-                            {t("creatorApplication.reasonLabel")}:
-                          </span>
-                          <p className="text-muted-foreground mt-1">
-                            {application.reason}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
+      {/* The queue is a list of decisions to make, so it is set as one: a rule
+       * above it, a hairline between entries, and the applicant's own reason
+       * quoted on a rule. Each entry used to be a bordered box holding a
+       * circular monogram that repeated the first letter of the name beside
+       * it. */}
+      <section>
+        <h2 className="eyebrow">
+          {t("creatorApplication.pendingApplications")}
+        </h2>
+        {applications.length === 0 ? (
+          <EmptyState
+            icon={CheckCircle}
+            title={t("creatorApplication.noPendingApplications")}
+            description={t("creatorApplication.noPendingApplicationsDesc")}
+          />
+        ) : (
+          <ul className="divide-y divide-border">
+            {applications.map((application) => (
+              <li
+                key={application.id}
+                className="flex flex-col gap-4 py-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6"
+              >
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <h3 className="display text-subtitle">
+                      {application.username || "-"}
+                    </h3>
                     {getStatusBadge(application.status || "")}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => openApproveDialog(application)}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        {t("creatorApplication.approve")}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => openRejectDialog(application)}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        {t("creatorApplication.reject")}
-                      </Button>
-                    </div>
                   </div>
+                  <MetaList>
+                    <MetaRow label={t("creatorApplication.emailLabel")}>
+                      <span className="block truncate">
+                        {application.email || "-"}
+                      </span>
+                    </MetaRow>
+                    <MetaRow label={t("creatorApplication.currentRole")}>
+                      {t(`roles.${application.currentRole || "guest"}`)}
+                    </MetaRow>
+                    <MetaRow label={t("creatorApplication.appliedAt")}>
+                      <span className="tabular-nums">
+                        {formatDate(
+                          application.createdAt || new Date().toISOString(),
+                        )}
+                      </span>
+                    </MetaRow>
+                  </MetaList>
+                  {application.reason && (
+                    <div>
+                      <p className="eyebrow mb-1.5">
+                        {t("creatorApplication.reasonLabel")}
+                      </p>
+                      <p className="border-border border-l-2 pl-3 text-sm leading-relaxed text-muted-foreground">
+                        {application.reason}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+                <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => openApproveDialog(application)}
+                  >
+                    <CheckCircle />
+                    {t("creatorApplication.approve")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openRejectDialog(application)}
+                  >
+                    <XCircle />
+                    {t("creatorApplication.reject")}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Approve Confirmation Dialog */}
       <AlertDialog
@@ -356,10 +338,10 @@ export function CreatorApplicationReviewPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2">
-            <label htmlFor="rejectReason" className="text-sm font-medium">
+            <Label htmlFor="rejectReason">
               {t("creatorApplication.rejectReasonLabel")} (
               {t("common.optional")})
-            </label>
+            </Label>
             <Textarea
               id="rejectReason"
               placeholder={t("creatorApplication.rejectReasonPlaceholder")}
