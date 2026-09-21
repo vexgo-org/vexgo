@@ -5,7 +5,12 @@
   - [Installation](/guides/installation)
   - [Configuration](/guides/configuration)
   - [Deployment](/guides/deployment)
-  - [Theme Development](/guides/theme-development)
+- 🛠️ Local Development
+  - [Quick Develop](/local-development/quick-develop)
+  - [Backend](/local-development/backend)
+  - [Frontend](/local-development/frontend)
+  - [Theme Development](/local-development/theme-development)
+  - [Workflow](/local-development/workflow)
 - 🧠 Concepts
   - [Architecture](/concepts/architecture)
   - [Theming](/concepts/theming)
