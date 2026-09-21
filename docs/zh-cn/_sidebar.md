@@ -5,7 +5,12 @@
   - [安装](/zh-cn/guides/installation)
   - [配置](/zh-cn/guides/configuration)
   - [部署](/zh-cn/guides/deployment)
-  - [主题开发](/zh-cn/guides/theme-development)
+- 🛠️ 本地开发
+  - [快速开始](/zh-cn/local-development/quick-develop)
+  - [后端](/zh-cn/local-development/backend)
+  - [前端](/zh-cn/local-development/frontend)
+  - [主题开发](/zh-cn/local-development/theme-development)
+  - [通用工作流](/zh-cn/local-development/workflow)
 - 🧠 概念
   - [架构](/zh-cn/concepts/architecture)
   - [主题系统](/zh-cn/concepts/theming)

@@ -7,7 +7,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/vexgo-org/vexgo/build-and-test.yml?branch=main)](https://github.com/vexgo-org/vexgo/actions)
 [![Release](https://img.shields.io/github/v/release/vexgo-org/vexgo)](https://github.com/vexgo-org/vexgo/releases)
 
-This is the official VexGo documentation site. It is organized into four sections so you can find what you need quickly:
+This is the official VexGo documentation site. It is organized into five sections so you can find what you need quickly:
 
 ## 🚀 Getting Started
 
@@ -22,7 +22,16 @@ This is the official VexGo documentation site. It is organized into four section
 - [Installation](/guides/installation) — install VexGo with Docker, Docker Compose, Nix, a binary release, or from source.
 - [Configuration](/guides/configuration) — configure the server, database, SSO, S3 storage, and more.
 - [Deployment](/guides/deployment) — run VexGo in production behind a reverse proxy with HTTPS.
-- [Theme Development](/guides/theme-development) — write, package, and install a custom theme.
+
+## 🛠️ Local Development
+
+**Tutorial + How-to** — go from zero to a running local stack, then look up the daily loops.
+
+- [Quick Develop](/local-development/quick-develop) — first run in about 10 minutes: backend, admin SPA, and default theme.
+- [Backend](/local-development/backend) — run, configure, and extend the Go backend.
+- [Frontend](/local-development/frontend) — run, change, and rebuild the admin SPA.
+- [Theme Development](/local-development/theme-development) — write, package, and install a custom theme.
+- [Workflow](/local-development/workflow) — format/lint/test gates, API codegen, and troubleshooting.
 
 ## 🧠 Concepts
 

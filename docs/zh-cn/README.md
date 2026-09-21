@@ -7,7 +7,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/vexgo-org/vexgo/build-and-test.yml?branch=main)](https://github.com/vexgo-org/vexgo/actions)
 [![Release](https://img.shields.io/github/v/release/vexgo-org/vexgo)](https://github.com/vexgo-org/vexgo/releases)
 
-这里是 VexGo 的官方文档站，内容按四个板块组织，方便你快速找到所需信息：
+这里是 VexGo 的官方文档站，内容按五个板块组织，方便你快速找到所需信息：
 
 ## 🚀 快速开始
 
@@ -22,7 +22,16 @@
 - [安装](/zh-cn/guides/installation) —— 通过 Docker、Docker Compose、Nix、二进制包或源码编译安装 VexGo。
 - [配置](/zh-cn/guides/configuration) —— 配置服务器、数据库、SSO、S3 存储等。
 - [部署](/zh-cn/guides/deployment) —— 在生产环境通过反向代理 + HTTPS 运行 VexGo。
-- [主题开发](/zh-cn/guides/theme-development) —— 编写、打包并安装自定义主题。
+
+## 🛠️ 本地开发
+
+**教程 + 操作指南** —— 从零跑通本地完整环境，再按日常循环查阅。
+
+- [快速开始](/zh-cn/local-development/quick-develop) —— 约 10 分钟第一次跑通：后端、管理后台与默认主题。
+- [后端](/zh-cn/local-development/backend) —— 运行、配置与扩展 Go 后端。
+- [前端](/zh-cn/local-development/frontend) —— 运行、修改与重建管理后台 SPA。
+- [主题开发](/zh-cn/local-development/theme-development) —— 编写、打包并安装自定义主题。
+- [通用工作流](/zh-cn/local-development/workflow) —— format/lint/test 门禁、API 代码生成与排错。
 
 ## 🧠 概念
 
