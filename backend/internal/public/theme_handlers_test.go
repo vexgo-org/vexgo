@@ -193,6 +193,37 @@ func TestPublicRoutes_DraftHiddenAndMissing404(t *testing.T) {
 	}
 }
 
+// TestPublicRoutes_PostIncrementsViewCount locks the SSR detail path to
+// counting its own reads: two page loads must raise the stored view count by
+// two. The SSR handler previously never incremented, so theme reads were
+// invisible in view counts.
+func TestPublicRoutes_PostIncrementsViewCount(t *testing.T) {
+	r, _, db := newPublicRouter(t)
+
+	viewCount := func() int {
+		t.Helper()
+		var post model.Post
+		if err := db.Where("slug = ?", "hello-world").First(&post).Error; err != nil {
+			t.Fatalf("reload post: %v", err)
+		}
+		return post.ViewCount
+	}
+
+	if got := viewCount(); got != 0 {
+		t.Fatalf("seeded ViewCount = %d, want 0", got)
+	}
+
+	for want := 1; want <= 2; want++ {
+		w := doPublicRequest(t, r, "/post/hello-world")
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET /post/hello-world status = %d, body: %s", w.Code, w.Body.String())
+		}
+		if got := viewCount(); got != want {
+			t.Fatalf("after %d load(s) ViewCount = %d, want %d", want, got, want)
+		}
+	}
+}
+
 func TestPublicRoutes_UserPage(t *testing.T) {
 	r, _, _ := newPublicRouter(t)
 	w := doPublicRequest(t, r, "/user/1")

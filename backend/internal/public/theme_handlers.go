@@ -192,6 +192,19 @@ func (r *Renderer) handlePost(c *gin.Context) {
 		return
 	}
 
+	// Record the view (best-effort): unlike the API detail endpoint, the SSR
+	// page previously never incremented the counter, so theme reads were
+	// invisible in view counts. The rendered number includes the current
+	// visit on success.
+	if err := r.db.WithContext(c.Request.Context()).
+		Model(&model.Post{}).
+		Where("id = ?", post.ID).
+		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error; err != nil {
+		slog.Warn("failed to increment post view count", "postID", post.ID, "err", err)
+	} else {
+		post.ViewCount++
+	}
+
 	commentCounts := r.countCommentsBatch(c.Request.Context(), []uint{post.ID})
 	likeCounts := r.countLikesBatch(c.Request.Context(), []uint{post.ID})
 

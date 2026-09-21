@@ -70,20 +70,23 @@ func filterAuthorsForViewer(posts []model.Post, viewerID uint, viewerRole string
 	}
 }
 
-// Get returns a single post by numeric ID with privacy filtering, view-count
-// increment and like/comment counts. Used by internal operations (edit,
-// delete, likes, moderation).
+// Get returns a single post by numeric ID with privacy filtering and
+// like/comment counts. It serves internal operations (edit, delete, likes,
+// moderation, notification link resolution), which are not reads: unlike
+// GetBySlug it must leave the view count untouched, otherwise every edit or
+// review would inflate it.
 func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("post load: %w", err)
 	}
 
-	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
+	return s.enrichPost(ctx, post, currentUserRole, currentUserID, false)
 }
 
 // GetBySlug returns a single post by slug with privacy filtering, view-count
-// increment and like/comment counts. Used by the public read route.
+// increment and like/comment counts. Used by the public read route: every
+// call counts as one view.
 func (s *Service) GetBySlug(ctx context.Context, slug, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	post, err := s.repo.FindBySlug(ctx, slug)
 	if err != nil {
@@ -93,7 +96,7 @@ func (s *Service) GetBySlug(ctx context.Context, slug, currentUserRole string, c
 		return nil, fmt.Errorf("find post by slug: %w", err)
 	}
 
-	return s.enrichPost(ctx, post, currentUserRole, currentUserID)
+	return s.enrichPost(ctx, post, currentUserRole, currentUserID, true)
 }
 
 // canViewPost reports whether the acting user may read this post. Admins see
@@ -112,8 +115,16 @@ func canViewPost(post *model.Post, role string, userID uint) bool {
 }
 
 // enrichPost fills like/comment counts, view count and privacy filtering on a
-// post that was just loaded from the database.
-func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserRole string, currentUserID uint) (*model.Post, error) {
+// post that was just loaded from the database. When countView is true the
+// visit is recorded in the view count (public reads); internal operations
+// pass false so editing or reviewing never inflates it.
+func (s *Service) enrichPost(
+	ctx context.Context,
+	post *model.Post,
+	currentUserRole string,
+	currentUserID uint,
+	countView bool,
+) (*model.Post, error) {
 	// If not logged in and guest viewing is not allowed, return 403
 	if currentUserRole == "" && !s.allowGuestView(ctx) {
 		return nil, ErrGuestViewDenied
@@ -127,9 +138,16 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 
 	filterAuthorForViewer(post, currentUserID, currentUserRole)
 
-	// Increment view count (best-effort)
-	if err := s.repo.IncrementViewCount(ctx, post.ID); err != nil {
-		slog.Warn("failed to increment view count", "err", err)
+	// Increment view count (best-effort) for public reads only. The in-memory
+	// copy is bumped on success so the response includes the current visit:
+	// without it the API would always report the pre-increment value,
+	// lagging the database by one on every read.
+	if countView {
+		if err := s.repo.IncrementViewCount(ctx, post.ID); err != nil {
+			slog.Warn("failed to increment view count", "postID", post.ID, "err", err)
+		} else {
+			post.ViewCount++
+		}
 	}
 
 	// Fill likes count and current logged-in user's like status. Counts are
@@ -142,7 +160,14 @@ func (s *Service) enrichPost(ctx context.Context, post *model.Post, currentUserR
 	post.LikesCount = int(count)
 	post.IsLiked = false
 	if currentUserID != 0 {
-		if _, err := s.repo.FindLike(ctx, post.ID, currentUserID); err == nil {
+		if _, err := s.repo.FindLike(ctx, post.ID, currentUserID); err != nil {
+			// Absence of a like is the normal case; only unexpected
+			// failures are worth logging, otherwise a database outage
+			// would silently report every post as unliked.
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				slog.Warn("failed to load like status", "postID", post.ID, "userID", currentUserID, "err", err)
+			}
+		} else {
 			post.IsLiked = true
 		}
 	}
