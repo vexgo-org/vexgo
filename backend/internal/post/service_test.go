@@ -886,6 +886,87 @@ func TestFindBySlug_UnknownSlug(t *testing.T) {
 	}
 }
 
+// TestGetBySlug_IncludesCurrentVisitInViewCount guards the off-by-one that
+// made the API report the pre-increment count: the returned post and the
+// database row must both reflect the visit that just happened.
+func TestGetBySlug_IncludesCurrentVisitInViewCount(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "tester", model.RoleAuthor)
+	db.Create(&model.Post{
+		Slug:      "counted",
+		Title:     "Counted",
+		Content:   "body",
+		Category:  "1",
+		AuthorID:  user.ID,
+		Status:    model.PostStatusPublished,
+		ViewCount: 5,
+	})
+
+	post, err := svc.GetBySlug(ctx, "counted", "", 0)
+	if err != nil {
+		t.Fatalf("GetBySlug error: %v", err)
+	}
+	if post.ViewCount != 6 {
+		t.Errorf("first read ViewCount = %d, want 6", post.ViewCount)
+	}
+
+	post, err = svc.GetBySlug(ctx, "counted", "", 0)
+	if err != nil {
+		t.Fatalf("GetBySlug error: %v", err)
+	}
+	if post.ViewCount != 7 {
+		t.Errorf("second read ViewCount = %d, want 7", post.ViewCount)
+	}
+
+	var stored model.Post
+	if err := db.Where("slug = ?", "counted").First(&stored).Error; err != nil {
+		t.Fatalf("reload post: %v", err)
+	}
+	if stored.ViewCount != 7 {
+		t.Errorf("stored ViewCount = %d, want 7", stored.ViewCount)
+	}
+}
+
+// TestGet_DoesNotIncrementViewCount locks internal by-ID reads (edit page,
+// moderation, notification resolution) to leaving the view count alone:
+// opening a post to work on it is not a read.
+func TestGet_DoesNotIncrementViewCount(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "tester", model.RoleAuthor)
+	db.Create(&model.Post{
+		Slug:      "internal",
+		Title:     "Internal",
+		Content:   "body",
+		Category:  "1",
+		AuthorID:  user.ID,
+		Status:    model.PostStatusPublished,
+		ViewCount: 5,
+	})
+
+	var id model.Post
+	if err := db.Where("slug = ?", "internal").First(&id).Error; err != nil {
+		t.Fatalf("reload post: %v", err)
+	}
+
+	post, err := svc.Get(ctx, strconv.Itoa(int(id.ID)), user.Role, user.ID)
+	if err != nil {
+		t.Fatalf("Get error: %v", err)
+	}
+	if post.ViewCount != 5 {
+		t.Errorf("Get ViewCount = %d, want 5 (unchanged)", post.ViewCount)
+	}
+
+	var stored model.Post
+	if err := db.Where("slug = ?", "internal").First(&stored).Error; err != nil {
+		t.Fatalf("reload post: %v", err)
+	}
+	if stored.ViewCount != 5 {
+		t.Errorf("stored ViewCount = %d, want 5 (unchanged)", stored.ViewCount)
+	}
+}
+
 // TestSlugValidation exercises model.ValidateSlug directly for both valid and
 // invalid inputs: empty, long, uppercase, various syntax violations, and
 // numeric-only slugs.  The service layer normalizes before calling
