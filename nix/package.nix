@@ -53,6 +53,9 @@ buildGoModule {
     "-w"
     "-X main.Version=${version}"
   ];
+  # Drop gin's MessagePack binding and its ugorji/go codec dependency, which
+  # VexGo never uses (~6 MB smaller binary).
+  tags = [ "nomsgpack" ];
   preBuild = ''
     mkdir -p backend/public/dist
     cp -r ${vexgoFrontend}/. backend/public/dist/
