@@ -1,8 +1,13 @@
 /**
  * Languages offered by the fenced-code language selector.
  *
- * Highlighting itself is resolved by `@codemirror/language-data`, so this list
- * only controls what the dropdown offers. `""` means "plain text".
+ * The dropdown is backed by `languageDescriptions.ts`, which registers the
+ * highlighters for exactly these languages — only what is listed here ships a
+ * parser. The two lists must be kept in step: a value with no descriptor in
+ * that module still appears in the dropdown but never highlights, and a
+ * descriptor with no value here ships a chunk nothing can reach.
+ *
+ * `""` means "plain text".
  */
 export const CODE_LANGUAGES: ReadonlyArray<{ value: string; label: string }> = [
   { value: "js", label: "JavaScript" },

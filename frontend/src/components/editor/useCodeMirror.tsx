@@ -26,9 +26,9 @@ import {
 } from "@codemirror/autocomplete";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { languages } from "@codemirror/language-data";
 import type { SyntaxNode } from "@lezer/common";
 
+import { CODE_LANGUAGE_DESCRIPTIONS } from "./languageDescriptions";
 import type { EditorSnapshot, EditorMode } from "./types";
 import { editorCallbacks, type EditorCallbacks } from "./extensions/config";
 import { createEditorTheme, markdownHighlight } from "./extensions/theme";
@@ -267,7 +267,10 @@ export function useCodeMirror({
         extensions: [
           themeCompartment.of(createEditorTheme(start.dark)),
           callbacksCompartment.of(editorCallbacks.of(start.callbacks)),
-          markdown({ base: markdownLanguage, codeLanguages: languages }),
+          markdown({
+            base: markdownLanguage,
+            codeLanguages: CODE_LANGUAGE_DESCRIPTIONS,
+          }),
           syntaxHighlighting(markdownHighlight),
           history(),
           drawSelection(),
