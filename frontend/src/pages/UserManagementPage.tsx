@@ -130,10 +130,12 @@ export function UserManagementPage() {
       );
       toast.success(response.message);
 
-      // Update the local user list
+      // Update the local user list. The handler is called with `String(user.id)`
+      // while `user.id` may be a number, so compare stringified ids — same fix
+      // as in handleDeleteUser.
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
-          user.id === userId
+          String(user.id) === userId
             ? {
                 ...user,
                 role: newRole as
