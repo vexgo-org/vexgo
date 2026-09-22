@@ -682,6 +682,7 @@ export const enUS = {
     // Console navigation: group headings first, then the leaf labels.
     navOverview: "Overview",
     navContent: "Content",
+    navAllPosts: "All posts",
     // Distinct from navPosts/navComments: the moderation queue and the
     // comment settings screen are different destinations, so they cannot
     // share a label or the rail shows two identical entries.
@@ -818,6 +819,22 @@ export const enUS = {
       "This action cannot be undone. The article and all its comments will be permanently deleted.",
     cancel: "Cancel",
     delete: "Delete",
+  },
+
+  // All Posts Page
+  allPostsPage: {
+    title: "All posts",
+    description: "Every published post on the site, newest first.",
+    writePost: "Write Post",
+    searchPlaceholder: "Search title or content...",
+    allCategories: "All categories",
+    category: "Category",
+    views: "Views",
+    uncategorized: "Uncategorized",
+    noPosts: "No posts yet",
+    noPostsDesc:
+      "Nothing matches the current filters — try a different search or category.",
+    loadFailed: "Failed to load posts",
   },
 
   // Post Detail Page Extended

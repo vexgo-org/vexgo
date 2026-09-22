@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  Newspaper,
   Palette,
   PenLine,
   Settings2,
@@ -78,6 +79,11 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: "layout.navContent",
     adminOnly: true,
     items: [
+      {
+        to: "/admin/posts",
+        labelKey: "layout.navAllPosts",
+        icon: Newspaper,
+      },
       {
         to: "/admin/pages",
         labelKey: "layout.pages",

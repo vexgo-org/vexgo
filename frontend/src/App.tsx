@@ -32,6 +32,9 @@ const ProfilePage = lazy(() =>
 const MyPostsPage = lazy(() =>
   import("@/pages/MyPostsPage").then((m) => ({ default: m.MyPostsPage })),
 );
+const AllPostsPage = lazy(() =>
+  import("@/pages/AllPostsPage").then((m) => ({ default: m.AllPostsPage })),
+);
 const AdminPage = lazy(() =>
   import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
@@ -251,6 +254,14 @@ function App() {
                   element={
                     <ProtectedRoute requireAdmin>
                       <CreatorApplicationReviewPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/posts"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AllPostsPage />
                     </ProtectedRoute>
                   }
                 />
