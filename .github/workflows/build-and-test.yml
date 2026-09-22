@@ -34,8 +34,9 @@ jobs:
       - name: Build default theme
         run: bash scripts/fetch-default-theme.sh --force
 
+      # Build and test with the same tags as the release build (see justfile).
       - name: Build backend
-        run: go build -v ./backend/cmd/vexgo
+        run: go build -v -tags nomsgpack ./backend/cmd/vexgo
 
       - name: Test backend
-        run: go test -v -race -count=1 ./...
+        run: go test -v -race -count=1 -tags nomsgpack ./...

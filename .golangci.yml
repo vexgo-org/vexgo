@@ -2,6 +2,11 @@
 # Uses the standard linter set: errcheck, govet, ineffassign, staticcheck, unused.
 version: "2"
 
+run:
+  # Analyze the same build configuration that ships (see justfile go_tags).
+  build-tags:
+    - nomsgpack
+
 linters:
   settings:
     errcheck:

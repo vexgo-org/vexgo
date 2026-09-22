@@ -1,5 +1,11 @@
 set shell := ["bash", "-O", "globstar", "-c"]
 
+# The nomsgpack tag drops gin's MessagePack binding and its ugorji/go codec
+# dependency, which VexGo never uses, for a ~6 MB (~12%) smaller binary.
+# Every Go recipe carries it so dev runs, tests and release artifacts are
+# compiled identically.
+go_tags := "-tags nomsgpack"
+
 format:
     # Run formatter.
     gofumpt -w -extra .
@@ -20,21 +26,21 @@ lint:
 test:
     # Run tests.
     just ensure-dist
-    go test -v ./...
+    go test {{go_tags}} -v ./...
 
 run *args:
     # Run VexGo.
-    go run backend/cmd/vexgo/main.go {{args}}
+    go run {{go_tags}} backend/cmd/vexgo/main.go {{args}}
 
 server:
     # Start VexGo server.
     just ensure-dist
-    go run backend/cmd/vexgo/main.go server
+    go run {{go_tags}} backend/cmd/vexgo/main.go server
 
 theme path:
     # Start VexGo server with a theme directory.
     just ensure-dist
-    go run backend/cmd/vexgo/main.go dev --theme-dir {{path}}
+    go run {{go_tags}} backend/cmd/vexgo/main.go dev --theme-dir {{path}}
 
 build:
     # Build VexGo.
@@ -53,7 +59,7 @@ build-theme:
 build-backend:
     # Build backend.
     just ensure-dist
-    go build backend/cmd/vexgo/main.go
+    go build -trimpath {{go_tags}} backend/cmd/vexgo/main.go
 
 @ensure-dist:
     # Ensure the embedded frontend builds exist (go:embed requires them).
