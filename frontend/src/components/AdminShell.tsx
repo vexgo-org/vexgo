@@ -21,6 +21,7 @@ import { useIsDark } from "@/hooks/useIsDark";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSiteBrand } from "@/hooks/useSiteSettings";
 import { useTheme } from "@/hooks/useTheme";
+import type { Locale } from "@/lib/i18n";
 import { useTranslation } from "@/lib/I18nContext";
 import { visibleNavGroups, type NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -258,7 +259,7 @@ function LanguageMenu() {
 
   // Language names stay in their own language, the way pickers are expected to
   // behave — an English-only reader must still recognise "简体中文".
-  const options = [
+  const options: ReadonlyArray<{ value: Locale; label: string }> = [
     { value: "zh-CN", label: "简体中文" },
     { value: "en-US", label: "English" },
   ];
@@ -278,7 +279,9 @@ function LanguageMenu() {
         {options.map((option) => (
           <DropdownMenuItem
             key={option.value}
-            onClick={() => setLocale(option.value)}
+            onClick={() => {
+              void setLocale(option.value);
+            }}
           >
             <span className="flex-1">{option.label}</span>
             {locale === option.value && (
