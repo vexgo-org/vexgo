@@ -650,6 +650,7 @@ export const zhCN = {
     // 后台导航：先分组标题，再叶子菜单
     navOverview: "概览",
     navContent: "内容",
+    navAllPosts: "全部文章",
     // 与 navPosts/navComments 区分：审核队列与评论设置是两个目的地，
     // 若共用同一个标签，导航栏会出现两条同名菜单。
     navPosts: "内容审核",
@@ -783,6 +784,21 @@ export const zhCN = {
     cannotUndo: "此操作不可撤销，文章及其所有评论将被永久删除。",
     cancel: "取消",
     delete: "删除",
+  },
+
+  // 全部文章页面
+  allPostsPage: {
+    title: "全部文章",
+    description: "站点上所有已发布的文章，按发布时间倒序排列。",
+    writePost: "写文章",
+    searchPlaceholder: "搜索标题或正文...",
+    allCategories: "所有分类",
+    category: "分类",
+    views: "阅读量",
+    uncategorized: "未分类",
+    noPosts: "暂无文章",
+    noPostsDesc: "当前筛选条件下没有找到文章，试试调整搜索或分类。",
+    loadFailed: "加载文章失败",
   },
 
   // 文章详情页面扩展
