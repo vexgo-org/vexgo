@@ -5,11 +5,20 @@ import { defineConfig } from "vite";
 import { inspectAttr } from "kimi-plugin-inspect-react";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   // The admin SPA lives entirely under /admin/; public pages are served by
   // the active theme (vexgo-default-theme build) so the SPA must not claim root.
   base: "/admin/",
-  plugins: [tailwindcss(), inspectAttr(), react()],
+  plugins: [
+    tailwindcss(),
+    // inspectAttr tags every JSX element with a `code-path` attribute so the
+    // browser inspector can jump from a DOM node back to its source. It is a
+    // development aid: in a production build those attributes are dead weight
+    // in the bundle and visible in every visitor's DOM, and the Babel pass
+    // that adds them is pure build overhead.
+    ...(command === "serve" ? [inspectAttr()] : []),
+    react(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -28,16 +37,14 @@ export default defineConfig({
         manualChunks: {
           // Bundle React-related libraries separately
           "react-vendor": ["react", "react-dom", "react-router-dom"],
-          // Bundle the unstyled component primitives separately
-          "ui-vendor": [
-            "@base-ui/react",
-            "sonner",
-            "clsx",
-            "tailwind-merge",
-            "lucide-react",
-          ],
-          // Bundle state-management and utility libraries separately
+          // Bundle the API client separately
           "utils-vendor": ["axios"],
+          // Deliberately no chunk for @base-ui/react, lucide-react, sonner and
+          // tailwind-merge. Naming a package here makes the whole package part of
+          // the entry's static graph, so the UI primitives only the shell reached
+          // were joined by the ones used exclusively by lazy routes — 50 kB of
+          // code an admin login never runs. Left unnamed, Rollup keeps each
+          // module in the chunk that actually imports it.
         },
       },
     },
@@ -49,4 +56,4 @@ export default defineConfig({
     // would select the wrong files.
     manifest: true,
   },
-});
+}));

@@ -1,10 +1,21 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import type { ReactNode } from "react";
-import { setLocale as setLocaleUtil, getLocale, t as translate } from "./i18n";
+import {
+  getLocale,
+  isLocale,
+  loadLocale,
+  setLocale as setLocaleUtil,
+  t as translate,
+  type Locale,
+} from "./i18n";
 
 interface I18nContextType {
-  locale: string;
-  setLocale: (locale: string) => void;
+  locale: Locale;
+  /**
+   * Switches locale, fetching the message pack first so labels never render as
+   * raw keys. Returns a promise the caller may ignore from a click handler.
+   */
+  setLocale: (locale: Locale) => Promise<void>;
   t: (key: string, params?: Record<string, unknown>) => string;
 }
 
@@ -15,22 +26,17 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ children }: I18nProviderProps) {
-  const [locale, setLocaleState] = useState(() => {
-    // Read from localStorage on init
+  // The entry point loads and applies the starting locale before the first
+  // render, so this only reads back the choice it already made.
+  const [locale, setLocaleState] = useState<Locale>(() => {
     const savedLocale = localStorage.getItem("locale");
-    if (savedLocale === "zh-CN" || savedLocale === "en-US") {
-      return savedLocale;
-    }
-    return getLocale();
+    return isLocale(savedLocale) ? savedLocale : getLocale();
   });
 
-  const setLocale = useCallback((newLocale: string) => {
-    if (newLocale === "zh-CN" || newLocale === "en-US") {
-      setLocaleState(newLocale);
-      setLocaleUtil(newLocale);
-      // Save to localStorage
-      localStorage.setItem("locale", newLocale);
-    }
+  const setLocale = useCallback(async (newLocale: Locale) => {
+    await loadLocale(newLocale);
+    setLocaleUtil(newLocale);
+    setLocaleState(newLocale);
   }, []);
 
   const t = useCallback(
