@@ -37,16 +37,14 @@ export default defineConfig(({ command }) => ({
         manualChunks: {
           // Bundle React-related libraries separately
           "react-vendor": ["react", "react-dom", "react-router-dom"],
-          // Bundle the unstyled component primitives separately
-          "ui-vendor": [
-            "@base-ui/react",
-            "sonner",
-            "clsx",
-            "tailwind-merge",
-            "lucide-react",
-          ],
-          // Bundle state-management and utility libraries separately
+          // Bundle the API client separately
           "utils-vendor": ["axios"],
+          // Deliberately no chunk for @base-ui/react, lucide-react, sonner and
+          // tailwind-merge. Naming a package here makes the whole package part of
+          // the entry's static graph, so the UI primitives only the shell reached
+          // were joined by the ones used exclusively by lazy routes — 50 kB of
+          // code an admin login never runs. Left unnamed, Rollup keeps each
+          // module in the chunk that actually imports it.
         },
       },
     },
