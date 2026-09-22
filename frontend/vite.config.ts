@@ -5,11 +5,20 @@ import { defineConfig } from "vite";
 import { inspectAttr } from "kimi-plugin-inspect-react";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   // The admin SPA lives entirely under /admin/; public pages are served by
   // the active theme (vexgo-default-theme build) so the SPA must not claim root.
   base: "/admin/",
-  plugins: [tailwindcss(), inspectAttr(), react()],
+  plugins: [
+    tailwindcss(),
+    // inspectAttr tags every JSX element with a `code-path` attribute so the
+    // browser inspector can jump from a DOM node back to its source. It is a
+    // development aid: in a production build those attributes are dead weight
+    // in the bundle and visible in every visitor's DOM, and the Babel pass
+    // that adds them is pure build overhead.
+    ...(command === "serve" ? [inspectAttr()] : []),
+    react(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -49,4 +58,4 @@ export default defineConfig({
     // would select the wrong files.
     manifest: true,
   },
-});
+}));
