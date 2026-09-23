@@ -20,9 +20,9 @@ import (
 )
 
 // TestGenerateFilename_LimitsExtensionToAllowlist ensures the client-supplied
-// extension survives only when it is an allowlisted (non-executable) media
-// type; anything else — separators, HTML/SVG documents, colons, overlong
-// tails — yields a bare UUID name served as application/octet-stream.
+// extension survives only when it is an allowlisted media type; anything else —
+// separators, HTML documents, colons, overlong tails — yields a bare UUID name
+// served as application/octet-stream.
 func TestGenerateFilename_LimitsExtensionToAllowlist(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -37,7 +37,8 @@ func TestGenerateFilename_LimitsExtensionToAllowlist(t *testing.T) {
 		{"dot only", "x.", ""},
 		{"html stripped", "evil.html", ""},
 		{"htm stripped", "evil.htm", ""},
-		{"svg stripped", "evil.svg", ""},
+		{"svg kept", "icon.svg", ".svg"},
+		{"uppercase svg normalized", "ICON.SVG", ".svg"},
 		{"xhtml stripped", "evil.xhtml", ""},
 		{"js stripped", "evil.js", ""},
 		{"html injection", "x.<script>", ""},

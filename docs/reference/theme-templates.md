@@ -277,13 +277,15 @@ Everything after the frontmatter is the Markdown body. Slugs must match `^[a-z0-
 
 ## Asset URLs
 
-| Disk path             | URL                                                         |
-| --------------------- | ----------------------------------------------------------- |
-| `assets/style.css`    | `/theme-assets/style.css`                                   |
-| `assets/images/a.png` | `/theme-assets/images/a.png`                                |
-| `favicon.ico`         | `/favicon.ico` (after the site icon and `data/favicon.ico`) |
+| Disk path             | URL                                             |
+| --------------------- | ----------------------------------------------- |
+| `assets/style.css`    | `/theme-assets/style.css`                       |
+| `assets/images/a.png` | `/theme-assets/images/a.png`                    |
+| `favicon.ico`         | `/favicon.ico` (4th of four sources, see below) |
 
 `/theme-assets/*` is resolved against the **active** theme, so templates never contain a theme id. The `assets/` segment is added by the server and must not appear in the URL.
+
+`/favicon.ico` is a single URL the tab icon reads, resolved once by the server in this order: the configured site icon, `data/favicon.ico`, the active theme's `favicon.ico`, then the glyph bundled with the admin console. A theme that ships no icon therefore still gets one, and uploading a site icon changes the public pages and the console together. Note that a theme's favicon sits at the **theme root**, not in `assets/`.
 
 ## Comment widget contract
 
