@@ -4,21 +4,24 @@
   stdenv,
   bun,
   fetchFromGitHub,
-  makeWrapper,
-  version ? "0.5.0",
+  version ? "0.9.0",
+  themeVersion ? "0.1.0",
 }:
 let
   src = fetchFromGitHub {
     owner = "vexgo-org";
     repo = "vexgo";
     rev = "v${version}";
-    hash = "sha256-4V1f6g/rnVVmvoqE5bL7V/1uiu0T+aLvf/Xgm04ylyg=";
+    hash = "sha256-o7I1vhTmGKav7J/PfB9Hj3Q2xbX1ggqFwz9OI9YRmWs=";
   };
 
-  # The frontend is built with `bun install --frozen-lockfile` at build time,
-  # which requires network access during the build (the Nix sandbox must allow
-  # it, e.g. `sandbox = false` on non-NixOS). This matches how the Docker
-  # image and CI build the frontend.
+  # Both front ends are built with `bun install --frozen-lockfile` at build
+  # time, which requires network access during the build (the Nix sandbox must
+  # allow it, e.g. `sandbox = false` on non-NixOS). This matches how the Docker
+  # image and CI build them.
+  #
+  # The admin SPA, built into backend/internal/public/dist and embedded with
+  # //go:embed dist/**/*.
   vexgoFrontend = stdenv.mkDerivation {
     pname = "vexgo-frontend";
     inherit version src;
@@ -29,7 +32,7 @@ let
     buildPhase = ''
       runHook preBuild
       chmod -R u+w $NIX_BUILD_TOP/source/backend
-      mkdir -p $NIX_BUILD_TOP/source/backend/public/dist
+      mkdir -p $NIX_BUILD_TOP/source/backend/internal/public/dist
       bun install --frozen-lockfile
       bun run build
       runHook postBuild
@@ -37,7 +40,37 @@ let
 
     installPhase = ''
       runHook preInstall
-      cp -r $NIX_BUILD_TOP/source/backend/public/dist $out
+      cp -r $NIX_BUILD_TOP/source/backend/internal/public/dist $out
+      runHook postInstall
+    '';
+  };
+
+  # The built-in public theme lives in its own repository
+  # (https://github.com/vexgo-org/vexgo-default-theme) and is built into
+  # backend/internal/public/default-theme, which the backend embeds with
+  # //go:embed default-theme.
+  vexgoDefaultTheme = stdenv.mkDerivation {
+    pname = "vexgo-default-theme";
+    version = themeVersion;
+    src = fetchFromGitHub {
+      owner = "vexgo-org";
+      repo = "vexgo-default-theme";
+      rev = "v${themeVersion}";
+      hash = "sha256-f3fsYtg/fofWx8oXHgeaYX6HiDYh/PL03HUQtIfsHsY=";
+    };
+
+    nativeBuildInputs = [ bun ];
+
+    buildPhase = ''
+      runHook preBuild
+      bun install --frozen-lockfile
+      bun run build
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+      cp -r dist $out
       runHook postInstall
     '';
   };
@@ -46,7 +79,7 @@ buildGoModule {
   pname = "vexgo";
   inherit version src;
 
-  vendorHash = "sha256-Ea+Zh21mkmjv2jmAHwiqxa4/bLWMLwcgzU2Tz3gvUIA=";
+  vendorHash = "sha256-cszhKB9IkSkG3CJjO/mPpsNmMIvmJhCFHIIZB/oOAt4=";
 
   ldflags = [
     "-s"
@@ -56,14 +89,12 @@ buildGoModule {
   # Drop gin's MessagePack binding and its ugorji/go codec dependency, which
   # VexGo never uses (~6 MB smaller binary).
   tags = [ "nomsgpack" ];
+  subPackages = [ "backend/cmd/vexgo" ];
   preBuild = ''
-    mkdir -p backend/public/dist
-    cp -r ${vexgoFrontend}/. backend/public/dist/
+    mkdir -p backend/internal/public/dist
+    cp -r ${vexgoFrontend}/. backend/internal/public/dist/
+    cp -r ${vexgoDefaultTheme}/. backend/internal/public/default-theme/
   '';
-  postInstall = ''
-    mv $out/bin/backend $out/bin/vexgo
-  '';
-  nativeBuildInputs = [ makeWrapper ];
 
   meta = with lib; {
     description = "A blog CMS built on React, Go, Gin, JWT, and SQLite";
@@ -71,6 +102,6 @@ buildGoModule {
     license = licenses.agpl3Only;
     mainProgram = "vexgo";
     platforms = platforms.linux ++ platforms.darwin;
-    maintainers = [ antipeth ];
+    maintainers = [ atp-gh ];
   };
 }
