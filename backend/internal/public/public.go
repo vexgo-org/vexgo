@@ -6,6 +6,7 @@ package public
 import (
 	"embed"
 	"encoding/json"
+	"io"
 	"io/fs"
 	"log/slog"
 	"mime"
@@ -58,6 +59,11 @@ const (
 	FaviconFile   = "favicon.ico"
 	DefaultTheme  = "default"
 	ThemeMetaFile = "vexgo-theme.json"
+
+	// DefaultFaviconAsset is the admin SPA's bundled glyph, relative to the
+	// embedded dist/ directory. A site that configured no icon falls back to
+	// it so the public pages show the same mark as the console.
+	DefaultFaviconAsset = "assets/vexgo-dark.ico"
 
 	// DevTheme is the id used when a local theme directory is injected via
 	// SetThemeDir (the `vexgo dev --theme-dir` workflow). It is not a real
@@ -267,13 +273,16 @@ func (r *Renderer) getRequestedTheme(c *gin.Context) string {
 }
 
 // uploadContentTypes maps stored-media extensions to the content type served
-// for them. It never maps to a type a browser executes as a document
-// (html/svg/xml/js are absent), and any unlisted extension falls back to
+// for them. It never maps to a type a browser executes as a script
+// (html/xhtml/xml/js are absent), and any unlisted extension falls back to
 // application/octet-stream. Because the type is set explicitly before
 // http.ServeContent runs, the file server never sniffs the bytes, so an
 // uploaded file cannot be rendered as a document on this origin. The upload
 // domain keeps its own filename allowlist; an extension it allows but this map
 // omits is simply served as an opaque byte stream.
+//
+// SVG is the deliberate exception: it is a document, so it is served as
+// image/svg+xml only together with the isolation policy in serveMediaFile.
 var uploadContentTypes = map[string]string{
 	".jpg":  "image/jpeg",
 	".jpeg": "image/jpeg",
@@ -285,6 +294,7 @@ var uploadContentTypes = map[string]string{
 	".ico":  "image/x-icon",
 	".tif":  "image/tiff",
 	".tiff": "image/tiff",
+	".svg":  "image/svg+xml",
 	".mp4":  "video/mp4",
 	".webm": "video/webm",
 	".mov":  "video/quicktime",
@@ -296,6 +306,51 @@ var uploadContentTypes = map[string]string{
 	".txt":  "text/plain; charset=utf-8",
 	".csv":  "text/csv; charset=utf-8",
 	".md":   "text/plain; charset=utf-8",
+}
+
+// Media response hardening. mediaSVGContentType is the one media type a browser
+// renders as a document, so navigating straight to an uploaded SVG would
+// otherwise run any <script> it carries with the site's own origin — a stored
+// XSS. It is therefore served with svgIsolationCSP, which disables scripting
+// and same-origin access inside that document. Loaded as an <img>, which is how
+// the site icon, avatars and cover images use it, an SVG is static and the
+// policy costs nothing.
+const (
+	mediaSVGContentType = "image/svg+xml"
+	svgIsolationCSP     = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+)
+
+// mediaContentType returns the content type served for a stored media file. It
+// is derived from the stored name only — never from sniffing the bytes — so a
+// hostile upload cannot talk the browser into rendering it as a document.
+// Unlisted extensions, including a name whose extension was stripped at upload
+// time, are opaque byte streams.
+func mediaContentType(name string) string {
+	if contentType, ok := uploadContentTypes[strings.ToLower(path.Ext(name))]; ok {
+		return contentType
+	}
+	return "application/octet-stream"
+}
+
+// serveMediaFile writes one stored media file with its explicit content type.
+// Both the /uploads route and the configured-site-icon path go through here, so
+// neither can be tricked into serving an upload as an executable document.
+func serveMediaFile(c *gin.Context, name string, info fs.FileInfo, file io.ReadSeeker) {
+	contentType := mediaContentType(name)
+	c.Header("Content-Type", contentType)
+	if contentType == mediaSVGContentType {
+		// Append to the baseline policy the security-headers middleware already
+		// set, so base-uri, object-src and frame-ancestors keep applying to the
+		// SVG document alongside the sandbox.
+		policy := c.Writer.Header().Get("Content-Security-Policy")
+		if policy == "" {
+			policy = svgIsolationCSP
+		} else {
+			policy += "; " + svgIsolationCSP
+		}
+		c.Header("Content-Security-Policy", policy)
+	}
+	http.ServeContent(c.Writer, c.Request, name, info.ModTime(), file)
 }
 
 // uploadHandler serves one local media file. The path is confined to mediaDir
@@ -329,12 +384,7 @@ func (r *Renderer) uploadHandler(mediaDir string) gin.HandlerFunc {
 			return
 		}
 
-		contentType, ok := uploadContentTypes[strings.ToLower(path.Ext(clean))]
-		if !ok {
-			contentType = "application/octet-stream"
-		}
-		c.Header("Content-Type", contentType)
-		http.ServeContent(c.Writer, c.Request, clean, info.ModTime(), file)
+		serveMediaFile(c, clean, info, file)
 	}
 }
 
@@ -365,7 +415,8 @@ func (r *Renderer) RegisterStaticRoutes(e *gin.Engine, s3Enabled bool) {
 	e.GET("/user/:id", r.handleUser)
 
 	// Favicon: allow overrides via configured site icon (highest priority),
-	// then ./data/favicon.ico, then the active theme's favicon.
+	// then ./data/favicon.ico, then the active theme's favicon, then the
+	// bundled admin glyph as the last resort.
 	e.GET("/favicon.ico", r.handleFavicon)
 
 	// Theme file route: /themes/:id/assets/*path serves a theme's static
@@ -418,7 +469,10 @@ func (r *Renderer) handleThemeAsset(c *gin.Context) {
 }
 
 // handleFavicon serves /favicon.ico, preferring the configured site icon, then
-// ./data/favicon.ico, then the active theme's copy.
+// ./data/favicon.ico, then the active theme's copy, and finally the bundled
+// admin glyph. A site that configured nothing still gets an icon instead of a
+// 404, and uploading a site icon switches the public pages and the console
+// together because both end up reading this same source.
 func (r *Renderer) handleFavicon(c *gin.Context) {
 	var settings model.GeneralSettings
 	if err := r.db.First(&settings).Error; err == nil && settings.SiteIcon != "" {
@@ -437,6 +491,11 @@ func (r *Renderer) handleFavicon(c *gin.Context) {
 		c.Data(http.StatusOK, "image/x-icon", content)
 		return
 	}
+
+	if content, err := ReadAsset(DefaultFaviconAsset); err == nil {
+		c.Data(http.StatusOK, "image/x-icon", content)
+		return
+	}
 	c.Status(http.StatusNotFound)
 }
 
@@ -449,11 +508,31 @@ func (r *Renderer) serveConfiguredIcon(c *gin.Context, iconURL string) bool {
 		c.Redirect(http.StatusFound, iconURL)
 		return true
 	}
-	localPath := filepath.Join(r.dataDir, "media", filepath.Base(iconURL))
-	if _, err := os.Stat(localPath); err != nil {
+
+	// Serve the upload through serveMediaFile rather than c.File. c.File hands
+	// the name to http.ServeFile, which sniffs the bytes when the extension is
+	// unknown, so a site icon pointing at an extensionless upload of a hostile
+	// HTML file would be served as text/html and execute on direct navigation.
+	// The media content types are explicit and never sniffed.
+	name := filepath.Base(iconURL)
+	root, err := os.OpenRoot(filepath.Join(r.dataDir, "media"))
+	if err != nil {
 		return false
 	}
-	c.File(localPath)
+	defer func() { _ = root.Close() }()
+
+	file, err := root.Open(name)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = file.Close() }()
+
+	info, err := file.Stat()
+	if err != nil || info.IsDir() {
+		return false
+	}
+
+	serveMediaFile(c, name, info, file)
 	return true
 }
 

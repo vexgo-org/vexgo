@@ -33,6 +33,11 @@ export function useSiteSettings() {
             link.rel = "icon";
             document.head.appendChild(link);
           }
+          // The bundled mark ships as scheme-scoped links (the light one is
+          // the server's /favicon.ico). A configured icon replaces both, so
+          // clear the media query that would otherwise keep it out of one
+          // color scheme.
+          link.media = "";
           link.href = response.data.siteIcon;
         }
       } catch {

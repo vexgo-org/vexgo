@@ -1,6 +1,7 @@
 package public
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -590,7 +592,7 @@ func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
 	evil := `<script>alert(document.domain)</script>`
 	for name, content := range map[string]string{
 		"evil.html": evil,
-		"evil.svg":  `<svg onload="alert(1)"></svg>`,
+		"evil.svg":  `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>`,
 		"deadbeef":  evil, // extensionless file, as a stripped upload becomes
 		"pic.png":   "not-really-a-png",
 	} {
@@ -604,6 +606,9 @@ func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
 
 	renderer := NewRenderer(db, "http://localhost", dataDir)
 	e := gin.New()
+	// Register the same baseline headers production uses, so the SVG policy is
+	// asserted as it will actually be sent.
+	e.Use(middleware.SecurityHeaders())
 	renderer.RegisterStaticRoutes(e, false)
 
 	for _, tc := range []struct {
@@ -611,9 +616,11 @@ func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
 		want string
 	}{
 		{"/uploads/evil.html", "application/octet-stream"},
-		{"/uploads/evil.svg", "application/octet-stream"},
 		{"/uploads/deadbeef", "application/octet-stream"},
 		{"/uploads/pic.png", "image/png"},
+		// SVG keeps a renderable type so an <img> can show it; the sandbox
+		// CSP below is what stops it executing when opened directly.
+		{"/uploads/evil.svg", mediaSVGContentType},
 	} {
 		w := doPublicRequest(t, e, tc.path)
 		if w.Code != http.StatusOK {
@@ -622,6 +629,26 @@ func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
 		if ct := w.Header().Get("Content-Type"); ct != tc.want {
 			t.Errorf("GET %s Content-Type = %q, want %q", tc.path, ct, tc.want)
 		}
+		if strings.HasPrefix(tc.want, "text/html") {
+			t.Errorf("GET %s served an executable document", tc.path)
+		}
+	}
+
+	// The SVG document must carry the isolation policy, alongside the baseline
+	// directives rather than replacing them.
+	w := doPublicRequest(t, e, "/uploads/evil.svg")
+	policy := w.Header().Get("Content-Security-Policy")
+	if !strings.Contains(policy, "sandbox") {
+		t.Errorf("SVG CSP = %q, want a sandbox directive", policy)
+	}
+	if !strings.Contains(policy, "default-src 'none'") {
+		t.Errorf("SVG CSP = %q, want default-src 'none'", policy)
+	}
+	if !strings.Contains(policy, "frame-ancestors") {
+		t.Errorf("SVG CSP = %q, want the baseline directives preserved", policy)
+	}
+	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
 	}
 
 	// Traversal must not escape the media directory.
@@ -688,5 +715,158 @@ func TestPublicRoutes_LegacyPathsRedirectUnderAdmin(t *testing.T) {
 	w := doPublicRequest(t, r, "/about")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("GET /about status = %d, want 404", w.Code)
+	}
+}
+
+// newFaviconRouter builds a router whose data directory the test owns, so it
+// can plant a data/favicon.ico or a media upload and assert which source wins.
+func newFaviconRouter(t *testing.T) (*gin.Engine, string, *gorm.DB) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.GeneralSettings{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	dataDir := t.TempDir()
+	r := NewRenderer(db, "http://localhost", dataDir)
+	e := gin.New()
+	e.Use(middleware.SecurityHeaders())
+	r.RegisterStaticRoutes(e, false)
+	return e, dataDir, db
+}
+
+// TestFavicon_FallsBackToBundledGlyph is the default the user asked for: with
+// no site icon, no data/favicon.ico and no theme favicon, /favicon.ico serves
+// the same glyph the admin console ships instead of 404ing.
+func TestFavicon_FallsBackToBundledGlyph(t *testing.T) {
+	e, _, _ := newFaviconRouter(t)
+
+	want, err := ReadAsset(DefaultFaviconAsset)
+	if err != nil {
+		t.Fatalf("read bundled favicon %s: %v — run `just build-frontend`", DefaultFaviconAsset, err)
+	}
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /favicon.ico status = %d, want 200", w.Code)
+	}
+	if !bytes.Equal(w.Body.Bytes(), want) {
+		t.Errorf("GET /favicon.ico served %d bytes, want the bundled %d", w.Body.Len(), len(want))
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "image/x-icon" {
+		t.Errorf("Content-Type = %q, want image/x-icon", ct)
+	}
+}
+
+// TestFavicon_ConfiguredSiteIconWins pins the priority order: an uploaded site
+// icon must replace the bundled glyph on the public site, exactly as it does
+// in the console.
+func TestFavicon_ConfiguredSiteIconWins(t *testing.T) {
+	e, dataDir, db := newFaviconRouter(t)
+
+	mediaDir := filepath.Join(dataDir, "media")
+	if err := os.MkdirAll(mediaDir, 0o750); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+	uploaded := []byte("fake-png-bytes")
+	if err := os.WriteFile(filepath.Join(mediaDir, "icon.png"), uploaded, 0o600); err != nil {
+		t.Fatalf("write upload: %v", err)
+	}
+	if err := db.Create(&model.GeneralSettings{SiteIcon: "/uploads/icon.png"}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /favicon.ico status = %d, want 200", w.Code)
+	}
+	if !bytes.Equal(w.Body.Bytes(), uploaded) {
+		t.Errorf("GET /favicon.ico served %q, want the configured site icon %q", w.Body.String(), uploaded)
+	}
+}
+
+// TestFavicon_SVGIconIsServedAsAnImage guards the upload path a site icon
+// actually takes: an SVG upload keeps its extension, so /favicon.ico must serve
+// it as image/svg+xml (a type the browser renders in <img> and in the tab) and
+// carry the isolation policy that makes direct navigation harmless.
+func TestFavicon_SVGIconIsServedAsAnImage(t *testing.T) {
+	e, dataDir, db := newFaviconRouter(t)
+
+	mediaDir := filepath.Join(dataDir, "media")
+	if err := os.MkdirAll(mediaDir, 0o750); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>`)
+	if err := os.WriteFile(filepath.Join(mediaDir, "icon.svg"), svg, 0o600); err != nil {
+		t.Fatalf("write svg: %v", err)
+	}
+	if err := db.Create(&model.GeneralSettings{SiteIcon: "/uploads/icon.svg"}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /favicon.ico status = %d, want 200", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != mediaSVGContentType {
+		t.Errorf("Content-Type = %q, want %q — anything else is not renderable as an icon", ct, mediaSVGContentType)
+	}
+	if policy := w.Header().Get("Content-Security-Policy"); !strings.Contains(policy, "sandbox") {
+		t.Errorf("SVG favicon CSP = %q, want a sandbox directive", policy)
+	}
+	if !bytes.Equal(w.Body.Bytes(), svg) {
+		t.Errorf("body = %q, want the uploaded SVG", w.Body.String())
+	}
+}
+
+// TestFavicon_HostileUploadIsNotServedAsADocument is the regression guard for
+// the sniffing hole: the site-icon path used c.File, which derives the type
+// from the bytes when the extension is unknown, so an uploaded HTML file served
+// as text/html executed on navigation to /favicon.ico.
+func TestFavicon_HostileUploadIsNotServedAsADocument(t *testing.T) {
+	e, dataDir, db := newFaviconRouter(t)
+
+	mediaDir := filepath.Join(dataDir, "media")
+	if err := os.MkdirAll(mediaDir, 0o750); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+	// An extensionless upload, exactly what a rejected .html filename becomes.
+	if err := os.WriteFile(filepath.Join(mediaDir, "deadbeef"), []byte(`<html><body><script>alert(1)</script></body></html>`), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	if err := db.Create(&model.GeneralSettings{SiteIcon: "/uploads/deadbeef"}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /favicon.ico status = %d, want 200", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/octet-stream" {
+		t.Errorf("Content-Type = %q, want application/octet-stream", ct)
+	}
+}
+
+// TestFavicon_LocalFileBeatsBundledGlyph covers ./data/favicon.ico, the drop-in
+// override a self-hoster uses without touching the settings UI.
+func TestFavicon_LocalFileBeatsBundledGlyph(t *testing.T) {
+	e, dataDir, _ := newFaviconRouter(t)
+
+	local := []byte("local-ico-bytes")
+	if err := os.WriteFile(filepath.Join(dataDir, FaviconFile), local, 0o600); err != nil {
+		t.Fatalf("write %s: %v", FaviconFile, err)
+	}
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /favicon.ico status = %d, want 200", w.Code)
+	}
+	if !bytes.Equal(w.Body.Bytes(), local) {
+		t.Errorf("GET /favicon.ico served %q, want the local file %q", w.Body.String(), local)
 	}
 }
