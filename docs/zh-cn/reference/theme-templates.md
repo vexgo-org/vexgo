@@ -1,6 +1,6 @@
 # 主题模板参考
 
-> **技术参考** —— VexGo 主题可用的全部文件、字段、函数与限制，供查阅。设计原理见[主题系统](/zh-cn/concepts/theming)，实操步骤见[主题开发指南](/zh-cn/guides/theme-development)。
+> VexGo 主题可用的全部文件、字段、函数与限制。设计原理见[主题系统](/zh-cn/concepts/theming)，实操步骤见[主题开发指南](/zh-cn/guides/theme-development)。
 
 ## 主题目录结构
 
@@ -250,7 +250,7 @@
 }
 ```
 
-- 文件名是**归一化后**的语言代码（`zh.json`，不是 `zh-CN.json`）。
+- 文件名是归一化后的语言代码（`zh.json`，不是 `zh-CN.json`）。
 - 字典按 `en` → 站点默认语言 → 访客语言 的顺序逐键合并。
 - 所有字典都缺失的键会渲染成键名本身。
 
@@ -283,9 +283,9 @@ frontmatter 之后的内容即 Markdown 正文。slug 必须匹配 `^[a-z0-9-]{1
 | `assets/images/a.png` | `/theme-assets/images/a.png`               |
 | `favicon.ico`         | `/favicon.ico`（四个来源中的第四个，见下） |
 
-`/theme-assets/*` 解析到**当前**主题，因此模板里不包含主题 id。`assets/` 这一段由服务端补上，不能出现在 URL 中。
+`/theme-assets/*` 解析到当前主题，因此模板里不包含主题 id。`assets/` 这一段由服务端补上，不能出现在 URL 中。
 
-`/favicon.ico` 是标签页图标读取的唯一 URL，由服务端按此顺序解析一次：配置的站点图标 → `data/favicon.ico` → 当前主题的 `favicon.ico` → 管理后台内置的图标。因此不带图标的主题也仍有图标，上传站点图标后公共页面与后台会同步变化。注意主题自带的 favicon 放在**主题根目录**，而不是 `assets/`。
+`/favicon.ico` 是标签页图标读取的唯一 URL，由服务端按此顺序解析一次：配置的站点图标 → `data/favicon.ico` → 当前主题的 `favicon.ico` → 管理后台内置的图标。因此不带图标的主题也仍有图标，上传站点图标后公共页面与后台会同步变化。注意主题自带的 favicon 放在主题根目录，而不是 `assets/`。
 
 ## 评论组件契约
 
@@ -324,6 +324,6 @@ frontmatter 之后的内容即 Markdown 正文。slug 必须匹配 `^[a-z0-9-]{1
 
 ## 相关阅读
 
-- [主题系统](/zh-cn/concepts/theming) —— 渲染器如何使用这些文件。
-- [主题开发指南](/zh-cn/guides/theme-development) —— 编写并安装主题。
-- [架构](/zh-cn/concepts/architecture) —— 渲染器在后端中的位置。
+- [主题系统](/zh-cn/concepts/theming)：渲染器如何使用这些文件。
+- [主题开发指南](/zh-cn/guides/theme-development)：编写并安装主题。
+- [架构](/zh-cn/concepts/architecture)：渲染器在后端中的位置。

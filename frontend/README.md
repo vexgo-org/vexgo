@@ -22,7 +22,7 @@ bun run lint     # oxlint
 bun run build    # tsc -b && vite build && bun scripts/copy-manifest.mjs
 ```
 
-From the repository root, `just build-frontend` runs the same thing. **The backend serves the embedded build**, so frontend changes are invisible until you rebuild — the dev server does not proxy through the backend.
+From the repository root, `just build-frontend` runs the same thing. The backend serves the embedded build, so frontend changes are invisible until you rebuild. The dev server does not proxy through the backend.
 
 ## Layout
 
@@ -30,7 +30,7 @@ From the repository root, `just build-frontend` runs the same thing. **The backe
 | ------------------------ | ----------------------------------------------------------------------- |
 | `src/pages/`             | Route pages                                                             |
 | `src/components/`        | Feature components; `src/components/ui/` holds the shadcn/ui primitives |
-| `src/api/generated/`     | Generated API client — never edit by hand, run `just generate`          |
+| `src/api/generated/`     | Generated API client; never edit by hand, run `just generate`           |
 | `src/locales/`           | i18n strings; keep `en-US.ts` and `zh-CN.ts` in sync                    |
 | `src/lib/`, `src/types/` | Shared logic and shared types                                           |
 

@@ -1,8 +1,8 @@
 # Deployment
 
-> **How-to** — this guide walks you through running VexGo in production: hardening, reverse proxies, HTTPS, service management, upgrades, and troubleshooting.
+> Running VexGo in production: hardening, reverse proxies, HTTPS, service management, upgrades, and troubleshooting.
 
-## Production Checklist
+## Production checklist
 
 Before exposing VexGo to the internet:
 
@@ -13,12 +13,10 @@ Before exposing VexGo to the internet:
 - [ ] Set `BASE_URL` to your public URL (required for SSO callbacks)
 - [ ] Set `behind_reverse_proxy: true` and configure `trusted_proxies` (or set `BEHIND_REVERSE_PROXY=true` / `TRUSTED_PROXIES=...`)
 - [ ] Use a real database (PostgreSQL) instead of the default SQLite for production workloads
-- [ ] Running more than one instance behind a load balancer? Set `VALKEY_ENABLED=true` (plus `VALKEY_URL`) so rate-limiting and OAuth state are shared — see [Scaling to Multiple Instances](#scaling-to-multiple-instances)
+- [ ] Running more than one instance behind a load balancer? Set `VALKEY_ENABLED=true` (plus `VALKEY_URL`) so rate-limiting and OAuth state are shared; see [Scaling to multiple instances](#scaling-to-multiple-instances)
 - [ ] Back up the data directory and database on a schedule
 
----
-
-## Reverse Proxy
+## Reverse proxy
 
 VexGo serves HTTP on port `3001` by default. In production you normally put a reverse proxy (Nginx, Caddy, Cloudflare, etc.) in front of it to handle TLS, caching, and real client IPs.
 
@@ -49,7 +47,7 @@ your-domain.com {
 
 Caddy obtains and renews HTTPS certificates automatically.
 
-### Tell VexGo About the Proxy
+### Tell VexGo about the proxy
 
 Set these so VexGo trusts proxy headers (real client IPs) and generates correct URLs:
 
@@ -68,8 +66,6 @@ BASE_URL=https://your-domain.com ./vexgo server
 
 or in your Docker/systemd environment.
 
----
-
 ## HTTPS with Let's Encrypt
 
 With Nginx and Certbot:
@@ -81,9 +77,7 @@ sudo certbot --nginx -d your-domain.com
 
 Certbot configures TLS, sets up automatic renewal, and redirects HTTP to HTTPS.
 
----
-
-## Running as a Service (systemd)
+## Running as a service (systemd)
 
 A systemd unit keeps VexGo running across reboots and crashes. See the [Installation guide](/guides/installation#step-5-run-as-a-systemd-service-optional) for the full unit file. Summary:
 
@@ -112,8 +106,6 @@ sudo systemctl start vexgo
 sudo systemctl status vexgo
 ```
 
----
-
 ## Firewall
 
 Open only the ports VexGo needs:
@@ -131,13 +123,11 @@ sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 ```
 
-> **Tip:** if VexGo is behind a reverse proxy on the same machine, only ports 80/443 need to be open — the proxy talks to VexGo on localhost.
+> If VexGo is behind a reverse proxy on the same machine, only ports 80/443 need to be open; the proxy talks to VexGo on localhost.
 
----
+## Scaling to multiple instances
 
-## Scaling to Multiple Instances
-
-VexGo is a single binary. By default the content cache, rate-limiting budgets and OAuth login state live **in the process** — which is correct for one instance, but two or more instances behind a load balancer must share that state through a Valkey (Redis-compatible) server:
+VexGo is a single binary. By default the content cache, rate-limiting budgets, and OAuth login state live in the process. That is correct for one instance, but two or more instances behind a load balancer must share that state through a Valkey (Redis-compatible) server:
 
 ```yaml
 cache_enabled: true # content cache; false = public reads always hit the database
@@ -149,19 +139,17 @@ Every instance must point at the same Valkey server. Unlike `cache_enabled`, whi
 
 Operational notes:
 
-- **Keep the server private**: loopback or a trusted network, a password in the URL, TLS via `rediss://` where appropriate. Everything in it is treated as trusted and served to users.
-- **Configure eviction**: set a `maxmemory` limit with `allkeys-lru` — rate-limit keys rotate per client IP and cannot be bounded application-side.
-- **Placement matters**: colocate Valkey with the app (same host, unix socket or host networking) or keep the network path low-RTT. For cheap reads (a single post), the cache roundtrip must be cheaper than the database query it replaces, or the cache is a net loss.
-- The content cache stays on the in-process memory backend when `valkey_enabled: false` — see the [Configuration Guide](/guides/configuration#content-cache--valkey) for the full behavior matrix.
-
----
+- Keep the server private: loopback or a trusted network, a password in the URL, TLS via `rediss://` where appropriate. Everything in it is treated as trusted and served to users.
+- Configure eviction: set a `maxmemory` limit with `allkeys-lru`, because rate-limit keys rotate per client IP and cannot be bounded application-side.
+- Colocate Valkey with the app (same host, unix socket or host networking) or keep the network path low-RTT. For cheap reads (a single post), the cache roundtrip must be cheaper than the database query it replaces, or the cache is a net loss.
+- The content cache stays on the in-process memory backend when `valkey_enabled: false`; see the [Configuration Guide](/guides/configuration#content-cache--valkey) for the full behavior matrix.
 
 ## Backups
 
 VexGo's data lives in two places:
 
-1. **The data directory** — SQLite database file and uploaded media (or media in S3 if enabled)
-2. **The database** — for PostgreSQL/MySQL deployments
+1. The data directory: SQLite database file and uploaded media (or media in S3 if enabled)
+2. The database, for PostgreSQL/MySQL deployments
 
 ### Back up the data directory
 
@@ -177,19 +165,17 @@ pg_dump -U vexgo_user vexgo_db > vexgo-db-$(date +%F).sql
 
 Restore with `psql -U vexgo_user vexgo_db < backup.sql`.
 
-Schedule backups with cron or systemd timers, and store them off-machine (e.g. an S3 bucket or another server).
+Schedule backups with cron or systemd timers, and store them off-machine, for example in an S3 bucket or on another server.
 
 > If `SETTINGS_ENCRYPTION_KEY` is set, back it up together with the database: a
 > backup restored without the key cannot decrypt the stored SMTP password and
 > API keys (the server keeps running; an admin must re-enter the secrets in the UI).
 
----
-
 ## Upgrading
 
-> **Before upgrading:** back up your data directory and database. Restart after upgrading so database migrations run.
+> Back up your data directory and database before upgrading. Restart after upgrading so database migrations run.
 
-> **Admin routes:** the admin console lives under `/admin/...` (for example `/admin/login` and `/admin/write`). Legacy top-level URLs such as `/login` 301-redirect to their `/admin/` equivalent with the query string preserved, so existing bookmarks and emailed `?token=...` links keep working.
+> The admin console lives under `/admin/...` (for example `/admin/login` and `/admin/write`). Legacy top-level URLs such as `/login` 301-redirect to their `/admin/` equivalent with the query string preserved, so existing bookmarks and emailed `?token=...` links keep working.
 
 ### Docker
 
@@ -212,8 +198,6 @@ docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-sto
 nix flake update
 sudo nixos-rebuild switch --flake .#myhost
 ```
-
----
 
 ## Troubleshooting
 

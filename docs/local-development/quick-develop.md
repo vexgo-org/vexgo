@@ -1,6 +1,6 @@
 # Local Development
 
-> **Tutorial + How-to** — this section takes you from zero to a running local stack, then serves as a lookup manual for daily backend and frontend work.
+> This section takes you from nothing to a running local stack, then serves as a lookup manual for daily backend and frontend work.
 
 By the end of the tutorial part you will have the backend API, the admin SPA, and the default theme running locally, with one test post published. The How-to part covers the loops you will use every day.
 
@@ -10,9 +10,9 @@ Scope: environment setup, backend loop, frontend loop, test/lint gates, API code
 
 Contents:
 
-- [Backend Development](/local-development/backend) — run the Go server, config layers, domain layout, add an endpoint.
-- [Frontend Development](/local-development/frontend) — run the admin SPA with HMR, API base URL, embedded build.
-- [Common Workflow](/local-development/workflow) — format/lint/test gates, swag + orval codegen, theme iteration, troubleshooting.
+- [Backend Development](/local-development/backend): run the Go server, config layers, domain layout, add an endpoint.
+- [Frontend Development](/local-development/frontend): run the admin SPA with HMR, API base URL, embedded build.
+- [Common Workflow](/local-development/workflow): format/lint/test gates, swag + orval codegen, theme iteration, troubleshooting.
 
 ## Prerequisites
 
@@ -50,7 +50,7 @@ bun install
 cd ..
 ```
 
-> **What just happened?** You fetched the Go module dependencies and the admin SPA dependencies. Nothing is built yet.
+> You fetched the Go module dependencies and the admin SPA dependencies. Nothing is built yet.
 
 ### Step 2: Build the embedded frontends once
 

@@ -2,22 +2,22 @@
 
 Thank you for contributing to VexGo.
 
-This document defines the expected development workflow, coding standards, issue conventions, pull request requirements, and commit message format for this repository. The goal is to keep changes easy to review, easy to trace, and safe to release.
+This document covers the development workflow, coding standards, issue conventions, pull request requirements, and commit message format for this repository, so changes stay easy to review and safe to release.
 
-## Table of Contents
+## Table of contents
 
 - [Motivation](#motivation)
-- [Development Environment](#development-environment)
-- [Project Layout](#project-layout)
-- [Local Workflow](#local-workflow)
-- [Code Style](#code-style)
+- [Development environment](#development-environment)
+- [Project layout](#project-layout)
+- [Local workflow](#local-workflow)
+- [Code style](#code-style)
 - [Testing](#testing)
-- [Issue Guidelines](#issue-guidelines)
-- [Pull Request Guidelines](#pull-request-guidelines)
-- [Commit Message Convention](#commit-message-convention)
-- [Review Expectations](#review-expectations)
-- [Scope Control](#scope-control)
-- [Definition of Done](#definition-of-done)
+- [Issue guidelines](#issue-guidelines)
+- [Pull request guidelines](#pull-request-guidelines)
+- [Commit message convention](#commit-message-convention)
+- [Review expectations](#review-expectations)
+- [Scope control](#scope-control)
+- [Definition of done](#definition-of-done)
 
 ## Motivation
 
@@ -32,13 +32,13 @@ Contributors are expected to:
 - include tests for behavior changes
 - use consistent issue, pull request, and commit naming
 
-The repository follows a lightweight engineering discipline:
+The repository expects:
 
 - issues describe work clearly
 - pull requests describe the implementation clearly
 - commits remain traceable through Conventional Commits
 
-## Development Environment
+## Development environment
 
 ### Requirements
 
@@ -54,7 +54,7 @@ nix develop
 
 If you use direnv, the checked-in `.envrc` (`use flake`) activates the shell automatically. A `devbox.json` with the same core tools (`go`, `bun`) is also available.
 
-> **Nix build note:** the Nix package builds the frontend with `bun install --frozen-lockfile` at build time (matching the Docker and CI build), so the build needs network access — allow it with `sandbox = false` on NixOS, or use the default (non-sandboxed) build on other systems.
+> The Nix package builds the frontend with `bun install --frozen-lockfile` at build time (matching the Docker and CI build), so the build needs network access. Allow it with `sandbox = false` on NixOS, or use the default (non-sandboxed) build on other systems.
 
 ### Typical commands
 
@@ -103,7 +103,7 @@ just server
 
 `just theme <dir>` starts the server with a theme directory, e.g. `just theme ../vexgo-default-theme/dist/`.
 
-Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password` — change it on your profile page.
+Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` with password `password`; change it on your profile page.
 
 ### API codegen (swag + orval)
 
@@ -119,13 +119,13 @@ just check-openapi-fresh # CI guard: fails if docs/swagger.json is stale
 Rules:
 
 - Declare request/response shapes as Go types with JSON tags plus swag annotations (`@Summary`, `@Param`, `@Success`, `@Failure`, `@Router`) on the handler. The general API block lives in `backend/cmd/vexgo/main.go`.
-- Never hand-edit `docs/swagger.json` or anything under `frontend/src/api/generated/` — change the backend annotations/types and re-run `just generate`.
+- Never hand-edit `docs/swagger.json` or anything under `frontend/src/api/generated/`; change the backend annotations/types and re-run `just generate`.
 - File uploads use `@Accept multipart/form-data` with `@Param <name> formData file true "<desc>"`. (swag v2 is pinned past `v2.0.0-rc5` in `go.mod` because rc5 cannot emit a correct multipart file schema.)
 - Keep annotation formatting clean: `just format` runs `go tool swag fmt backend/`; CI enforces it via `just check-swag-fmt`.
-- If you add, remove, or rename a route, also update the route surface locked by `backend/internal/router/router_test.go` — and make sure the `@Router` path/method matches the registered route, otherwise the generated client calls a URL that 404s.
+- If you add, remove, or rename a route, also update the route surface locked by `backend/internal/router/router_test.go`, and make sure the `@Router` path/method matches the registered route, otherwise the generated client calls a URL that 404s.
 - In frontend code, call the API via `getVexGoAPI()` from `@/api/generated/endpoints`. Requests go through the shared axios instance in `frontend/src/api/customAxios.ts` (attaches the token, redirects to `/admin/login` on non-auth 401s).
 
-## Project Layout
+## Project layout
 
 ```text
 backend/
@@ -184,7 +184,7 @@ General expectations:
 
 If a module becomes too broad, split it by responsibility rather than growing a single file indefinitely.
 
-## Local Workflow
+## Local workflow
 
 Recommended local workflow:
 
@@ -202,7 +202,7 @@ A good contribution should be:
 - supported by tests where behavior changes
 - free of unrelated cleanup
 
-## Code Style
+## Code style
 
 ### General
 
@@ -279,7 +279,7 @@ go build -v ./...
 go test -v ./...
 ```
 
-## Issue Guidelines
+## Issue guidelines
 
 Issues should describe one clear unit of work.
 
@@ -383,7 +383,7 @@ For features, include:
 - what is explicitly out of scope
 - how completion will be verified
 
-## Pull Request Guidelines
+## Pull request guidelines
 
 Pull requests should remain tightly scoped and easy to review.
 
@@ -432,7 +432,7 @@ A pull request should not combine:
 
 If cleanup is necessary to enable the main change, keep it minimal and explain it clearly.
 
-## Commit Message Convention
+## Commit message convention
 
 This repository uses Conventional Commits.
 
@@ -483,7 +483,7 @@ feat(api): replace legacy theme config shape
 BREAKING CHANGE: theme config now requires an explicit mode field.
 ```
 
-## Review Expectations
+## Review expectations
 
 Reviewers will primarily look for:
 
@@ -503,7 +503,7 @@ Common review concerns include:
 - missing regression tests
 - unrelated edits in the same change
 
-## Scope Control
+## Scope control
 
 Do not include unrelated changes in a contribution.
 
@@ -517,7 +517,7 @@ Avoid:
 
 If a larger redesign is truly necessary, open a dedicated issue first.
 
-## Definition of Done
+## Definition of done
 
 A contribution is considered ready when:
 
@@ -528,5 +528,3 @@ A contribution is considered ready when:
 - the pull request description is complete
 - the title follows the required convention
 - no unrelated changes are included
-
-Thank you for helping keep VexGo maintainable and consistent.

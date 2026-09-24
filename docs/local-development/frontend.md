@@ -1,8 +1,8 @@
 # Frontend Development
 
-> **How-to** — run, change, and rebuild the admin SPA (React + TypeScript, Vite, Tailwind, shadcn/ui). Read the [Local Development](/local-development/quick-develop) tutorial first so `bun install` is done and the backend runs.
+> Run, change, and rebuild the admin SPA (React + TypeScript, Vite, Tailwind, shadcn/ui). Work through the [Local Development](/local-development/quick-develop) tutorial first so `bun install` is done and the backend runs.
 
-The SPA lives entirely under `/admin/`; public pages are server-rendered from themes, so the SPA must never claim the site root. `bun run build` writes the bundle to `backend/internal/public/dist/` (gitignored), which the Go binary embeds and serves. **The backend serves frontend changes only after a rebuild** — the Vite dev server does not proxy through the backend.
+The SPA lives entirely under `/admin/`; public pages are server-rendered from themes, so the SPA must never claim the site root. `bun run build` writes the bundle to `backend/internal/public/dist/` (gitignored), which the Go binary embeds and serves. The backend serves frontend changes only after a rebuild; the Vite dev server does not proxy through the backend.
 
 ## Run the dev server
 
@@ -37,7 +37,7 @@ Resolution lives in `frontend/src/api/customAxios.ts`: `import.meta.env.VITE_API
 | ------------------------ | --------------------------------------------------------------------------------------------------- |
 | `src/pages/`             | Route pages                                                                                         |
 | `src/components/`        | Feature components; `src/components/ui/` holds shadcn/ui primitives                                 |
-| `src/api/generated/`     | Generated API client — never edit by hand, run `just generate`                                      |
+| `src/api/generated/`     | Generated API client; never edit by hand, run `just generate`                                       |
 | `src/locales/`           | i18n strings; keep `en-US.ts` and `zh-CN.ts` in sync                                                |
 | `src/lib/`, `src/types/` | Shared logic and shared types                                                                       |
 | `vite.config.ts`         | `base: "/admin/"`, `outDir: ../backend/internal/public/dist`, `emptyOutDir: true`, `manifest: true` |
@@ -52,7 +52,7 @@ bun run dev        # iterate with HMR against just server
 bun run build      # tsc -b + vite build + copy theme manifest
 ```
 
-From the repo root, `just build-frontend` runs the same build. Restarting the backend is unnecessary after a frontend rebuild in most cases — reload `/admin/` — but a stale `dist` (multiple same-named hashed chunks) is why `emptyOutDir: true` plus the manifest exists: never disable them.
+From the repo root, `just build-frontend` runs the same build. Restarting the backend is usually unnecessary after a frontend rebuild; just reload `/admin/`. A stale `dist` (multiple same-named hashed chunks) is why `emptyOutDir: true` and the manifest exist, so never disable them.
 
 ## How-to: verify before a PR
 

@@ -1,8 +1,8 @@
 # Configuration
 
-> **How-to** — this guide shows you how to configure VexGo: where settings come from, how to connect a real database, enable SSO, use S3 storage, and set up email.
+> How to configure VexGo: where settings come from, how to connect a real database, enable SSO, use S3 storage, and set up email.
 
-## How VexGo Loads Configuration
+## How VexGo loads configuration
 
 VexGo reads settings from four sources. When the same setting appears in more than one source, this priority order applies:
 
@@ -19,13 +19,13 @@ command-line arguments  >  config file  >  environment variables  >  defaults
 
 Start the server with `./vexgo server`. Running `./vexgo` without arguments prints help instead of starting the server.
 
-**Server flags:** `--config, -c <file>`, `--addr, -a <addr>`, `--port, -p <port>`, `--data, -d <dir>`, `--help, -h`. These flags follow `server`; run `./vexgo server --help` to see the full list.
+Server flags: `--config, -c <file>`, `--addr, -a <addr>`, `--port, -p <port>`, `--data, -d <dir>`, `--help, -h`. These flags follow `server`; run `./vexgo server --help` to see the full list.
 
-**Root-only version flag:** use `./vexgo --version` (or `-V`) to print the version and exit, not `./vexgo server --version`.
+The version flag is root-only: use `./vexgo --version` (or `-V`) to print the version and exit, not `./vexgo server --version`.
 
-> **Tip:** secrets (like `JWT_SECRET` or database passwords) can go in either the config file or environment variables — pick what fits your deployment. Never commit real secrets to a repository.
+> Secrets such as `JWT_SECRET` or database passwords can go in either the config file or environment variables. Pick what fits your deployment, and never commit real secrets to a repository.
 
-## Using a Config File
+## Using a config file
 
 Copy the [example config](https://github.com/vexgo-org/vexgo/blob/main/examples/config.yml) and adapt it:
 
@@ -70,24 +70,24 @@ s3_bucket: "my-bucket"
 
 For a full annotated config file, see [examples/config.yml](https://github.com/vexgo-org/vexgo/blob/main/examples/config.yml). Example files for PostgreSQL and MySQL live next to it (`examples/config-postgres.yml`, `examples/config-mysql.yml`).
 
-> **Note:** an explicit value in the config file — including `false` — overrides an environment variable. For example, `s3_enabled: false` in the file wins over `S3_ENABLED=true` in the environment.
+> An explicit value in the config file, including `false`, overrides an environment variable. For example, `s3_enabled: false` in the file wins over `S3_ENABLED=true` in the environment.
 
-## Using Environment Variables
+## Using environment variables
 
-Every setting can also be provided as an environment variable. This is the natural fit for Docker and systemd deployments.
+Every setting can also be provided as an environment variable, which is the natural fit for Docker and systemd deployments.
 
 | Variable                  | Default   | Description                                                                                                                                      |
 | ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ADDR`                    | `0.0.0.0` | Listen address                                                                                                                                   |
 | `PORT`                    | `3001`    | Listen port                                                                                                                                      |
 | `DATA_DIR`                | `./data`  | Data directory (SQLite DB and media)                                                                                                             |
-| `JWT_SECRET`              | —         | JWT signing secret (**required in production**)                                                                                                  |
+| `JWT_SECRET`              | —         | JWT signing secret (required in production)                                                                                                      |
 | `SETTINGS_ENCRYPTION_KEY` | —         | Passphrase for encrypting secrets at rest (SMTP password, AI and comment-moderation API keys). Empty = plaintext storage with a startup warning. |
 | `LOG_LEVEL`               | `info`    | `debug`, `info`, `warn`, `error`                                                                                                                 |
 | `BEHIND_REVERSE_PROXY`    | `false`   | Honor `X-Forwarded-*` headers when `true`                                                                                                        |
 | `TRUSTED_PROXIES`         | —         | Comma-separated trusted proxy IPs/CIDRs                                                                                                          |
 
-### Rate Limiting
+### Rate limiting
 
 Both limits count requests per client IP on unauthenticated endpoints; `0` disables the corresponding limit.
 
@@ -151,11 +151,9 @@ Both limits count requests per client IP on unauthenticated endpoints; `0` disab
 | `VALKEY_ENABLED` | `false` | Store cacheable state in Valkey (Redis-compatible): the content cache (when `CACHE_ENABLED=true`) plus rate limiting and OAuth login state, shared across instances. |
 | `VALKEY_URL`     | —       | Valkey connection URL, e.g. `valkey://127.0.0.1:6379` (required when `VALKEY_ENABLED=true`; `redis://` and `rediss://` for TLS are also accepted)                    |
 
----
+## Setting up a database
 
-## Setting Up a Database
-
-VexGo uses **SQLite out of the box** — no setup needed. For production or multi-user workloads, switch to **PostgreSQL** or **MySQL**.
+VexGo uses SQLite out of the box, with no setup needed. For production or multi-user workloads, switch to PostgreSQL or MySQL.
 
 ### PostgreSQL (recommended for production)
 
@@ -225,15 +223,13 @@ Run VexGo with the MySQL config:
 go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
 ```
 
-> On the first start, VexGo runs database migrations automatically — there's nothing to import manually.
+> On the first start, VexGo runs database migrations automatically. There's nothing to import manually.
 
----
+## Setting up SSO
 
-## Setting Up SSO
+VexGo supports login via GitHub, Google, and any OpenID Connect (OIDC) provider (Keycloak, Authentik, Authelia, Okta, Casdoor, etc.).
 
-VexGo supports login via **GitHub**, **Google**, and any **OpenID Connect (OIDC)** provider (Keycloak, Authentik, Authelia, Okta, Casdoor, etc.).
-
-> Set `BASE_URL` to your public instance URL (e.g. `https://vexgo.example.com`) so that OAuth callback URLs are generated correctly, especially behind a reverse proxy.
+> Set `BASE_URL` to your public instance URL (e.g. `https://vexgo.example.com`) so OAuth callback URLs are generated correctly, especially behind a reverse proxy.
 
 ### GitHub
 
@@ -250,7 +246,7 @@ VexGo supports login via **GitHub**, **Google**, and any **OpenID Connect (OIDC)
 ### OIDC (any provider)
 
 1. Create a client in your OIDC provider with the callback URL `https://your-domain/api/sso/oidc/callback`.
-2. Find your **issuer URL**: open `<provider-base-url>/.well-known/openid-configuration` and look for the `issuer` field.
+2. Find your issuer URL: open `<provider-base-url>/.well-known/openid-configuration` and look for the `issuer` field.
 3. Enable OIDC:
 
 ```yaml
@@ -262,15 +258,13 @@ oidc_client_secret: "your-client-secret"
 
 To restrict login to specific groups, set `oidc_allowed_groups` (e.g. `admins,developers`) and make sure the group claim is included in the token (add `groups` to `oidc_scopes` if needed).
 
-### Enforce SSO-Only
+### Enforce SSO-only
 
-Set `allow_local_login: false` to disable password login entirely — users can only sign in through SSO providers.
+Set `allow_local_login: false` to disable password login entirely, so users can only sign in through SSO providers.
 
----
+## Setting up email (SMTP)
 
-## Setting Up Email (SMTP)
-
-SMTP is configured **at runtime from the admin panel**, not in the config file:
+SMTP is configured at runtime from the admin panel, not in the config file:
 
 1. Log in as an admin and open **Settings → SMTP**.
 2. Enter your SMTP host, port, credentials, and the `from` address/name.
@@ -282,11 +276,9 @@ Email is used for:
 - Password reset links
 - Email change confirmation
 
----
+## Enabling S3 storage
 
-## Enabling S3 Storage
-
-S3 works with any S3-compatible service — AWS S3, MinIO, Garage, etc.
+S3 works with any S3-compatible service: AWS S3, MinIO, Garage, etc.
 
 ### Example: Docker with MinIO
 
@@ -305,14 +297,14 @@ docker run -d --name vexgo \
   ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
-> **MinIO/Wasabi:** set `S3_FORCE_PATH=true` — most S3-compatible services require path-style URLs.
+> Set `S3_FORCE_PATH=true` for MinIO and Wasabi. Most S3-compatible services require path-style URLs.
 
 ## Content Cache & Valkey
 
 VexGo caches its public read paths (post lists, single posts, popular/latest, home stats) behind a read-through cache, and can move rate-limiting and OAuth login state out of the process. Two switches control this independently:
 
-- **`cache_enabled`** (default `false`) — the content cache. `false` sends every public read straight to the database.
-- **`valkey_enabled`** (default `false`) — store cacheable state in a Valkey (Redis-compatible) server: the content cache (when `cache_enabled` is on) **and** the shared state (rate limiting, OAuth login state) that multiple instances must agree on.
+- `cache_enabled` (default `false`) controls the content cache. `false` sends every public read straight to the database.
+- `valkey_enabled` (default `false`) stores cacheable state in a Valkey (Redis-compatible) server: the content cache (when `cache_enabled` is on) and the shared state (rate limiting, OAuth login state) that multiple instances must agree on.
 
 ```yaml
 cache_enabled: true
@@ -330,22 +322,22 @@ Behavior matrix:
 
 Notes:
 
-- With `valkey_enabled: true` the server must be reachable at startup — VexGo fails fast on a bad URL or unreachable server instead of failing at request time.
+- With `valkey_enabled: true` the server must be reachable at startup; VexGo fails fast on a bad URL or unreachable server instead of failing at request time.
 - Multi-instance deployments require `valkey_enabled: true`; without it, rate-limit budgets and OAuth state are per-process.
-- Keep the Valkey server private (loopback / trusted network, password, TLS via `rediss://`), and configure a `maxmemory` limit with `allkeys-lru` eviction — rate-limit keys rotate per client IP and cannot be bounded application-side.
+- Keep the Valkey server private (loopback / trusted network, password, TLS via `rediss://`), and configure a `maxmemory` limit with `allkeys-lru` eviction, because rate-limit keys rotate per client IP and cannot be bounded application-side.
 - Colocating Valkey with the app (same host or low-RTT network) matters for cheap reads: the cache roundtrip must be cheaper than the database query it replaces.
 
-## Secrets at Rest Encryption
+## Secrets at rest encryption
 
 The SMTP password and the AI / comment-moderation API keys are stored in the database. Set `SETTINGS_ENCRYPTION_KEY` (or `settings_encryption_key`) to encrypt them at rest with AES-256-GCM. With a key set, existing plaintext values are encrypted in place on the next startup; without one, secrets are stored as plaintext and a warning is logged at startup. See the [Configuration Reference](/reference/configuration#secrets-at-rest-encryption) for the full behavior, including wrong-key handling.
 
-## What's Configurable at Runtime?
+## What's configurable at runtime?
 
-Some settings are managed from the **admin panel** and stored in the database (no restart needed):
+Some settings are managed from the admin panel and stored in the database, with no restart needed:
 
-- **General settings** — site name, description, registration toggle, captcha, guest viewing, items per page
-- **Comment moderation** — manual review, keyword filter, and LLM review switches; prompt and blocked keywords
-- **Active theme** — switch between installed themes
-- **SMTP** — see above
+- General settings: site name, description, registration toggle, captcha, guest viewing, items per page
+- Comment moderation: manual review, keyword filter, and LLM review switches; prompt and blocked keywords
+- Active theme: switch between installed themes
+- SMTP, described above
 
 See the [API Reference](api.html) for the corresponding endpoints, and the [Configuration Reference](/reference/configuration) for the complete list of flags, variables, and config keys.

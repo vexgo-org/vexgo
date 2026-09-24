@@ -1,16 +1,16 @@
 # Theme Development
 
-> **How-to guide** — build a VexGo theme, package it and install it, then add the pages, translations and interactions you need. Each section is a task you can complete on its own. Field-by-field details live in the [Theme Templates reference](/reference/theme-templates); the reasoning behind the system is in [Theming](/concepts/theming).
+> Build a VexGo theme, package it and install it, then add the pages, translations and interactions you need. Each section is a task you can complete on its own. Field-by-field details live in the [Theme Templates reference](/reference/theme-templates); the reasoning behind the system is in [Theming](/concepts/theming).
 
 ## Before you start
 
 You need:
 
 - A running VexGo instance with an admin account (to upload the theme).
-- A text editor. No compiler, Node.js or build step is required — a theme is plain HTML, CSS and JavaScript.
+- A text editor. No compiler, Node.js or build step is required; a theme is plain HTML, CSS and JavaScript.
 - Somewhere to look up what a template receives: the [Theme Templates reference](/reference/theme-templates).
 
-The best reference implementation is the built-in default theme. Its source lives in the standalone [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) repository (React components that emit the templates at build time); `scripts/fetch-default-theme.sh` copies its `dist/` build output to `backend/internal/public/default-theme/` for embedding. Read it for patterns, but note that the generated `.html` files are minified into a single line and are **build output** — do not edit them, and prefer writing your templates by hand.
+The best reference implementation is the built-in default theme. Its source lives in the standalone [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) repository (React components that emit the templates at build time); `scripts/fetch-default-theme.sh` copies its `dist/` build output to `backend/internal/public/default-theme/` for embedding. Read it for patterns, but note that the generated `.html` files are minified into a single line and are build output, so do not edit them. Write your own templates by hand.
 
 ### Iterate with `vexgo dev`
 
@@ -26,7 +26,7 @@ The `justfile` wraps this as the `theme` recipe, which takes the directory as an
 just theme ../vexgo-default-theme/dist/
 ```
 
-The directory is treated as the theme root: `index.html`, `post.html`, `page.html`, `user.html`, `404.html`, any `<slug>.html` file, `assets/` and `i18n/` are read straight from it. Assets keep working through the stable `/theme-assets/` prefix, and templates are re-read from disk on every request — no restart, no rebuild, no upload. This is also the fastest loop for the built-in theme: point `--theme-dir` at the standalone `vexgo-default-theme` checkout (or its `dist/` build) and edit there.
+The directory is treated as the theme root: `index.html`, `post.html`, `page.html`, `user.html`, `404.html`, any `<slug>.html` file, `assets/` and `i18n/` are read straight from it. Assets keep working through the stable `/theme-assets/` prefix, and templates are re-read from disk on every request, so there is no restart, rebuild, or upload involved. This is also the fastest loop for the built-in theme: point `--theme-dir` at the standalone `vexgo-default-theme` checkout (or its `dist/` build) and edit there.
 
 ## Step 1: Create a minimal theme
 
@@ -74,7 +74,7 @@ my-theme/
 
 That is a working home page. Everything else in this guide is additive.
 
-If the active theme is missing a template for a route, that route returns a 404 — so add `post.html`, `page.html` and `user.html` before you want those pages to work, or ship only the home page at first.
+If the active theme is missing a template for a route, that route returns a 404, so add `post.html`, `page.html` and `user.html` before you want those pages to work, or ship only the home page at first.
 
 ## Step 2: Fill in the manifest
 
@@ -88,12 +88,12 @@ If the active theme is missing a template for a route, that route returns a 404 
 
 These are optional but shown in the admin theme list:
 
-| Field         | Notes                                                                                                                                   |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `author`      | Author name.                                                                                                                            |
-| `description` | One-line description.                                                                                                                   |
-| `url`         | Theme homepage or repository.                                                                                                           |
-| `preview`     | Cover image **URL** shown in the theme picker. Must be `http://` or `https://`. A relative path such as `assets/cover.png` is rejected. |
+| Field         | Notes                                                                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `author`      | Author name.                                                                                                                        |
+| `description` | One-line description.                                                                                                               |
+| `url`         | Theme homepage or repository.                                                                                                       |
+| `preview`     | Cover image URL shown in the theme picker. Must be `http://` or `https://`. A relative path such as `assets/cover.png` is rejected. |
 
 Unknown fields are ignored, so you can keep extra keys for your own tooling.
 
@@ -114,7 +114,7 @@ my-theme.zip
 └── index.html
 ```
 
-In both cases the theme is installed under `data/theme/<id>/`, where `<id>` is the manifest's `id` (which in layout A must also equal the folder name). The archive itself may have any filename — it does not have to match the theme id.
+In both cases the theme is installed under `data/theme/<id>/`, where `<id>` is the manifest's `id` (which in layout A must also equal the folder name). The archive itself may have any filename; it does not have to match the theme id.
 
 Build the archive from a directory so the manifest lands where the server expects it:
 
@@ -170,10 +170,10 @@ Archives that exceed these limits, or that have no readable `vexgo-theme.json`, 
 
 Two things to notice:
 
-- **`{{.Post.ContentHTML}}` is the rendered Markdown body.** It is the one value you should emit unescaped; Go's templates know it is safe HTML. Do not wrap it in `<pre>` or escape it.
-- **The author is optional.** A post may have no author row, so guard any use of `.Post.AuthorName` with `{{if .Post.AuthorID}}` if your layout requires one.
+- `{{.Post.ContentHTML}}` is the rendered Markdown body, and the one value you should emit unescaped; Go's templates know it is safe HTML. Do not wrap it in `<pre>` or escape it.
+- The author is optional. A post may have no author row, so guard any use of `.Post.AuthorName` with `{{if .Post.AuthorID}}` if your layout requires one.
 
-Drafts, pending and rejected posts are not reachable on this route regardless of the slug — only the admin draft preview can see them, and that is not something a theme has to handle.
+Drafts, pending and rejected posts are not reachable on this route regardless of the slug. Only the admin draft preview can see them, and that is not something a theme has to handle.
 
 ## Step 5: Write the custom page and user pages
 
@@ -224,7 +224,7 @@ Drafts, pending and rejected posts are not reachable on this route regardless of
 
 Any plain lowercase `<slug>.html` file at the theme root becomes the dedicated template for the custom page with that slug. If a theme has `links.html` and a page with the slug `links`, that page renders with `links.html` instead of `page.html`.
 
-This is how the default theme gives its `links` and `timeline` pages bespoke layouts. Note that a slash in the name disqualifies it — `pages/links.html` is not a page template.
+This is how the default theme gives its `links` and `timeline` pages bespoke layouts. A slash in the name disqualifies it, so `pages/links.html` is not a page template.
 
 To make the page exist in the first place, ship a seed file. `seed/links.md`:
 
@@ -245,7 +245,7 @@ VexGo | https://github.com/vexgo-org/vexgo |  | A self-hosted blog CMS
 
 The frontmatter keys are `title` (defaults to the filename), `showInNav` (`true` or `1`), `sortOrder` (integer) and `status` (`published` by default, `draft` supported). The body is Markdown. The filename becomes the slug and must be lowercase ASCII letters, digits and hyphens.
 
-Seeds are created only for slugs that do not already exist — they bootstrap a fresh install and never overwrite an edited page.
+Seeds are created only for slugs that do not already exist; they bootstrap a fresh install and never overwrite an edited page.
 
 ## Step 7: Translate the theme
 
@@ -287,7 +287,7 @@ How a visitor's language is picked:
 ?lang=zh  →  vexgo_lang cookie  →  Accept-Language  →  site default  →  en
 ```
 
-Dictionaries are merged **per key** along the chain `en` → site default → visitor language, so a missing translation falls back rather than breaking the page. A key that no dictionary defines renders as the key itself, which makes omissions visible during development.
+Dictionaries are merged per key along the chain `en` → site default → visitor language, so a missing translation falls back rather than breaking the page. A key that no dictionary defines renders as the key itself, which makes omissions visible during development.
 
 Two practical notes:
 
@@ -310,7 +310,7 @@ my-theme/
 <img src="/theme-assets/logo.svg" alt="logo" />
 ```
 
-The `assets/` segment is added by the server, so a file at `assets/style.css` is served at `/theme-assets/style.css` — **not** `/theme-assets/assets/style.css`. This indirection is what lets a template keep working when the active theme changes.
+The `assets/` segment is added by the server, so a file at `assets/style.css` is served at `/theme-assets/style.css`, not `/theme-assets/assets/style.css`. This indirection is what lets a template keep working when the active theme changes.
 
 ## Step 9: Add optional interactions
 
@@ -331,19 +331,19 @@ The comment widget is self-contained and styles itself, so it renders in any the
 
 The `data-post-id` attribute is required; `data-lang` selects the widget's built-in strings (`en` and `zh` are included) and falls back to English. The widget talks to the public comment and like API, and reuses the admin SPA's stored session, so visitors who have logged in can post without the theme implementing authentication.
 
-If you want to replace the widget with your own, keep the same `id`/`data-post-id` convention, or drop it entirely — the server never injects it.
+If you want to replace the widget with your own, keep the same `id`/`data-post-id` convention, or drop it entirely; the server never injects it.
 
 ### Dark mode
 
 Dark mode is a theme concern: the default theme toggles a class on `<html>` and persists the choice in `localStorage`. There is no backend setting for it, so implement it however fits your markup.
 
-## Limitations to keep in mind
+## Limitations
 
-- **Templates are Go `html/template`.** They cannot call arbitrary functions, loop over the database or access the filesystem. Only the values and helpers in the [Theme Templates reference](/reference/theme-templates) are available.
-- **All root-level `.html` files are parsed into one set.** A `{{define}}` block in one file is visible from every other file, and files are parsed in sorted filename order, so keep shared fragments in one place to avoid duplicate definitions.
-- **A syntax error anywhere blocks activation.** Run the theme locally first if you can, and install it in a staging instance before switching a production site.
-- **Every page must be a complete document.** There is no layout inheritance; use `{{define}}`/`{{template}}` for shared markup.
-- **Content markup is server-authored.** Markdown is rendered by the server in safe mode, with raw HTML escaped. A theme cannot opt into raw HTML from posts, and should not try to re-render `ContentHTML`.
+- Templates are Go `html/template`. They cannot call arbitrary functions, loop over the database or access the filesystem. Only the values and helpers in the [Theme Templates reference](/reference/theme-templates) are available.
+- All root-level `.html` files are parsed into one set. A `{{define}}` block in one file is visible from every other file, and files are parsed in sorted filename order, so keep shared fragments in one place to avoid duplicate definitions.
+- A syntax error anywhere blocks activation. Run the theme locally first if you can, and install it in a staging instance before switching a production site.
+- Every page must be a complete document. There is no layout inheritance; use `{{define}}`/`{{template}}` for shared markup.
+- Content markup is server-authored. Markdown is rendered by the server in safe mode, with raw HTML escaped. A theme cannot opt into raw HTML from posts, and should not try to re-render `ContentHTML`.
 
 ## Troubleshooting
 

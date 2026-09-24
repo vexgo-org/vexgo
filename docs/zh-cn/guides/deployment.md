@@ -1,6 +1,6 @@
 # 部署
 
-> **操作指南** —— 本指南介绍如何在生产环境运行 VexGo：安全加固、反向代理、HTTPS、服务管理、升级和故障排查。
+> 在生产环境运行 VexGo：安全加固、反向代理、HTTPS、服务管理、升级和故障排查。
 
 ## 生产环境检查清单
 
@@ -13,10 +13,8 @@
 - [ ] 将 `BASE_URL` 设置为公网地址（SSO 回调必需）
 - [ ] 设置 `behind_reverse_proxy: true` 并配置 `trusted_proxies`（或设置 `BEHIND_REVERSE_PROXY=true` / `TRUSTED_PROXIES=...`）
 - [ ] 生产环境使用真实数据库（PostgreSQL）而非默认 SQLite
-- [ ] 在负载均衡后运行多个实例？设置 `VALKEY_ENABLED=true`（及 `VALKEY_URL`），使限流与 OAuth state 多实例共享——参见[多实例扩展](#多实例扩展)
+- [ ] 在负载均衡后运行多个实例？设置 `VALKEY_ENABLED=true`（及 `VALKEY_URL`），使限流与 OAuth state 多实例共享；参见[多实例扩展](#多实例扩展)
 - [ ] 定期备份数据目录和数据库
-
----
 
 ## 反向代理
 
@@ -68,8 +66,6 @@ BASE_URL=https://your-domain.com ./vexgo server
 
 或配置在 Docker/systemd 环境中。
 
----
-
 ## Let's Encrypt HTTPS
 
 配合 Nginx 和 Certbot：
@@ -80,8 +76,6 @@ sudo certbot --nginx -d your-domain.com
 ```
 
 Certbot 会配置 TLS、设置自动续期，并将 HTTP 重定向到 HTTPS。
-
----
 
 ## 作为服务运行（systemd）
 
@@ -112,8 +106,6 @@ sudo systemctl start vexgo
 sudo systemctl status vexgo
 ```
 
----
-
 ## 防火墙
 
 只开放 VexGo 需要的端口：
@@ -131,13 +123,11 @@ sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 ```
 
-> **提示：** 如果 VexGo 与反向代理在同一台机器上，只需开放 80/443 端口——代理通过 localhost 与 VexGo 通信。
-
----
+> 如果 VexGo 与反向代理在同一台机器上，只需开放 80/443 端口，代理通过 localhost 与 VexGo 通信。
 
 ## 多实例扩展
 
-VexGo 是单一二进制。默认情况下内容缓存、限流预算与 OAuth 登录 state 都位于**进程内部**——单实例没有问题，但负载均衡后的两个及以上实例必须通过 Valkey（兼容 Redis）服务器共享这些状态：
+VexGo 是单一二进制。默认情况下内容缓存、限流预算与 OAuth 登录 state 都位于进程内部。单实例没有问题，但负载均衡后的两个及以上实例必须通过 Valkey（兼容 Redis）服务器共享这些状态：
 
 ```yaml
 cache_enabled: true # 内容缓存；false = 公开读取始终直达数据库
@@ -145,23 +135,21 @@ valkey_enabled: true # 多实例部署必填
 valkey_url: "valkey://valkey.internal:6379"
 ```
 
-所有实例必须指向同一个 Valkey 服务器。与 `cache_enabled` 不同——它无需外部服务器，会回退到进程内内存缓存——启用 `valkey_enabled` 使 Valkey 成为硬依赖：VexGo 启动时以 PING 验证连接，服务器不可达时拒绝启动（fail-fast），让错误的 URL 立刻暴露而不是等到请求时才失败。
+所有实例必须指向同一个 Valkey 服务器。`cache_enabled` 无需外部服务器，会回退到进程内内存缓存；`valkey_enabled` 则让 Valkey 成为硬依赖：VexGo 启动时以 PING 验证连接，服务器不可达时拒绝启动（fail-fast），让错误的 URL 立刻暴露，而不是等到请求时才失败。
 
 运维要点：
 
-- **保持服务器私有**：回环或可信网络、URL 中带密码、必要时用 `rediss://` 走 TLS。其中的数据被视为可信并直接提供给用户。
-- **配置淘汰策略**：设置 `maxmemory` 上限并配合 `allkeys-lru`——限流键按客户端 IP 轮换，应用层无法设界。
-- **部署位置很重要**：将 Valkey 与应用同宿主（同一台机器、unix socket 或 host 网络），或保持低 RTT 网络路径。对廉价读取（单篇文章）而言，缓存往返必须比它替代的数据库查询更便宜，否则缓存得不偿失。
-- `valkey_enabled: false` 时内容缓存仍使用进程内内存后端——完整行为矩阵见[配置指南](/zh-cn/guides/configuration#内容缓存与-valkey)。
-
----
+- 保持服务器私有：回环或可信网络、URL 中带密码、必要时用 `rediss://` 走 TLS。其中的数据被视为可信并直接提供给用户。
+- 配置淘汰策略：设置 `maxmemory` 上限并配合 `allkeys-lru`，因为限流键按客户端 IP 轮换，应用层无法设界。
+- 将 Valkey 与应用同宿主（同一台机器、unix socket 或 host 网络），或保持低 RTT 网络路径。对廉价读取（单篇文章）而言，缓存往返必须比它替代的数据库查询更便宜，否则缓存得不偿失。
+- `valkey_enabled: false` 时内容缓存仍使用进程内内存后端；完整行为矩阵见[配置指南](/zh-cn/guides/configuration#内容缓存与-valkey)。
 
 ## 备份
 
 VexGo 的数据存放在两处：
 
-1. **数据目录** —— SQLite 数据库文件和上传的媒体（启用 S3 时媒体在 S3）
-2. **数据库** —— 使用 PostgreSQL/MySQL 时
+1. 数据目录：SQLite 数据库文件和上传的媒体（启用 S3 时媒体在 S3）
+2. 数据库：使用 PostgreSQL/MySQL 时
 
 ### 备份数据目录
 
@@ -177,17 +165,15 @@ pg_dump -U vexgo_user vexgo_db > vexgo-db-$(date +%F).sql
 
 使用 `psql -U vexgo_user vexgo_db < backup.sql` 恢复。
 
-用 cron 或 systemd 定时器定期备份，并存储到机器之外（如 S3 桶或其他服务器）。
+用 cron 或 systemd 定时器定期备份，并存储到机器之外，例如 S3 桶或其他服务器。
 
 > 如果设置了 `SETTINGS_ENCRYPTION_KEY`，请将其与数据库一起备份：恢复备份时若没有该密钥，将无法解密已存储的 SMTP 密码与 API 密钥（服务器仍可运行，但需要管理员在后台重新录入这些敏感信息）。
 
----
-
 ## 升级
 
-> **升级前：** 备份数据目录和数据库。升级后重启，以便数据库迁移执行。
+> 升级前请备份数据目录和数据库。升级后重启，以便数据库迁移执行。
 
-> **管理端路径：** 管理面板位于 `/admin/...`（例如 `/admin/login`、`/admin/write`）。旧的一级路径（如 `/login`）会 301 重定向到对应的 `/admin/` 地址并保留查询串，因此已有书签和邮件里的 `?token=...` 链接仍然可用。
+> 管理面板位于 `/admin/...`（例如 `/admin/login`、`/admin/write`）。旧的一级路径如 `/login` 会 301 重定向到对应的 `/admin/` 地址并保留查询串，因此已有书签和邮件里的 `?token=...` 链接仍然可用。
 
 ### Docker
 
@@ -210,8 +196,6 @@ docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-sto
 nix flake update
 sudo nixos-rebuild switch --flake .#myhost
 ```
-
----
 
 ## 故障排查
 

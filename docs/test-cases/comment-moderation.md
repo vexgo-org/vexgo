@@ -1,4 +1,4 @@
-# Comment Moderation — Test Cases
+# Comment moderation test cases
 
 Test cases for the comment moderation decision pipeline (explicit manual /
 keyword / LLM review modes with fail-closed fallback). Backend tests live in
@@ -56,12 +56,12 @@ enabled manual gate. Any LLM failure results in `pending`, never publish.
 
 ## Handler / integration (`comment/handler_test.go`)
 
-| ID          | Scenario                                                                                                                                                | Expected                                           |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| TC-CMOD-023 | Create comment (keyword reject) → appears in `/api/moderation/comments/pending`? No — in rejected list with `moderationReason`; pending list unaffected | Moderation reason returned by moderation list API  |
-| TC-CMOD-024 | Config round-trip `GET`/`PUT /api/moderation/comments/config`                                                                                           | New switches persisted and returned, ApiKey masked |
-| TC-CMOD-025 | `POST /comments` returns `requiresModeration=true` when final status is `pending`                                                                       | Commenter-facing behavior unchanged                |
-| TC-CMOD-026 | Moderation config endpoints reject non-admin roles                                                                                                      | 401/403 as before                                  |
+| ID          | Scenario                                                                                                                                                          | Expected                                           |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-CMOD-023 | Create comment (keyword reject) does not appear in `/api/moderation/comments/pending`, only in the rejected list with `moderationReason`; pending list unaffected | Moderation reason returned by moderation list API  |
+| TC-CMOD-024 | Config round-trip `GET`/`PUT /api/moderation/comments/config`                                                                                                     | New switches persisted and returned, ApiKey masked |
+| TC-CMOD-025 | `POST /comments` returns `requiresModeration=true` when final status is `pending`                                                                                 | Commenter-facing behavior unchanged                |
+| TC-CMOD-026 | Moderation config endpoints reject non-admin roles                                                                                                                | 401/403 as before                                  |
 
 ## Frontend (manual, `bun run build` is the type gate)
 

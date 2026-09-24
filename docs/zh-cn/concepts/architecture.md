@@ -1,15 +1,15 @@
 # 架构
 
-> **原理讲解** —— 本页介绍 VexGo 的设计：后端结构、角色与权限的工作方式、内容审核管线、主题系统和 SSO。这是背景知识——用于理解 VexGo，而不是完成某个具体任务。
+> 本页介绍 VexGo 的设计：后端结构、角色与权限、内容审核管线、主题系统和 SSO。需要按步骤操作时请看各篇指南。
 
 ## 总览
 
 VexGo 是一个自托管的博客 CMS，由两部分组成：
 
-- **Go 后端**（`backend/`）—— 基于 Gin 和 GORM 构建的 HTTP API，提供管理面板、公开站点和 REST API。支持 SQLite、PostgreSQL 或 MySQL。
-- **React 前端**（`frontend/`）—— 管理面板：基于 TypeScript + Vite + Tailwind CSS 的 SPA，与 API 通信。构建产物嵌入后端二进制，并只在 `/admin/...` 下提供；旧的一级路径（如 `/login`）会 301 重定向到对应位置且保留查询串，因此旧书签仍然可用。公开页面则由主题进行服务端渲染。
+- Go 后端（`backend/`）：基于 Gin 和 GORM 构建的 HTTP API，提供管理面板、公开站点和 REST API。支持 SQLite、PostgreSQL 或 MySQL。
+- React 前端（`frontend/`）：管理面板，基于 TypeScript + Vite + Tailwind CSS 的 SPA，与 API 通信。构建产物嵌入后端二进制，并只在 `/admin/...` 下提供；旧的一级路径（如 `/login`）会 301 重定向到对应位置且保留查询串，因此旧书签仍然可用。公开页面则由主题进行服务端渲染。
 
-**主题系统**让后端能够以服务端渲染的方式，用上传的主题渲染公开页面——访客无需 JavaScript 即可阅读内容。
+主题系统让后端用上传的主题渲染公开页面，访客无需 JavaScript 即可阅读内容。
 
 ## 后端结构
 
@@ -46,7 +46,7 @@ backend/
 
 ### 分层架构（每个领域）
 
-每个领域包遵循一致的三层模式：
+每个领域包遵循三层模式：
 
 ```text
 handler.go    → HTTP 请求解析、响应渲染（调用 service）
@@ -54,15 +54,13 @@ service.go    → 业务逻辑、跨领域编排（调用 repository）
 repository.go → 持久化接口 + GORM 实现（调用数据库）
 ```
 
-这种分离确保：
-
-- **Handler** 不直接操作 GORM——它们委托给 Service。
-- **Service** 在 `Repository` 接口之后与数据库无关，因此无需真实数据库即可测试（各领域的测试用内存 SQLite 运行，接缝则用 fake）。
-- **Repository** 封装所有 SQL/GORM 查询，包括批量操作以避免 N+1 问题。
+- Handler 不直接操作 GORM，而是委托给 Service。
+- Service 在 `Repository` 接口之后与数据库无关，因此无需真实数据库即可测试。各领域的测试用内存 SQLite 运行，接缝则用 fake。
+- Repository 封装所有 SQL/GORM 查询，包括避免 N+1 的批量操作。
 
 ### 共享接缝（`model/interfaces.go`）
 
-`model` 包中只有两个跨领域接缝的小型接口；其余接口由消费方领域自行声明：
+`model` 包中只有两个跨领域接缝的小型接口，其余接口由消费方领域自行声明：
 
 ```go
 // NotificationInput 是 CreateNotification 接收的通知字段（userID、type、title、content、relatedID、relatedType）。
@@ -92,25 +90,25 @@ type FileRemover interface {
 - `notification` 实现 `Notifier`；由 `post`、`comment`、`user` 消费。
 - `upload` 实现 `FileRemover`；由 `post`、`user`、`auth` 用于文件清理。
 - `captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接缝；`settings` 自行声明 `SecretCipher`，`post`/`home` 自行声明 `ReadCache`。
-- 邮件是刻意的例外：`mailer.Service` 以具体类型注入 `auth` 与 `settings`。它只负责发送；验证令牌、密码重置与帐号数据仍留在各领域的 repository 中。
+- 邮件是例外：`mailer.Service` 以具体类型注入 `auth` 与 `settings`。它只负责发送；验证令牌、密码重置与帐号数据仍留在各领域的 repository 中。
 
 ### 缓存后端（`internal/cache/`）
 
-`internal/cache` 是一个**叶子包**（不 import 任何其他 backend 内部包），提供一个 `Cache` 接口——`Get`/`Set`/`Delete`/`GetDel`/`Incr`——以及两个实现：进程内内存后端与基于 `valkey-io/valkey-go` 的 Valkey（兼容 Redis）后端。所有键以 `vexgo:` 前缀命名空间隔离，使服务器可以与无关应用共享。
+`internal/cache` 是一个叶子包，不 import 任何其他 backend 内部包。它提供一个 `Cache` 接口（`Get`/`Set`/`Delete`/`GetDel`/`Incr`）以及两个实现：进程内内存后端与基于 `valkey-io/valkey-go` 的 Valkey（兼容 Redis）后端。所有键以 `vexgo:` 前缀命名空间隔离，使服务器可以与无关应用共享。
 
 遵循消费方声明接缝的惯例，没有任何领域包 import `cache`。取而代之：
 
-- `middleware` 声明 `CounterStore`——分布式固定窗口限流器背后的原子自增
-- `sso` 声明 `StateStore`——通过 `Set`/`GetDel` 实现的一次性 OAuth state
-- `post` 与 `home` 声明 `ReadCache`——公开读路径的读穿透装饰器
+- `middleware` 声明 `CounterStore`：分布式固定窗口限流器背后的原子自增
+- `sso` 声明 `StateStore`：通过 `Set`/`GetDel` 实现的一次性 OAuth state
+- `post` 与 `home` 声明 `ReadCache`：公开读路径的读穿透装饰器
 
 `cache.Cache` 在结构上满足以上全部接口，组合根注入具体后端（memory，或启动时拨号并 PING 的 valkey 连接）。运行期存储错误在限流器中**fail-open**（可用性优先于防滥用），在 SSO state 检查中**fail-closed**（CSRF 防护保持完整）。
 
 ### 组合根（`internal/app/`）
 
-`internal/app/app.go` 包是组合根（也称"装配层"）。它：
+`internal/app/app.go` 包是组合根，也称装配层。它：
 
-1. 接收 `cli.Execute()` 解析完成的配置——cobra 负责命令行参数，viper 负责按「参数 > 配置文件 > 环境变量 > 默认值」分层。
+1. 接收 `cli.Execute()` 解析完成的配置：cobra 负责命令行参数，viper 按「参数 > 配置文件 > 环境变量 > 默认值」分层。
 2. 确保 JWT 密钥存在（开发环境生成随机兜底值）并应用前端地址默认值；SSO 结构体在配置解析阶段派生。
 3. 打开数据库并运行迁移/种子数据。
 4. 从 `settings_encryption_key` 构建静态加密 cipher（未设置时记录警告，敏感信息保持明文存储），并运行 `database.MigrateSecretsAtRest` 将仍为明文的敏感信息就地加密（幂等）。
@@ -121,7 +119,7 @@ type FileRemover interface {
 
 ### 依赖规则
 
-包结构保证了依赖图**无环**：
+包结构保证依赖图无环：
 
 ```text
 cmd/vexgo/main.go
@@ -155,20 +153,20 @@ cmd/vexgo/main.go
 
 ### 配置管理
 
-配置通过三层优先级链加载：
+配置按优先级链加载：
 
 ```text
 命令行参数  →  配置文件（YAML）  →  环境变量  →  默认值
   （最高优先级）                              （最低优先级）
 ```
 
-命令行使用 **cobra** 定义（`internal/cli`），各来源由 **viper** 分层（`internal/config`）。分层顺序的一个直接结果：配置文件中的显式 `false` 会覆盖环境变量中的 `true`——环境变量只填充配置文件未设置的键。
+命令行用 cobra 定义（`internal/cli`），各来源由 viper 分层（`internal/config`）。分层顺序有一个直接结果：配置文件中的显式 `false` 会覆盖环境变量中的 `true`，因为环境变量只填充配置文件未设置的键。
 
-`config.Config` 结构体保存所有运行时值。**不存在全局变量**——JWT 密钥、SSO 配置和前端 URL 是 `Config` 的字段，而非包级别变量。
+`config.Config` 结构体保存所有运行时值。没有全局变量，JWT 密钥、SSO 配置和前端 URL 都是 `Config` 的字段，不是包级别变量。
 
 ### context.Context 传播
 
-所有 service 和 repository 方法都以 `context.Context` 作为第一个参数。Handler 从 Gin 请求上下文传递 `c.Request.Context()`，支持：
+所有 service 和 repository 方法都以 `context.Context` 作为第一个参数。Handler 从 Gin 请求上下文传递 `c.Request.Context()`，可用于：
 
 - 请求作用域的取消和超时
 - 分布式追踪传播
@@ -176,7 +174,7 @@ cmd/vexgo/main.go
 
 ## 用户、角色与权限
 
-认证基于 JWT。每个用户只有一个角色；每次请求都会根据数据库中的角色检查权限。
+认证基于 JWT。每个用户只有一个角色，每次请求都会根据数据库中的角色检查权限。
 
 | 角色          | 权限                                             |
 | ------------- | ------------------------------------------------ |
@@ -184,21 +182,21 @@ cmd/vexgo/main.go
 | `admin`       | 审核内容、管理用户和设置、审批创作者申请         |
 | `author`      | 直接发布文章                                     |
 | `contributor` | 申请角色升级（创作者申请）                       |
-| `guest`       | 新注册用户——受限访问                             |
+| `guest`       | 新注册用户，受限访问                             |
 
 权限检查是累积的：
 
-- **Is admin** = `admin` 或 `super_admin`
-- **Is author** = `author` 及以上角色
-- **Is contributor** = `contributor` 及以上角色
+- Is admin = `admin` 或 `super_admin`
+- Is author = `author` 及以上角色
+- Is contributor = `contributor` 及以上角色
 
 ### 创作者申请
 
-新用户注册为 `guest`。他们可以提交**创作者申请**（附理由）请求升级。管理员审核队列，批准或拒绝每份申请；批准后用户升入更高角色层级。
+新用户注册为 `guest`，可以提交创作者申请（附理由）请求升级。管理员审核队列，批准或拒绝每份申请；批准后用户升入更高角色层级。
 
 ## 内容审核
 
-VexGo 有两条审核管线——文章和评论各一条。两者都围绕 `status` 字段：
+VexGo 有两条审核管线，文章和评论各一条。两者都围绕 `status` 字段：
 
 - **文章**：`draft` → `pending` → `published` / `rejected`（被拒文章可重新提交）
 - **评论**：`published`、`pending`、`rejected`
@@ -209,17 +207,17 @@ VexGo 有两条审核管线——文章和评论各一条。两者都围绕 `sta
 
 ### 评论审核
 
-评论审核由三个相互独立的开关驱动，可在管理面板配置（默认全部关闭，此时新评论立即发布）：
+评论审核由三个相互独立的开关驱动，可在管理面板配置。默认全部关闭，此时新评论立即发布：
 
-- **关键词过滤** —— 包含屏蔽关键词的评论直接拒绝，不再调用大模型
-- **大模型审核** —— 由已配置的大模型（OpenAI 兼容 API）按提示词审核每条评论。拒绝结论则评论被拒绝；通过结论仅在人工审核关闭时发布。任何大模型故障（网络、超时、非 200、非 JSON 响应）都会使评论保持 `pending`——整条管道 fail-closed，被误导或故障的模型最多把评论送进待审队列，绝不会发布垃圾内容
-- **人工审核** —— 所有未被发布或拒绝的评论在队列中等待管理员裁决（人工终审）
+- 关键词过滤：包含屏蔽关键词的评论直接拒绝，不再调用大模型。
+- 大模型审核：由已配置的大模型（OpenAI 兼容 API）按提示词审核每条评论。拒绝结论则评论被拒绝，通过结论仅在人工审核关闭时发布。任何大模型故障（网络、超时、非 200、非 JSON 响应）都会使评论保持 `pending`，因为整条管道 fail-closed：被误导或故障的模型最多把评论送进待审队列，绝不会发布垃圾内容。
+- 人工审核：所有未被发布或拒绝的评论在队列中等待管理员裁决（人工终审）。
 
-审核配置（开关、提示词、关键词、模型）存储在数据库中，通过管理面板或 `/moderation` API 端点管理。旧版本单一的"启用 AI 审核"开关会在启动时自动迁移为新的开关组合。
+审核配置（开关、提示词、关键词、模型）存储在数据库中，通过管理面板或 `/moderation` API 端点管理。旧版本单一的「启用 AI 审核」开关会在启动时自动迁移为新的开关组合。
 
 ## 主题系统
 
-公开页面由服务端渲染：`internal/public` 中的渲染器执行当前主题的 Go 模板并返回渲染好的 HTML，因此访客无需执行 JavaScript 即可阅读内容。内置的**默认主题**始终可用；管理员可通过管理面板上传 ZIP 格式的主题。当前主题是数据库中的一个值，无需重启即可在运行时切换。
+公开页面由服务端渲染：`internal/public` 中的渲染器执行当前主题的 Go 模板并返回渲染好的 HTML，因此访客无需执行 JavaScript 即可阅读内容。内置的默认主题始终可用，管理员可通过管理面板上传 ZIP 格式的主题。当前主题是数据库中的一个值，无需重启即可在运行时切换。
 
 一个主题就是「模板 + 可选的翻译、种子页面和静态资源」构成的目录：
 
@@ -239,14 +237,14 @@ my-theme/
 
 上传的主题解压到 `data/theme/<id>/`。根目录下的所有模板会解析进同一个集合（因此 `{{define}}` 片段可跨文件共享），由 `html/template` 自动转义渲染，Markdown 正文由 goldmark 以安全模式渲染。解析后的模板按主题缓存，主题文件变化时重新读取。
 
-完整管线——模板解析及其回退链、语言优先级、缓存、种子页面，以及主题的信任边界——见[主题系统](/zh-cn/concepts/theming)。逐字段细节见[主题模板参考](/zh-cn/reference/theme-templates)。
+[主题系统](/zh-cn/concepts/theming) 介绍了完整管线：模板解析及其回退链、语言优先级、缓存、种子页面，以及主题的信任边界。逐字段细节见[主题模板参考](/zh-cn/reference/theme-templates)。
 
 ## SSO
 
 登录可以委托给外部身份提供商：
 
-- **GitHub** 和 **Google** OAuth
-- 任意 **OpenID Connect (OIDC)** 提供商（Keycloak、Authentik、Authelia、Okta、Casdoor 等）
+- GitHub 和 Google OAuth
+- 任意 OpenID Connect (OIDC) 提供商（Keycloak、Authentik、Authelia、Okta、Casdoor 等）
 
 SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_callback_result` 键，打开方页面通过 `storage` 事件获取。当 `allow_local_login` 为 `false` 时，密码登录被完全禁用，SSO 成为唯一入口。
 
@@ -262,14 +260,14 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ## 存储
 
-- **上传文件** 默认存到本地数据目录，启用 S3 后存到任意 **S3 兼容对象存储**（AWS S3、MinIO、Garage 等）。
-- **元数据**（用户、文章、评论、设置）存储在数据库中——默认 SQLite，生产环境用 PostgreSQL/MySQL。
+- 上传文件默认存到本地数据目录，启用 S3 后存到任意 S3 兼容对象存储（AWS S3、MinIO、Garage 等）。
+- 元数据（用户、文章、评论、设置）存储在数据库：默认 SQLite，生产环境用 PostgreSQL/MySQL。
 
 ## 通知
 
 站内通知按用户存储。评论、点赞、回复、文章审核和角色变更等事件都会在接收者的收件箱中创建通知，通过 `/notifications` API 暴露。
 
-通知系统使用**接缝接口**（`model.Notifier`）——各领域调用 `notifier.CreateNotification()` 而不导入 notification 包。具体实现在启动时由组合根注入。
+通知系统使用接缝接口 `model.Notifier`，各领域调用 `notifier.CreateNotification()` 而不导入 notification 包，具体实现在启动时由组合根注入。
 
 ## 数据库
 
@@ -315,11 +313,11 @@ Repository（如 internal/post/repository.go）
 JSON 响应（主题页面则为 SSR 渲染的 HTML）
 ```
 
-JWT 中间件验证令牌并通过 `middleware.CurrentUser(c)` / `middleware.CurrentUserID(c)` 辅助函数将用户写入 Gin 上下文。权限中间件将数据库中的角色与端点要求的角色进行比对。`super_admin` 始终通过。
+JWT 中间件验证令牌并通过 `middleware.CurrentUser(c)` / `middleware.CurrentUserID(c)` 辅助函数将用户写入 Gin 上下文。权限中间件用数据库中的角色比对端点要求的角色。`super_admin` 始终通过。
 
 ### 性能：批量查询
 
-对于显示每篇文章点赞/评论数的列表端点，post 领域使用**批量查询**而非 N+1：
+对于显示每篇文章点赞/评论数的列表端点，post 领域使用批量查询而非 N+1：
 
 ```text
 // 之前（N+1）：每篇文章 3 次查询
@@ -335,14 +333,14 @@ commentsCounts := repo.BatchCountCommentsByPostIDs(ctx, postIDs)    // 1 次 GRO
 likedPosts     := repo.BatchFindLikedPostIDs(ctx, postIDs, userID)  // 1 次 IN 查询
 ```
 
-查询次数从 `3 × N` 降为 **3 次**，无论页面大小。
+查询次数从 `3 × N` 降为 3 次，与页面大小无关。
 
 ## 测试
 
 每个领域包都有自己的 `_test.go` 文件。测试基础设施：
 
-- 使用**内存 SQLite**（`glebarez/sqlite`）进行快速、隔离的数据库测试。
-- 使用 fake 代替跨领域依赖（`fakeNotifier`、`fakeFiles`），避免测试与其他领域耦合。
+- 使用内存 SQLite（`glebarez/sqlite`）进行快速、隔离的数据库测试。
+- 跨领域依赖改用 fake（`fakeNotifier`、`fakeFiles`），避免测试与其他领域耦合。
 - 每个测试使用 `AutoMigrate()` 创建全新数据库，仅注入所需数据。
 
 运行完整测试套件：
@@ -359,7 +357,7 @@ cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/
 
 ## 相关阅读
 
-- [主题系统](/zh-cn/concepts/theming) —— 服务端渲染管线与主题系统如何工作
-- [配置参考](/zh-cn/reference/configuration) —— 全部参数、变量和配置键
-- [API 参考](api.html) —— 该架构暴露的 REST 端点
-- [配置指南](/zh-cn/guides/configuration) —— 实操配置方法
+- [主题系统](/zh-cn/concepts/theming)：服务端渲染管线与主题系统如何工作
+- [配置参考](/zh-cn/reference/configuration)：全部参数、变量和配置键
+- [API 参考](api.html)：该架构暴露的 REST 端点
+- [配置指南](/zh-cn/guides/configuration)：实操配置方法

@@ -1,6 +1,6 @@
 # 后端开发
 
-> **操作指南** —— 运行、配置与扩展 Go 后端（Gin + GORM）。请先读完[本地开发](/zh-cn/local-development/quick-develop)教程，确保内嵌 SPA 与主题已存在。
+> 运行、配置与扩展 Go 后端（Gin + GORM）的实操指南。请先读完[本地开发](/zh-cn/local-development/quick-develop)教程，确保内嵌 SPA 与主题已存在。
 
 ## 运行服务
 
@@ -11,7 +11,7 @@ just run server --addr 127.0.0.1 --port 3001 --data ./data
 go run backend/cmd/vexgo/main.go server       # 不用 just 的等价写法
 ```
 
-`backend/cmd/vexgo/main.go` 很薄：经 `cli.Execute` 解析配置后调用 `app.New(cfg)`。真正的装配在 `backend/internal/app`（组合根，负责选择缓存后端、构建加解密器、注入各领域的 `Deps`）。
+`backend/cmd/vexgo/main.go` 很薄：经 `cli.Execute` 解析配置后调用 `app.New(cfg)`。装配都在 `backend/internal/app`（组合根，负责选择缓存后端、构建加解密器、注入各领域的 `Deps`）。
 
 配置分层（优先级从高到低）：CLI flags > 配置文件（`vexgo server -c`，见 `examples/`）> 环境变量（`.env.example`）> `internal/config/config.go` 中的默认值（`keyDefaults` + `mapstructure` tag；不要再引入按来源各自解析的逻辑）。运行时数据（SQLite 文件、上传文件）默认在 `./data/`。
 
@@ -30,10 +30,10 @@ go run backend/cmd/vexgo/main.go server       # 不用 just 的等价写法
 
 配套结构：
 
-- `backend/internal/router` —— `RegisterAPIRoutes` 把各领域路由挂到 `/api` 下（group 级别应用可选 JWT 中间件），依赖聚合在 `router.Deps`。`router_test.go` 锁死了 method+path 全表：增删改路由必须同步更新该表。
-- `backend/internal/app` —— 装配所有领域；`backend/cmd/vexgo/main.go` 只做配置解析与调用。
+- `backend/internal/router`：`RegisterAPIRoutes` 把各领域路由挂到 `/api` 下（group 级别应用可选 JWT 中间件），依赖聚合在 `router.Deps`。`router_test.go` 锁死了 method+path 全表：增删改路由必须同步更新该表。
+- `backend/internal/app`：装配所有领域；`backend/cmd/vexgo/main.go` 只做配置解析与调用。
 - 不导入其他后端包的叶子包：`config`、`model`、`secrets`、`cache`。`model` 放 GORM 模型与 `Notifier`/`FileRemover` 缝隙（`model/interfaces.go`）；不得导入应用逻辑。
-- `backend/internal/public` —— SSR 引擎、主题 serving、嵌入资源。`backend/internal/settings` —— 站点设置与主题管理。
+- `backend/internal/public`：SSR 引擎、主题 serving、嵌入资源。`backend/internal/settings`：站点设置与主题管理。
 - 跨域调用走消费方声明的接口（`notification` 实现 `model.Notifier`，`upload` 实现 `model.FileRemover`）。`mailer.Service` 是有意的例外：以具体 `*mailer.Service` 注入 `auth` 与 `settings`。
 - 每一层都要透传 `context.Context`；handler 传 `c.Request.Context()`。依赖经 `Deps` 结构体显式注入，不用全局变量（唯一的全局可变状态是测试缝隙 `mailer.SetMailCaptureHook`，测试中用 `t.Cleanup` 还原）。
 

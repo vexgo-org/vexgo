@@ -1,19 +1,19 @@
 # Architecture
 
-> **Explanation** — this page explains how VexGo is designed: the backend layout, how roles and permissions work, the moderation pipeline, theming, and SSO. It's background knowledge — read it to understand VexGo, not to accomplish a specific task.
+> This page covers how VexGo is designed: the backend layout, roles and permissions, the moderation pipeline, theming, and SSO. For instructions you can follow, see the guides.
 
 ## Overview
 
 VexGo is a self-hosted blog CMS with two main parts:
 
-- **A Go backend** (`backend/`) — an HTTP API built with Gin and GORM, serving the admin panel, the public site, and the REST API. It can run against SQLite, PostgreSQL, or MySQL.
-- **A React frontend** (`frontend/`) — the admin console: a TypeScript + Vite + Tailwind CSS SPA that talks to the API. Its build output is embedded into the backend binary and served under `/admin/...`; legacy top-level URLs (such as `/login`) 301-redirect there with the query string preserved, so old bookmarks keep working. Public pages are server-side rendered from themes instead.
+- A Go backend (`backend/`): an HTTP API built with Gin and GORM, serving the admin panel, the public site, and the REST API. It can run against SQLite, PostgreSQL, or MySQL.
+- A React frontend (`frontend/`): the admin console, a TypeScript + Vite + Tailwind CSS SPA that talks to the API. Its build output is embedded into the backend binary and served under `/admin/...`; legacy top-level URLs (such as `/login`) 301-redirect there with the query string preserved, so old bookmarks keep working. Public pages are server-side rendered from themes instead.
 
-A **theme system** lets the backend server-side-render public pages with uploaded themes, so visitors don't need JavaScript to read content.
+A theme system lets the backend server-side-render public pages with uploaded themes, so visitors don't need JavaScript to read content.
 
-## Backend Layout
+## Backend layout
 
-The backend follows a domain-oriented layout under `backend/internal` with a composition root for bootstrapping:
+The backend follows a domain-oriented layout under `backend/internal`, with a composition root for bootstrapping:
 
 ```text
 backend/
@@ -44,9 +44,9 @@ backend/
     user/                    # user management, roles, creator applications
 ```
 
-### Layered Architecture (per domain)
+### Layered architecture (per domain)
 
-Each domain package follows a consistent three-layer pattern:
+Each domain package follows a three-layer pattern:
 
 ```text
 handler.go    → HTTP request parsing, response rendering (calls service)
@@ -54,15 +54,13 @@ service.go    → business logic, cross-domain orchestration (calls repository)
 repository.go → persistence interface + GORM implementation (calls database)
 ```
 
-This separation ensures that:
+- Handlers never touch GORM directly; they delegate to the service.
+- Services are database-agnostic behind a `Repository` interface, so they can be tested without a live database. The domain tests run them against in-memory SQLite, and the seams are faked.
+- Repositories encapsulate all SQL/GORM queries, including batch operations that prevent N+1.
 
-- **Handlers** never touch GORM directly — they delegate to the service.
-- **Services** are database-agnostic behind a `Repository` interface, so they can be tested without a live database (the domain tests run them against in-memory SQLite, and the seams are faked).
-- **Repositories** encapsulate all SQL/GORM queries, including batch operations for N+1 prevention.
+### Shared seams (`model/interfaces.go`)
 
-### Shared Seams (`model/interfaces.go`)
-
-Two cross-domain seams live in the `model` package as small interfaces; the other domains declare their own where they are consumed:
+The `model` package holds two cross-domain seams as small interfaces; other domains declare their own where they are consumed:
 
 ```go
 // NotificationInput groups the notification fields passed to CreateNotification.
@@ -92,25 +90,25 @@ The implementations are wired in `internal/app`, so no domain imports another do
 - `notification` implements `Notifier`; `post`, `comment`, and `user` consume it.
 - `upload` implements `FileRemover`; `post`, `user`, and `auth` consume it for file cleanup.
 - `captcha` implements the `CaptchaChecker` seam that `auth` declares; `settings` declares its own `SecretCipher` and `post`/`home` their own `ReadCache` the same way.
-- Email is the deliberate exception: `mailer.Service` is injected as a concrete type into `auth` and `settings`. It is send-only; verification tokens, password resets, and accounts stay in the domain repositories.
+- Email is an exception: `mailer.Service` is injected as a concrete type into `auth` and `settings`. It is send-only; verification tokens, password resets, and accounts stay in the domain repositories.
 
-### Cache Backends (`internal/cache/`)
+### Cache backends (`internal/cache/`)
 
-`internal/cache` is a **leaf package** (it imports no other backend module) providing one `Cache` interface — `Get`/`Set`/`Delete`/`GetDel`/`Incr` — with two implementations: an in-process memory backend and a Valkey (Redis-compatible) backend built on `valkey-io/valkey-go`. All keys are namespaced with a `vexgo:` prefix so the server can be shared with unrelated applications.
+`internal/cache` is a leaf package that imports no other backend module. It provides one `Cache` interface (`Get`/`Set`/`Delete`/`GetDel`/`Incr`) with two implementations: an in-process memory backend and a Valkey (Redis-compatible) backend built on `valkey-io/valkey-go`. All keys are namespaced with a `vexgo:` prefix so the server can be shared with unrelated applications.
 
 Following the consumer-declared seam convention, no domain imports `cache`. Instead:
 
-- `middleware` declares `CounterStore` — the atomic increment behind the distributed fixed-window rate limiter
-- `sso` declares `StateStore` — one-time OAuth state via `Set`/`GetDel`
-- `post` and `home` declare `ReadCache` — the read-through decorators for the public read paths
+- `middleware` declares `CounterStore`, the atomic increment behind the distributed fixed-window rate limiter
+- `sso` declares `StateStore`, one-time OAuth state via `Set`/`GetDel`
+- `post` and `home` declare `ReadCache`, the read-through decorators for the public read paths
 
 `cache.Cache` satisfies all of these structurally, and the composition root injects the concrete backend (memory, or a valkey connection dialed and PINGed at startup). Runtime store errors fail **open** in the rate limiter (availability over abuse protection) and fail **closed** in the SSO state check (CSRF protection stays intact).
 
-### Composition Root (`internal/app/`)
+### Composition root (`internal/app/`)
 
-The `internal/app/app.go` package is the composition root (also called the "wiring" layer). It:
+The `internal/app/app.go` package is the composition root, also called the wiring layer. It:
 
-1. Receives the configuration resolved by `cli.Execute()` — cobra parses the flags, viper layers flags > config file > environment variables > defaults.
+1. Receives the configuration resolved by `cli.Execute()`: cobra parses the flags, and viper layers flags > config file > environment variables > defaults.
 2. Ensures the JWT secret exists (generating a random development fallback) and applies the frontend URL default; the SSO struct is derived during config resolution.
 3. Opens the database and runs migrations/seeding.
 4. Builds the at-rest cipher from `settings_encryption_key` (a warning is logged when unset, meaning secrets stay in plaintext) and runs `database.MigrateSecretsAtRest` to encrypt still-plaintext secrets in place (idempotent).
@@ -119,9 +117,9 @@ The `internal/app/app.go` package is the composition root (also called the "wiri
 
 `cmd/vexgo/main.go` is a thin entry point that calls `cli.Execute()`, then `app.New(cfg)` and `app.Run()`.
 
-### Dependency Rules
+### Dependency rules
 
-The package layout keeps the dependency graph **acyclic**:
+The package layout keeps the dependency graph acyclic:
 
 ```text
 cmd/vexgo/main.go
@@ -153,30 +151,30 @@ Cross-domain edges:
     mailer/        ← injected as a concrete *mailer.Service into auth and settings (send-only)
 ```
 
-### Configuration Management
+### Configuration management
 
-Configuration is loaded through a three-layer priority chain:
+Configuration resolves through a priority chain:
 
 ```text
 command line flags  →  config file (YAML)  →  environment variables  →  defaults
      (highest)                                                (lowest)
 ```
 
-The command line is defined with **cobra** (`internal/cli`), and the sources are layered with **viper** (`internal/config`). One consequence of the ordering: an explicit `false` in the config file overrides a `true` from the environment — environment variables only fill keys the config file leaves unset.
+The command line is defined with **cobra** (`internal/cli`), and the sources are layered with **viper** (`internal/config`). One consequence of the ordering: an explicit `false` in the config file overrides a `true` from the environment, because environment variables only fill keys the config file leaves unset.
 
-The `config.Config` struct holds all runtime values. There are **no global variables** — the JWT secret, SSO config, and frontend URL are fields on `Config`, not package-level vars.
+The `config.Config` struct holds all runtime values. There are no global variables; the JWT secret, SSO config, and frontend URL are fields on `Config`, not package-level vars.
 
-### context.Context Propagation
+### context.Context propagation
 
-All service and repository methods accept `context.Context` as their first parameter. Handlers pass `c.Request.Context()` from the Gin request context, enabling:
+All service and repository methods accept `context.Context` as their first parameter. Handlers pass `c.Request.Context()` from the Gin request context, which gives:
 
 - Request-scoped cancellation and timeouts
 - Distributed tracing propagation
 - GORM `WithContext()` for query cancellation
 
-## Users, Roles, and Permissions
+## Users, roles, and permissions
 
-Authentication is JWT-based. Each user has exactly one role; permissions are checked against the role in the database on every request.
+Authentication is JWT-based. Each user has exactly one role, and permissions are checked against the role in the database on every request.
 
 | Role          | Can do                                                                         |
 | ------------- | ------------------------------------------------------------------------------ |
@@ -184,21 +182,21 @@ Authentication is JWT-based. Each user has exactly one role; permissions are che
 | `admin`       | Moderate content, manage users and settings, approve creator applications      |
 | `author`      | Publish posts directly                                                         |
 | `contributor` | Apply for a role upgrade (creator application)                                 |
-| `guest`       | Newly registered users — limited access                                        |
+| `guest`       | Newly registered users, with limited access                                    |
 
 Privilege checks are cumulative:
 
-- **Is admin** = `admin` or `super_admin`
-- **Is author** = `author` + admin roles
-- **Is contributor** = `contributor` + higher roles
+- Is admin = `admin` or `super_admin`
+- Is author = `author` + admin roles
+- Is contributor = `contributor` + higher roles
 
-### Creator Applications
+### Creator applications
 
-New users register as `guest`. They can submit a **creator application** (with a reason) to request an upgrade. Admins review the queue and approve or reject each application; approving moves the user up a role tier.
+New users register as `guest`. They can submit a creator application (with a reason) to request an upgrade. Admins review the queue and approve or reject each application; approving moves the user up a role tier.
 
-## Content Moderation
+## Content moderation
 
-VexGo has two moderation pipelines — one for posts, one for comments. Both revolve around a `status` field:
+VexGo has two moderation pipelines, one for posts and one for comments. Both revolve around a `status` field:
 
 - **Posts**: `draft` → `pending` → `published` / `rejected` (rejected posts can be resubmitted)
 - **Comments**: `published`, `pending`, `rejected`
@@ -209,17 +207,17 @@ When an author publishes a post, it can go straight to `published` (if the autho
 
 ### Comment moderation
 
-Comment moderation is driven by three independent switches, configurable from the admin panel (all default to off, which publishes new comments immediately):
+Comment moderation is driven by three independent switches, configurable from the admin panel. All default to off, which publishes new comments immediately:
 
-- **Keyword filter** — comments containing a blocked keyword are rejected outright; the LLM is not called
-- **LLM review** — the configured LLM (OpenAI-compatible API) reviews each comment against a prompt. A reject verdict rejects the comment; an approve verdict is published only when manual review is off. Any LLM failure (network, timeout, non-200, non-JSON reply) holds the comment as `pending` — the pipeline is fail-closed, so a broken or fooled model can at worst send comments to the review queue, never publish junk
-- **Manual review** — every comment that was not published or rejected waits in the queue for an admin decision ("manual final review")
+- Keyword filter: comments containing a blocked keyword are rejected outright. The LLM is not called.
+- LLM review: the configured LLM (OpenAI-compatible API) reviews each comment against a prompt. A reject verdict rejects the comment, and an approve verdict publishes it only when manual review is off. Any LLM failure (network, timeout, non-200, non-JSON reply) holds the comment as `pending`, because the pipeline is fail-closed: a broken or fooled model can at worst send comments to the review queue, never publish junk.
+- Manual review: every comment that was not published or rejected waits in the queue for an admin decision ("manual final review").
 
 The moderation configuration (switches, prompt, keywords, model) lives in the database and is managed via the admin panel or the `/moderation` API endpoints. Installations upgrading from the single "enable AI moderation" toggle are migrated to the new switches automatically at startup.
 
-## Theme System
+## Theme system
 
-Public pages are rendered server-side: the renderer in `internal/public` executes Go templates from the active theme and returns finished HTML, so visitors do not need JavaScript to read content. The embedded **default theme** is always available; admins can upload additional themes as ZIP archives from the admin panel. The active theme is a database value and can be switched at runtime without a restart.
+Public pages are rendered server-side: the renderer in `internal/public` executes Go templates from the active theme and returns finished HTML, so visitors do not need JavaScript to read content. The embedded default theme is always available, and admins can upload additional themes as ZIP archives from the admin panel. The active theme is a database value and can be switched at runtime without a restart.
 
 A theme is a directory of templates plus optional translations, seed pages and static assets:
 
@@ -239,14 +237,14 @@ my-theme/
 
 Uploaded themes are extracted to `data/theme/<id>/`. All root-level templates are parsed into one set (so `{{define}}` fragments are shared across files), rendered with `html/template` auto-escaping, and Markdown bodies are rendered by goldmark in safe mode. Parsed templates are cached per theme and re-read when the theme's files change.
 
-The full pipeline — template resolution and its fallback chains, the language priority order, caching, seed pages, and the theme trust boundary — is explained in [Theming](/concepts/theming). Field-level details live in the [Theme Templates reference](/reference/theme-templates).
+[Theming](/concepts/theming) explains the full pipeline: template resolution and its fallback chains, the language priority order, caching, seed pages, and the theme trust boundary. Field-level details live in the [Theme Templates reference](/reference/theme-templates).
 
 ## SSO
 
 Login can be delegated to external identity providers:
 
-- **GitHub** and **Google** OAuth
-- Any **OpenID Connect (OIDC)** provider (Keycloak, Authentik, Authelia, Okta, Casdoor, ...)
+- GitHub and Google OAuth
+- Any OpenID Connect (OIDC) provider (Keycloak, Authentik, Authelia, Okta, Casdoor, ...)
 
 SSO flows use the authorization-code grant with a popup window; the result is written to `localStorage` under `sso_callback_result` and the opener page picks it up via the `storage` event. When `allow_local_login` is `false`, password login is disabled entirely and SSO is the only way in.
 
@@ -262,14 +260,14 @@ The callback URLs are:
 
 ## Storage
 
-- **Uploads** go to the local data directory by default, or to any **S3-compatible object storage** (AWS S3, MinIO, Garage, ...) when S3 is enabled.
-- **Metadata** (users, posts, comments, settings) lives in the database — SQLite by default, PostgreSQL/MySQL for production.
+- Uploads go to the local data directory by default, or to any S3-compatible object storage (AWS S3, MinIO, Garage, ...) when S3 is enabled.
+- Metadata (users, posts, comments, settings) lives in the database: SQLite by default, PostgreSQL/MySQL for production.
 
 ## Notifications
 
 In-app notifications are stored per user. Events such as comments, likes, replies, post reviews, and role changes create notifications in the recipient's inbox, exposed through the `/notifications` API.
 
-The notification system uses a **seam interface** (`model.Notifier`) — domain packages call `notifier.CreateNotification()` without importing the notification package. The concrete implementation is injected at startup by the composition root.
+The notification system uses a seam interface, `model.Notifier`. Domain packages call `notifier.CreateNotification()` without importing the notification package; the composition root injects the concrete implementation at startup.
 
 ## Database
 
@@ -285,11 +283,11 @@ The `database.Open()` function supports three backends:
 
 The database type is determined by the `db_type` config field or `DB_TYPE` environment variable. When connecting to MySQL, the server will automatically create the database if it doesn't exist.
 
-### Migrations and Seeding
+### Migrations and seeding
 
-`database.AutoMigrate()` creates or updates the schema for all models. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they don't already exist.
+`database.AutoMigrate()` creates or updates the schema for all models. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
 
-## Request Flow
+## Request flow
 
 A typical request looks like this:
 
@@ -317,9 +315,9 @@ JSON response (or SSR-rendered HTML for theme pages)
 
 The JWT middleware validates the token and sets the user in the Gin context via `middleware.CurrentUser(c)` / `middleware.CurrentUserID(c)` helpers. The permission middleware checks the database role against the endpoint's required roles. `super_admin` always passes.
 
-### Performance: Batch Queries
+### Performance: batch queries
 
-For list endpoints that display per-post like/comment counts, the post domain uses **batch queries** instead of N+1:
+For list endpoints that display per-post like and comment counts, the post domain uses batch queries instead of N+1:
 
 ```text
 // Before (N+1): 3 queries per post
@@ -335,14 +333,14 @@ commentsCounts := repo.BatchCountCommentsByPostIDs(ctx, postIDs)    // 1 query w
 likedPosts     := repo.BatchFindLikedPostIDs(ctx, postIDs, userID)  // 1 query with IN
 ```
 
-This reduces the query count from `3 × N` to exactly **3 queries** regardless of page size.
+This reduces the query count from `3 × N` to 3 queries regardless of page size.
 
 ## Testing
 
 Each domain package has its own `_test.go` files. The test infrastructure:
 
-- Uses **in-memory SQLite** (`glebarez/sqlite`) for fast, isolated database tests.
-- Fakes cross-domain dependencies (`fakeNotifier`, `fakeFiles`) to avoid coupling tests to other domains.
+- Uses in-memory SQLite (`glebarez/sqlite`) for fast, isolated database tests.
+- Fakes cross-domain dependencies (`fakeNotifier`, `fakeFiles`) to keep tests decoupled from other domains.
 - Each test creates a fresh database with `AutoMigrate()` and seeds only the data it needs.
 
 To run the full test suite:
@@ -357,9 +355,9 @@ To check coverage:
 cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/notification/...
 ```
 
-## Related Reading
+## Related reading
 
-- [Theming](/concepts/theming) — how the server-side rendering pipeline and theme system work
-- [Configuration Reference](/reference/configuration) — every flag, variable, and config key
-- [API Reference](api.html) — the REST endpoints exposed by this architecture
-- [Configuration Guide](/guides/configuration) — practical setup recipes
+- [Theming](/concepts/theming): how the server-side rendering pipeline and theme system work
+- [Configuration Reference](/reference/configuration): every flag, variable, and config key
+- [API Reference](api.html): the REST endpoints exposed by this architecture
+- [Configuration Guide](/guides/configuration): practical setup recipes

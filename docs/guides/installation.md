@@ -1,29 +1,27 @@
 # Installation
 
-> **How-to** — this guide shows you how to install VexGo on your own machine or server. Pick the method that fits your environment.
+> How to install VexGo on your own machine or server. Pick the method that fits your environment.
 
 ## Prerequisites
 
-- **Operating system**: Linux, macOS, Windows, FreeBSD or any system with Docker
-- **Memory**: 512 MB minimum, 1 GB recommended
-- **Disk**: at least 100 MB for the application, plus space for your data
+- Operating system: Linux, macOS, Windows, FreeBSD, or any system with Docker
+- Memory: 512 MB minimum, 1 GB recommended
+- Disk: at least 100 MB for the application, plus space for your data
 
-| Method                                                  | Requires                  | Best for                              |
-| ------------------------------------------------------- | ------------------------- | ------------------------------------- |
-| [Binary](#method-1-binary-installation)                 | A downloaded executable   | Quick local runs, VPS deployment      |
-| [Docker](#method-2-docker-installation)                 | Docker                    | Single-container deployment           |
-| [Docker Compose](#method-3-docker-compose-installation) | Docker + Docker Compose   | Multi-service setups (DB, etc.)       |
-| [Nix](#method-4-nix-installation)                       | Nix package manager       | Trying instantly, reproducible setups |
-| [NixOS Flake](#method-5-nixos-flake-installation)       | NixOS with flakes enabled | NixOS systems                         |
-| [From Source](#method-6-building-from-source)           | Go 1.26+, bun             | Development, custom builds            |
+| Method                                                  | Requires                  | Best for                           |
+| ------------------------------------------------------- | ------------------------- | ---------------------------------- |
+| [Binary](#method-1-binary-installation)                 | A downloaded executable   | Quick local runs, VPS deployment   |
+| [Docker](#method-2-docker-installation)                 | Docker                    | Single-container deployment        |
+| [Docker Compose](#method-3-docker-compose-installation) | Docker + Docker Compose   | Multi-service setups (DB, etc.)    |
+| [Nix](#method-4-nix-installation)                       | Nix package manager       | Trying it out, reproducible setups |
+| [NixOS Flake](#method-5-nixos-flake-installation)       | NixOS with flakes enabled | NixOS systems                      |
+| [From Source](#method-6-building-from-source)           | Go 1.26+, bun             | Development, custom builds         |
 
----
+## Method 1: Binary installation
 
-## Method 1: Binary Installation
+Download a pre-compiled binary and run it.
 
-The simplest method — download a pre-compiled binary and run it.
-
-### Step 1: Download the Binary
+### Step 1: Download the binary
 
 Visit the [Releases page](https://github.com/vexgo-org/vexgo/releases) and download the binary for your system and architecture.
 
@@ -41,7 +39,7 @@ curl -L $(curl -s https://api.github.com/repos/vexgo-org/vexgo/releases/latest |
 chmod +x vexgo
 ```
 
-### Step 2: Create a Data Directory
+### Step 2: Create a data directory
 
 ```bash
 mkdir -p ./data
@@ -55,7 +53,7 @@ mkdir -p ./data
 
 VexGo starts on `http://0.0.0.0:3001` by default.
 
-### Step 4: Run with Custom Options
+### Step 4: Run with custom options
 
 Server flags must follow the `server` subcommand:
 
@@ -75,7 +73,7 @@ Server flags must follow the `server` subcommand:
 
 Running bare `./vexgo` prints help instead of starting the server. The version flag is root-only: use `./vexgo --version` (or `./vexgo -V`), not `./vexgo server --version`.
 
-### Step 5: Run as a systemd Service (Optional)
+### Step 5: Run as a systemd service (optional)
 
 Create `/etc/systemd/system/vexgo.service`:
 
@@ -113,11 +111,9 @@ sudo systemctl start vexgo
 sudo systemctl status vexgo
 ```
 
----
+## Method 2: Docker installation
 
-## Method 2: Docker Installation
-
-### Step 1: Pull and Run VexGo
+### Step 1: Pull and run VexGo
 
 ```bash
 docker pull ghcr.io/vexgo-org/vexgo:latest
@@ -138,7 +134,7 @@ docker ps                 # container status
 docker logs vexgo         # container logs
 ```
 
-### Step 3: Run with Custom Configuration
+### Step 3: Run with custom configuration
 
 ```bash
 docker run -d \
@@ -155,7 +151,7 @@ docker run -d \
   ./vexgo server
 ```
 
-### Common Docker Commands
+### Common Docker commands
 
 ```bash
 docker stop vexgo
@@ -169,11 +165,9 @@ docker stop vexgo && docker rm vexgo
 docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
----
+## Method 3: Docker Compose installation
 
-## Method 3: Docker Compose Installation
-
-Docker Compose is ideal when VexGo runs alongside PostgreSQL or MySQL.
+Use Docker Compose when VexGo runs alongside PostgreSQL or MySQL.
 
 ### Step 1: Create `docker-compose.yml`
 
@@ -216,7 +210,7 @@ services:
     restart: unless-stopped
 ```
 
-### Step 2: Start the Services
+### Step 2: Start the services
 
 ```bash
 mkdir -p data postgres
@@ -226,7 +220,7 @@ docker compose logs -f vexgo   # view logs
 docker compose ps              # check status
 ```
 
-### Common Compose Commands
+### Common Compose commands
 
 ```bash
 docker compose stop
@@ -236,9 +230,7 @@ docker compose down            # stop and remove containers
 docker compose down -v         # also remove volumes (deletes data!)
 ```
 
----
-
-## Method 4: Nix Installation
+## Method 4: Nix installation
 
 ### Step 1: Install Nix
 
@@ -247,32 +239,30 @@ curl -L https://nixos.org/nix/install | sh
 source ~/.nix-profile/etc/profile.d/nix.sh
 ```
 
-### Step 2: Run VexGo Directly
+### Step 2: Run VexGo directly
 
 ```bash
 # Run without installing (fetches from GitHub)
 nix run github:vexgo-org/vexgo -- server
 ```
 
-### Step 3: Install Permanently
+### Step 3: Install permanently
 
 ```bash
 nix profile install github:vexgo-org/vexgo
 vexgo server
 ```
 
-### Step 4: Run with Custom Options
+### Step 4: Run with custom options
 
 ```bash
 nix run github:vexgo-org/vexgo -- server -c /path/to/config.yml
 nix run github:vexgo-org/vexgo -- server --port 8080 --addr 0.0.0.0
 ```
 
----
+## Method 5: NixOS flake installation
 
-## Method 5: NixOS Flake Installation
-
-### Step 1: Enable Flakes
+### Step 1: Enable flakes
 
 Add to `/etc/nixos/configuration.nix`:
 
@@ -289,7 +279,7 @@ Rebuild:
 sudo nixos-rebuild switch
 ```
 
-### Step 2: Add VexGo to Your Flake
+### Step 2: Add VexGo to your flake
 
 ```nix
 {
@@ -352,7 +342,7 @@ sudo nixos-rebuild switch
 }
 ```
 
-### Step 4: Rebuild and Manage
+### Step 4: Rebuild and manage
 
 ```bash
 sudo nix flake update
@@ -365,19 +355,17 @@ sudo systemctl restart vexgo
 sudo journalctl -u vexgo -f
 ```
 
----
-
-## Method 6: Building from Source
+## Method 6: Building from source
 
 Use this when you want the latest development version or need to customize the code.
 
-### Step 1: Install Build Dependencies
+### Step 1: Install build dependencies
 
-- **Go 1.26+**
-- **bun 1.3**
-- Optional (recommended): `just`, `gofumpt`, `golangci-lint`, `prettier`, `oxlint` — a Nix dev shell with all of them is available via `nix develop`
+- Go 1.26+
+- bun 1.3
+- Optional (recommended): `just`, `gofumpt`, `golangci-lint`, `prettier`, `oxlint`. A Nix dev shell with all of them is available via `nix develop`.
 
-### Step 2: Clone and Build
+### Step 2: Clone and build
 
 ```bash
 git clone https://github.com/vexgo-org/vexgo.git
@@ -398,7 +386,7 @@ just server
 
 `just run` passes arguments to the CLI, for example `just run server -c examples/config.yml` or `just run --version`. Bare `just run` prints help.
 
-### Development Commands
+### Development commands
 
 ```sh
 just format            # gofumpt -w -extra . && prettier --write
@@ -412,33 +400,31 @@ The frontend build output is written to `backend/internal/public/dist` and embed
 
 `just theme <dir>` is `vexgo dev --theme-dir <dir>`: it starts the server and renders public pages from a local theme directory instead of the active theme, so a developer can iterate on a theme without rebuilding the embedded default theme or uploading it. For example, `just theme ../vexgo-default-theme/dist/`.
 
----
+## After installation
 
-## After Installation
-
-### Access the Site
+### Access the site
 
 Open `http://localhost:3001` (or `http://your-server-ip:3001` on a remote server).
 
 The admin panel is at `http://localhost:3001/admin/` (login at `/admin/login`, write at `/admin/write`); legacy top-level URLs 301-redirect to their `/admin/` equivalent with the query string preserved.
 
-### Default Credentials
+### Default credentials
 
 | Field    | Value               |
 | -------- | ------------------- |
 | Email    | `admin@example.com` |
 | Password | `password`          |
 
-> **⚠️ Important:** change the default password immediately after your first login — see the [Quick Start](/getting-started) tutorial.
+> Change the default password immediately after your first login. See the [Quick Start](/getting-started) tutorial.
 
-### Verify It Works
+### Verify it works
 
 1. Log in with the default account.
 2. Create a test post and publish it.
 3. Check that it appears on the home page.
 
-### Next Steps
+### Next steps
 
-- [Configuration Guide](/guides/configuration) — set up a database, SSO, S3, and email
-- [Production Deployment](/guides/deployment) — reverse proxy, HTTPS, systemd
-- [Troubleshooting](/guides/deployment#troubleshooting) — common problems and fixes
+- [Configuration Guide](/guides/configuration): set up a database, SSO, S3, and email
+- [Production Deployment](/guides/deployment): reverse proxy, HTTPS, systemd
+- [Troubleshooting](/guides/deployment#troubleshooting): common problems and fixes

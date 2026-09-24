@@ -1,6 +1,6 @@
 # Common Workflow
 
-> **How-to** — the shared gates, API codegen, theme iteration, and troubleshooting checklist for VexGo local development. Assumes the [Local Development](/local-development/quick-develop) tutorial already runs.
+> The shared gates, API codegen, theme iteration, and troubleshooting checklist for VexGo local development. Assumes the [Local Development](/local-development/quick-develop) tutorial already runs.
 
 ## Pass the gates before a PR
 
@@ -52,7 +52,7 @@ just theme ../vexgo-default-theme/dist/
 
 Use it to iterate on a theme without rebuilding the embedded default theme or uploading anything. `server` rejects `--theme-dir` (see `backend/internal/cli/cli_test.go`). Full theme authoring lives in [Theme Development](/local-development/theme-development) and [Theming](/concepts/theming).
 
-Template parsing trap: `go()` expressions inside HTML attributes must not contain double quotes — React escapes them to `&quot;`, which breaks template parsing. Use the helper funcs (`date`, `truncate`, `userURL`, `categoryURL`) instead.
+Template parsing trap: `go()` expressions inside HTML attributes must not contain double quotes. React escapes them to `&quot;`, which breaks template parsing. Use the helper funcs (`date`, `truncate`, `userURL`, `categoryURL`) instead.
 
 ## Troubleshooting
 
@@ -67,9 +67,9 @@ Template parsing trap: `go()` expressions inside HTML attributes must not contai
 
 ## References
 
-- [Installation](/guides/installation) — every install method, including building from source.
-- [Configuration](/guides/configuration) — config file, env keys, databases.
-- [Deployment](/guides/deployment) — reverse proxy, HTTPS, systemd, production hardening.
+- [Installation](/guides/installation): every install method, including building from source.
+- [Configuration](/guides/configuration): config file, env keys, databases.
+- [Deployment](/guides/deployment): reverse proxy, HTTPS, systemd, production setup.
 - [Theme Development](/local-development/theme-development), [Theming](/concepts/theming), [Theme Templates](/reference/theme-templates).
 - [Architecture](/concepts/architecture), [API Reference](api.html).
-- `CONTRIBUTING.md` — workflow, issue/PR/commit conventions, Definition of Done.
+- `CONTRIBUTING.md`: workflow, issue/PR/commit conventions, Definition of Done.

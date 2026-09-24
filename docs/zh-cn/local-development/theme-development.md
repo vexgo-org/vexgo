@@ -1,16 +1,16 @@
 # 主题开发指南
 
-> **操作指南** —— 编写一个 VexGo 主题、打包并安装它，然后按需添加页面、翻译和交互。每一节都是一个可以独立完成的任务。逐字段的细节见[主题模板参考](/zh-cn/reference/theme-templates)，系统的设计原理见[主题系统](/zh-cn/concepts/theming)。
+> 编写一个 VexGo 主题、打包并安装它，然后按需添加页面、翻译和交互。每一节都是一个可以独立完成的任务。逐字段的细节见[主题模板参考](/zh-cn/reference/theme-templates)，系统的设计原理见[主题系统](/zh-cn/concepts/theming)。
 
 ## 开始之前
 
 你需要：
 
 - 一个正在运行的 VexGo 实例，以及一个管理员账号（用于上传主题）。
-- 一个文本编辑器。不需要编译器、Node.js 或构建步骤——主题就是普通的 HTML、CSS 和 JavaScript。
+- 一个文本编辑器。不需要编译器、Node.js 或构建步骤，主题就是普通的 HTML、CSS 和 JavaScript。
 - 一个查询模板可用数据的地方：[主题模板参考](/zh-cn/reference/theme-templates)。
 
-最好的参考实现是内置的默认主题。它的源码在独立的 [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) 仓库（构建时由 React 组件生成模板）；`scripts/fetch-default-theme.sh` 会把它的 `dist/` 构建产物复制到 `backend/internal/public/default-theme/` 以便嵌入。可以读它的写法找思路，但要注意生成的 `.html` 被压缩成了单行，并且是**构建产物**——不要直接改它，也不建议照搬，手写自己的模板更好。
+最好的参考实现是内置的默认主题。它的源码在独立的 [vexgo-default-theme](https://github.com/vexgo-org/vexgo-default-theme) 仓库（构建时由 React 组件生成模板）；`scripts/fetch-default-theme.sh` 会把它的 `dist/` 构建产物复制到 `backend/internal/public/default-theme/` 以便嵌入。可以读它的写法找思路，但要注意生成的 `.html` 被压缩成了单行，并且是构建产物，不要直接改它，也不建议照搬，手写自己的模板更好。
 
 ### 使用 `vexgo dev` 迭代
 
@@ -26,7 +26,7 @@ vexgo dev --theme-dir ../vexgo-default-theme/dist/
 just theme ../vexgo-default-theme/dist/
 ```
 
-该目录被视为主题根目录：`index.html`、`post.html`、`page.html`、`user.html`、`404.html`、任意 `<slug>.html` 文件、`assets/` 和 `i18n/` 都会直接从其中读取。资源文件仍通过稳定的 `/theme-assets/` 前缀提供，且模板在每次请求时都会从磁盘重新读取——无需重启、无需重新构建、无需上传。这也是内置主题最快的迭代方式：将 `--theme-dir` 指向独立的 `vexgo-default-theme` 检出目录（或其 `dist/` 构建产物）并在其中修改即可。
+该目录被视为主题根目录：`index.html`、`post.html`、`page.html`、`user.html`、`404.html`、任意 `<slug>.html` 文件、`assets/` 和 `i18n/` 都会直接从其中读取。资源文件仍通过稳定的 `/theme-assets/` 前缀提供，且模板在每次请求时都会从磁盘重新读取，无需重启、无需重新构建、无需上传。这也是内置主题最快的迭代方式：将 `--theme-dir` 指向独立的 `vexgo-default-theme` 检出目录（或其 `dist/` 构建产物）并在其中修改即可。
 
 ## 第 1 步：创建最小主题
 
@@ -74,7 +74,7 @@ my-theme/
 
 这就是一个可用的首页。本指南后面所有内容都是在此基础上叠加的。
 
-如果当前主题缺少某个路由对应的模板，那个路由会返回 404——所以在需要文章页、自定义页和用户页之前，先把 `post.html`、`page.html`、`user.html` 补上；也可以先只发布首页。
+如果当前主题缺少某个路由对应的模板，那个路由会返回 404。所以在需要文章页、自定义页和用户页之前，先把 `post.html`、`page.html`、`user.html` 补上；也可以先只发布首页。
 
 ## 第 2 步：补齐清单
 
@@ -173,7 +173,7 @@ cd my-theme && zip -r ../my-theme.zip .
 - **`{{.Post.ContentHTML}}` 是渲染好的 Markdown 正文。** 这是唯一一个应当以不转义方式输出的值；Go 模板知道它是安全的 HTML。不要把它包进 `<pre>` 或做转义。
 - **作者是可选的。** 文章可能没有作者记录，所以如果布局强依赖作者，请用 `{{if .Post.AuthorID}}` 包住 `.Post.AuthorName` 的使用。
 
-无论 slug 是什么，草稿、待审和被拒的文章在这条路由上都无法访问，只有管理员草稿预览例外——而这不是主题需要处理的事。
+无论 slug 是什么，草稿、待审和被拒的文章在这条路由上都无法访问，只有管理员草稿预览例外；这不是主题需要处理的事。
 
 ## 第 5 步：编写自定义页和用户页
 
@@ -224,7 +224,7 @@ cd my-theme && zip -r ../my-theme.zip .
 
 主题根目录下任意一个纯小写的 `<slug>.html`，都会成为该 slug 对应自定义页面的专属模板。如果主题有 `links.html`，且存在 slug 为 `links` 的页面，那么该页面会用 `links.html` 渲染，而不是 `page.html`。
 
-默认主题就是这样给它的 `links` 和 `timeline` 页面配上专属布局的。注意文件名里不能有斜杠——`pages/links.html` 不算页面模板。
+默认主题就是这样给它的 `links` 和 `timeline` 页面配上专属布局的。注意文件名里不能有斜杠，`pages/links.html` 不算页面模板。
 
 要让这个页面存在，还需要提供一个种子文件。`seed/links.md`：
 
@@ -245,7 +245,7 @@ VexGo | https://github.com/vexgo-org/vexgo |  | A self-hosted blog CMS
 
 frontmatter 支持 `title`（默认取文件名）、`showInNav`（`true` 或 `1`）、`sortOrder`（整数）和 `status`（默认 `published`，也支持 `draft`）。正文是 Markdown。文件名即 slug，必须是小写 ASCII 字母、数字和连字符。
 
-种子只会为尚不存在的 slug 创建页面——它们用于引导全新安装，永远不会覆盖已编辑的页面。
+种子只会为尚不存在的 slug 创建页面，用于引导全新安装，永远不会覆盖已编辑的页面。
 
 ## 第 7 步：为主题做多语言
 
@@ -331,7 +331,7 @@ my-theme/
 
 `data-post-id` 必填；`data-lang` 选择组件内置文案（自带 `en` 和 `zh`），未匹配时回退英文。组件通过公开的评论与点赞 API 通信，并复用管理面板存储的登录态，所以已登录的访客可以直接评论，主题不需要自己实现认证。
 
-如果你想用自己的组件替换它，保留相同的 `id`/`data-post-id` 约定即可，也可以完全去掉——服务端从不注入它。
+如果你想用自己的组件替换它，保留相同的 `id`/`data-post-id` 约定即可，也可以完全去掉，服务端从不注入它。
 
 ### 深色模式
 
