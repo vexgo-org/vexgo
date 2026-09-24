@@ -15,13 +15,13 @@
 #
 # Environment overrides:
 #   DEFAULT_THEME_REPO  theme git URL (default: the GitHub repo above)
-#   DEFAULT_THEME_REF   branch/tag/commit to build (default: v0.1.0)
+#   DEFAULT_THEME_REF   branch/tag/commit to build (default: v0.1.1)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="$REPO_ROOT/backend/internal/public/default-theme"
 THEME_REPO="${DEFAULT_THEME_REPO:-https://github.com/vexgo-org/vexgo-default-theme.git}"
-THEME_REF="${DEFAULT_THEME_REF:-v0.1.0}"
+THEME_REF="${DEFAULT_THEME_REF:-v0.1.1}"
 
 FORCE=0
 if [[ "${1:-}" == "--force" ]]; then
