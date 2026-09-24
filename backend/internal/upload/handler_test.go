@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -81,7 +82,7 @@ func isUUID(s string) bool {
 // has no separator and is what the os.Root layer refuses.
 func TestLocalStorage_ContainsHostileFilenames(t *testing.T) {
 	dataDir := t.TempDir()
-	storage := NewLocalStorage(dataDir)
+	storage := storage.NewLocalStorage(dataDir)
 
 	// A decoy outside the media tree must survive every hostile operation.
 	if err := os.WriteFile(filepath.Join(dataDir, "secret.txt"), []byte("secret"), 0o600); err != nil {

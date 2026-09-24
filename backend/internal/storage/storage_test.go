@@ -1,4 +1,4 @@
-package upload
+package storage
 
 import (
 	"context"

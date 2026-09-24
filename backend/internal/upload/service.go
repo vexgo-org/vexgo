@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"gorm.io/gorm"
 )
@@ -24,13 +25,13 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Storage   Storage
+	Storage   storage.Storage
 }
 
 // Service contains the business logic of the upload domain.
 type Service struct {
 	repo    Repository
-	storage Storage
+	storage storage.Storage
 }
 
 // NewService creates an upload service with the given dependencies.

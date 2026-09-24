@@ -27,6 +27,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/router"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
 
@@ -283,11 +284,11 @@ var (
 
 // initStorage returns the file storage backend: local disk by default, or an
 // S3-compatible storage when S3 is enabled in the config.
-func initStorage(cfg *config.Config) (upload.Storage, error) {
-	var storage upload.Storage = upload.NewLocalStorage(cfg.DataDir)
+func initStorage(cfg *config.Config) (storage.Storage, error) {
+	var appStorage storage.Storage = storage.NewLocalStorage(cfg.DataDir)
 	if !cfg.S3Enabled {
 		slog.Info("using local file storage")
-		return storage, nil
+		return appStorage, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -312,15 +313,15 @@ func initStorage(cfg *config.Config) (upload.Storage, error) {
 		"bucket", s3Cfg.Bucket,
 	)
 
-	s3Storage, err := upload.NewS3Storage(ctx, s3Cfg)
+	s3Storage, err := storage.NewS3Storage(ctx, s3Cfg)
 	if err != nil {
 		return nil, fmt.Errorf("init S3 storage: %w", err)
 	}
 	if s3Storage != nil {
-		storage = s3Storage
+		appStorage = s3Storage
 	}
 	slog.Info("s3 storage initialized")
-	return storage, nil
+	return appStorage, nil
 }
 
 // configureProxies sets gin's trusted proxies: none when not behind a reverse
