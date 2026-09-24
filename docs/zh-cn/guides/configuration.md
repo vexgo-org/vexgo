@@ -1,6 +1,6 @@
 # 配置
 
-> **操作指南** —— 本指南介绍如何配置 VexGo：配置来源与优先级、连接真实数据库、启用 SSO、使用 S3 存储和设置邮件。
+> 如何配置 VexGo：配置来源与优先级、连接真实数据库、启用 SSO、使用 S3 存储和设置邮件。
 
 ## VexGo 如何加载配置
 
@@ -19,11 +19,11 @@ VexGo 从四个来源读取配置。当同一设置出现在多个来源时，�
 
 使用 `./vexgo server` 启动服务器。不带参数运行 `./vexgo` 会打印帮助信息，而不是启动服务器。
 
-**服务器参数：** `--config, -c <file>`、`--addr, -a <addr>`、`--port, -p <port>`、`--data, -d <dir>`、`--help, -h`。这些参数必须跟在 `server` 之后；运行 `./vexgo server --help` 查看完整列表。
+服务器参数：`--config, -c <file>`、`--addr, -a <addr>`、`--port, -p <port>`、`--data, -d <dir>`、`--help, -h`。这些参数必须跟在 `server` 之后；运行 `./vexgo server --help` 查看完整列表。
 
-**仅限根命令的版本参数：** 使用 `./vexgo --version`（或 `-V`）打印版本并退出，而不是 `./vexgo server --version`。
+版本参数仅限根命令：使用 `./vexgo --version`（或 `-V`）打印版本并退出，而不是 `./vexgo server --version`。
 
-> **提示：** 密钥（如 `JWT_SECRET` 或数据库密码）既可在配置文件中，也可用环境变量提供——选择符合你部署方式的方案。切勿把真实密钥提交到仓库。
+> 密钥（如 `JWT_SECRET` 或数据库密码）既可在配置文件中，也可用环境变量提供，选择符合你部署方式的方案即可。切勿把真实密钥提交到仓库。
 
 ## 使用配置文件
 
@@ -70,7 +70,7 @@ s3_bucket: "my-bucket"
 
 完整注释版配置文件见 [examples/config.yml](https://github.com/vexgo-org/vexgo/blob/main/examples/config.yml)。PostgreSQL 和 MySQL 的示例文件位于同目录（`examples/config-postgres.yml`、`examples/config-mysql.yml`）。
 
-> **注意：** 配置文件中的显式值——包括 `false`——会覆盖环境变量。例如，文件中的 `s3_enabled: false` 会优先于环境中的 `S3_ENABLED=true`。
+> 配置文件中的显式值，包括 `false`，会覆盖环境变量。例如，文件中的 `s3_enabled: false` 会优先于环境中的 `S3_ENABLED=true`。
 
 ## 使用环境变量
 
@@ -81,7 +81,7 @@ s3_bucket: "my-bucket"
 | `ADDR`                    | `0.0.0.0` | 监听地址                                                                                     |
 | `PORT`                    | `3001`    | 监听端口                                                                                     |
 | `DATA_DIR`                | `./data`  | 数据目录（SQLite 数据库和媒体文件）                                                          |
-| `JWT_SECRET`              | —         | JWT 签名密钥（**生产环境必填**）                                                             |
+| `JWT_SECRET`              | —         | JWT 签名密钥（生产环境必填）                                                                 |
 | `SETTINGS_ENCRYPTION_KEY` | —         | 加密静态敏感信息（SMTP 密码、AI 与评论审核 API 密钥）的口令。留空 = 明文存储并输出启动警告。 |
 | `LOG_LEVEL`               | `info`    | `debug`、`info`、`warn`、`error`                                                             |
 | `BEHIND_REVERSE_PROXY`    | `false`   | 为 `true` 时解析 `X-Forwarded-*` 请求头                                                      |
@@ -151,11 +151,9 @@ s3_bucket: "my-bucket"
 | `VALKEY_ENABLED` | `false` | 将可缓存状态存入 Valkey（兼容 Redis）：内容缓存（当 `CACHE_ENABLED=true`）以及限流、OAuth 登录 state，多实例共享。     |
 | `VALKEY_URL`     | —       | Valkey 连接 URL，如 `valkey://127.0.0.1:6379`（`VALKEY_ENABLED=true` 时必填；也接受 `redis://` 与 TLS 的 `rediss://`） |
 
----
-
 ## 配置数据库
 
-VexGo **开箱即用 SQLite**——无需任何设置。生产环境或多用户场景下，建议切换为 **PostgreSQL** 或 **MySQL**。
+VexGo 开箱即用 SQLite，无需任何设置。生产环境或多用户场景下，建议切换为 PostgreSQL 或 MySQL。
 
 ### PostgreSQL（生产环境推荐）
 
@@ -225,13 +223,11 @@ mysql> FLUSH PRIVILEGES;
 go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
 ```
 
-> 首次启动时 VexGo 会自动执行数据库迁移——无需手动导入任何东西。
-
----
+> 首次启动时 VexGo 会自动执行数据库迁移，无需手动导入任何东西。
 
 ## 配置 SSO
 
-VexGo 支持通过 **GitHub**、**Google** 以及任意 **OpenID Connect (OIDC)** 提供商（Keycloak、Authentik、Authelia、Okta、Casdoor 等）登录。
+VexGo 支持通过 GitHub、Google 以及任意 OpenID Connect (OIDC) 提供商（Keycloak、Authentik、Authelia、Okta、Casdoor 等）登录。
 
 > 将 `BASE_URL` 设置为你的公网实例地址（如 `https://vexgo.example.com`），以便正确生成 OAuth 回调地址，尤其是在反向代理之后。
 
@@ -250,7 +246,7 @@ VexGo 支持通过 **GitHub**、**Google** 以及任意 **OpenID Connect (OIDC)*
 ### OIDC（任意提供商）
 
 1. 在 OIDC 提供商处创建客户端，回调地址为 `https://your-domain/api/sso/oidc/callback`。
-2. 找到你的 **issuer URL**：打开 `<provider-base-url>/.well-known/openid-configuration`，查看 `issuer` 字段。
+2. 找到你的 issuer URL：打开 `<provider-base-url>/.well-known/openid-configuration`，查看 `issuer` 字段。
 3. 启用 OIDC：
 
 ```yaml
@@ -264,16 +260,14 @@ oidc_client_secret: "your-client-secret"
 
 ### 强制仅 SSO 登录
 
-将 `allow_local_login` 设为 `false` 可完全禁用密码登录——用户只能通过 SSO 提供商登录。
-
----
+将 `allow_local_login` 设为 `false` 可完全禁用密码登录，用户只能通过 SSO 提供商登录。
 
 ## 配置邮件（SMTP）
 
-SMTP 在**运行时通过管理面板**配置，而不是在配置文件中：
+SMTP 在运行时通过管理面板配置，而不是在配置文件中：
 
 1. 以管理员身份登录，打开**设置 → SMTP**。
-2. 输入 SMTP 主机、端口、凭据以及发件地址/名称。
+2. 输入 SMTP 主机、端口、凭据以及 `from` 发件地址/名称。
 3. 点击**发送测试邮件**验证配置。
 
 邮件用于：
@@ -282,11 +276,9 @@ SMTP 在**运行时通过管理面板**配置，而不是在配置文件中：
 - 密码重置链接
 - 修改邮箱确认
 
----
-
 ## 启用 S3 存储
 
-S3 兼容任何 S3 兼容服务——AWS S3、MinIO、Garage 等。
+S3 支持任何 S3 兼容服务：AWS S3、MinIO、Garage 等。
 
 ### 示例：Docker + MinIO
 
@@ -305,14 +297,14 @@ docker run -d --name vexgo \
   ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
-> **MinIO/Wasabi：** 请设置 `S3_FORCE_PATH=true`——大多数 S3 兼容服务需要路径风格 URL。
+> MinIO 和 Wasabi 请设置 `S3_FORCE_PATH=true`。大多数 S3 兼容服务需要路径风格 URL。
 
 ## 内容缓存与 Valkey
 
 VexGo 为公开读路径（文章列表、文章详情、热门/最新、首页统计）提供读穿透缓存，并可将限流预算与 OAuth 登录 state 移出进程。两个开关独立控制：
 
-- **`cache_enabled`**（默认 `false`）——内容缓存。`false` 时所有公开读取直达数据库。
-- **`valkey_enabled`**（默认 `false`）——将可缓存状态存入 Valkey（兼容 Redis）服务器：内容缓存（`cache_enabled` 开启时）**以及**多实例必须达成一致的共享状态（限流、OAuth 登录 state）。
+- `cache_enabled`（默认 `false`）控制内容缓存。`false` 时所有公开读取直达数据库。
+- `valkey_enabled`（默认 `false`）将可缓存状态存入 Valkey（兼容 Redis）服务器：内容缓存（`cache_enabled` 开启时）以及多实例必须达成一致的共享状态（限流、OAuth 登录 state）。
 
 ```yaml
 cache_enabled: true
@@ -330,9 +322,9 @@ valkey_url: "valkey://127.0.0.1:6379"
 
 注意事项：
 
-- `valkey_enabled: true` 时服务器必须在启动时可达——URL 错误或服务器不可达会在启动阶段直接报错退出，而不是等到请求时才失败。
+- `valkey_enabled: true` 时服务器必须在启动时可达，因此 URL 错误或服务器不可达会在启动阶段直接报错退出，而不是等到请求时才失败。
 - 多实例部署必须设置 `valkey_enabled: true`；否则限流预算与 OAuth state 是每进程一份。
-- 保持 Valkey 服务器私有（回环/可信网络、URL 中带密码、必要时用 `rediss://` 走 TLS），并配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略——限流键按客户端 IP 轮换，应用层无法设界。
+- 保持 Valkey 服务器私有（回环/可信网络、URL 中带密码、必要时用 `rediss://` 走 TLS），并配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略，因为限流键按客户端 IP 轮换，应用层无法设界。
 - 廉价读取（如单篇文章）对部署位置敏感：缓存往返必须比它替代的数据库查询更便宜。请将 Valkey 与应用同宿主部署，或保持低 RTT 网络路径。
 
 ## 静态敏感信息加密
@@ -341,11 +333,11 @@ SMTP 密码以及 AI / 评论审核 API 密钥存储在数据库中。设置 `SE
 
 ## 哪些配置在运行时管理？
 
-以下设置在**管理面板**中管理，存储在数据库中（无需重启）：
+以下设置在管理面板中管理，存储在数据库中，无需重启：
 
-- **通用设置** —— 站点名称、描述、注册开关、验证码、游客浏览、每页条数
-- **评论审核** —— 人工审核、关键词过滤、大模型审核三个开关；提示词与拦截关键词
-- **当前主题** —— 切换已安装的主题
-- **SMTP** —— 见上文
+- 通用设置：站点名称、描述、注册开关、验证码、游客浏览、每页条数
+- 评论审核：人工审核、关键词过滤、大模型审核三个开关；提示词与拦截关键词
+- 当前主题：切换已安装的主题
+- SMTP，见上文
 
 对应的 API 端点见 [API 参考](api.html)，完整的参数、变量和配置键清单见[配置参考](/zh-cn/reference/configuration)。

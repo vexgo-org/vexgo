@@ -7,30 +7,27 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/vexgo-org/vexgo/build-and-test.yml?branch=main)](https://github.com/vexgo-org/vexgo/actions)
 [![Release](https://img.shields.io/github/v/release/vexgo-org/vexgo)](https://github.com/vexgo-org/vexgo/releases)
 
-## VexGo - Modern Blog CMS
+VexGo is a self-hosted blog CMS written in Go. One binary serves the JSON API, the server-side rendered public pages, and the admin panel, with SQLite by default.
 
-VexGo is a lightweight, self-hosted blog content management system designed for developers and writers who value simplicity, performance, and control. Built with modern technologies, it provides a complete blogging platform with user management, rich content creation, and extensibility.
+## Features
 
-### ✨ Key Features
+- React admin panel for managing content
+- JWT authentication with five roles: `guest`, `contributor`, `author`, `admin`, and `super_admin`
+- Markdown editor with categories, tags, drafts, likes, and comments
+- Comment moderation with independent manual-review, keyword-filter, and LLM-review switches; the LLM check fails closed
+- File storage on local disk or any S3-compatible service
+- Server-side rendered themes, switchable and uploadable from the admin panel
+- In-app notifications for likes, comments, and other events
+- Login with GitHub, Google, or any OpenID Connect provider
+- Self-hosted, so your data and deployment stay under your control
 
-- **🖥️ Modern Web Interface**: React-based admin panel for content management
-- **🚀 High Performance**: Built with Go and Gin for fast, efficient processing
-- **🔐 Secure Authentication**: JWT-based user system with role-based permissions (guest / contributor / author / admin / super_admin)
-- **📝 Rich Content**: Markdown editor, categories, tags, drafts, likes, and comments
-- **🛡️ Configurable Comment Moderation**: Independent manual-review, keyword-filter, and LLM-review switches with fail-closed LLM fallback
-- **🖼️ Media Management**: Built-in file storage with S3-compatible support
-- **🎨 Theme System**: Server-side-rendered themes, switchable and uploadable from the admin panel
-- **🔔 Notifications**: In-app notification inbox for likes, comments, and other events
-- **🔑 SSO**: Login with GitHub, Google, or any OpenID Connect provider
-- **🌐 Self-Hosted**: Complete control over your data and deployment
+## Technology Stack
 
-### 🛠️ Technology Stack
-
-- **Backend**: Go, Gin, GORM, SQLite/PostgreSQL/MySQL
-- **Frontend**: React, TypeScript, Vite, Tailwind CSS
-- **Authentication**: JWT, OAuth (GitHub, Google, OIDC)
-- **Storage**: Local filesystem or S3-compatible services
-- **Email**: SMTP integration
+- Backend: Go, Gin, GORM, SQLite/PostgreSQL/MySQL
+- Frontend: React, TypeScript, Vite, Tailwind CSS
+- Authentication: JWT, OAuth (GitHub, Google, OIDC)
+- Storage: local filesystem or S3-compatible services
+- Email: SMTP
 
 ## Table of Contents
 
@@ -45,7 +42,7 @@ VexGo is a lightweight, self-hosted blog content management system designed for 
 
 ## Quick Start
 
-Select the corresponding system and architecture on the release page to download.
+Download the binary for your system and architecture from the release page.
 
 ### Linux
 
@@ -59,17 +56,17 @@ Select the corresponding system and architecture on the release page to download
 sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
-### ❄️Nix
+### Nix
 
-You can try VexGo instantly without installing:
+Run VexGo without installing it:
 
 ```bash
 nix run github:vexgo-org/vexgo -- server
 ```
 
-### ❄️NixOS Flake
+### NixOS flake
 
-Add the following to your `inputs` in `flake.nix`:
+Add this to `inputs` in `flake.nix`:
 
 ```nix
 # flake.nix
@@ -119,16 +116,16 @@ Then rebuild your system:
 sudo nixos-rebuild switch --flake .#your-host
 ```
 
-### After Installation
+### After installing
 
-Then, visit http://127.0.0.1:3001
+Visit http://127.0.0.1:3001.
 
-The admin panel is at http://127.0.0.1:3001/admin/ (login at `/admin/login`, write at `/admin/write`); legacy top-level URLs 301-redirect to their `/admin/` equivalent with the query string preserved.
+The admin panel is at http://127.0.0.1:3001/admin/ (login at `/admin/login`, write at `/admin/write`). Legacy top-level URLs 301-redirect to their `/admin/` equivalent with the query string preserved.
 
-The Default super admin account: `admin@example.com`
-The Default super admin password: `password`
+Default super admin account: `admin@example.com`
+Default super admin password: `password`
 
-You can change your account password on your profile page.
+Change the password on your profile page.
 
 ## Configuration
 
@@ -136,9 +133,9 @@ Configuration priority: server command-line arguments > configuration files > en
 
 Start with `vexgo server`; running `vexgo` without arguments prints help. Server flags (`--config/-c`, `--addr/-a`, `--port/-p`, `--data/-d`) follow `server`; use `vexgo server --help` for details. The version flag is root-only: `vexgo --version` (or `-V`).
 
-### Use config file
+### Config file
 
-Here is example config file:
+Example config:
 
 ```yaml
 # Server listen address
@@ -312,15 +309,15 @@ s3_custom_domain: ""
 s3_disable_bucket_in_custom_url: false
 ```
 
-Then, Run the following command:
+Then run:
 
 ```bash
 ./vexgo-linux-amd64 server -c /the/path/to/config.yml
 ```
 
-### Use environment variables
+### Environment variables
 
-You can also configure the application using environment variables.
+Every server setting also reads from an environment variable.
 
 #### Server
 
@@ -474,7 +471,7 @@ sudo docker run -d --name vexgo \
 | `VALKEY_ENABLED` | `false` | Store cacheable state in Valkey (Redis-compatible): the content cache (when `CACHE_ENABLED=true`) plus rate limiting and OAuth login state, shared across instances. |
 | `VALKEY_URL`     | —       | Valkey connection URL, e.g. `valkey://127.0.0.1:6379` (required when `VALKEY_ENABLED=true`; `redis://` and `rediss://` for TLS are also accepted)                    |
 
-> **Notes:** with `VALKEY_ENABLED=false` the content cache runs on in-process memory and rate limiting/OAuth state are per-process — single-instance only. Running multiple instances behind a load balancer requires `VALKEY_ENABLED=true`. With `VALKEY_ENABLED=true` the server must be reachable at startup (fail-fast) and should be kept private, with a `maxmemory` limit and `allkeys-lru` eviction configured.
+> **Notes:** with `VALKEY_ENABLED=false` the content cache runs on in-process memory, and rate limiting and OAuth state are per-process, so this works for a single instance only. Running multiple instances behind a load balancer requires `VALKEY_ENABLED=true`. With `VALKEY_ENABLED=true` the server must be reachable at startup (fail-fast) and should be kept private, with a `maxmemory` limit and `allkeys-lru` eviction configured.
 
 #### Email (SMTP)
 
@@ -484,15 +481,15 @@ SMTP is disabled by default (seeded in the database) and managed in Admin Settin
 
 ### Postgres
 
-Recommend Version: Postgres 18
+Postgres 18 is recommended.
 
-To use postgres. First, you run a postgres instance.
+First, start a Postgres instance:
 
 ```bash
 sudo docker run -d --name postgres -e POSTGRES_PASSWORD=test -p 5432:5432 -v ./postgres:/var/lib/postgresql/data docker.io/library/postgres:18-alpine
 ```
 
-Then, enter postgres shell.
+Then open the Postgres shell:
 
 ```bash
 psql -U postgres
@@ -500,23 +497,23 @@ postgres=# CREATE USER vexgo_user WITH PASSWORD 'password';
 postgres=# CREATE DATABASE vexgo_db OWNER vexgo_user ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0;
 ```
 
-Run backend with this command:
+Run the backend with:
 
 ```bash
 go run ./backend/cmd/vexgo server -c examples/config-postgres.yml
 ```
 
-### Mysql
+### MySQL
 
-Recommend Version: Mysql 8
+MySQL 8 is recommended.
 
-To use mysql. First, you run a mysql instance.
+First, start a MySQL instance:
 
 ```bash
 sudo docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=test -v ./mysql:/var/lib/mysql docker.io/library/mysql:8
 ```
 
-Then, enter mysql shell.
+Then open the MySQL shell:
 
 ```bash
 mysql -p
@@ -526,7 +523,7 @@ mysql> GRANT ALL ON vexgo_db.* TO 'vexgo_user'@'%';
 mysql> FLUSH PRIVILEGES;
 ```
 
-Run backend with this command:
+Run the backend with:
 
 ```bash
 go run ./backend/cmd/vexgo server -c examples/config-mysql.yml
@@ -576,7 +573,7 @@ just server
 
 `just server` starts the server. `just run *args` passes CLI arguments, for example `just run server -c examples/config.yml` or `just run --version`; bare `just run` prints help.
 
-Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` / `password` — change it on your profile page.
+Then visit http://127.0.0.1:3001. The default super admin account is `admin@example.com` / `password`; change it on your profile page.
 
 ### Backend structure
 
@@ -631,12 +628,12 @@ import (
 )
 ```
 
-### Dependency facts
+### Dependencies
 
-- **Leaf packages** — `config/`, `model/`, `secrets/`, and `cache/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
-- **Shared layer** — `middleware/` (JWT auth, role permissions, request logging) depends only on `model`.
-- **Cross-domain edges** — `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
-- **Wiring** — `backend/cmd/vexgo/main.go` is the thin entry point: it parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root — it opens the database, creates storage and the `public.Renderer`, and wires every domain together by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
+- Leaf packages: `config/`, `model/`, `secrets/`, and `cache/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
+- Shared layer: `middleware/` (JWT auth, role permissions, request logging) depends only on `model`.
+- Cross-domain edges: `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
+- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, creates storage and the `public.Renderer`, and wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
 ## Contributing
 

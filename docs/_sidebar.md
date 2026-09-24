@@ -1,20 +1,20 @@
-- [🏠 Home](/)
-- 🚀 Getting Started
+- [Home](/)
+- Getting Started
   - [Quick Start](/getting-started)
-- 📖 Guides
+- Guides
   - [Installation](/guides/installation)
   - [Configuration](/guides/configuration)
   - [Deployment](/guides/deployment)
-- 🛠️ Local Development
+- Local Development
   - [Quick Develop](/local-development/quick-develop)
   - [Backend](/local-development/backend)
   - [Frontend](/local-development/frontend)
   - [Theme Development](/local-development/theme-development)
   - [Workflow](/local-development/workflow)
-- 🧠 Concepts
+- Concepts
   - [Architecture](/concepts/architecture)
   - [Theming](/concepts/theming)
-- 📚 Reference
+- Reference
   - [Configuration](/reference/configuration)
   - [Theme Templates](/reference/theme-templates)
   - [API](api.html ":ignore")

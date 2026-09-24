@@ -1,27 +1,25 @@
 # 安装
 
-> **操作指南** —— 本指南介绍如何在你的机器或服务器上安装 VexGo。请根据你的环境选择合适的方式。
+> 如何在你机器或服务器上安装 VexGo。请根据你的环境选择合适的方式。
 
 ## 环境要求
 
-- **操作系统**：Linux、macOS、Windows、FreeBSD，或任何装有 Docker 的系统
-- **内存**：最低 512 MB，推荐 1 GB
-- **磁盘**：应用本身至少 100 MB，另需数据存储空间
+- 操作系统：Linux、macOS、Windows、FreeBSD，或任何装有 Docker 的系统
+- 内存：最低 512 MB，推荐 1 GB
+- 磁盘：应用本身至少 100 MB，另需数据存储空间
 
 | 方式                                         | 依赖                    | 适用场景               |
 | -------------------------------------------- | ----------------------- | ---------------------- |
 | [二进制包](#方式-1二进制包安装)              | 下载可执行文件          | 本地快速运行、VPS 部署 |
 | [Docker](#方式-2docker-安装)                 | Docker                  | 单容器部署             |
 | [Docker Compose](#方式-3docker-compose-安装) | Docker + Docker Compose | 多服务场景（含数据库） |
-| [Nix](#方式-4nix-安装)                       | Nix 包管理器            | 即时试用、可复现配置   |
+| [Nix](#方式-4nix-安装)                       | Nix 包管理器            | 试用体验、可复现配置   |
 | [NixOS Flake](#方式-5nixos-flake-安装)       | 启用 flakes 的 NixOS    | NixOS 系统             |
 | [源码编译](#方式-6源码编译)                  | Go 1.26+、bun           | 开发、定制构建         |
 
----
-
 ## 方式 1：二进制包安装
 
-最简单的方式——下载预编译二进制并直接运行。
+下载预编译二进制并直接运行。
 
 ### 第 1 步：下载二进制
 
@@ -113,8 +111,6 @@ sudo systemctl start vexgo
 sudo systemctl status vexgo
 ```
 
----
-
 ## 方式 2：Docker 安装
 
 ### 第 1 步：拉取并运行 VexGo
@@ -168,8 +164,6 @@ docker pull ghcr.io/vexgo-org/vexgo:latest
 docker stop vexgo && docker rm vexgo
 docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data --restart unless-stopped ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
-
----
 
 ## 方式 3：Docker Compose 安装
 
@@ -236,8 +230,6 @@ docker compose down            # 停止并移除容器
 docker compose down -v         # 同时删除数据卷（会删除数据！）
 ```
 
----
-
 ## 方式 4：Nix 安装
 
 ### 第 1 步：安装 Nix
@@ -267,8 +259,6 @@ vexgo server
 nix run github:vexgo-org/vexgo -- server -c /path/to/config.yml
 nix run github:vexgo-org/vexgo -- server --port 8080 --addr 0.0.0.0
 ```
-
----
 
 ## 方式 5：NixOS Flake 安装
 
@@ -365,17 +355,15 @@ sudo systemctl restart vexgo
 sudo journalctl -u vexgo -f
 ```
 
----
-
 ## 方式 6：源码编译
 
 当你需要最新的开发版本或自定义代码时，请使用此方式。
 
 ### 第 1 步：安装构建依赖
 
-- **Go 1.26+**
-- **bun 1.3**
-- 可选（推荐）：`just`、`gofumpt`、`golangci-lint`、`prettier`、`oxlint` —— 可通过 `nix develop` 获得包含全部工具的 Nix 开发环境
+- Go 1.26+
+- bun 1.3
+- 可选（推荐）：`just`、`gofumpt`、`golangci-lint`、`prettier`、`oxlint`。可通过 `nix develop` 获得包含全部工具的 Nix 开发环境。
 
 ### 第 2 步：克隆并构建
 
@@ -412,8 +400,6 @@ go test -v ./...       # 运行后端测试
 
 `just theme <dir>` 即 `vexgo dev --theme-dir <dir>`：启动服务器并从本地主题目录渲染公开页面，而不是使用已激活的主题，让开发者无需重新构建内置主题或重新上传即可迭代主题。例如 `just theme ../vexgo-default-theme/dist/`。
 
----
-
 ## 安装完成后
 
 ### 访问网站
@@ -429,7 +415,7 @@ go test -v ./...       # 运行后端测试
 | 邮箱 | `admin@example.com` |
 | 密码 | `password`          |
 
-> **⚠️ 重要：** 首次登录后请立即修改默认密码——参见[快速开始](/zh-cn/getting-started)教程。
+> 首次登录后请立即修改默认密码。参见[快速开始](/zh-cn/getting-started)教程。
 
 ### 验证安装
 
@@ -439,6 +425,6 @@ go test -v ./...       # 运行后端测试
 
 ### 下一步
 
-- [配置指南](/zh-cn/guides/configuration) —— 配置数据库、SSO、S3 和邮件
-- [生产部署](/zh-cn/guides/deployment) —— 反向代理、HTTPS、systemd
-- [故障排查](/zh-cn/guides/deployment#故障排查) —— 常见问题及解决方法
+- [配置指南](/zh-cn/guides/configuration)：配置数据库、SSO、S3 和邮件
+- [生产部署](/zh-cn/guides/deployment)：反向代理、HTTPS、systemd
+- [故障排查](/zh-cn/guides/deployment#故障排查)：常见问题及解决方法

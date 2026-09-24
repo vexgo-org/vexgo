@@ -1,8 +1,8 @@
 # 前端开发
 
-> **操作指南** —— 运行、修改与重建管理后台 SPA（React + TypeScript，Vite、Tailwind、shadcn/ui）。请先读完[本地开发](/zh-cn/local-development/quick-develop)教程，确保 `bun install` 已完成且后端在运行。
+> 运行、修改与重建管理后台 SPA（React + TypeScript，Vite、Tailwind、shadcn/ui）的实操指南。请先读完[本地开发](/zh-cn/local-development/quick-develop)教程，确保 `bun install` 已完成且后端在运行。
 
-SPA 全部位于 `/admin/` 下；公开页面由主题服务端渲染，SPA 绝不能占用站点根。`bun run build` 把产物写到 `backend/internal/public/dist/`（gitignored），Go 二进制再将其 embed 并对外 serving。**改完前端必须重建，后端才会生效** —— Vite 开发服务器不会经过后端代理。
+SPA 全部位于 `/admin/` 下；公开页面由主题服务端渲染，SPA 绝不能占用站点根。`bun run build` 把产物写到 `backend/internal/public/dist/`（gitignored），Go 二进制再将其 embed 并对外 serving。改完前端必须重建，后端才会生效；Vite 开发服务器不会经过后端代理。
 
 ## 运行开发服务器
 
@@ -37,7 +37,7 @@ VITE_API_URL=http://localhost:3001/api
 | ------------------------ | --------------------------------------------------------------------------------------------------- |
 | `src/pages/`             | 路由页面                                                                                            |
 | `src/components/`        | 业务组件；`src/components/ui/` 放 shadcn/ui 基元                                                    |
-| `src/api/generated/`     | 生成的 API 客户端 —— 禁止手改，用 `just generate`                                                   |
+| `src/api/generated/`     | 生成的 API 客户端；禁止手改，用 `just generate`                                                     |
 | `src/locales/`           | i18n 文案；`en-US.ts` 与 `zh-CN.ts` 保持同步                                                        |
 | `src/lib/`、`src/types/` | 共享逻辑与共享类型                                                                                  |
 | `vite.config.ts`         | `base: "/admin/"`、`outDir: ../backend/internal/public/dist`、`emptyOutDir: true`、`manifest: true` |
@@ -52,7 +52,7 @@ bun run dev        # 用 HMR 对着 just server 迭代
 bun run build      # tsc -b + vite build + 拷贝 theme manifest
 ```
 
-仓库根下 `just build-frontend` 是同一构建。前端重建后一般无需重启后端，刷新 `/admin/` 即可 —— `emptyOutDir: true` 加 manifest 就是为了避免 `dist` 里残留旧 hash chunk 导致后端 serve 到过期 JS：不要关掉它们。
+仓库根下 `just build-frontend` 是同一构建。前端重建后一般无需重启后端，刷新 `/admin/` 即可：`emptyOutDir: true` 加 manifest 就是为了避免 `dist` 里残留旧 hash chunk 导致后端 serve 到过期 JS：不要关掉它们。
 
 ## 实操：PR 前验证
 

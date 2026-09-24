@@ -1,6 +1,6 @@
 # Backend Development
 
-> **How-to** — run, configure, and extend the Go backend (Gin + GORM). Read the [Local Development](/local-development/quick-develop) tutorial first so the embedded SPA and theme already exist.
+> Run, configure, and extend the Go backend (Gin + GORM). Work through the [Local Development](/local-development/quick-develop) tutorial first so the embedded SPA and theme already exist.
 
 ## Run the server
 
@@ -30,11 +30,11 @@ Each domain under `backend/internal/<domain>/` follows the same three layers:
 
 Supporting pieces:
 
-- `backend/internal/router` — `RegisterAPIRoutes` mounts every domain under `/api` (optional-JWT middleware at the group level) from the aggregate `router.Deps`. `router_test.go` locks the method+path surface: adding, removing, or renaming a route means updating that list deliberately.
-- `backend/internal/app` — wires every domain; `backend/cmd/vexgo/main.go` only resolves config and calls it.
+- `backend/internal/router`: `RegisterAPIRoutes` mounts every domain under `/api` (optional-JWT middleware at the group level) from the aggregate `router.Deps`. `router_test.go` locks the method+path surface: adding, removing, or renaming a route means updating that list deliberately.
+- `backend/internal/app`: wires every domain; `backend/cmd/vexgo/main.go` only resolves config and calls it.
 - Leaf packages importing no other backend package: `config`, `model`, `secrets`, `cache`. `model` holds GORM models plus the `Notifier`/`FileRemover` seams (`model/interfaces.go`); it must not import application logic.
-- `backend/internal/public` — SSR engine, theme serving, embedded assets. `backend/internal/settings` — site settings and theme management.
-- Cross-domain calls go through consumer-declared interfaces (`notification` implements `model.Notifier`, `upload` implements `model.FileRemover`). `mailer.Service` is the deliberate exception: injected as concrete `*mailer.Service` into `auth` and `settings`.
+- `backend/internal/public`: SSR engine, theme serving, embedded assets. `backend/internal/settings`: site settings and theme management.
+- Cross-domain calls go through consumer-declared interfaces (`notification` implements `model.Notifier`, `upload` implements `model.FileRemover`). `mailer.Service` is an exception: injected as concrete `*mailer.Service` into `auth` and `settings`.
 - Thread `context.Context` through every layer; handlers pass `c.Request.Context()`. Pass dependencies through `Deps` structs, never globals (the only global mutable state is the test seam `mailer.SetMailCaptureHook`, restored with `t.Cleanup`).
 
 ## How-to: add or change an endpoint

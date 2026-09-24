@@ -1,14 +1,14 @@
 # Quick Start
 
-> **Tutorial** — in this lesson you will install VexGo, log in for the first time, and publish your first post. It takes about 5 minutes.
+> Tutorial: install VexGo, log in for the first time, and publish your first post. It takes about 5 minutes.
 
-This tutorial is written for complete beginners. By the end you will have a running VexGo instance with one published blog post.
+By the end you will have a running VexGo instance with one published post.
 
-## Before You Begin
+## Before you begin
 
 You need:
 
-- A machine running **Linux**, **macOS**, **Windows**, or **FreeBSD** (or a machine with **Docker** installed)
+- A machine running Linux, macOS, Windows, or FreeBSD, or one with Docker installed
 - An internet connection
 - A web browser
 
@@ -16,7 +16,7 @@ No prior knowledge of Go, React, or databases is required.
 
 ## Step 1: Start VexGo
 
-Choose the method that fits you best. Both start the same server.
+Pick either method; both start the same server.
 
 ### Option A: Run with Docker (recommended for trying out)
 
@@ -36,11 +36,11 @@ chmod +x vexgo-linux-amd64
 ./vexgo-linux-amd64 server
 ```
 
-> **What just happened?** VexGo started an HTTP server on port `3001` and created a SQLite database in the `./data` directory. That's the whole server — no separate database to install.
+> VexGo started an HTTP server on port `3001` and created a SQLite database in the `./data` directory. There is no separate database to install.
 
-## Step 2: Open the Site
+## Step 2: Open the site
 
-Open your browser and visit:
+Visit:
 
 ```
 http://127.0.0.1:3001
@@ -48,7 +48,7 @@ http://127.0.0.1:3001
 
 You should see the VexGo home page.
 
-## Step 3: Log In
+## Step 3: Log in
 
 1. Click **Log in** (top right corner).
 2. Use the default super admin account:
@@ -60,18 +60,18 @@ You should see the VexGo home page.
 
 3. Click **Log in**.
 
-Direct link: `http://127.0.0.1:3001/admin/login`. Legacy top-level URLs (such as `/login`) 301-redirect to their `/admin/` equivalent with the query string preserved.
+Direct link: `http://127.0.0.1:3001/admin/login`. Legacy top-level URLs such as `/login` 301-redirect to their `/admin/` equivalent with the query string preserved.
 
-## Step 4: Change the Default Password
+## Step 4: Change the default password
 
-The default password is public knowledge — change it before doing anything else.
+The default password is public knowledge, so change it first.
 
 1. Click your avatar in the top right corner and open your **Profile**.
 2. Change your password and save.
 
-> **Security note:** anyone who can reach your instance can log in with the default credentials. Change the password immediately, and set a strong `JWT_SECRET` and `SETTINGS_ENCRYPTION_KEY` (used to encrypt the SMTP password and AI/comment-moderation API keys at rest) before deploying publicly. See [Deployment](/guides/deployment) for production hardening.
+> Anyone who can reach your instance can log in with the default credentials. Change the password immediately, and set a strong `JWT_SECRET` and `SETTINGS_ENCRYPTION_KEY` (used to encrypt the SMTP password and AI/comment-moderation API keys at rest). See [Deployment](/guides/deployment) before exposing the instance publicly.
 
-## Step 5: Write Your First Post
+## Step 5: Write your first post
 
 1. Click **New Post** (or **Write** in the navigation). Direct link: `http://127.0.0.1:3001/admin/write`.
 2. Enter a title, for example: `Hello, VexGo!`
@@ -79,22 +79,20 @@ The default password is public knowledge — change it before doing anything els
 4. Select a **category** (the default category already exists).
 5. Click **Publish**.
 
-Your post now appears on the home page, visible to everyone who visits your site.
+Your post now appears on the home page.
 
-## Step 6: Explore the Admin Panel
+## Step 6: Explore the admin panel
 
-With the super admin account you can manage the whole site. Open the admin panel at `http://127.0.0.1:3001/admin/` — from there you can:
+With the super admin account you can manage the whole site. The admin panel at `http://127.0.0.1:3001/admin/` lets you:
 
-- Moderate **pending posts and comments** (if moderation is enabled)
-- Manage **users and roles**
-- Change **site settings** (site name, registration, captcha)
-- Install and switch **themes**
+- Moderate pending posts and comments, if moderation is enabled
+- Manage users and roles
+- Change site settings such as the site name, registration, and captcha
+- Install and switch themes
 
-## What's Next?
+## What's next?
 
-Now that VexGo is running, you can go deeper:
-
-- **Deploy it for real** — [Production Deployment](/guides/deployment) covers reverse proxies, HTTPS, and systemd.
-- **Tune the configuration** — the [Configuration Guide](/guides/configuration) explains config files, environment variables, and databases.
-- **Understand the internals** — [Architecture](/concepts/architecture) explains how VexGo is built.
-- **Look up endpoints** — the [API Reference](api.html) documents every REST endpoint.
+- [Production Deployment](/guides/deployment) covers reverse proxies, HTTPS, and systemd.
+- The [Configuration Guide](/guides/configuration) explains config files, environment variables, and databases.
+- [Architecture](/concepts/architecture) explains how VexGo is built.
+- The [API Reference](api.html) documents every REST endpoint.

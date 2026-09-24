@@ -7,30 +7,27 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/vexgo-org/vexgo/build-and-test.yml?branch=main)](https://github.com/vexgo-org/vexgo/actions)
 [![Release](https://img.shields.io/github/v/release/vexgo-org/vexgo)](https://github.com/vexgo-org/vexgo/releases)
 
-## VexGo - 现代化博客 CMS
+VexGo 是一个用 Go 编写的自托管博客 CMS。单个二进制文件同时提供 JSON API、服务端渲染的公开页面和管理面板，默认使用 SQLite。
 
-VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视简洁性、性能和控制权的开发者和作家而设计。采用现代技术构建，它提供了一个完整的博客平台，包括用户管理、丰富内容创作和可扩展性。
+## 主要特性
 
-### ✨ 主要特性
+- React 管理面板，用于管理内容
+- JWT 认证，角色分为 `guest`、`contributor`、`author`、`admin`、`super_admin` 五级
+- Markdown 编辑器，支持分类、标签、草稿、点赞和评论
+- 评论审核的人工审核、关键词过滤、LLM 审核三个开关相互独立，LLM 检查失败时默认拦截
+- 文件存储支持本地磁盘或任意 S3 兼容服务
+- 服务端渲染主题，可在管理面板切换和上传
+- 点赞、评论等事件的站内通知
+- 支持 GitHub、Google 或任意 OpenID Connect 提供商登录
+- 自托管，数据和部署都在你自己手里
 
-- **🖥️ 现代化 Web 界面**：基于 React 的管理面板用于内容管理
-- **🚀 高性能**：使用 Go 和 Gin 构建，实现快速高效的处理
-- **🔐 安全认证**：基于 JWT 的用户系统，具有基于角色的权限（guest / contributor / author / admin / super_admin）
-- **📝 丰富内容**：Markdown 编辑器、分类、标签、草稿、点赞和评论
-- **🛡️ 可配置的评论审核**：人工审核、关键词过滤、LLM 审核相互独立的开关，LLM 失败时默认拦截
-- **🖼️ 媒体管理**：内置文件存储，支持 S3 兼容服务
-- **🎨 主题系统**：服务端渲染主题，可在管理面板切换和上传
-- **🔔 通知**：点赞、评论等事件的站内通知收件箱
-- **🔑 SSO**：支持 GitHub、Google 及任意 OpenID Connect 提供商登录
-- **🌐 自托管**：完全控制您的数据和部署
+## 技术栈
 
-### 🛠️ 技术栈
-
-- **后端**：Go, Gin, GORM, SQLite/PostgreSQL/MySQL
-- **前端**：React, TypeScript, Vite, Tailwind CSS
-- **认证**：JWT, OAuth (GitHub, Google, OIDC)
-- **存储**：本地文件系统或 S3 兼容服务
-- **邮件**：SMTP 集成
+- 后端：Go、Gin、GORM、SQLite/PostgreSQL/MySQL
+- 前端：React、TypeScript、Vite、Tailwind CSS
+- 认证：JWT、OAuth（GitHub、Google、OIDC）
+- 存储：本地文件系统或 S3 兼容服务
+- 邮件：SMTP
 
 ## 目录
 
@@ -59,15 +56,15 @@ VexGo 是一个轻量级的、自托管博客内容管理系统，专为重视�
 sudo docker run -d --name vexgo -p 3001:3001 -v ./data:/app/data ghcr.io/vexgo-org/vexgo:latest ./vexgo server
 ```
 
-### ❄️Nix
+### Nix
 
-无需安装即可立即试用 VexGo：
+无需安装即可试用 VexGo：
 
 ```bash
 nix run github:vexgo-org/vexgo -- server
 ```
 
-### ❄️NixOS Flake
+### NixOS flake
 
 在你的 `flake.nix` 的 `inputs` 中添加：
 
@@ -121,18 +118,18 @@ sudo nixos-rebuild switch --flake .#your-host
 
 ### 安装之后
 
-访问 http://127.0.0.1:3001
+访问 http://127.0.0.1:3001。
 
 管理面板位于 http://127.0.0.1:3001/admin/（登录 `/admin/login`，写文章 `/admin/write`）；旧版顶层 URL 会 301 重定向到对应的 `/admin/` 地址，并保留查询字符串。
 
-**默认超级管理员账号**：`admin@example.com`
-**默认超级管理员密码**：`password`
+默认超级管理员账号：`admin@example.com`
+默认超级管理员密码：`password`
 
-您可以在个人资料页面修改账号密码。
+在个人资料页面修改密码。
 
 ## 配置
 
-配置优先级：**服务器命令行参数 > 配置文件 > 环境变量 > 默认值**
+配置优先级：服务器命令行参数 > 配置文件 > 环境变量 > 默认值
 
 使用 `vexgo server` 启动服务器；不带参数运行 `vexgo` 会打印帮助信息。服务器参数（`--config/-c`、`--addr/-a`、`--port/-p`、`--data/-d`）必须跟在 `server` 之后，详情见 `vexgo server --help`。版本参数仅限根命令：`vexgo --version`（或 `-V`）。
 
@@ -318,7 +315,7 @@ s3_disable_bucket_in_custom_url: false
 
 ### 使用环境变量
 
-您也可以通过环境变量配置应用程序。
+你也可以通过环境变量配置应用程序。
 
 #### Server
 
@@ -385,7 +382,7 @@ VexGo 支持 GitHub、Google 以及任何兼容 OpenID Connect (OIDC) 的提供�
 | `OIDC_CLIENT_ID`     | —       | 提供商颁发的 Client ID                                                                                                                            |
 | `OIDC_CLIENT_SECRET` | —       | 提供商颁发的 Client Secret                                                                                                                        |
 
-**高级选项：**
+高级选项：
 
 | 变量                  | 默认值                 | 说明                                                                           |
 | --------------------- | ---------------------- | ------------------------------------------------------------------------------ |
@@ -400,7 +397,7 @@ VexGo 支持 GitHub、Google 以及任何兼容 OpenID Connect (OIDC) 的提供�
 | `OIDC_TOKEN_URL`      | —                      | 手动指定 Token 端点                                                            |
 | `OIDC_USERINFO_URL`   | —                      | 手动指定 UserInfo 端点（`id_token` 缺少必要信息时备用）                        |
 
-OIDC 客户端回调地址：`https://your-domain/api/sso/oidc/callback`。
+注册 OIDC 客户端时使用回调地址：`https://your-domain/api/sso/oidc/callback`。
 
 > **提示：** 要查找 Issuer URL，可打开 `<provider-base-url>/.well-known/openid-configuration` 并查看 `issuer` 字段。
 
@@ -472,7 +469,7 @@ sudo docker run -d --name vexgo \
 | `VALKEY_ENABLED` | `false` | 将可缓存状态存入 Valkey（兼容 Redis）：内容缓存（当 `CACHE_ENABLED=true`）以及限流、OAuth 登录 state，多实例共享。     |
 | `VALKEY_URL`     | —       | Valkey 连接 URL，如 `valkey://127.0.0.1:6379`（`VALKEY_ENABLED=true` 时必填；也接受 `redis://` 与 TLS 的 `rediss://`） |
 
-> **注意：** `VALKEY_ENABLED=false` 时内容缓存运行在进程内内存中，限流与 OAuth state 也是每进程一份——仅适用于单实例。在负载均衡后运行多个实例必须设置 `VALKEY_ENABLED=true`。启用后服务器必须在启动时可达（fail-fast），并应保持私有、配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略。
+> **注意：** `VALKEY_ENABLED=false` 时内容缓存运行在进程内内存中，限流与 OAuth state 也是每进程一份，因此只适用于单实例。在负载均衡后运行多个实例必须设置 `VALKEY_ENABLED=true`。启用后服务器必须在启动时可达（fail-fast），并应保持私有、配置 `maxmemory` 上限与 `allkeys-lru` 淘汰策略。
 
 #### 邮件（SMTP）
 
@@ -574,7 +571,7 @@ just server
 
 `just server` 启动服务器。`just run *args` 将参数传给 CLI，例如 `just run server -c examples/config.yml` 或 `just run --version`；不带参数的 `just run` 会打印帮助信息。
 
-然后访问 http://127.0.0.1:3001。默认超级管理员账号：`admin@example.com` / `password`——请在个人资料页面修改密码。
+然后访问 http://127.0.0.1:3001。默认超级管理员账号：`admin@example.com` / `password`；请在个人资料页面修改密码。
 
 ### 后端结构
 
@@ -629,12 +626,12 @@ import (
 )
 ```
 
-### 依赖事实
+### 依赖关系
 
-- **叶子包** — `config/`、`model/`、`secrets/`、`cache/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`）。
-- **共享层** — `middleware/`（JWT 认证、角色权限、请求日志）只依赖 `model`。
-- **领域间依赖** — `auth` 被 `comment`、`post`、`sso` 引用；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`，`captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接口。`mailer.Service` 以具体类型注入 `auth` 与 `settings`。依赖图无环。
-- **接线** — `backend/cmd/vexgo/main.go` 是极简入口：解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根——打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
+- 叶子包：`config/`、`model/`、`secrets/`、`cache/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`）。
+- 共享层：`middleware/`（JWT 认证、角色权限、请求日志）只依赖 `model`。
+- 领域间依赖：`auth` 被 `comment`、`post`、`sso` 引用；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`database` 依赖 `config` 和 `model`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`upload` 实现 `FileRemover`，`captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接口。`mailer.Service` 以具体类型注入 `auth` 与 `settings`。依赖图无环。
+- 接线：`backend/cmd/vexgo/main.go` 是极简入口，解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根，负责打开数据库、创建存储和 `public.Renderer`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
 
 ## 贡献指南
 

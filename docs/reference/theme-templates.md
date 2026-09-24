@@ -1,6 +1,6 @@
 # Theme Templates Reference
 
-> **Reference** — the exact files, fields, functions and limits a VexGo theme can use. Look things up here; for the reasoning behind the system see [Theming](/concepts/theming), and for a walkthrough see the [Theme Development guide](/guides/theme-development).
+> The exact files, fields, functions and limits a VexGo theme can use. For the reasoning behind the system see [Theming](/concepts/theming); for a walkthrough see the [Theme Development guide](/guides/theme-development).
 
 ## Theme directory layout
 
@@ -20,7 +20,7 @@ A theme directory, as extracted from an uploaded ZIP into `data/theme/<id>/`:
 | `assets/<file>`    | No       | Static files served at `/theme-assets/<file>`.                                |
 | anything else      | No       | Kept on disk but not read by the renderer.                                    |
 
-\* A theme must provide **at least one** of `index.html`, `post.html`, `page.html`, `user.html` or `404.html`, or activation fails with "theme has no template files". Routes whose template is missing simply return a 404.
+\* A theme must provide at least one of `index.html`, `post.html`, `page.html`, `user.html` or `404.html`, or activation fails with "theme has no template files". Routes whose template is missing simply return a 404.
 
 All templates are parsed into a single template set, so `{{define}}`/`{{template}}` fragments are shared across files. Root-level `.html` files that are not one of the five names above are treated as dedicated custom-page templates.
 
@@ -250,7 +250,7 @@ A flat object of string keys to strings; nesting is not supported.
 }
 ```
 
-- The filename is the **normalized** language code (`zh.json`, not `zh-CN.json`).
+- The filename is the normalized language code (`zh.json`, not `zh-CN.json`).
 - Dictionaries are merged per key in the order `en` → site default → visitor language.
 - A key missing from every dictionary renders as the key itself.
 
@@ -283,9 +283,9 @@ Everything after the frontmatter is the Markdown body. Slugs must match `^[a-z0-
 | `assets/images/a.png` | `/theme-assets/images/a.png`                    |
 | `favicon.ico`         | `/favicon.ico` (4th of four sources, see below) |
 
-`/theme-assets/*` is resolved against the **active** theme, so templates never contain a theme id. The `assets/` segment is added by the server and must not appear in the URL.
+`/theme-assets/*` is resolved against the active theme, so templates never contain a theme id. The `assets/` segment is added by the server and must not appear in the URL.
 
-`/favicon.ico` is a single URL the tab icon reads, resolved once by the server in this order: the configured site icon, `data/favicon.ico`, the active theme's `favicon.ico`, then the glyph bundled with the admin console. A theme that ships no icon therefore still gets one, and uploading a site icon changes the public pages and the console together. Note that a theme's favicon sits at the **theme root**, not in `assets/`.
+`/favicon.ico` is a single URL the tab icon reads, resolved once by the server in this order: the configured site icon, `data/favicon.ico`, the active theme's `favicon.ico`, then the glyph bundled with the admin console. A theme that ships no icon therefore still gets one, and uploading a site icon changes the public pages and the console together. Note that a theme's favicon sits at the theme root, not in `assets/`.
 
 ## Comment widget contract
 
@@ -322,8 +322,8 @@ Applied when a theme ZIP is uploaded, before anything is written to disk:
 
 Additional validation: the archive must contain a readable `vexgo-theme.json` (at the root or inside a single top-level directory), `id`/`name`/`version` must be present, `id` must match the install directory, and `preview` must be an `http(s)` URL. Activation separately requires every shipped template to parse.
 
-## Related Reading
+## Related reading
 
-- [Theming](/concepts/theming) — how the renderer uses these files.
-- [Theme Development guide](/guides/theme-development) — building and installing a theme.
-- [Architecture](/concepts/architecture) — where the renderer sits in the backend.
+- [Theming](/concepts/theming): how the renderer uses these files.
+- [Theme Development guide](/guides/theme-development): building and installing a theme.
+- [Architecture](/concepts/architecture): where the renderer sits in the backend.

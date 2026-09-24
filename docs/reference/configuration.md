@@ -1,21 +1,21 @@
 # Configuration Reference
 
-> **Reference** — a complete dictionary of every way to configure VexGo: command-line flags, environment variables, and config-file keys. For recipes and examples, see the [Configuration Guide](/guides/configuration).
+> Every way to configure VexGo: command-line flags, environment variables, and config-file keys. For recipes and examples, see the [Configuration Guide](/guides/configuration).
 
-## Configuration Sources and Priority
+## Configuration sources and priority
 
 ```
 command-line arguments  >  config file  >  environment variables  >  defaults
 ```
 
-- **Command-line arguments** — passed to the binary directly
-- **Config file** — YAML, loaded with `-c <path>`
-- **Environment variables** — read at startup
-- **Defaults** — built into the binary
+- Command-line arguments: passed to the binary directly
+- Config file: YAML, loaded with `-c <path>`
+- Environment variables: read at startup
+- Defaults: built into the binary
 
-An explicit value in a higher-priority source overrides lower sources. Note that an explicit `false` in the config file overrides a `true` from an environment variable (the file is applied after the environment).
+An explicit value in a higher-priority source overrides lower sources, so an explicit `false` in the config file overrides a `true` from an environment variable (the file is applied after the environment).
 
-## Command-Line Flags
+## Command-line flags
 
 Start the server with `./vexgo server`. Running `./vexgo` without a subcommand prints help instead of starting the server. Server flags must follow `server`; positional arguments are rejected.
 
@@ -47,7 +47,7 @@ Root command flags:
 | `ADDR`                    | `0.0.0.0` | Server listen address                                                                                                                                                                                                |
 | `PORT`                    | `3001`    | Server listen port                                                                                                                                                                                                   |
 | `DATA_DIR`                | `./data`  | Data directory path                                                                                                                                                                                                  |
-| `JWT_SECRET`              | —         | JWT secret key (**required in production**)                                                                                                                                                                          |
+| `JWT_SECRET`              | —         | JWT secret key (required in production)                                                                                                                                                                              |
 | `SETTINGS_ENCRYPTION_KEY` | —         | Passphrase used to encrypt secrets at rest in the database (SMTP password, AI and comment-moderation API keys) with AES-256-GCM. When empty, these secrets are stored in plaintext (a warning is logged at startup). |
 | `LOG_LEVEL`               | `info`    | Logging level: `debug`, `info`, `warn`, `error`                                                                                                                                                                      |
 | `BASE_URL`                | —         | Public base URL of the instance, e.g. `https://vexgo.example.com`. Used to build OAuth callback URLs and emailed links (verification, password reset, email change). Required behind a reverse proxy.                |
@@ -55,7 +55,7 @@ Root command flags:
 | `BEHIND_REVERSE_PROXY`    | `false`   | Set to `true` when behind a reverse proxy so `X-Forwarded-*` headers are honored                                                                                                                                     |
 | `TRUSTED_PROXIES`         | —         | Comma-separated trusted proxy IPs/CIDRs. Only used when `BEHIND_REVERSE_PROXY=true`. Empty = default private networks.                                                                                               |
 
-### Rate Limiting
+### Rate limiting
 
 Both limits are per client IP and apply to unauthenticated endpoints; `0` disables the corresponding limit.
 
@@ -78,27 +78,27 @@ Both limits are per client IP and apply to unauthenticated endpoints; `0` disabl
 
 ### SSO / Single Sign-On
 
-**General**
+#### General
 
 | Variable            | Default | Description                                                           |
 | ------------------- | ------- | --------------------------------------------------------------------- |
 | `ALLOW_LOCAL_LOGIN` | `true`  | Set to `false` to disable password login and enforce SSO-only access. |
 
-**GitHub**
+#### GitHub
 
 | Variable               | Description                    |
 | ---------------------- | ------------------------------ |
 | `GITHUB_CLIENT_ID`     | GitHub OAuth App Client ID     |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
 
-**Google**
+#### Google
 
 | Variable               | Description                    |
 | ---------------------- | ------------------------------ |
 | `GOOGLE_CLIENT_ID`     | Google OAuth 2.0 Client ID     |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret |
 
-**OIDC**
+#### OIDC
 
 | Variable              | Default                | Description                                                                       |
 | --------------------- | ---------------------- | --------------------------------------------------------------------------------- |
@@ -139,7 +139,7 @@ Both limits are per client IP and apply to unauthenticated endpoints; `0` disabl
 | `VALKEY_ENABLED` | `false` | Store cacheable state in Valkey (Redis-compatible): the content cache (when `CACHE_ENABLED=true`) plus rate limiting and OAuth login state, shared across instances.                                                          |
 | `VALKEY_URL`     | —       | Valkey connection URL, e.g. `valkey://127.0.0.1:6379` (required when `VALKEY_ENABLED=true`). A trailing path ("/1") or a `db` query parameter selects a logical database; `redis://` and `rediss://` (TLS) are also accepted. |
 
-## Config File Keys
+## Config file keys
 
 The config file uses the same settings with lowercase YAML keys. The canonical example lives at `examples/config.yml` in the repository and is loaded with `-c examples/config.yml`.
 
@@ -150,7 +150,7 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 | `addr`                          | `0.0.0.0` | Listen address                                                                                                                                    |
 | `port`                          | `3001`    | Listen port                                                                                                                                       |
 | `data_dir`                      | `./data`  | Data directory path                                                                                                                               |
-| `jwt_secret`                    | —         | JWT secret key (**required in production**)                                                                                                       |
+| `jwt_secret`                    | —         | JWT secret key (required in production)                                                                                                           |
 | `settings_encryption_key`       | —         | Passphrase for encrypting secrets at rest (SMTP password, AI and comment-moderation API keys). Empty = plaintext storage with a startup warning.  |
 | `log_level`                     | `info`    | `debug`, `info`, `warn`, `error`                                                                                                                  |
 | `base_url`                      | —         | Public base URL, e.g. `https://vexgo.example.com`                                                                                                 |
@@ -218,7 +218,7 @@ The config file uses the same settings with lowercase YAML keys. The canonical e
 | `valkey_enabled` | `false` | Use Valkey for the content cache (when `cache_enabled: true`) and for shared state (rate limiting, OAuth login state)                    |
 | `valkey_url`     | —       | Valkey connection URL; required when `valkey_enabled: true`. A trailing path ("/1") or a `db` query parameter selects a logical database |
 
-## Environment ↔ Config File ↔ Flag Cross-Reference
+## Environment, config file, and flag cross-reference
 
 | Setting                 | Environment variable            | Config file key                 | CLI flag     |
 | ----------------------- | ------------------------------- | ------------------------------- | ------------ |
@@ -265,17 +265,17 @@ Only `addr`, `port`, and `data` have command-line flags. Every other setting is 
 
 > **Note:** `base_url` (or `BASE_URL`) is a general server setting, not an SSO-specific one: it is also used to build emailed links for email verification, password reset and email change. When it is unset those links fall back to the request origin, which is vulnerable to host-header poisoning by anyone who can reach the server directly.
 
-## Secrets at Rest Encryption
+## Secrets at rest encryption
 
 The SMTP password and the AI / comment-moderation API keys are stored in the database. Because a DB dump is a common backup/restore artifact, VexGo can encrypt these secrets at rest under `SETTINGS_ENCRYPTION_KEY` (AES-256-GCM; the key is derived from the configured passphrase with scrypt).
 
 Behavior:
 
-- **With a key set:** saved secrets are stored as values with the `enc:v1:` marker; existing plaintext values are encrypted in place once on startup (idempotent — already-encrypted values are left untouched). Reads decrypt transparently.
-- **Without a key:** secrets are stored as plaintext exactly as before, and a prominent warning is logged at startup.
-- **Wrong or rotated key:** the affected secret is treated as unset with an error logged (naming the setting) — the server keeps running, but the affected feature (SMTP sending, AI calls, AI comment moderation) must be re-saved by an admin in the UI.
+- With a key set: saved secrets are stored as values with the `enc:v1:` marker; existing plaintext values are encrypted in place once on startup (idempotent, so already-encrypted values are left untouched). Reads decrypt transparently.
+- Without a key: secrets are stored as plaintext, and a warning is logged at startup.
+- Wrong or rotated key: the affected secret is treated as unset with an error logged (naming the setting). The server keeps running, but an admin must re-save the affected feature (SMTP sending, AI calls, AI comment moderation) in the UI.
 
-> **Note:** losing the key means every encrypted secret must be re-entered in
+> **Note:** Losing the key means every encrypted secret must be re-entered in
 > the admin UI, so back it up together with the database. API responses always
 > mask these secrets regardless of encryption, and an empty secret on update
 > means "keep the existing value".

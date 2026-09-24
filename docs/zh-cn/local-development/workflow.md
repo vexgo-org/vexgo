@@ -1,6 +1,6 @@
 # 通用工作流
 
-> **操作指南** —— VexGo 本地开发的共享门禁、API 代码生成、主题迭代与排错清单。假设[本地开发](/zh-cn/local-development/quick-develop)教程已经跑通。
+> VexGo 本地开发的共享门禁、API 代码生成、主题迭代与排错清单。假设[本地开发](/zh-cn/local-development/quick-develop)教程已经跑通。
 
 ## PR 前先过门禁
 
@@ -52,7 +52,7 @@ just theme ../vexgo-default-theme/dist/
 
 用它迭代主题时无需重建内嵌默认主题，也无需上传。`server` 会拒绝 `--theme-dir`（见 `backend/internal/cli/cli_test.go`）。主题完整写法见[主题开发](/zh-cn/local-development/theme-development)与[主题系统](/zh-cn/concepts/theming)。
 
-模板解析陷阱：HTML 属性里的 `go()` 表达式不得含双引号 —— React 会把它转义成 `&quot;`，导致模板解析失败。请用 helper（`date`、`truncate`、`userURL`、`categoryURL`）代替。
+模板解析陷阱：HTML 属性里的 `go()` 表达式不得含双引号，因为 React 会把它转义成 `&quot;`，导致模板解析失败。请用 helper（`date`、`truncate`、`userURL`、`categoryURL`）代替。
 
 ## 排错
 
@@ -67,9 +67,9 @@ just theme ../vexgo-default-theme/dist/
 
 ## 相关阅读
 
-- [安装](/zh-cn/guides/installation) —— 全量安装方式，含源码编译。
-- [配置](/zh-cn/guides/configuration) —— 配置文件、环境变量、数据库。
-- [部署](/zh-cn/guides/deployment) —— 反向代理、HTTPS、systemd、生产加固。
+- [安装](/zh-cn/guides/installation)：全量安装方式，含源码编译。
+- [配置](/zh-cn/guides/configuration)：配置文件、环境变量、数据库。
+- [部署](/zh-cn/guides/deployment)：反向代理、HTTPS、systemd、生产加固。
 - [主题开发](/zh-cn/local-development/theme-development)、[主题系统](/zh-cn/concepts/theming)、[主题模板参考](/zh-cn/reference/theme-templates)。
 - [架构](/zh-cn/concepts/architecture)、[API 参考](api.html)。
-- `CONTRIBUTING.md` —— 工作流、issue/PR/commit 规范、Definition of Done。
+- `CONTRIBUTING.md`：工作流、issue/PR/commit 规范、Definition of Done。

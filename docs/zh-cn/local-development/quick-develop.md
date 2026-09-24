@@ -1,6 +1,6 @@
 # 本地开发
 
-> **教程 + 操作指南** —— 本节带你从零跑通本地完整环境，之后可作为日常后端与前端开发的查阅手册。
+> 本节带你从零跑通本地完整环境，之后可作为日常后端与前端开发的查阅手册。
 
 完成教程部分后，你将在本地跑起后端 API、管理后台 SPA 与默认主题，并发布一篇测试文章。操作指南部分覆盖你每天都会用到的开发循环。
 
@@ -10,9 +10,9 @@
 
 内容：
 
-- [后端开发](/zh-cn/local-development/backend) —— 运行 Go 服务、配置分层、领域目录结构、新增接口。
-- [前端开发](/zh-cn/local-development/frontend) —— 以 HMR 运行管理后台、API 基地址、嵌入式构建。
-- [通用工作流](/zh-cn/local-development/workflow) —— format/lint/test 门禁、swag + orval 代码生成、主题迭代、排错。
+- [后端开发](/zh-cn/local-development/backend)：运行 Go 服务、配置分层、领域目录结构、新增接口。
+- [前端开发](/zh-cn/local-development/frontend)：以 HMR 运行管理后台、API 基地址、嵌入式构建。
+- [通用工作流](/zh-cn/local-development/workflow)：format/lint/test 门禁、swag + orval 代码生成、主题迭代、排错。
 
 ## 环境要求
 
@@ -50,12 +50,11 @@ bun install
 cd ..
 ```
 
-> **刚才发生了什么？** 你拉取了 Go 模块依赖与管理后台 SPA 依赖。此时还没有任何构建产物。
+> 你拉取了 Go 模块依赖与管理后台 SPA 依赖。此时还没有任何构建产物。
 
 ### 第 2 步：一次性构建被嵌入的前端
 
-有2个前端需要构建。
-一个是管理后台的前端，还有一个是默认主题的前端。
+需要构建两个前端：管理后台 SPA 和默认主题。
 
 1. 管理后台前端
 
@@ -76,9 +75,9 @@ mkdir -p path/to/vexgo/backend/internal/public/default-theme/
 cp -r dist/* path/to/vexgo/backend/internal/public/default-theme/
 ```
 
-或者手动把`vexgo-default-theme/dist/*`文件夹下面的所有文件复制到`vexgo/backend/internal/public/default-theme/*`文件夹下面
+也可以手动把 `vexgo-default-theme/dist/` 下的内容复制到 `vexgo/backend/internal/public/default-theme/`。
 
-如果你的just可用，且在linux上，可以使用`just`来便捷执行
+如果 `just` 可用（例如在 Linux 上），可以用它作为快捷方式：
 
 ```bash
 just build-frontend
