@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -31,7 +32,7 @@ func newTestService(t *testing.T) (*Service, string, *gorm.DB) {
 	}
 
 	dataDir := t.TempDir()
-	svc := NewService(Deps{DB: db, Storage: NewLocalStorage(dataDir)})
+	svc := NewService(Deps{DB: db, Storage: storage.NewLocalStorage(dataDir)})
 	return svc, dataDir, db
 }
 
