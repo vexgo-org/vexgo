@@ -4,15 +4,15 @@
   stdenv,
   bun,
   fetchFromGitHub,
-  version ? "0.9.0",
-  themeVersion ? "0.1.0",
+  version ? "0.9.1",
+  themeVersion ? "0.1.1",
 }:
 let
   src = fetchFromGitHub {
     owner = "vexgo-org";
     repo = "vexgo";
     rev = "v${version}";
-    hash = "sha256-o7I1vhTmGKav7J/PfB9Hj3Q2xbX1ggqFwz9OI9YRmWs=";
+    hash = "sha256-3/Ng0E/HdslsRLKrSv3sIA4gfzhq2N6Kegc2E95+f3Y=";
   };
 
   # Both front ends are built with `bun install --frozen-lockfile` at build
@@ -56,7 +56,7 @@ let
       owner = "vexgo-org";
       repo = "vexgo-default-theme";
       rev = "v${themeVersion}";
-      hash = "sha256-f3fsYtg/fofWx8oXHgeaYX6HiDYh/PL03HUQtIfsHsY=";
+      hash = "sha256-Afvvwj4o6trJwAkDMRkx8fQJsWSKb0uJX7ME5Y9ZJ2s=";
     };
 
     nativeBuildInputs = [ bun ];
