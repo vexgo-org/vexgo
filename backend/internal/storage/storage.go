@@ -2,7 +2,15 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"io"
+	"path"
+	"strings"
+)
+
+var (
+	ErrInvalidKey = errors.New("invalid storage key")
+	ErrNotFound   = errors.New("storage object not found")
 )
 
 // Storage abstracts the file backend (S3-compatible or local disk). It is an
@@ -21,4 +29,27 @@ type Storage interface {
 	Delete(ctx context.Context, key string) error
 
 	URL(ctx context.Context, key string) (string, error)
+}
+
+func cleanKey(key string) (string, error) {
+	if key == "" {
+		return "", ErrInvalidKey
+	}
+
+	if strings.ContainsRune(key, '\\') {
+		return "", ErrInvalidKey
+	}
+
+	if strings.HasPrefix(key, "/") {
+		return "", ErrInvalidKey
+	}
+
+	cleaned := path.Clean(key)
+	if cleaned == "." ||
+		cleaned == ".." ||
+		strings.HasPrefix(cleaned, "../") {
+		return "", ErrInvalidKey
+	}
+
+	return cleaned, nil
 }
