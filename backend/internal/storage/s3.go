@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -62,6 +63,43 @@ func NewS3Storage(ctx context.Context, cfg *config.S3Config) (*S3Storage, error)
 
 	slog.Info("s3 storage initialized successfully")
 	return &S3Storage{client: client, cfg: cfg}, nil
+}
+
+func (s *S3Storage) Put(
+	ctx context.Context,
+	key string,
+	reader io.Reader,
+	size int64,
+	contentType string,
+) error {
+	if s.client == nil {
+		return errors.New("S3 storage not initialized")
+	}
+
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return fmt.Errorf("%w: %q", err, key)
+	}
+
+	if contentType == "" {
+		contentType = detectContentType(cleanedKey)
+	}
+
+	_, err = s.client.PutObject(
+		ctx,
+		s.cfg.Bucket,
+		cleanedKey,
+		reader,
+		size,
+		minio.PutObjectOptions{
+			ContentType: contentType,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("put S3 object failed: %w", err)
+	}
+
+	return nil
 }
 
 // Upload uploads a file to the configured S3 bucket.
