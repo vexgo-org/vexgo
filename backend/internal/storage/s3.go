@@ -72,8 +72,8 @@ func (s *S3Storage) Put(
 	size int64,
 	contentType string,
 ) error {
-	if s.client == nil {
-		return errors.New("S3 storage not initialized")
+	if err := s.checkClientInitialized(); err != nil {
+		return err
 	}
 
 	cleanedKey, err := cleanKey(key)
@@ -99,6 +99,48 @@ func (s *S3Storage) Put(
 		return fmt.Errorf("put S3 object failed: %w", err)
 	}
 
+	return nil
+}
+
+func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	if err := s.checkClientInitialized(); err != nil {
+		return nil, err
+	}
+
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %q", err, key)
+	}
+
+	object, err := s.client.GetObject(
+		ctx,
+		s.cfg.Bucket,
+		cleanedKey,
+		minio.GetObjectOptions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("open S3 object failed: %w", err)
+	}
+
+	if _, err := object.Stat(); err != nil {
+		_ = object.Close()
+		resp := minio.ToErrorResponse(err)
+		if resp.Code == minio.NoSuchKey ||
+			resp.Code == "NoSuchObject" ||
+			resp.StatusCode == 404 {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("stat S3 object failed: %w", err)
+	}
+
+	return object, nil
+}
+
+func (s *S3Storage) checkClientInitialized() error {
+	if s.client == nil {
+		return errors.New("S3 storage not initialized")
+	}
 	return nil
 }
 
