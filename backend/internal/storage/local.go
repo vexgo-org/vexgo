@@ -116,6 +116,28 @@ func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error
 	}, nil
 }
 
+func (s *LocalStorage) Delete(_ context.Context, key string) error {
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return fmt.Errorf("%w: %q", err, key)
+	}
+
+	root, err := s.openRoot()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+
+	if err := root.Remove(cleanedKey); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("delete local storage object failed: %w", err)
+	}
+
+	return nil
+}
+
 func removeLocalObject(root *os.Root, key string) {
 	err := root.Remove(key)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -198,25 +220,4 @@ func writeUploadFile(dst io.WriteCloser, reader io.Reader) error {
 	default:
 		return nil
 	}
-}
-
-// Delete removes a local file identified by its /uploads/ URL. Missing files
-// are not an error.
-func (s *LocalStorage) Delete(_ context.Context, url string) error {
-	root, err := s.openRoot()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = root.Close() }()
-
-	filename := filepath.Base(url)
-	if filename == "" || filename == "/" || filename == "." || filename == ".." ||
-		filename == string(filepath.Separator) {
-		return fmt.Errorf("invalid filename: %s", url)
-	}
-
-	if err := root.Remove("media/" + filename); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("failed to delete file: %w", err)
-	}
-	return nil
 }
