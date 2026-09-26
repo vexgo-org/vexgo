@@ -14,23 +14,27 @@ import (
 // LocalStorage stores files under <dataDir>/media and serves them at
 // /uploads/<filename>.
 type LocalStorage struct {
-	dataDir string
+	rootDir string
+	baseURL string
 }
 
 // NewLocalStorage creates a local-disk file storage.
 func NewLocalStorage(dataDir string) *LocalStorage {
-	return &LocalStorage{dataDir: dataDir}
+	return &LocalStorage{
+		rootDir: filepath.Join(dataDir, "media"),
+		baseURL: "/uploads",
+	}
 }
 
-// mediaRoot opens an os.Root over the data directory. Every media file
+// openRoot opens an os.Root over the data directory. Every media file
 // operation goes through it so a hostile filename (absolute path, ".."
 // segment, volume name) can never resolve outside the media tree — the
 // containment is enforced at the OS level, not by string checks.
-func (s *LocalStorage) mediaRoot() (*os.Root, error) {
-	if err := os.MkdirAll(s.dataDir, 0o750); err != nil {
+func (s *LocalStorage) openRoot() (*os.Root, error) {
+	if err := os.MkdirAll(s.rootDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
-	root, err := os.OpenRoot(s.dataDir)
+	root, err := os.OpenRoot(s.rootDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open data directory: %w", err)
 	}
@@ -39,7 +43,7 @@ func (s *LocalStorage) mediaRoot() (*os.Root, error) {
 
 // Upload writes the file to the local media directory.
 func (s *LocalStorage) Upload(_ context.Context, reader io.Reader, filename, contentType string) (string, error) {
-	root, err := s.mediaRoot()
+	root, err := s.openRoot()
 	if err != nil {
 		return "", err
 	}
@@ -98,7 +102,7 @@ func writeUploadFile(dst io.WriteCloser, reader io.Reader) error {
 // Delete removes a local file identified by its /uploads/ URL. Missing files
 // are not an error.
 func (s *LocalStorage) Delete(_ context.Context, url string) error {
-	root, err := s.mediaRoot()
+	root, err := s.openRoot()
 	if err != nil {
 		return err
 	}
