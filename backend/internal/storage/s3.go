@@ -159,6 +159,14 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+func (s *S3Storage) URL(_ context.Context, key string) (string, error) {
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return "", fmt.Errorf("%w: %q", err, key)
+	}
+	return s.cfg.GetURL(cleanedKey), nil
+}
+
 func (s *S3Storage) checkClientInitialized() error {
 	if s.client == nil {
 		return errors.New("S3 storage not initialized")
