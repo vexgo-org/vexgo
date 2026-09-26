@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -23,6 +24,79 @@ func NewLocalStorage(dataDir string) *LocalStorage {
 	return &LocalStorage{
 		rootDir: filepath.Join(dataDir, "media"),
 		baseURL: "/uploads",
+	}
+}
+
+func (s *LocalStorage) Put(
+	_ context.Context,
+	key string,
+	reader io.Reader,
+	size int64,
+	contentType string,
+) error {
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return fmt.Errorf("%w: %q", err, key)
+	}
+
+	root, err := s.openRoot()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+
+	directory := path.Dir(cleanedKey)
+	if directory != "." {
+		if err := root.MkdirAll(directory, 0o750); err != nil {
+			return fmt.Errorf("create object directory failed: %w", err)
+		}
+	}
+
+	tempKey := cleanedKey + ".uploading"
+
+	dst, err := root.Create(tempKey)
+	if err != nil {
+		return fmt.Errorf("create temporary object failed: %w", err)
+	}
+
+	if err := writeUploadFile(dst, reader); err != nil {
+		removeLocalObject(root, tempKey)
+		return err
+	}
+
+	if size >= 0 {
+		info, err := root.Stat(tempKey)
+		if err != nil {
+			removeLocalObject(root, tempKey)
+			return fmt.Errorf("stat uploaded object failed: %w", err)
+		}
+
+		if info.Size() != size {
+			removeLocalObject(root, tempKey)
+			return fmt.Errorf(
+				"uploaded object size mismatch: expected %d, got %d",
+				size,
+				info.Size(),
+			)
+		}
+	}
+
+	if err := root.Rename(tempKey, cleanedKey); err != nil {
+		removeLocalObject(root, tempKey)
+		return fmt.Errorf("commit uploaded object failed: %w", err)
+	}
+
+	return nil
+}
+
+func removeLocalObject(root *os.Root, key string) {
+	err := root.Remove(key)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn(
+			"failed to remove local storage object",
+			"key", key,
+			"err", err,
+		)
 	}
 }
 
