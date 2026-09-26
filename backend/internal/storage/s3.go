@@ -137,6 +137,28 @@ func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error)
 	return object, nil
 }
 
+func (s *S3Storage) Delete(ctx context.Context, key string) error {
+	if err := s.checkClientInitialized(); err != nil {
+		return err
+	}
+
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return fmt.Errorf("%w: %q", err, key)
+	}
+
+	if err = s.client.RemoveObject(
+		ctx,
+		s.cfg.Bucket,
+		cleanedKey,
+		minio.RemoveObjectOptions{},
+	); err != nil {
+		return fmt.Errorf("delete S3 object failed: %w", err)
+	}
+
+	return nil
+}
+
 func (s *S3Storage) checkClientInitialized() error {
 	if s.client == nil {
 		return errors.New("S3 storage not initialized")
@@ -167,26 +189,6 @@ func (s *S3Storage) Upload(ctx context.Context, reader io.Reader, filename, cont
 	url := s.cfg.GetURL(filename)
 	slog.Debug("file uploaded successfully", "url", url)
 	return url, nil
-}
-
-// Delete removes an object from the configured S3 bucket by extracting the key
-// from its public URL (with a filename fallback).
-func (s *S3Storage) Delete(ctx context.Context, url string) error {
-	if s.client == nil {
-		return fmt.Errorf("S3 storage not initialized")
-	}
-
-	key := ExtractS3Key(url, s.cfg)
-	if key != "" {
-		return s.remove(ctx, key)
-	}
-
-	// If key extraction failed, try to delete using filename as key (fallback)
-	filename := filepath.Base(url)
-	if filename != "" && filename != "/" {
-		return s.remove(ctx, filename)
-	}
-	return fmt.Errorf("invalid S3 key from URL: %s", url)
 }
 
 // remove deletes the object with the given key from the configured bucket.
