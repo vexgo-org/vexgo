@@ -138,6 +138,16 @@ func (s *LocalStorage) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+func (s *LocalStorage) URL(_ context.Context, key string) (string, error) {
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return "", fmt.Errorf("%w: %q", err, key)
+	}
+	return strings.TrimRight(s.baseURL, "/") +
+		"/" +
+		cleanedKey, nil
+}
+
 func removeLocalObject(root *os.Root, key string) {
 	err := root.Remove(key)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
