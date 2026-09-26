@@ -41,18 +41,33 @@ func NewService(deps Deps) *Service {
 
 // Upload stores a file and records it in the database.
 func (s *Service) Upload(ctx context.Context, userID uint, filename string, size int64, src io.Reader) (model.MediaFile, error) {
-	url, err := s.storage.Upload(ctx, src, filename, "")
+	key := filename
+	if err := s.storage.Put(
+		ctx,
+		key,
+		src,
+		size,
+		"",
+	); err != nil {
+		return model.MediaFile{}, fmt.Errorf("failed to store file: %w", err)
+	}
+
+	publicURL, err := s.storage.URL(ctx, key)
 	if err != nil {
-		return model.MediaFile{}, err
+		s.rollbackUpload(ctx, key)
+		return model.MediaFile{}, fmt.Errorf("failed to generate file URL: %w", err)
 	}
 
 	media := model.MediaFile{
-		URL:    url,
-		Size:   size,
-		Type:   "unknown",
-		UserID: userID,
+		URL:        publicURL,
+		Size:       size,
+		Type:       "unknown",
+		UserID:     userID,
+		StorageKey: key,
 	}
+
 	if err := s.repo.CreateMedia(ctx, &media); err != nil {
+		s.rollbackUpload(ctx, key)
 		return model.MediaFile{}, fmt.Errorf("failed to save file record: %w", err)
 	}
 	return media, nil
@@ -91,4 +106,15 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	}
 
 	return s.repo.DeleteMedia(ctx, media)
+}
+
+func (s *Service) rollbackUpload(ctx context.Context, key string) {
+	if err := s.storage.Delete(ctx, key); err != nil {
+		slog.WarnContext(
+			ctx,
+			"failed to remove uploading file after media creation failed",
+			"storage_key", key,
+			"err", err,
+		)
+	}
 }
