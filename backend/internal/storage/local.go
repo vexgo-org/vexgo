@@ -174,44 +174,6 @@ func (s *LocalStorage) openRoot() (*os.Root, error) {
 	return root, nil
 }
 
-// Upload writes the file to the local media directory.
-func (s *LocalStorage) Upload(_ context.Context, reader io.Reader, filename, contentType string) (string, error) {
-	root, err := s.openRoot()
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = root.Close() }()
-
-	// Reject path separators in the (server-generated) filename up front so
-	// the error message is accurate; os.Root would contain them anyway.
-	if strings.ContainsRune(filename, '/') || strings.ContainsRune(filename, '\\') {
-		return "", fmt.Errorf("invalid filename: %s", filename)
-	}
-
-	if err := root.MkdirAll("media", 0o750); err != nil {
-		return "", fmt.Errorf("failed to create upload directory: %w", err)
-	}
-
-	dst, err := root.Create("media/" + filename)
-	if err != nil {
-		return "", fmt.Errorf("failed to create file: %w", err)
-	}
-
-	if err := writeUploadFile(dst, reader); err != nil {
-		// The bytes on disk are truncated (or absent) and no media row will be
-		// created, so the file could never be served or deleted through the
-		// API: leaving it behind would only accumulate orphans under
-		// data/media. Removal is best-effort — the write error is the one worth
-		// reporting, and a concurrent removal is not an error.
-		if removeErr := root.Remove("media/" + filename); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			slog.Warn("failed to remove partial upload", "file", filename, "err", removeErr)
-		}
-		return "", err
-	}
-
-	return fmt.Sprintf("/uploads/%s", filename), nil
-}
-
 // writeUploadFile copies the upload into dst and closes it exactly once.
 // Closing is part of writing, not cleanup: the bytes are only durable once the
 // descriptor is flushed, so a late write-back failure (full disk, NFS) must

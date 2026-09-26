@@ -74,7 +74,13 @@ func TestLocalStorage_UploadRemovesPartialFileOnCopyError(t *testing.T) {
 	storage := NewLocalStorage(dataDir)
 	copyErr := errors.New("read failed")
 
-	if _, err := storage.Upload(context.Background(), failingReader{err: copyErr}, "partial.txt", ""); !errors.Is(err, copyErr) {
+	if err := storage.Put(
+		context.Background(),
+		"partial.txt",
+		failingReader{err: copyErr},
+		0,
+		"",
+	); !errors.Is(err, copyErr) {
 		t.Fatalf("expected the copy error to be reported, got %v", err)
 	}
 
