@@ -1022,6 +1022,9 @@
                     "size": {
                         "type": "integer"
                     },
+                    "storageKey": {
+                        "type": "string"
+                    },
                     "type": {
                         "description": "image/video etc.",
                         "type": "string"

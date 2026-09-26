@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"gorm.io/gorm"
 )
@@ -24,13 +25,13 @@ var (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Storage   Storage
+	Storage   storage.Storage
 }
 
 // Service contains the business logic of the upload domain.
 type Service struct {
 	repo    Repository
-	storage Storage
+	storage storage.Storage
 }
 
 // NewService creates an upload service with the given dependencies.
@@ -40,18 +41,33 @@ func NewService(deps Deps) *Service {
 
 // Upload stores a file and records it in the database.
 func (s *Service) Upload(ctx context.Context, userID uint, filename string, size int64, src io.Reader) (model.MediaFile, error) {
-	url, err := s.storage.Upload(ctx, src, filename, "")
+	key := filename
+	if err := s.storage.Put(
+		ctx,
+		key,
+		src,
+		size,
+		"",
+	); err != nil {
+		return model.MediaFile{}, fmt.Errorf("failed to store file: %w", err)
+	}
+
+	publicURL, err := s.storage.URL(ctx, key)
 	if err != nil {
-		return model.MediaFile{}, err
+		s.rollbackUpload(ctx, key)
+		return model.MediaFile{}, fmt.Errorf("failed to generate file URL: %w", err)
 	}
 
 	media := model.MediaFile{
-		URL:    url,
-		Size:   size,
-		Type:   "unknown",
-		UserID: userID,
+		URL:        publicURL,
+		Size:       size,
+		Type:       "unknown",
+		UserID:     userID,
+		StorageKey: key,
 	}
+
 	if err := s.repo.CreateMedia(ctx, &media); err != nil {
+		s.rollbackUpload(ctx, key)
 		return model.MediaFile{}, fmt.Errorf("failed to save file record: %w", err)
 	}
 	return media, nil
@@ -67,7 +83,10 @@ func (s *Service) ListByUser(ctx context.Context, userID uint) ([]model.MediaFil
 func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	media, err := s.repo.FindMediaByID(ctx, id)
 	if err != nil {
-		return ErrNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to find media file: %w", err)
 	}
 
 	// Look up the acting user's role. A lookup failure must not bypass the
@@ -80,14 +99,33 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 		}
 		return fmt.Errorf("failed to look up acting user: %w", err)
 	}
+
 	if !model.IsAdmin(user.Role) && media.UserID != userID {
 		return ErrForbidden
 	}
 
-	// Delete the underlying file; log but continue to delete the DB record
-	if err := s.storage.Delete(ctx, media.URL); err != nil {
-		slog.Warn("failed to delete file", "err", err)
+	if media.StorageKey == "" {
+		return fmt.Errorf("media file %d has no storage key", media.ID)
 	}
 
-	return s.repo.DeleteMedia(ctx, media)
+	if err := s.storage.Delete(ctx, media.StorageKey); err != nil {
+		return fmt.Errorf("failed to delete stored media file: %w", err)
+	}
+
+	if err := s.repo.DeleteMedia(ctx, media); err != nil {
+		return fmt.Errorf("failed to delete media record: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) rollbackUpload(ctx context.Context, key string) {
+	if err := s.storage.Delete(ctx, key); err != nil {
+		slog.WarnContext(
+			ctx,
+			"failed to remove uploading file after media creation failed",
+			"storage_key", key,
+			"err", err,
+		)
+	}
 }
