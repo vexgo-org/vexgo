@@ -89,6 +89,33 @@ func (s *LocalStorage) Put(
 	return nil
 }
 
+func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %q", err, key)
+	}
+
+	root, err := s.openRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := root.Open(cleanedKey)
+	if err != nil {
+		_ = root.Close()
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("open local storage object failed: %w", err)
+	}
+
+	return &rootReadCloser{
+		file: file,
+		root: root,
+	}, nil
+}
+
 func removeLocalObject(root *os.Root, key string) {
 	err := root.Remove(key)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
