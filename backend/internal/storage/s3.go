@@ -76,9 +76,9 @@ func (s *S3Storage) Put(
 		return err
 	}
 
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return fmt.Errorf("%w: %q", err, key)
+		return err
 	}
 
 	if contentType == "" {
@@ -107,9 +107,9 @@ func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error)
 		return nil, err
 	}
 
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %q", err, key)
+		return nil, err
 	}
 
 	object, err := s.client.GetObject(
@@ -142,9 +142,9 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 		return err
 	}
 
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return fmt.Errorf("%w: %q", err, key)
+		return err
 	}
 
 	if err = s.client.RemoveObject(
@@ -160,9 +160,9 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 }
 
 func (s *S3Storage) URL(_ context.Context, key string) (string, error) {
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return "", fmt.Errorf("%w: %q", err, key)
+		return "", err
 	}
 	return s.cfg.GetURL(cleanedKey), nil
 }

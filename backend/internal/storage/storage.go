@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -29,6 +30,14 @@ type Storage interface {
 	Delete(ctx context.Context, key string) error
 
 	URL(ctx context.Context, key string) (string, error)
+}
+
+func unwrapCleanKey(key string) (string, error) {
+	cleanedKey, err := cleanKey(key)
+	if err != nil {
+		return "", fmt.Errorf("%w: %q", err, key)
+	}
+	return cleanedKey, nil
 }
 
 func cleanKey(key string) (string, error) {

@@ -34,9 +34,9 @@ func (s *LocalStorage) Put(
 	size int64,
 	contentType string,
 ) error {
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return fmt.Errorf("%w: %q", err, key)
+		return err
 	}
 
 	root, err := s.openRoot()
@@ -90,9 +90,9 @@ func (s *LocalStorage) Put(
 }
 
 func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %q", err, key)
+		return nil, err
 	}
 
 	root, err := s.openRoot()
@@ -117,9 +117,9 @@ func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error
 }
 
 func (s *LocalStorage) Delete(_ context.Context, key string) error {
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return fmt.Errorf("%w: %q", err, key)
+		return err
 	}
 
 	root, err := s.openRoot()
@@ -139,9 +139,9 @@ func (s *LocalStorage) Delete(_ context.Context, key string) error {
 }
 
 func (s *LocalStorage) URL(_ context.Context, key string) (string, error) {
-	cleanedKey, err := cleanKey(key)
+	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
-		return "", fmt.Errorf("%w: %q", err, key)
+		return "", err
 	}
 	return strings.TrimRight(s.baseURL, "/") +
 		"/" +
