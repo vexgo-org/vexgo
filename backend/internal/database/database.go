@@ -194,7 +194,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.Category{},
 		&model.Comment{},
 		&model.Like{},
-		&model.MediaFile{},
+		&model.Asset{},
 		&model.SMTPConfig{},
 		&model.Captcha{},
 		&model.GeneralSettings{},
@@ -215,7 +215,15 @@ func AutoMigrate(db *gorm.DB) error {
 	}
 
 	// Backfill slugs for existing posts that don't have one yet.
-	return backfillSlugs(db)
+	if err := backfillSlugs(db); err != nil {
+		return err
+	}
+
+	if err := backFillAssets(db); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // backfillSlugs generates unique slugs for existing posts that have an empty
