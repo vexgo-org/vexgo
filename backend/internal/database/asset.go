@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 	"log/slog"
-	"mime"
 	"net/url"
 	"path"
 	"strings"
@@ -61,14 +60,14 @@ func backFillAssets(db *gorm.DB) error {
 				name = asset.StorageKey
 			}
 
-			mimeType := mimeTypeFromName(name)
+			mimeType := model.MimeTypeFromName(name)
 			updates["mime_type"] = mimeType
 			asset.MimeType = mimeType
 		}
 
 		if asset.Type == "" ||
 			asset.Type == "unknown" {
-			updates["type"] = assetTypeFromMIME(asset.MimeType)
+			updates["type"] = model.AssetTypeFromMIME(asset.MimeType)
 		}
 
 		if len(updates) == 0 {
@@ -126,46 +125,4 @@ func originalNameFromURL(rawURL string) string {
 	}
 
 	return strings.TrimSpace(decoded)
-}
-
-func assetTypeFromMIME(mimeType string) string {
-	switch {
-	case strings.HasPrefix(mimeType, "image/"):
-		return "image"
-	case strings.HasPrefix(mimeType, "video/"):
-		return "video"
-	case strings.HasPrefix(mimeType, "audio/"):
-		return "audio"
-	}
-	return "unknown"
-}
-
-func mimeTypeFromName(name string) string {
-	extension := strings.ToLower(path.Ext(name))
-
-	contentType := mime.TypeByExtension(extension)
-	if contentType != "" {
-		return contentType
-	}
-
-	switch extension {
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".png":
-		return "image/png"
-	case ".gif":
-		return "image/gif"
-	case ".webp":
-		return "image/webp"
-	case ".svg":
-		return "image/svg+xml"
-	case ".mp4":
-		return "video/mp4"
-	case ".mp3":
-		return "audio/mpeg"
-	case ".pdf":
-		return "application/pdf"
-	default:
-		return "application/octet-stream"
-	}
 }
