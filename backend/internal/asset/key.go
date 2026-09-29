@@ -1,15 +1,12 @@
 package asset
 
 import (
-	"errors"
 	"fmt"
 	"path"
 	"strings"
 
 	"github.com/google/uuid"
 )
-
-var ErrInvalidExtension = errors.New("invalid file extension")
 
 // allowedExts is the allowlist of extensions kept on the stored
 // file. Local uploads are served from this origin, so a file the browser would
