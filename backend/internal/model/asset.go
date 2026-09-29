@@ -14,9 +14,11 @@ type Asset struct {
 
 	OriginalName string `gorm:"size:255;index"`
 
-	StorageKey string `gorm:"size:1024;index"`
-	URL        string
-	MimeType   string `gorm:"size:127;index"`
+	// StorageKey format `UUID.ext`
+	StorageKey string `gorm:"size:1024;uniqueIndex"`
+
+	URL      string
+	MimeType string `gorm:"size:127;index"`
 
 	Type string `gorm:"size:50;index"`
 
