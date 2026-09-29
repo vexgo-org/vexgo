@@ -9,6 +9,15 @@ import (
 	"gorm.io/gorm"
 )
 
+type AssetType string
+
+const (
+	AssetTypeAudio   AssetType = "audio"
+	AssetTypeImage   AssetType = "image"
+	AssetTypeUnknown AssetType = "unknown"
+	AssetTypeVideo   AssetType = "video"
+)
+
 type Asset struct {
 	ID uint `gorm:"primaryKey"`
 
@@ -20,7 +29,7 @@ type Asset struct {
 	URL      string
 	MimeType string `gorm:"size:127;index"`
 
-	Type string `gorm:"size:50;index"`
+	Type AssetType `gorm:"size:50;index"`
 
 	Size int64
 
@@ -36,16 +45,16 @@ func (Asset) TableName() string {
 	return "media_files"
 }
 
-func AssetTypeFromMIME(mimeType string) string {
+func AssetTypeFromMIME(mimeType string) AssetType {
 	switch {
 	case strings.HasPrefix(mimeType, "image/"):
-		return "image"
+		return AssetTypeImage
 	case strings.HasPrefix(mimeType, "video/"):
-		return "video"
+		return AssetTypeVideo
 	case strings.HasPrefix(mimeType, "audio/"):
-		return "audio"
+		return AssetTypeAudio
 	}
-	return "unknown"
+	return AssetTypeUnknown
 }
 
 func MimeTypeFromName(name string) string {
