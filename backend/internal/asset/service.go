@@ -2,6 +2,7 @@ package asset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -82,6 +83,39 @@ func (s *Service) Upload(
 	}
 
 	return &asset, nil
+}
+
+// Delete soft-deletes a file. It only marks the file as deleted in database,
+// and keeps original file in storage.
+func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
+	// Find the asset from database.
+	asset, err := s.repo.FindAssetByStorageKey(ctx, key)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to find asset by storage key: %w", err)
+	}
+
+	// Find the operator.
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+
+	// Verify user permission of deleting this file.
+	// Admin and super admin can delete any files.
+	// Other users can only delete their own files.
+	if user.ID != asset.UserID && !model.IsAdmin(user.Role) {
+		return ErrForbidden
+	}
+
+	// Soft-delete asset record in database.
+	if err := s.repo.SoftDeleteAsset(ctx, asset); err != nil {
+		return fmt.Errorf("failed to soft delete asset: %w", err)
+	}
+
+	return nil
 }
 
 // rollbackUpload removes file from storage when uploading error occurs.
