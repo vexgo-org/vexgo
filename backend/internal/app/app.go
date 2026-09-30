@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/cache"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
@@ -212,6 +213,11 @@ func New(cfg *config.Config) (*App, error) {
 			Themes:    renderer,
 			Mailer:    mailerSvc,
 			Cipher:    cipher,
+		},
+		Asset: asset.Deps{
+			DB:        db,
+			JWTSecret: cfg.JWTSecret,
+			Storage:   storage,
 		},
 	})
 
