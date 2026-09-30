@@ -18,6 +18,11 @@ const (
 	AssetTypeVideo   AssetType = "video"
 )
 
+const (
+	MaxAssetBytes        = 25 << 20
+	MaxAssetRequestBytes = MaxAssetBytes + (1 << 20)
+)
+
 type Asset struct {
 	ID uint `gorm:"primaryKey"`
 
