@@ -2,6 +2,7 @@
 package router
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
@@ -34,6 +35,7 @@ type Deps struct {
 	SSO          sso.Deps
 	Home         home.Deps
 	Settings     settings.Deps
+	Asset        asset.Deps
 }
 
 // RegisterAPIRoutes registers all routes under /api.
@@ -52,4 +54,5 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	sso.NewHandler(deps.SSO).RegisterRoutes(api)
 	home.NewHandler(deps.Home).RegisterRoutes(api)
 	settings.NewHandler(deps.Settings).RegisterRoutes(api)
+	asset.NewHandler(deps.Asset).RegisterRoutes(api)
 }
