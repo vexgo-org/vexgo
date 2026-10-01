@@ -6,4 +6,5 @@ import (
 
 func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.POST("/asset/upload", h.mw.JWTAuth(), h.Upload)
+	api.POST("/asset/delete/:key", h.mw.JWTAuth(), h.Delete)
 }
