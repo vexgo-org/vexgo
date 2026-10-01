@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
@@ -54,14 +55,12 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		Page:         page.Deps{DB: db, JWTSecret: secret},
 		Upload:       upload.Deps{DB: db, JWTSecret: secret},
 		User:         user.Deps{DB: db, JWTSecret: secret},
-		Captcha: captcha.Deps{
-			DB:        db,
-			JWTSecret: secret,
-		},
-		Auth:     auth.Deps{DB: db, JWTSecret: secret},
-		SSO:      sso.Deps{DB: db, JWTSecret: secret},
-		Home:     home.Deps{DB: db, JWTSecret: secret},
-		Settings: settings.Deps{DB: db, JWTSecret: secret},
+		Captcha:      captcha.Deps{DB: db, JWTSecret: secret},
+		Auth:         auth.Deps{DB: db, JWTSecret: secret},
+		SSO:          sso.Deps{DB: db, JWTSecret: secret},
+		Home:         home.Deps{DB: db, JWTSecret: secret},
+		Settings:     settings.Deps{DB: db, JWTSecret: secret},
+		Asset:        asset.Deps{DB: db, JWTSecret: secret},
 	})
 
 	got := make([]string, 0, len(r.Routes()))
@@ -84,6 +83,9 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"POST /api/auth/password/reset",
 		"GET /api/auth/email/verify",
 		"GET /api/auth/email/verify/status",
+		// asset
+		"POST /api/asset/upload",
+		"POST /api/asset/delete/:key",
 		// comment
 		"GET /api/comments/post/:id",
 		"POST /api/comments",
