@@ -118,6 +118,31 @@ func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
 	return nil
 }
 
+// pruneOne purnes one asset.
+func (s *Service) pruneOne(ctx context.Context, asset *model.Asset) error {
+	if asset == nil {
+		return errors.New("asset is nil")
+	}
+
+	if asset.DeletedAt.Valid {
+		return ErrAssetNotDeleted
+	}
+
+	if asset.StorageKey == "" {
+		return ErrEmptyStorageKey
+	}
+
+	if err := s.storage.Delete(ctx, asset.StorageKey); err != nil {
+		return fmt.Errorf("failed to delete asset: %w", err)
+	}
+
+	if err := s.repo.PermanentlyDeleteAsset(ctx, asset); err != nil {
+		return fmt.Errorf("stored file deleted but asset record could not be removed: %w", err)
+	}
+
+	return nil
+}
+
 // rollbackUpload removes file from storage when uploading error occurs.
 func (s *Service) rollbackUpload(ctx context.Context, key string) {
 	if err := s.storage.Delete(ctx, key); err != nil {

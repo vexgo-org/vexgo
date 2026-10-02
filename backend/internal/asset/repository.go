@@ -3,6 +3,7 @@ package asset
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"gorm.io/gorm"
@@ -13,6 +14,8 @@ type Repository interface {
 	FindAssetByStorageKey(context.Context, string) (*model.Asset, error)
 	FindUserByID(context.Context, uint) (*model.User, error)
 	SoftDeleteAsset(context.Context, *model.Asset) error
+	PermanentlyDeleteAsset(context.Context, *model.Asset) error
+	ListAssetsForPrune(context.Context, time.Time, int) ([]model.Asset, error)
 }
 
 // gormRepository is the GORM-backed implementation of Repository.
@@ -68,4 +71,45 @@ func (r *gormRepository) SoftDeleteAsset(ctx context.Context, asset *model.Asset
 		WithContext(ctx).
 		Delete(asset).
 		Error
+}
+
+func (r *gormRepository) PermanentlyDeleteAsset(ctx context.Context, asset *model.Asset) error {
+	result := r.db.
+		WithContext(ctx).
+		Unscoped().
+		Delete(asset)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected <= 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
+func (r *gormRepository) ListAssetsForPrune(
+	ctx context.Context,
+	deletedBefore time.Time,
+	limit int,
+) ([]model.Asset, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	var assets []model.Asset
+	if err := r.db.
+		WithContext(ctx).
+		Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Where("deleted_at < ?", deletedBefore).
+		Order("deleted_at ASC").
+		Limit(limit).
+		Find(&assets).
+		Error; err != nil {
+		return nil, err
+	}
+
+	return assets, nil
 }
