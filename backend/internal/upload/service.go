@@ -119,6 +119,11 @@ func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
 	return nil
 }
 
+// rollbackUpload removes a stored object once the media record could not be
+// written. Without it the bytes would stay on the backend with no row pointing
+// at them, so nothing could ever serve or delete them through the API. It runs
+// before the original error is returned and only logs its own failure, which
+// must not mask the reason the upload failed.
 func (s *Service) rollbackUpload(ctx context.Context, key string) {
 	if err := s.storage.Delete(ctx, key); err != nil {
 		slog.WarnContext(

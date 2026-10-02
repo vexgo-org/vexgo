@@ -12,10 +12,12 @@ import (
 	"strings"
 )
 
-// LocalStorage stores files under <dataDir>/media and serves them at
-// /uploads/<filename>.
+// LocalStorage stores objects under <dataDir>/media and serves them at
+// /uploads/<key>.
 type LocalStorage struct {
+	// rootDir is the directory every operation is confined to.
 	rootDir string
+	// baseURL is the public prefix the media route serves rootDir under.
 	baseURL string
 }
 
@@ -27,6 +29,12 @@ func NewLocalStorage(dataDir string) *LocalStorage {
 	}
 }
 
+// Put writes the object under key. The bytes are staged in a sibling
+// ".uploading" file and renamed into place, so a reader that dies mid-stream or
+// a body whose length does not match size never publishes a partial object at
+// the key the caller is about to serve and record. contentType is unused here:
+// the media route derives the response type from the key's extension, never
+// from sniffing.
 func (s *LocalStorage) Put(
 	_ context.Context,
 	key string,
@@ -89,6 +97,8 @@ func (s *LocalStorage) Put(
 	return nil
 }
 
+// Open returns a reader over the stored object. The returned ReadCloser owns
+// the os.Root the file was opened through, so closing it releases both.
 func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
 	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
@@ -116,6 +126,7 @@ func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error
 	}, nil
 }
 
+// Delete removes the object. A key that holds nothing is not an error.
 func (s *LocalStorage) Delete(_ context.Context, key string) error {
 	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
@@ -138,6 +149,7 @@ func (s *LocalStorage) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+// URL returns the public path the media route serves the object under.
 func (s *LocalStorage) URL(_ context.Context, key string) (string, error) {
 	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
@@ -148,6 +160,9 @@ func (s *LocalStorage) URL(_ context.Context, key string) (string, error) {
 		cleanedKey, nil
 }
 
+// removeLocalObject drops a staging file that never became an object. It is
+// best-effort: the caller already has the error worth reporting, and a
+// concurrent removal is not a failure.
 func removeLocalObject(root *os.Root, key string) {
 	err := root.Remove(key)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

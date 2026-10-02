@@ -16,6 +16,8 @@ import (
 
 // S3Storage stores files in an S3-compatible bucket.
 type S3Storage struct {
+	// client is nil until NewS3Storage verified the bucket, so every method
+	// checks it rather than trusting the wiring.
 	client *minio.Client
 	cfg    *config.S3Config
 }
@@ -65,6 +67,9 @@ func NewS3Storage(ctx context.Context, cfg *config.S3Config) (*S3Storage, error)
 	return &S3Storage{client: client, cfg: cfg}, nil
 }
 
+// Put uploads the object under key. An empty contentType falls back to
+// extension-based detection. size is handed to minio-go as the object size; -1
+// leaves the multipart decision to the client.
 func (s *S3Storage) Put(
 	ctx context.Context,
 	key string,
@@ -102,6 +107,9 @@ func (s *S3Storage) Put(
 	return nil
 }
 
+// Open returns a reader over the stored object. GetObject defers the request
+// until the first read, so a missing object only surfaces here — hence the
+// Stat, which turns that into ErrNotFound instead of a read-time error.
 func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	if err := s.checkClientInitialized(); err != nil {
 		return nil, err
@@ -137,6 +145,8 @@ func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error)
 	return object, nil
 }
 
+// Delete removes the object. S3 treats removing a missing key as success, so
+// this stays idempotent like the local backend.
 func (s *S3Storage) Delete(ctx context.Context, key string) error {
 	if err := s.checkClientInitialized(); err != nil {
 		return err
@@ -159,6 +169,8 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// URL returns the bucket's public URL for the key, honoring the custom domain
+// and path-style settings from the S3 config.
 func (s *S3Storage) URL(_ context.Context, key string) (string, error) {
 	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
@@ -167,6 +179,8 @@ func (s *S3Storage) URL(_ context.Context, key string) (string, error) {
 	return s.cfg.GetURL(cleanedKey), nil
 }
 
+// checkClientInitialized guards the zero value: NewS3Storage returns a nil
+// *S3Storage when S3 is disabled, and app only keeps it when it is non-nil.
 func (s *S3Storage) checkClientInitialized() error {
 	if s.client == nil {
 		return errors.New("S3 storage not initialized")
