@@ -40,7 +40,8 @@ backend/
     secrets/                 # 数据库中敏感信息的 AES-256-GCM 加密
     settings/                # 管理员配置（SMTP、AI、通用、主题）
     sso/                     # GitHub / Google / OIDC 登录
-    upload/                  # 文件上传（本地磁盘或 S3）
+    storage/                 # Storage 接缝后的文件后端（本地磁盘或 S3）
+    upload/                  # 上传接口与媒体文件记录
     user/                    # 用户管理、角色、创作者申请
 ```
 
@@ -79,7 +80,7 @@ type Notifier interface {
     CreateNotification(ctx context.Context, input NotificationInput) error
 }
 
-// FileRemover 删除已存储的文件（通过公开 URL）；由 upload.Storage 实现。
+// FileRemover 按存储 key 删除已存储的文件；由 storage.Storage 实现。
 type FileRemover interface {
     Delete(ctx context.Context, url string) error
 }
@@ -88,7 +89,7 @@ type FileRemover interface {
 具体实现由 `internal/app` 装配，所以没有任何领域包导入其他领域的具体类型：
 
 - `notification` 实现 `Notifier`；由 `post`、`comment`、`user` 消费。
-- `upload` 实现 `FileRemover`；由 `post`、`user`、`auth` 用于文件清理。
+- `storage.Storage` 实现 `FileRemover`；由 `post`、`user`、`auth` 用于文件清理。
 - `captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接缝；`settings` 自行声明 `SecretCipher`，`post`/`home` 自行声明 `ReadCache`。
 - 邮件是例外：`mailer.Service` 以具体类型注入 `auth` 与 `settings`。它只负责发送；验证令牌、密码重置与帐号数据仍留在各领域的 repository 中。
 
@@ -133,11 +134,13 @@ cmd/vexgo/main.go
 
 叶子包（无内部导入）：
     model/         ← 数据模型 + 共享接缝，被所有领域包导入
-    config/        ← 配置解析，被 cli、app、database、sso、upload 导入
+    config/        ← 配置解析，被 cli、app、database、sso、storage 导入
     secrets/       ← 静态敏感信息的 AES-256-GCM cipher；各领域通过自己的
                      SecretCipher 接口消费，由 app 装配
     cache/         ← 内存 + Valkey 后端；各领域通过自己的窄接缝
                      （CounterStore、StateStore、ReadCache）消费
+    storage/       ← 本地磁盘与 S3 文件后端（仅导入 config）；由 upload
+                     上传媒体，以及 model.FileRemover 清理路径消费
 
 共享层：
     middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）
@@ -145,7 +148,8 @@ cmd/vexgo/main.go
 跨领域边：
     auth/          ← 被 comment、post、sso 使用（隐私过滤）
     notification/  ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
-    upload/        ← 实现 model.FileRemover，被 user、auth、post 用于文件清理
+    storage/       ← storage.Storage 实现 model.FileRemover，被 user、auth、post
+                     用于文件清理；upload 领域通过它存储媒体
     captcha/       ← 实现 auth 声明的验证码检查接缝 auth.CaptchaChecker
     public/        ← 被 settings 用作主题渲染器接缝
     mailer/        ← 以具体类型 *mailer.Service 注入 auth 与 settings（只负责发送）
@@ -261,6 +265,8 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 ## 存储
 
 - 上传文件默认存到本地数据目录，启用 S3 后存到任意 S3 兼容对象存储（AWS S3、MinIO、Garage 等）。
+- 两种后端都放在 `internal/storage` 下，共用一个 `Storage` 接口（`Put`/`Open`/`Delete`/`URL`），因此 `upload` 不需要知道拿到的是哪个后端，测试也可以换成指向临时目录的 `LocalStorage`。具体后端由 `app.initStorage` 选择并注入。
+- 对象一律按 key 寻址，绝不使用 URL。因此 `MediaFile` 同时记录两者：`storage_key` 供 `Delete` 使用，`url` 给浏览器访问。key 在进入后端前先由 `cleanKey` 归一化并拦截，`LocalStorage` 还用 `os.Root` 约束每一次操作，恶意 key 无法逃出 `data/media`。
 - 元数据（用户、文章、评论、设置）存储在数据库：默认 SQLite，生产环境用 PostgreSQL/MySQL。
 
 ## 通知

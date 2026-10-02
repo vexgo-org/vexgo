@@ -40,7 +40,8 @@ backend/
     secrets/                 # AES-256-GCM encryption of secrets stored in the database
     settings/                # admin configuration (SMTP, AI, general, theme)
     sso/                     # GitHub / Google / OIDC login
-    upload/                  # file upload (local disk or S3)
+    storage/                 # file backends behind the Storage seam (local disk or S3)
+    upload/                  # upload endpoints and the media-file records
     user/                    # user management, roles, creator applications
 ```
 
@@ -79,7 +80,7 @@ type Notifier interface {
     CreateNotification(ctx context.Context, input NotificationInput) error
 }
 
-// FileRemover deletes a stored file by its public URL; implemented by upload.Storage.
+// FileRemover deletes a stored file by its storage key; implemented by storage.Storage.
 type FileRemover interface {
     Delete(ctx context.Context, url string) error
 }
@@ -88,7 +89,7 @@ type FileRemover interface {
 The implementations are wired in `internal/app`, so no domain imports another domain's concrete type:
 
 - `notification` implements `Notifier`; `post`, `comment`, and `user` consume it.
-- `upload` implements `FileRemover`; `post`, `user`, and `auth` consume it for file cleanup.
+- `storage.Storage` implements `FileRemover`; `post`, `user`, and `auth` consume it for file cleanup.
 - `captcha` implements the `CaptchaChecker` seam that `auth` declares; `settings` declares its own `SecretCipher` and `post`/`home` their own `ReadCache` the same way.
 - Email is an exception: `mailer.Service` is injected as a concrete type into `auth` and `settings`. It is send-only; verification tokens, password resets, and accounts stay in the domain repositories.
 
@@ -133,11 +134,13 @@ cmd/vexgo/main.go
 
 Leaf packages (no internal imports):
     model/         ← data models + shared seams, imported by every domain
-    config/        ← configuration parsing, imported by cli, app, database, sso, upload
+    config/        ← configuration parsing, imported by cli, app, database, sso, storage
     secrets/       ← AES-256-GCM cipher for secrets at rest; domains consume it
                      through their own SecretCipher interfaces, wired by app
     cache/         ← memory + Valkey backends; domains consume it through their
                      own narrow seams (CounterStore, StateStore, ReadCache)
+    storage/       ← local disk and S3 file backends (imports config only); consumed
+                     by upload and by the model.FileRemover cleanup paths
 
 Shared layer:
     middleware/     ← JWT auth, role permissions, request logging (imports model only)
@@ -145,7 +148,8 @@ Shared layer:
 Cross-domain edges:
     auth/          ← used by comment, post, sso (for privacy filtering)
     notification/  ← implements model.Notifier, used by comment, post, user as notification seam
-    upload/        ← implements model.FileRemover, used by user, auth, post for file cleanup
+    storage/       ← storage.Storage implements model.FileRemover, used by user, auth,
+                     post for file cleanup; the upload domain stores media through it
     captcha/       ← implements auth.CaptchaChecker, the captcha-check seam auth declares
     public/        ← used by settings as the theme-renderer seam
     mailer/        ← injected as a concrete *mailer.Service into auth and settings (send-only)
@@ -261,6 +265,8 @@ The callback URLs are:
 ## Storage
 
 - Uploads go to the local data directory by default, or to any S3-compatible object storage (AWS S3, MinIO, Garage, ...) when S3 is enabled.
+- Both live behind `internal/storage` as one `Storage` interface (`Put`/`Open`/`Delete`/`URL`), so `upload` never learns which backend it got and tests can swap in `LocalStorage` over a temp directory. `app.initStorage` picks the backend and injects it.
+- Objects are addressed by key, never by URL. A `MediaFile` row therefore stores both: `storage_key` is what `Delete` takes, `url` is what browsers get. Keys are normalized and screened by `cleanKey` before they reach a backend, and `LocalStorage` confines every operation with `os.Root`, so a hostile key cannot escape `data/media`.
 - Metadata (users, posts, comments, settings) lives in the database: SQLite by default, PostgreSQL/MySQL for production.
 
 ## Notifications

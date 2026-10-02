@@ -604,7 +604,8 @@ backend/
     secrets/         # AES-256-GCM encryption of secrets stored in the database
     settings/        # admin configuration (SMTP, AI, general, theme)
     sso/             # GitHub / Google / OIDC login
-    upload/          # file upload (local disk or S3)
+    storage/         # file backends behind the Storage seam (local disk or S3)
+    upload/          # upload endpoints and the media-file records
     user/            # user management, roles, creator applications
 ```
 

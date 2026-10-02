@@ -34,7 +34,7 @@ go run backend/cmd/vexgo/main.go server       # 不用 just 的等价写法
 - `backend/internal/app`：装配所有领域；`backend/cmd/vexgo/main.go` 只做配置解析与调用。
 - 不导入其他后端包的叶子包：`config`、`model`、`secrets`、`cache`。`model` 放 GORM 模型与 `Notifier`/`FileRemover` 缝隙（`model/interfaces.go`）；不得导入应用逻辑。
 - `backend/internal/public`：SSR 引擎、主题 serving、嵌入资源。`backend/internal/settings`：站点设置与主题管理。
-- 跨域调用走消费方声明的接口（`notification` 实现 `model.Notifier`，`upload` 实现 `model.FileRemover`）。`mailer.Service` 是有意的例外：以具体 `*mailer.Service` 注入 `auth` 与 `settings`。
+- 跨域调用走消费方声明的接口（`notification` 实现 `model.Notifier`，`storage.Storage` 实现 `model.FileRemover`）。`mailer.Service` 是有意的例外：以具体 `*mailer.Service` 注入 `auth` 与 `settings`。
 - 每一层都要透传 `context.Context`；handler 传 `c.Request.Context()`。依赖经 `Deps` 结构体显式注入，不用全局变量（唯一的全局可变状态是测试缝隙 `mailer.SetMailCaptureHook`，测试中用 `t.Cleanup` 还原）。
 
 ## 实操：新增或修改接口
