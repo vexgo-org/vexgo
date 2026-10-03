@@ -6,12 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface ModelMediaFile {
+export interface ModelAsset {
   createdAt?: string;
-  id?: number;
   size?: number;
-  /** image/video etc. */
-  type?: string;
+  updatedAt?: string;
   url?: string;
-  userId?: number;
 }
