@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -31,7 +32,7 @@ func newTestService(t *testing.T) (*Service, string, *gorm.DB) {
 	}
 
 	dataDir := t.TempDir()
-	svc := NewService(Deps{DB: db, Storage: NewLocalStorage(dataDir)})
+	svc := NewService(Deps{DB: db, Storage: storage.NewLocalStorage(dataDir)})
 	return svc, dataDir, db
 }
 
@@ -48,14 +49,23 @@ func TestUpload_WritesFileAndRecord(t *testing.T) {
 	svc, dataDir, db := newTestService(t)
 	user := seedUser(t, db, "uploader", model.RoleContributor)
 
-	media, err := svc.Upload(context.Background(), user.ID, "photo.jpg", 42, strings.NewReader("jpeg-data"))
+	// Storage verifies the declared size against the bytes it received, so the
+	// size has to be the payload's real length rather than an arbitrary number.
+	payload := "jpeg-data"
+	media, err := svc.Upload(
+		context.Background(),
+		user.ID,
+		"photo.jpg",
+		int64(len(payload)),
+		strings.NewReader(payload),
+	)
 	if err != nil {
 		t.Fatalf("Upload error: %v", err)
 	}
 	if media.URL == "" || !strings.HasPrefix(media.URL, "/uploads/") {
 		t.Errorf("expected /uploads/ URL, got %q", media.URL)
 	}
-	if media.Size != 42 || media.UserID != user.ID {
+	if media.Size != int64(len(payload)) || media.UserID != user.ID {
 		t.Errorf("unexpected media record: %+v", media)
 	}
 
@@ -64,7 +74,7 @@ func TestUpload_WritesFileAndRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("file not written: %v", err)
 	}
-	if string(content) != "jpeg-data" {
+	if string(content) != payload {
 		t.Errorf("unexpected file content %q", string(content))
 	}
 
@@ -72,6 +82,35 @@ func TestUpload_WritesFileAndRecord(t *testing.T) {
 	var stored model.MediaFile
 	if err := db.First(&stored, media.ID).Error; err != nil {
 		t.Fatalf("media record not saved: %v", err)
+	}
+}
+
+// TestUpload_RejectsTruncatedPayload covers the upload path's share of the size
+// guard: a body shorter than the size the client declared must not produce a
+// media row, and must not leave bytes behind.
+func TestUpload_RejectsTruncatedPayload(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	user := seedUser(t, db, "uploader", model.RoleContributor)
+
+	_, err := svc.Upload(context.Background(), user.ID, "short.jpg", 42, strings.NewReader("tiny"))
+	if err == nil {
+		t.Fatal("expected an error for a truncated payload, got nil")
+	}
+
+	var count int64
+	if err := db.Model(&model.MediaFile{}).Count(&count).Error; err != nil {
+		t.Fatalf("count error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("a failed upload created %d media record(s)", count)
+	}
+
+	entries, err := os.ReadDir(filepath.Join(dataDir, "media"))
+	if err != nil {
+		t.Fatalf("read media dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("a failed upload left %d file(s) behind", len(entries))
 	}
 }
 

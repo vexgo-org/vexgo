@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -75,58 +77,161 @@ func isUUID(s string) bool {
 	return err == nil
 }
 
-// TestLocalStorage_ContainsHostileFilenames ensures os.Root confinement:
-// hostile filenames can never create or delete files outside the media
-// directory. Upload rejects separator-carrying names outright; the ".." name
-// has no separator and is what the os.Root layer refuses.
+// TestLocalStorage_ContainsHostileFilenames ensures os.Root confinement: a
+// hostile key can never create, read or delete a file outside the media
+// directory. Storage takes a key, not a URL, so every escaping key is refused
+// by cleanKey before touching the filesystem — absolute paths, backslashes and
+// ".." segments alike. The decoy must survive all of it.
 func TestLocalStorage_ContainsHostileFilenames(t *testing.T) {
 	dataDir := t.TempDir()
-	storage := NewLocalStorage(dataDir)
+	store := storage.NewLocalStorage(dataDir)
 
-	// A decoy outside the media tree must survive every hostile operation.
-	if err := os.WriteFile(filepath.Join(dataDir, "secret.txt"), []byte("secret"), 0o600); err != nil {
+	rootDir := path.Join(dataDir, "media")
+	if err := os.MkdirAll(rootDir, 0o750); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+
+	// A decoy inside the media tree, next to where a traversal would land.
+	if err := os.WriteFile(filepath.Join(rootDir, "secret.txt"), []byte("secret"), 0o600); err != nil {
 		t.Fatalf("seed decoy: %v", err)
 	}
 
-	for _, name := range []string{"../evil.txt", "media/../../evil.txt", "/tmp/evil.txt", ".."} {
-		if _, err := storage.Upload(context.Background(), strings.NewReader("evil"), name, ""); err == nil {
-			t.Errorf("Upload(%q): expected error, got nil", name)
+	// -1 skips the size check so each case fails on the key, not on a size
+	// mismatch that would mask the assertion.
+	for _, key := range []string{
+		"../evil.txt",
+		"media/../../evil.txt",
+		"/tmp/evil.txt",
+		"/evil.txt",
+		`..\evil.txt`,
+		"..",
+		".",
+		"",
+	} {
+		if err := store.Put(
+			context.Background(),
+			key,
+			strings.NewReader("evil"),
+			-1,
+			"",
+		); !errors.Is(err, storage.ErrInvalidKey) {
+			t.Errorf("Put(%q) = %v, want ErrInvalidKey", key, err)
 		}
-		// Delete cannot escape either: filepath.Base neutralizes traversal
-		// segments (missing files stay "not an error"), the ".." name is
-		// rejected outright, and os.Root confines the removal; the decoy must
-		// survive all of them.
-		for _, url := range []string{"/uploads/" + name, name} {
-			err := storage.Delete(context.Background(), url)
-			if name == ".." {
-				if err == nil {
-					t.Errorf("Delete(%q): expected error, got nil", url)
-				}
-				continue
-			}
-			if err != nil {
-				t.Errorf("Delete(%q): unexpected error %v", url, err)
-			}
+		if err := store.Delete(context.Background(), key); !errors.Is(err, storage.ErrInvalidKey) {
+			t.Errorf("Delete(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		if _, err := store.Open(context.Background(), key); !errors.Is(err, storage.ErrInvalidKey) {
+			t.Errorf("Open(%q) = %v, want ErrInvalidKey", key, err)
+		}
+		if _, err := store.URL(context.Background(), key); !errors.Is(err, storage.ErrInvalidKey) {
+			t.Errorf("URL(%q) = %v, want ErrInvalidKey", key, err)
 		}
 	}
 
-	if _, err := os.Stat(filepath.Join(dataDir, "secret.txt")); err != nil {
+	if _, err := os.Stat(filepath.Join(rootDir, "secret.txt")); err != nil {
 		t.Errorf("decoy file was disturbed: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, "evil.txt")); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("evil.txt must not exist outside media")
 	}
+
+	// A valid key that simply is not there is not an error, so deleting an
+	// already-deleted file stays idempotent.
+	if err := store.Delete(context.Background(), "absent.txt"); err != nil {
+		t.Errorf("Delete of a missing object = %v, want nil", err)
+	}
 }
 
-// failingStorage always fails Upload with the error it was given, so the
+// TestLocalStorage_PublishesObjectUnderItsKey pins that a successful Put
+// leaves the bytes readable under the key the caller asked for. The object is
+// staged under a temporary name first, so a Put that never publishes it would
+// hand the caller a URL to a file that does not exist.
+func TestLocalStorage_PublishesObjectUnderItsKey(t *testing.T) {
+	dataDir := t.TempDir()
+	store := storage.NewLocalStorage(dataDir)
+	ctx := context.Background()
+	const payload = "jpeg-data"
+
+	if err := store.Put(ctx, "photo.png", strings.NewReader(payload), int64(len(payload)), ""); err != nil {
+		t.Fatalf("Put error: %v", err)
+	}
+
+	url, err := store.URL(ctx, "photo.png")
+	if err != nil {
+		t.Fatalf("URL error: %v", err)
+	}
+	if url != "/uploads/photo.png" {
+		t.Errorf("URL = %q, want /uploads/photo.png", url)
+	}
+
+	rc, err := store.Open(ctx, "photo.png")
+	if err != nil {
+		t.Fatalf("Open after Put = %v, want the published object", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("read object: %v", err)
+	}
+	if string(got) != payload {
+		t.Errorf("object content = %q, want %q", got, payload)
+	}
+
+	// No staging file may be left behind: it would be an unlistable orphan.
+	entries, err := os.ReadDir(filepath.Join(dataDir, "media"))
+	if err != nil {
+		t.Fatalf("read media dir: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != "photo.png" {
+			t.Errorf("unexpected leftover in media dir: %s", entry.Name())
+		}
+	}
+
+	// And a published object is deletable, unlike a stranded staging file.
+	if err := store.Delete(ctx, "photo.png"); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+	if _, err := store.Open(ctx, "photo.png"); !errors.Is(err, storage.ErrNotFound) {
+		t.Errorf("Open after Delete = %v, want ErrNotFound", err)
+	}
+}
+
+// TestLocalStorage_PutRejectsSizeMismatch covers the guard that keeps a
+// truncated upload from being recorded as a successful one: the declared size
+// and the stored size have to agree, and the staging file is cleaned up.
+func TestLocalStorage_PutRejectsSizeMismatch(t *testing.T) {
+	dataDir := t.TempDir()
+	store := storage.NewLocalStorage(dataDir)
+
+	err := store.Put(context.Background(), "short.png", strings.NewReader("tiny"), 42, "")
+	if err == nil {
+		t.Fatal("expected a size mismatch error, got nil")
+	}
+
+	entries, err := os.ReadDir(filepath.Join(dataDir, "media"))
+	if err != nil {
+		t.Fatalf("read media dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("rejected upload left %d file(s) behind", len(entries))
+	}
+}
+
+// failingStorage always fails Put with the error it was given, so the
 // handler's error path can be exercised without a real storage backend.
 type failingStorage struct{ err error }
 
-func (s failingStorage) Upload(context.Context, io.Reader, string, string) (string, error) {
-	return "", s.err
+func (s failingStorage) Put(context.Context, string, io.Reader, int64, string) error {
+	return s.err
 }
 
 func (s failingStorage) Delete(context.Context, string) error { return nil }
+
+func (s failingStorage) Open(context.Context, string) (io.ReadCloser, error) { return nil, s.err }
+
+func (s failingStorage) URL(context.Context, string) (string, error) { return "", s.err }
 
 // TestUploadFile_DoesNotLeakStorageErrors pins the contract that a persistence
 // failure is logged server-side and answered with a generic 500: the storage

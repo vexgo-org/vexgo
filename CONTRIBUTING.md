@@ -152,7 +152,8 @@ backend/
     secrets/               # AES-256-GCM encryption of secrets at rest
     settings/              # site settings endpoints
     sso/                   # OAuth2 / OIDC login
-    upload/                # file upload (local disk or S3)
+    storage/               # file backends behind the Storage seam (local disk or S3)
+    upload/                # upload endpoints and the media-file records
     user/                  # user management
 frontend/
   src/
