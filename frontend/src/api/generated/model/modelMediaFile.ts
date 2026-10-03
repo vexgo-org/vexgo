@@ -10,7 +10,6 @@ export interface ModelMediaFile {
   createdAt?: string;
   id?: number;
   size?: number;
-  storageKey?: string;
   /** image/video etc. */
   type?: string;
   url?: string;

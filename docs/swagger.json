@@ -50,6 +50,27 @@
                 },
                 "type": "object"
             },
+            "asset.MessageResponse": {
+                "properties": {
+                    "message": {
+                        "example": "File deleted",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "asset.UploadResponse": {
+                "properties": {
+                    "file": {
+                        "$ref": "#/components/schemas/model.Asset"
+                    },
+                    "message": {
+                        "example": "File uploaded successfully",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "auth.ChangePasswordRequestWire": {
                 "properties": {
                     "newPassword": {
@@ -797,6 +818,23 @@
                 },
                 "type": "object"
             },
+            "model.Asset": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "type": "integer"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "model.Category": {
                 "properties": {
                     "description": {
@@ -1021,9 +1059,6 @@
                     },
                     "size": {
                         "type": "integer"
-                    },
-                    "storageKey": {
-                        "type": "string"
                     },
                     "type": {
                         "description": "image/video etc.",
@@ -2455,6 +2490,160 @@
         "url": ""
     },
     "paths": {
+        "/asset/delete/{key}": {
+            "post": {
+                "description": "Soft deletes the asset identified by its storage key.\nOnly the owner or an administrator may delete it.\nRequires authentication.",
+                "parameters": [
+                    {
+                        "description": "asset storage key",
+                        "in": "path",
+                        "name": "key",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/asset.MessageResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "not the owner"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "asset does not exist"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "failed to delete asset"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete an asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/asset/upload": {
+            "post": {
+                "description": "Accepts a multipart/form-data body with a single 'file'\npart. The storage key is a freshly generated UUID\nplus the sanitized extension from the original filename;\nany untrusted characters are stripped before persistence.\nRequires authentication.",
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "description": "file to upload",
+                                        "format": "binary",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ],
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "description": "file to upload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/asset.UploadResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "missing or malformed form"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "failed to persist file"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Upload an asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/auth/email": {
             "put": {
                 "description": "Sends a verification link to the new address when\nSMTP is enabled, or applies the change directly\notherwise. The 200 response indicates the request\nwas accepted; the body distinguishes the two paths\nvia the `pending` boolean.",
