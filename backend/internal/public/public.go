@@ -475,7 +475,11 @@ func (r *Renderer) handleThemeAsset(c *gin.Context) {
 // together because both end up reading this same source.
 func (r *Renderer) handleFavicon(c *gin.Context) {
 	var settings model.GeneralSettings
-	if err := r.db.First(&settings).Error; err == nil && settings.SiteIcon != "" {
+	if err := r.db.
+		Preload("SiteIcon").
+		First(&settings).
+		Error; err == nil &&
+		settings.SiteIcon != nil {
 		if r.serveConfiguredIcon(c, settings.SiteIcon) {
 			return
 		}
@@ -502,10 +506,10 @@ func (r *Renderer) handleFavicon(c *gin.Context) {
 // serveConfiguredIcon serves or redirects the configured site icon and reports
 // whether it answered the request. A local upload that is gone from disk
 // reports false so the caller can fall back to the other favicon sources.
-func (r *Renderer) serveConfiguredIcon(c *gin.Context, iconURL string) bool {
-	if !strings.HasPrefix(iconURL, "/uploads/") {
+func (r *Renderer) serveConfiguredIcon(c *gin.Context, asset *model.Asset) bool {
+	if !strings.HasPrefix(asset.URL, "/uploads/") {
 		// External or S3 URL: let the browser fetch it directly.
-		c.Redirect(http.StatusFound, iconURL)
+		c.Redirect(http.StatusFound, asset.URL)
 		return true
 	}
 
@@ -514,14 +518,17 @@ func (r *Renderer) serveConfiguredIcon(c *gin.Context, iconURL string) bool {
 	// unknown, so a site icon pointing at an extensionless upload of a hostile
 	// HTML file would be served as text/html and execute on direct navigation.
 	// The media content types are explicit and never sniffed.
-	name := filepath.Base(iconURL)
+	//
+	// The storage key addresses the object; the URL only says where it is
+	// served from, and the two stop matching as soon as the storage
+	// configuration changes.
 	root, err := os.OpenRoot(filepath.Join(r.dataDir, "media"))
 	if err != nil {
 		return false
 	}
 	defer func() { _ = root.Close() }()
 
-	file, err := root.Open(name)
+	file, err := root.Open(asset.StorageKey)
 	if err != nil {
 		return false
 	}
@@ -532,7 +539,7 @@ func (r *Renderer) serveConfiguredIcon(c *gin.Context, iconURL string) bool {
 		return false
 	}
 
-	serveMediaFile(c, name, info, file)
+	serveMediaFile(c, asset.StorageKey, info, file)
 	return true
 }
 
