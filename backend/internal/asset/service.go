@@ -114,7 +114,15 @@ func (s *Service) DeleteByID(ctx context.Context, userID, assetID uint) error {
 
 // FindByID finds an asset by asset ID.
 func (s *Service) FindByID(ctx context.Context, id uint) (*model.Asset, error) {
-	return s.repo.FindAssetByID(ctx, id)
+	asset, err := s.repo.FindAssetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to find asset by id: %w", err)
+	}
+
+	return asset, nil
 }
 
 // rollbackUpload removes file from storage when uploading error occurs.
