@@ -255,7 +255,7 @@ type GeneralSettingsRequest struct {
 	AllowGuestViewPosts bool
 	SiteName            string
 	SiteDescription     string
-	SiteIcon            string
+	SiteIconID          *uint
 	ItemsPerPage        int
 	SiteLanguage        string
 }
@@ -282,7 +282,6 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 				AllowGuestViewPosts: true,
 				SiteName:            "VexGo",
 				SiteDescription:     "",
-				SiteIcon:            "",
 				ItemsPerPage:        20,
 				SiteLanguage:        public.DefaultLanguage,
 			}, nil
@@ -304,7 +303,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 				AllowGuestViewPosts: req.AllowGuestViewPosts,
 				SiteName:            req.SiteName,
 				SiteDescription:     req.SiteDescription,
-				SiteIcon:            req.SiteIcon,
+				SiteIconID:          req.SiteIconID,
 				ItemsPerPage:        req.ItemsPerPage,
 				SiteLanguage:        normalizeSiteLanguage(req.SiteLanguage),
 			}
@@ -321,7 +320,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		config.AllowGuestViewPosts = req.AllowGuestViewPosts
 		config.SiteName = req.SiteName
 		config.SiteDescription = req.SiteDescription
-		config.SiteIcon = req.SiteIcon
+		config.SiteIconID = req.SiteIconID
 		config.ItemsPerPage = req.ItemsPerPage
 		config.SiteLanguage = normalizeSiteLanguage(req.SiteLanguage)
 
@@ -330,7 +329,10 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		}
 	}
 
-	return config, nil
+	// Re-read so the returned row carries the site icon asset: a write persists
+	// the reference but leaves the loaded association as it was, so switching or
+	// clearing the icon would otherwise report the previous one.
+	return s.repo.GetGeneralSettings(ctx)
 }
 
 // AIConfigRequest carries the fields accepted when updating the AI config.

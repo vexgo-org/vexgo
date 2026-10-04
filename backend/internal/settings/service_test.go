@@ -28,7 +28,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.SMTPConfig{}, &model.GeneralSettings{}, &model.AIConfig{}, &model.ThemeConfig{}); err != nil {
+	if err := db.AutoMigrate(&model.SMTPConfig{}, &model.GeneralSettings{}, &model.AIConfig{}, &model.ThemeConfig{}, &model.Asset{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -184,6 +184,122 @@ func TestUpdateGeneralSettings(t *testing.T) {
 	}
 	if got.RegistrationEnabled {
 		t.Errorf("expected RegistrationEnabled=false persisted, got %+v", got)
+	}
+}
+
+func TestUpdateGeneralSettings_SiteIconIsAnAssetReference(t *testing.T) {
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	asset := model.Asset{StorageKey: "icon.png", URL: "/uploads/icon.png", UserID: 1}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatalf("seed asset: %v", err)
+	}
+	assetID := asset.ID
+
+	// The stored value is the reference, and callers get the asset back with
+	// the URL to render.
+	config, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{
+		SiteName:   "B",
+		SiteIconID: &assetID,
+	})
+	if err != nil {
+		t.Fatalf("UpdateGeneralSettings error: %v", err)
+	}
+	if config.SiteIconID == nil || *config.SiteIconID != assetID {
+		t.Fatalf("SiteIconID = %v, want %d", config.SiteIconID, assetID)
+	}
+	if config.SiteIcon == nil {
+		t.Fatal("SiteIcon is nil, want the referenced asset")
+	}
+	if config.SiteIcon.ID != assetID || config.SiteIcon.URL != "/uploads/icon.png" {
+		t.Errorf("SiteIcon = %+v, want asset %d at /uploads/icon.png", config.SiteIcon, assetID)
+	}
+
+	// Saving unrelated settings must not rewrite the asset it points at: the
+	// reference is loaded to render the URL, and writing it back would upsert
+	// an untouched media_files row on every save.
+	before := model.Asset{}
+	if err := db.First(&before, assetID).Error; err != nil {
+		t.Fatalf("load asset: %v", err)
+	}
+	if _, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{
+		SiteName:   "C",
+		SiteIconID: &assetID,
+	}); err != nil {
+		t.Fatalf("second UpdateGeneralSettings error: %v", err)
+	}
+	after := model.Asset{}
+	if err := db.First(&after, assetID).Error; err != nil {
+		t.Fatalf("reload asset: %v", err)
+	}
+	if !before.UpdatedAt.Equal(after.UpdatedAt) {
+		t.Errorf("asset row rewritten by an unrelated settings save: %v -> %v", before.UpdatedAt, after.UpdatedAt)
+	}
+
+	// Clearing the reference drops the asset too, rather than leaving the
+	// in-memory copy reporting the icon that was just removed.
+	cleared, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "C"})
+	if err != nil {
+		t.Fatalf("clear icon: %v", err)
+	}
+	if cleared.SiteIconID != nil {
+		t.Errorf("SiteIconID = %d, want nil", *cleared.SiteIconID)
+	}
+	if cleared.SiteIcon != nil {
+		t.Errorf("SiteIcon = %+v, want nil after clearing the reference", cleared.SiteIcon)
+	}
+}
+
+// TestGetGeneralSettings_DanglingSiteIconResolvesToNothing covers an id that
+// names no live asset: the reference is still stored, so the console can tell
+// an unresolvable icon from no icon at all, but nothing renders.
+func TestGetGeneralSettings_DanglingSiteIconResolvesToNothing(t *testing.T) {
+	svc, db := newTestService(t)
+	ctx := context.Background()
+
+	asset := model.Asset{StorageKey: "icon.png", URL: "/uploads/icon.png", UserID: 1}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatalf("seed asset: %v", err)
+	}
+	assetID := asset.ID
+	if _, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{
+		SiteName:   "B",
+		SiteIconID: &assetID,
+	}); err != nil {
+		t.Fatalf("UpdateGeneralSettings error: %v", err)
+	}
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("soft delete asset: %v", err)
+	}
+
+	config, err := svc.GetGeneralSettings(ctx)
+	if err != nil {
+		t.Fatalf("GetGeneralSettings error: %v", err)
+	}
+	if config.SiteIconID == nil || *config.SiteIconID != assetID {
+		t.Fatalf("SiteIconID = %v, want the stored %d", config.SiteIconID, assetID)
+	}
+	if config.SiteIcon != nil {
+		t.Errorf("SiteIcon = %+v, want nil for a soft-deleted asset", config.SiteIcon)
+	}
+
+	// The reference survives a later save, because site_icon_id is written from
+	// SiteIconID rather than from the association that failed to load. Round-
+	// tripping the stored id — what the console does — keeps it recoverable
+	// when the asset is restored.
+	if _, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{
+		SiteName:   "C",
+		SiteIconID: &assetID,
+	}); err != nil {
+		t.Fatalf("save after delete error: %v", err)
+	}
+	var stored model.GeneralSettings
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("load settings: %v", err)
+	}
+	if stored.SiteIconID == nil || *stored.SiteIconID != assetID {
+		t.Errorf("site_icon_id = %v, want the dangling reference %d kept", stored.SiteIconID, assetID)
 	}
 }
 
