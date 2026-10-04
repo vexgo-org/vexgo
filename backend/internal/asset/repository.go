@@ -11,6 +11,7 @@ import (
 type Repository interface {
 	CreateAsset(context.Context, *model.Asset) error
 	FindAssetByStorageKey(context.Context, string) (*model.Asset, error)
+	FindAssetByID(context.Context, uint) (*model.Asset, error)
 	FindUserByID(context.Context, uint) (*model.User, error)
 	SoftDeleteAsset(context.Context, *model.Asset) error
 }
@@ -49,6 +50,17 @@ func (r *gormRepository) FindAssetByStorageKey(ctx context.Context, key string) 
 		return nil, err
 	}
 
+	return &asset, nil
+}
+
+func (r *gormRepository) FindAssetByID(ctx context.Context, id uint) (*model.Asset, error) {
+	var asset model.Asset
+	if err := r.db.
+		WithContext(ctx).
+		First(&asset, id).
+		Error; err != nil {
+		return nil, err
+	}
 	return &asset, nil
 }
 

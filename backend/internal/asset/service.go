@@ -118,6 +118,11 @@ func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
 	return nil
 }
 
+// FindByID finds an asset by asset ID.
+func (s *Service) FindByID(ctx context.Context, id uint) (*model.Asset, error) {
+	return s.repo.FindAssetByID(ctx, id)
+}
+
 // rollbackUpload removes file from storage when uploading error occurs.
 func (s *Service) rollbackUpload(ctx context.Context, key string) {
 	if err := s.storage.Delete(ctx, key); err != nil {
