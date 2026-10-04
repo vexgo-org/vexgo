@@ -85,8 +85,7 @@ func (s *Service) Upload(
 	return &asset, nil
 }
 
-// Delete soft-deletes a file. It only marks the file as deleted in database,
-// and keeps original file in storage.
+// Delete soft-deletes a file by storage key.
 func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
 	// Find the asset from database.
 	asset, err := s.repo.FindAssetByStorageKey(ctx, key)
@@ -97,6 +96,30 @@ func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
 		return fmt.Errorf("failed to find asset by storage key: %w", err)
 	}
 
+	return s.softDelete(ctx, userID, asset)
+}
+
+// FindByID finds an asset by asset ID.
+func (s *Service) FindByID(ctx context.Context, id uint) (*model.Asset, error) {
+	return s.repo.FindAssetByID(ctx, id)
+}
+
+// rollbackUpload removes file from storage when uploading error occurs.
+func (s *Service) rollbackUpload(ctx context.Context, key string) {
+	if err := s.storage.Delete(ctx, key); err != nil {
+		slog.WarnContext(
+			ctx,
+			"failed to remove uploading file after media creation failed",
+			"storage_key", key,
+			"err", err,
+		)
+	}
+}
+
+// softDelete soft-deletes an asset.
+// It only marks the file as deleted in database,
+// and keeps original file in storage.
+func (s *Service) softDelete(ctx context.Context, userID uint, asset *model.Asset) error {
 	// Find the operator.
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
@@ -116,21 +139,4 @@ func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
 	}
 
 	return nil
-}
-
-// FindByID finds an asset by asset ID.
-func (s *Service) FindByID(ctx context.Context, id uint) (*model.Asset, error) {
-	return s.repo.FindAssetByID(ctx, id)
-}
-
-// rollbackUpload removes file from storage when uploading error occurs.
-func (s *Service) rollbackUpload(ctx context.Context, key string) {
-	if err := s.storage.Delete(ctx, key); err != nil {
-		slog.WarnContext(
-			ctx,
-			"failed to remove uploading file after media creation failed",
-			"storage_key", key,
-			"err", err,
-		)
-	}
 }
