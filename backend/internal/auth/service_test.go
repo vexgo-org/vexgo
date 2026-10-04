@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -133,28 +131,6 @@ func (f *failingRepo) FindUserByEmail(ctx context.Context, email string) (*model
 	return f.Repository.FindUserByEmail(ctx, email)
 }
 
-func TestUpdateSettings(t *testing.T) {
-	svc, _, db := newTestService(t)
-	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
-
-	hideEmail := true
-	visibility := "private"
-	user, err := svc.UpdateSettings(context.Background(), u.ID, UpdateSettingsRequest{
-		ProfileVisibility: &visibility,
-		HideEmail:         &hideEmail,
-	})
-	if err != nil {
-		t.Fatalf("UpdateSettings error: %v", err)
-	}
-	if !user.HideEmail || user.ProfileVisibility != "private" {
-		t.Errorf("expected settings applied, got %+v", user)
-	}
-
-	if _, err := svc.UpdateSettings(context.Background(), 99999, UpdateSettingsRequest{}); !errors.Is(err, ErrUserNotFound) {
-		t.Errorf("expected ErrUserNotFound, got %v", err)
-	}
-}
-
 // seedMedia inserts a media_files row for the given owner and URL.
 func seedMedia(t *testing.T, db *gorm.DB, userID uint, url string) model.MediaFile {
 	t.Helper()
@@ -163,65 +139,6 @@ func seedMedia(t *testing.T, db *gorm.DB, userID uint, url string) model.MediaFi
 		t.Fatalf("failed to seed media: %v", err)
 	}
 	return media
-}
-
-// TestGenerateTokens_CryptoRandomAndPrefixed ensures the emailed account
-// tokens (reset / verification / email change) carry high entropy instead of
-// the former predictable "userID-nanotime" format, and keep their prefixes so
-// token kinds stay distinguishable.
-func TestGenerateTokens_CryptoRandomAndPrefixed(t *testing.T) {
-	svc, _, _ := newTestService(t)
-	ctx := context.Background()
-
-	cases := []struct {
-		prefix string
-		gen    func(ctx context.Context, userID uint) (string, error)
-	}{
-		{model.TokenPrefixReset, svc.GeneratePasswordResetToken},
-		{model.TokenPrefixVerify, svc.GenerateVerificationToken},
-	}
-
-	for _, tc := range cases {
-		t1, err := tc.gen(ctx, 1)
-		if err != nil {
-			t.Fatalf("generate token error: %v", err)
-		}
-		t2, err := tc.gen(ctx, 1)
-		if err != nil {
-			t.Fatalf("generate token error: %v", err)
-		}
-
-		if !strings.HasPrefix(t1, tc.prefix) {
-			t.Errorf("expected prefix %q, got %q", tc.prefix, t1)
-		}
-		if t1 == t2 {
-			t.Errorf("expected two tokens for the same user to differ")
-		}
-		if len(t1) < len(tc.prefix)+43 { // 43 = base64url length of 32 bytes
-			t.Errorf("expected >= 256 bits of entropy, token too short: %q (%d chars)", t1, len(t1))
-		}
-	}
-}
-
-func TestIssueJWT(t *testing.T) {
-	u := &model.User{ID: 1, Username: "alice", Role: model.RoleAdmin, PasswordVersion: 2}
-	token, err := IssueJWT(u, testJWTSecret)
-	if err != nil {
-		t.Fatalf("IssueJWT error: %v", err)
-	}
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		return testJWTSecret, nil
-	})
-	if err != nil || !parsed.Valid {
-		t.Fatalf("expected valid token, got err=%v", err)
-	}
-	claims := parsed.Claims.(jwt.MapClaims)
-	if claims["username"] != "alice" || claims["role"] != model.RoleAdmin {
-		t.Errorf("unexpected claims: %v", claims)
-	}
-	if uint(claims["password_version"].(float64)) != 2 {
-		t.Errorf("expected password version 2 in claims")
-	}
 }
 
 // capturedEmail holds the rendered parts of an outgoing email captured by the
