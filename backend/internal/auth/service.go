@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
@@ -63,66 +62,4 @@ func NewService(deps Deps) *Service {
 		mailer:    deps.Mailer,
 		captcha:   deps.Captcha,
 	}
-}
-
-// UpdateEmail changes the user's email. When SMTP is enabled it requires
-// confirmation via an emailed token; otherwise the email is changed directly.
-// It returns whether confirmation is pending.
-func (s *Service) UpdateEmail(ctx context.Context, req UpdateEmailRequest) (pending bool, err error) {
-	user, err := s.repo.FindUserByID(ctx, req.UserID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, ErrUserNotFound
-		}
-		return false, err
-	}
-
-	// Check if new email is the same as current email
-	if req.NewEmail == user.Email {
-		return false, ErrSameEmail
-	}
-
-	// Check if new email is already used by another user
-	if _, err := s.repo.FindUserByEmailExcluding(ctx, req.NewEmail, req.UserID); err == nil {
-		return false, ErrEmailInUse
-	}
-
-	// Check if SMTP is enabled
-	enabled, err := s.mailer.Enabled(ctx)
-	if err != nil {
-		return false, ErrMailConfigCheck
-	}
-
-	if enabled {
-		// If SMTP enabled, generate email change verification token and send confirmation email
-		token, err := s.GenerateEmailChangeToken(ctx, req.UserID, req.NewEmail)
-		if err != nil {
-			return false, ErrGenerateToken
-		}
-
-		// Build verification link
-		verificationLink := buildLinkWithToken(req.Protocol, req.Host, verificationLinkPath, token)
-
-		// Send confirmation email to the new address so the change is only
-		// completed after the new mailbox is confirmed.
-		if err := s.mailer.SendEmailChangeEmail(
-			ctx,
-			req.NewEmail,
-			&mailer.EmailChangeEmailTemplateData{
-				Name:     user.Username,
-				NewEmail: req.NewEmail,
-				Link:     verificationLink,
-			},
-		); err != nil {
-			return false, ErrSendEmail
-		}
-
-		return true, nil
-	}
-
-	// If SMTP not enabled, update email directly
-	if err := s.repo.UpdateEmail(ctx, req.UserID, req.NewEmail); err != nil {
-		return false, err
-	}
-	return false, nil
 }
