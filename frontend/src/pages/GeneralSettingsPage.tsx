@@ -39,6 +39,7 @@ export function GeneralSettingsPage() {
     siteName: t("common.siteName") || "VexGo",
     siteDescription: "",
     siteIcon: "",
+    siteIconId: null,
     itemsPerPage: 20,
     siteLanguage: "en",
     createdAt: "",
@@ -87,7 +88,20 @@ export function GeneralSettingsPage() {
 
     setSaving(true);
     try {
-      await unwrap(getVexGoAPI().putConfigGeneral(config));
+      // siteIcon is the resolved URL for the preview only; the site stores the
+      // asset reference, not the URL.
+      await unwrap(
+        getVexGoAPI().putConfigGeneral({
+          captchaEnabled: config.captchaEnabled,
+          registrationEnabled: config.registrationEnabled,
+          allowGuestViewPosts: config.allowGuestViewPosts,
+          siteName: config.siteName,
+          siteDescription: config.siteDescription,
+          siteIconId: config.siteIconId ?? undefined,
+          itemsPerPage: config.itemsPerPage,
+          siteLanguage: config.siteLanguage,
+        }),
+      );
       toast.success(t("generalSettings.saveSuccess"));
     } catch (error) {
       console.error("Failed to save general settings:", error);
@@ -112,9 +126,13 @@ export function GeneralSettingsPage() {
     }
 
     try {
-      const response = await unwrap(getVexGoAPI().postUpload({ file }));
-      if (response.file?.url) {
-        setConfig({ ...config, siteIcon: response.file.url });
+      const response = await unwrap(getVexGoAPI().postAssetUpload({ file }));
+      if (response.file?.id) {
+        setConfig({
+          ...config,
+          siteIconId: response.file.id,
+          siteIcon: response.file.url ?? "",
+        });
       }
       toast.success(t("generalSettings.iconUploadSuccess"));
     } catch (error) {
@@ -128,7 +146,7 @@ export function GeneralSettingsPage() {
   };
 
   const handleRemoveIcon = () => {
-    setConfig({ ...config, siteIcon: "" });
+    setConfig({ ...config, siteIcon: "", siteIconId: null });
   };
 
   if (loading) {
