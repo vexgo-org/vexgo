@@ -245,6 +245,77 @@ func TestDelete_Permissions(t *testing.T) {
 	}
 }
 
+// TestFindByID covers the ID-addressed lookup: it resolves an asset the caller
+// already knows the ID of, and reports a miss as the domain's ErrNotFound so
+// callers can map it to 404 without leaking the storage layer's sentinel.
+func TestFindByID(t *testing.T) {
+	svc, _, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+
+	asset, err := svc.Upload(context.Background(), owner.ID, strings.NewReader("x"), "mine.jpg", 1)
+	if err != nil {
+		t.Fatalf("Upload error: %v", err)
+	}
+
+	found, err := svc.FindByID(context.Background(), asset.ID)
+	if err != nil {
+		t.Fatalf("FindByID error: %v", err)
+	}
+	if found.ID != asset.ID || found.StorageKey != asset.StorageKey || found.UserID != owner.ID {
+		t.Errorf("FindByID returned %+v, want asset %d", found, asset.ID)
+	}
+
+	if _, err := svc.FindByID(context.Background(), asset.ID+999); !errors.Is(err, ErrNotFound) {
+		t.Errorf("FindByID(unknown id) = %v, want ErrNotFound", err)
+	}
+}
+
+// TestDeleteByID_Permissions pins the same ownership rule as
+// TestDelete_Permissions, for the ID-addressed route: the uploader and admins
+// may delete, nobody else, and the delete stays soft.
+func TestDeleteByID_Permissions(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	stranger := seedUser(t, db, "stranger", model.RoleContributor)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+
+	asset, err := svc.Upload(context.Background(), owner.ID, strings.NewReader("x"), "mine.jpg", 1)
+	if err != nil {
+		t.Fatalf("Upload error: %v", err)
+	}
+
+	if err := svc.DeleteByID(context.Background(), stranger.ID, asset.ID); !errors.Is(err, ErrForbidden) {
+		t.Errorf("stranger DeleteByID = %v, want ErrForbidden", err)
+	}
+
+	if err := svc.DeleteByID(context.Background(), admin.ID, asset.ID); err != nil {
+		t.Errorf("admin DeleteByID of another user's asset = %v, want nil", err)
+	}
+
+	var visible int64
+	if err := db.Model(&model.Asset{}).Count(&visible).Error; err != nil {
+		t.Fatalf("count error: %v", err)
+	}
+	if visible != 0 {
+		t.Errorf("soft-deleted asset still visible to normal queries: %d row(s)", visible)
+	}
+	var softDeleted model.Asset
+	if err := db.Unscoped().First(&softDeleted, asset.ID).Error; err != nil {
+		t.Errorf("expected a soft-deleted row to remain: %v", err)
+	}
+	if names := storedFiles(t, dataDir); len(names) != 1 {
+		t.Errorf("soft delete must keep the object in storage, got %v", names)
+	}
+
+	// Soft-deleted rows are scoped out, so a repeat delete looks like a miss.
+	if err := svc.DeleteByID(context.Background(), owner.ID, asset.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("second DeleteByID = %v, want ErrNotFound", err)
+	}
+	if err := svc.DeleteByID(context.Background(), owner.ID, 999); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown id = %v, want ErrNotFound", err)
+	}
+}
+
 // failingUserLookupRepo forces FindUserByID to fail with an unexpected error
 // to exercise the fail-closed authorization path in Delete.
 type failingUserLookupRepo struct{ Repository }
