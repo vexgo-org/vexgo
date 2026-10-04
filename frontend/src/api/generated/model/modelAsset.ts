@@ -5,10 +5,16 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
+import type { ModelAssetType } from "./modelAssetType";
 
 export interface ModelAsset {
   createdAt?: string;
+  id?: number;
+  mimeType?: string;
+  originalName?: string;
   size?: number;
+  type?: ModelAssetType;
   updatedAt?: string;
   url?: string;
+  userId?: number;
 }

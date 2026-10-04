@@ -5,9 +5,9 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelGeneralSettings } from "./modelGeneralSettings";
+import type { SettingsGeneralSettingsResponse } from "./settingsGeneralSettingsResponse";
 
 export interface SettingsGeneralSettingsUpdateResponse {
-  generalSettings?: ModelGeneralSettings;
+  generalSettings?: SettingsGeneralSettingsResponse;
   message?: string;
 }
