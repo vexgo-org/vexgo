@@ -369,12 +369,18 @@ func (r *Renderer) buildSiteData(ctx context.Context, lang string) *SiteData {
 	}
 	var settings model.GeneralSettings
 	if r.db != nil {
-		if err := r.db.WithContext(ctx).First(&settings).Error; err == nil {
+		if err := r.db.
+			WithContext(ctx).
+			Preload("SiteIcon").
+			First(&settings).
+			Error; err == nil {
 			if settings.SiteName != "" {
 				site.Name = settings.SiteName
 			}
 			site.Description = settings.SiteDescription
-			site.Icon = settings.SiteIcon
+			if settings.SiteIcon != nil {
+				site.Icon = settings.SiteIcon.URL
+			}
 			if settings.ItemsPerPage > 0 {
 				site.ItemsPerPage = settings.ItemsPerPage
 			}
