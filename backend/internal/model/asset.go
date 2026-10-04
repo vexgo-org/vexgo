@@ -24,26 +24,26 @@ const (
 )
 
 type Asset struct {
-	ID uint `gorm:"primaryKey"`
+	ID uint `json:"id" gorm:"primaryKey"`
 
-	OriginalName string `gorm:"size:255;index"`
+	OriginalName string `json:"originalName" gorm:"size:255;index"`
 
 	// StorageKey format `UUID.ext`
-	StorageKey string `gorm:"size:1024;uniqueIndex"`
+	StorageKey string `json:"-" gorm:"size:1024;uniqueIndex"`
 
-	URL      string
-	MimeType string `gorm:"size:127;index"`
+	URL      string `json:"url"`
+	MimeType string `json:"mimeType" gorm:"size:127;index"`
 
-	Type AssetType `gorm:"size:50;index"`
+	Type AssetType `json:"type" gorm:"size:50;index"`
 
-	Size int64
+	Size int64 `json:"size"`
 
-	UserID uint `gorm:"not null;index"`
-	User   User `gorm:"foreignKey:UserID"`
+	UserID uint `json:"userId" gorm:"not null;index"`
+	User   User `json:"-" gorm:"foreignKey:UserID"`
 
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `json:"-"`
 }
 
 func (Asset) TableName() string {
