@@ -823,17 +823,47 @@
                     "createdAt": {
                         "type": "string"
                     },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "mimeType": {
+                        "type": "string"
+                    },
+                    "originalName": {
+                        "type": "string"
+                    },
                     "size": {
                         "type": "integer"
+                    },
+                    "type": {
+                        "$ref": "#/components/schemas/model.AssetType"
                     },
                     "updatedAt": {
                         "type": "string"
                     },
                     "url": {
                         "type": "string"
+                    },
+                    "userId": {
+                        "type": "integer"
                     }
                 },
                 "type": "object"
+            },
+            "model.AssetType": {
+                "enum": [
+                    "audio",
+                    "image",
+                    "unknown",
+                    "video"
+                ],
+                "type": "string",
+                "x-enum-varnames": [
+                    "AssetTypeAudio",
+                    "AssetTypeImage",
+                    "AssetTypeUnknown",
+                    "AssetTypeVideo"
+                ]
             },
             "model.Category": {
                 "properties": {
@@ -1000,54 +1030,6 @@
                     "CreatorApplicationStatusApproved",
                     "CreatorApplicationStatusRejected"
                 ]
-            },
-            "model.GeneralSettings": {
-                "properties": {
-                    "allowGuestViewPosts": {
-                        "description": "Whether guests can view posts",
-                        "type": "boolean"
-                    },
-                    "captchaEnabled": {
-                        "description": "Whether captcha verification is enabled",
-                        "type": "boolean"
-                    },
-                    "created_at": {
-                        "description": "Creation time",
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "itemsPerPage": {
-                        "description": "Items per page",
-                        "type": "integer"
-                    },
-                    "registrationEnabled": {
-                        "description": "Whether registration is allowed",
-                        "type": "boolean"
-                    },
-                    "siteDescription": {
-                        "description": "Site description",
-                        "type": "string"
-                    },
-                    "siteIcon": {
-                        "description": "Site icon URL",
-                        "type": "string"
-                    },
-                    "siteLanguage": {
-                        "description": "Default public theme language (e.g. en, zh)",
-                        "type": "string"
-                    },
-                    "siteName": {
-                        "description": "Site name",
-                        "type": "string"
-                    },
-                    "updated_at": {
-                        "description": "Update time",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
             },
             "model.MediaFile": {
                 "properties": {
@@ -2010,6 +1992,10 @@
                         "example": "https://example.com/icon.png",
                         "type": "string"
                     },
+                    "siteIconId": {
+                        "example": 1,
+                        "type": "integer"
+                    },
                     "siteLanguage": {
                         "example": "en",
                         "type": "string"
@@ -2042,9 +2028,9 @@
                     "siteDescription": {
                         "type": "string"
                     },
-                    "siteIcon": {
-                        "example": "https://example.com/icon.png",
-                        "type": "string"
+                    "siteIconId": {
+                        "example": 1,
+                        "type": "integer"
                     },
                     "siteLanguage": {
                         "example": "en",
@@ -2060,7 +2046,7 @@
             "settings.GeneralSettingsUpdateResponse": {
                 "properties": {
                     "generalSettings": {
-                        "$ref": "#/components/schemas/model.GeneralSettings"
+                        "$ref": "#/components/schemas/settings.GeneralSettingsResponse"
                     },
                     "message": {
                         "example": "General settings updated successfully",
