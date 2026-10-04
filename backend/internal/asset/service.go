@@ -99,6 +99,19 @@ func (s *Service) Delete(ctx context.Context, userID uint, key string) error {
 	return s.softDelete(ctx, userID, asset)
 }
 
+// DeleteByID soft-deletes a files by asset ID.
+func (s *Service) DeleteByID(ctx context.Context, userID, assetID uint) error {
+	asset, err := s.repo.FindAssetByID(ctx, assetID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to find asset by id: %w", err)
+	}
+
+	return s.softDelete(ctx, userID, asset)
+}
+
 // FindByID finds an asset by asset ID.
 func (s *Service) FindByID(ctx context.Context, id uint) (*model.Asset, error) {
 	return s.repo.FindAssetByID(ctx, id)
