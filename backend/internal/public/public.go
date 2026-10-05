@@ -478,11 +478,13 @@ func (r *Renderer) handleFavicon(c *gin.Context) {
 	if err := r.db.
 		Preload("SiteIcon").
 		First(&settings).
-		Error; err == nil &&
-		settings.SiteIcon != nil {
-		if r.serveConfiguredIcon(c, settings.SiteIcon) {
-			return
-		}
+		Error; err != nil {
+		slog.Error("read general settings failed", "err", err)
+	}
+
+	if settings.SiteIcon != nil {
+		r.serveConfiguredIcon(c, settings.SiteIcon)
+		return
 	}
 
 	localFavicon := filepath.Join(r.dataDir, FaviconFile)
