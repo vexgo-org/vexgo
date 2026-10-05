@@ -129,3 +129,27 @@ type LikeStatusResponse struct {
 	IsLiked    bool  `json:"isLiked" example:"false"`
 	LikesCount int64 `json:"likesCount" example:"7"`
 }
+
+// CreateRequest carries the fields accepted when creating a post.
+type CreateRequest struct {
+	Slug       string
+	Title      string
+	Content    string
+	Category   string
+	Tags       []string
+	Excerpt    string
+	CoverImage string
+	Status     model.PostStatus
+}
+
+// UpdateRequest carries the fields accepted when updating a post.
+type UpdateRequest struct {
+	Slug       string
+	Title      string
+	Content    string
+	Category   string
+	Tags       []string
+	Excerpt    string
+	CoverImage string
+	Status     model.PostStatus
+}

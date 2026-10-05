@@ -182,18 +182,6 @@ func (s *Service) enrichPost(
 	return post, nil
 }
 
-// CreateRequest carries the fields accepted when creating a post.
-type CreateRequest struct {
-	Slug       string
-	Title      string
-	Content    string
-	Category   string
-	Tags       []string
-	Excerpt    string
-	CoverImage string
-	Status     model.PostStatus
-}
-
 // validateAuthorStatus validates a client-supplied status for the
 // author-facing create/update endpoints. The status field is untrusted input:
 // without this check any role could publish past the moderation queue by
@@ -287,18 +275,6 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 
 	return &post, nil
-}
-
-// UpdateRequest carries the fields accepted when updating a post.
-type UpdateRequest struct {
-	Slug       string
-	Title      string
-	Content    string
-	Category   string
-	Tags       []string
-	Excerpt    string
-	CoverImage string
-	Status     model.PostStatus
 }
 
 // Update modifies a post when the acting user is its author or an admin.
