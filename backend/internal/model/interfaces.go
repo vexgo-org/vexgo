@@ -9,7 +9,7 @@ type NotificationInput struct {
 	Type          NotificationType
 	Title         string
 	Content       string
-	RelatedID     string
+	RelatedID     uint
 	RelatedType   NotificationRelatedType
 	RelatedPostID *uint // Owning post ID for reply/comment notifications
 }

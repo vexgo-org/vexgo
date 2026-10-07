@@ -44,7 +44,7 @@ func TestCreateNotification(t *testing.T) {
 		Type:        model.NotificationTypeComment,
 		Title:       "New comment",
 		Content:     "someone commented",
-		RelatedID:   "42",
+		RelatedID:   42,
 		RelatedType: model.NotificationRelatedTypePost,
 	})
 	if err != nil {

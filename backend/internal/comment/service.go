@@ -332,7 +332,7 @@ func (s *Service) notifyPostAuthor(ctx context.Context, postID, userID uint, con
 		Type:          model.NotificationTypeComment,
 		Title:         "Post Commented",
 		Content:       fmt.Sprintf("User \"%s\" commented on your post \"%s\": %s", user.Username, post.Title, commentContent),
-		RelatedID:     strconv.FormatUint(uint64(postID), 10),
+		RelatedID:     postID,
 		RelatedType:   model.NotificationRelatedTypePost,
 		RelatedPostID: &postID,
 	}); err != nil {
@@ -360,7 +360,7 @@ func (s *Service) notifyParentAuthor(ctx context.Context, parentID, userID uint,
 		Type:          model.NotificationTypeReply,
 		Title:         "Comment Replied",
 		Content:       fmt.Sprintf("User \"%s\" replied to your comment: %s", user.Username, replyContent),
-		RelatedID:     strconv.FormatUint(uint64(parentID), 10),
+		RelatedID:     parentID,
 		RelatedType:   model.NotificationRelatedTypeComment,
 		RelatedPostID: &parentComment.PostID,
 	}); err != nil {
