@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
@@ -75,7 +74,7 @@ func filterAuthorsForViewer(posts []model.Post, viewerID uint, viewerRole string
 // moderation, notification link resolution), which are not reads: unlike
 // GetBySlug it must leave the view count untouched, otherwise every edit or
 // review would inflate it.
-func (s *Service) Get(ctx context.Context, id, currentUserRole string, currentUserID uint) (*model.Post, error) {
+func (s *Service) Get(ctx context.Context, id uint, currentUserRole string, currentUserID uint) (*model.Post, error) {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("post load: %w", err)
@@ -278,7 +277,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 }
 
 // Update modifies a post when the acting user is its author or an admin.
-func (s *Service) Update(ctx context.Context, id string, userID uint, req UpdateRequest) (*model.Post, error) {
+func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -371,7 +370,7 @@ func (s *Service) Update(ctx context.Context, id string, userID uint, req Update
 
 // Delete removes a post (author or admin only), cleaning up its files,
 // comments, likes and tag associations.
-func (s *Service) Delete(ctx context.Context, id string, userID uint) error {
+func (s *Service) Delete(ctx context.Context, id, userID uint) error {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -473,7 +472,7 @@ func (s *Service) Drafts(ctx context.Context, q DraftsQuery) ([]model.Post, int6
 
 // UserPostsQuery carries the target user, acting user and pagination.
 type UserPostsQuery struct {
-	UserIDStr       string
+	UserID          uint
 	CurrentUserRole string
 	CurrentUserID   uint
 	Page            int
@@ -482,10 +481,7 @@ type UserPostsQuery struct {
 
 // UserPosts returns the posts of a specific user with role-based visibility.
 func (s *Service) UserPosts(ctx context.Context, q UserPostsQuery) ([]model.Post, int64, error) {
-	uid, err := strconv.Atoi(q.UserIDStr)
-	if err != nil {
-		return nil, 0, ErrBadRequest
-	}
+	uid := q.UserID
 
 	// Checked before the lookup below: when guest viewing is off, an
 	// anonymous caller must not be able to probe which accounts exist.
@@ -497,7 +493,7 @@ func (s *Service) UserPosts(ctx context.Context, q UserPostsQuery) ([]model.Post
 	// both as an empty list made the two indistinguishable to a client and
 	// hid typos from callers. Existence is public anyway — the profile page
 	// answers 404 for ids that are not in use.
-	exists, err := s.repo.UserExists(ctx, uint(uid))
+	exists, err := s.repo.UserExists(ctx, uid)
 	if err != nil {
 		return nil, 0, err
 	}

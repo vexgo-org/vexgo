@@ -961,6 +961,7 @@ func TestGetUserPosts_UnknownAuthorIsNotFound(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/posts/user/"+idString(author.ID), nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("known author without posts: expected 200, got %d (body=%s)", w.Code, w.Body.String())

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -57,7 +56,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 	// Notify the post author. The like is already recorded, so a failed
 	// lookup is logged instead of failing the request; the caller must still
 	// learn their like registered.
-	post, err := s.repo.FindByID(ctx, strconv.FormatUint(uint64(postID), 10))
+	post, err := s.repo.FindByID(ctx, postID)
 	if err != nil {
 		slog.Warn("failed to load the liked post", "postID", postID, "err", err)
 		return true, count, nil
@@ -76,7 +75,7 @@ func (s *Service) ToggleLike(ctx context.Context, postID, userID uint) (isLiked 
 		Type:        model.NotificationTypeLike,
 		Title:       "The post received likes",
 		Content:     fmt.Sprintf("User \"%s\" liked your post \"%s\"", user.Username, post.Title),
-		RelatedID:   strconv.FormatUint(uint64(postID), 10),
+		RelatedID:   postID,
 		RelatedType: model.NotificationRelatedTypePost,
 	}); err != nil {
 		slog.Warn("failed to create like notification", "err", err)

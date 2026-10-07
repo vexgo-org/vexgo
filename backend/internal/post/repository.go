@@ -24,8 +24,8 @@ type ListFilter struct {
 // Repository is the persistence interface for the post domain.
 type Repository interface {
 	// Posts
-	FindByID(ctx context.Context, id string) (*model.Post, error)
-	FindByIDPreloadTags(ctx context.Context, id string) (*model.Post, error)
+	FindByID(ctx context.Context, id uint) (*model.Post, error)
+	FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error)
 	FindBySlug(ctx context.Context, slug string) (*model.Post, error)
 	FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error)
 	SlugExists(ctx context.Context, slug string) (bool, error)
@@ -111,7 +111,7 @@ func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }
 
-func (r *gormRepository) FindByID(ctx context.Context, id string) (*model.Post, error) {
+func (r *gormRepository) FindByID(ctx context.Context, id uint) (*model.Post, error) {
 	var post model.Post
 	if err := r.db.WithContext(ctx).Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (r *gormRepository) FindByID(ctx context.Context, id string) (*model.Post, 
 	return &post, nil
 }
 
-func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id string) (*model.Post, error) {
+func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error) {
 	var post model.Post
 	if err := r.db.WithContext(ctx).Preload("Tags").First(&post, id).Error; err != nil {
 		return nil, err

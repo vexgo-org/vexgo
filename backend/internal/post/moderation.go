@@ -24,7 +24,7 @@ func (s *Service) ListModeration(ctx context.Context, q ListModerationQuery) ([]
 }
 
 // Approve approves a post and notifies its author.
-func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
+func (s *Service) Approve(ctx context.Context, id uint) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
 		return nil, ErrPostNotFound
@@ -50,7 +50,7 @@ func (s *Service) Approve(ctx context.Context, id string) (*model.Post, error) {
 }
 
 // Reject rejects a post with a reason and notifies its author.
-func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*model.Post, error) {
+func (s *Service) Reject(ctx context.Context, id uint, rejectionReason string) (*model.Post, error) {
 	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, ErrPostNotFound
@@ -77,7 +77,7 @@ func (s *Service) Reject(ctx context.Context, id, rejectionReason string) (*mode
 }
 
 // Resubmit moves a rejected post back to pending.
-func (s *Service) Resubmit(ctx context.Context, id string) (*model.Post, error) {
+func (s *Service) Resubmit(ctx context.Context, id uint) (*model.Post, error) {
 	post, err := s.repo.FindByIDPreloadTags(ctx, id)
 	if err != nil {
 		return nil, ErrPostNotFound
