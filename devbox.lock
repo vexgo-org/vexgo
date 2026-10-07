@@ -252,6 +252,44 @@
           "store_path": "/nix/store/vyk901pyxqddcgf43z7r46kyd9n279bb-gotools-0.44.0"
         }
       }
+    },
+    "prettier@3.9.6": {
+      "last_modified": "2026-08-27T23:47:58Z",
+      "resolved": "github:NixOS/nixpkgs/7d1a7c21a4c00ea653fc7ed5c083d261340f185f#prettier",
+      "source": "devbox-search",
+      "version": "3.9.6",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/9j82cqj3msajb0j2kikka3x5s3sh7r0v-prettier-3.9.6",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/9j82cqj3msajb0j2kikka3x5s3sh7r0v-prettier-3.9.6"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/15dd37yjin93zikq6mzfb2llldb44sfv-prettier-3.9.6",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/15dd37yjin93zikq6mzfb2llldb44sfv-prettier-3.9.6"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/adglp5sp9z99rvk57bp9fn5k3ha7pq42-prettier-3.9.6",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/adglp5sp9z99rvk57bp9fn5k3ha7pq42-prettier-3.9.6"
+        }
+      }
     }
   }
 }
