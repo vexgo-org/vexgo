@@ -31,8 +31,8 @@
                         "type": "string"
                     },
                     "postId": {
-                        "example": "42",
-                        "type": "string"
+                        "example": 42,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -1053,7 +1053,7 @@
                     },
                     "related_id": {
                         "description": "Related resource ID",
-                        "type": "string"
+                        "type": "integer"
                     },
                     "related_post_id": {
                         "description": "Owning post ID for reply/comment notifications",
@@ -4760,7 +4760,7 @@
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     }
                 ],
@@ -4774,6 +4774,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "invalid post id"
                     },
                     "401": {
                         "content": {
@@ -5499,7 +5509,7 @@
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     }
                 ],
@@ -5682,7 +5692,7 @@
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     }
                 ],
@@ -5705,7 +5715,7 @@
                                 }
                             }
                         },
-                        "description": "post is not rejected"
+                        "description": "invalid request"
                     },
                     "401": {
                         "content": {
@@ -6573,7 +6583,7 @@
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     }
                 ],
@@ -6587,6 +6597,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "invalid post id"
                     },
                     "403": {
                         "content": {
@@ -6775,12 +6795,12 @@
                 "description": "Public for published posts; pending and rejected posts\nare only visible to the author and to admins.",
                 "parameters": [
                     {
-                        "description": "author user id or username",
+                        "description": "author user id",
                         "in": "path",
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     },
                     {
@@ -6860,7 +6880,7 @@
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     }
                 ],
@@ -6874,6 +6894,16 @@
                             }
                         },
                         "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "invalid post id"
                     },
                     "403": {
                         "content": {
@@ -6925,7 +6955,7 @@
                         "name": "id",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     }
                 ],
@@ -6961,7 +6991,7 @@
                                 }
                             }
                         },
-                        "description": "invalid slug"
+                        "description": "invalid post id or slug"
                     },
                     "403": {
                         "content": {

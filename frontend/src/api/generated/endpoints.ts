@@ -684,7 +684,7 @@ export const getVexGoAPI = () => {
   /**
    * @summary Approve a pending post
    */
-  const putModerationApproveId = (id: string) => {
+  const putModerationApproveId = (id: number) => {
     return customInstance<PostPostMessageResponse>({
       url: `/moderation/approve/${id}`,
       method: "PUT",
@@ -818,7 +818,7 @@ export const getVexGoAPI = () => {
    * @summary Reject a pending post
    */
   const putModerationRejectId = (
-    id: string,
+    id: number,
     postRejectPostRequest: PostRejectPostRequest,
   ) => {
     return customInstance<PostPostMessageResponse>({
@@ -846,7 +846,7 @@ export const getVexGoAPI = () => {
    * can be resubmitted.
    * @summary Resubmit a rejected post
    */
-  const putModerationResubmitId = (id: string) => {
+  const putModerationResubmitId = (id: number) => {
     return customInstance<PostPostMessageResponse>({
       url: `/moderation/resubmit/${id}`,
       method: "PUT",
@@ -1009,7 +1009,7 @@ export const getVexGoAPI = () => {
    * need to resolve a post id to its slug.
    * @summary Look up a post by numeric id
    */
-  const getPostsByIdId = (id: string) => {
+  const getPostsByIdId = (id: number) => {
     return customInstance<PostPostSingleResponse>({
       url: `/posts/by-id/${id}`,
       method: "GET",
@@ -1045,7 +1045,7 @@ export const getVexGoAPI = () => {
    * are only visible to the author and to admins.
    * @summary List a specific user's posts
    */
-  const getPostsUserId = (id: string, params?: GetPostsUserIdParams) => {
+  const getPostsUserId = (id: number, params?: GetPostsUserIdParams) => {
     return customInstance<PostPostListResponse>({
       url: `/posts/user/${id}`,
       method: "GET",
@@ -1059,7 +1059,7 @@ export const getVexGoAPI = () => {
    * the same transaction.
    * @summary Delete a post
    */
-  const deletePostsId = (id: string) => {
+  const deletePostsId = (id: number) => {
     return customInstance<PostPostDeleteResponse>({
       url: `/posts/${id}`,
       method: "DELETE",
@@ -1072,7 +1072,7 @@ export const getVexGoAPI = () => {
    * @summary Update a post
    */
   const putPostsId = (
-    id: string,
+    id: number,
     postUpdatePostRequest: PostUpdatePostRequest,
   ) => {
     return customInstance<PostPostMessageResponse>({

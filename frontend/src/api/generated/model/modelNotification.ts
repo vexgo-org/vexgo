@@ -16,7 +16,7 @@ export interface ModelNotification {
   /** Whether it has been read */
   is_read?: boolean;
   /** Related resource ID */
-  related_id?: string;
+  related_id?: number;
   /** Owning post ID for reply/comment notifications */
   related_post_id?: number;
   /** Related resource type */

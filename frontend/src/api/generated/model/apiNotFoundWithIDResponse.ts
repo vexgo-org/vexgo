@@ -8,5 +8,5 @@
 
 export interface ApiNotFoundWithIDResponse {
   error?: string;
-  postId?: string;
+  postId?: number;
 }

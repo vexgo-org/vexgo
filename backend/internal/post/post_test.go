@@ -3,7 +3,6 @@ package post
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -73,7 +72,7 @@ func TestList_GuestViewDenied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
-	if _, err := svc.Get(ctx, idString(post.ID), "", 0); !errors.Is(err, ErrGuestViewDenied) {
+	if _, err := svc.Get(ctx, post.ID, "", 0); !errors.Is(err, ErrGuestViewDenied) {
 		t.Errorf("expected ErrGuestViewDenied, got %v", err)
 	}
 }
@@ -162,7 +161,7 @@ func TestGet_UnpublishedPostsArePrivate(t *testing.T) {
 		if err := db.Create(&post).Error; err != nil {
 			t.Fatalf("seed %s: %v", status, err)
 		}
-		id := strconv.Itoa(int(post.ID))
+		id := post.ID
 
 		// Guest and an unrelated logged-in user must see "not found".
 		for _, tc := range []struct {
@@ -265,7 +264,7 @@ func TestGet_DoesNotIncrementViewCount(t *testing.T) {
 		t.Fatalf("reload post: %v", err)
 	}
 
-	post, err := svc.Get(ctx, strconv.Itoa(int(id.ID)), user.Role, user.ID)
+	post, err := svc.Get(ctx, id.ID, user.Role, user.ID)
 	if err != nil {
 		t.Fatalf("Get error: %v", err)
 	}
@@ -579,7 +578,7 @@ func TestUpdate_ModifiesFields(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	updated, err := svc.Update(ctx, idString(post.ID), user.ID, UpdateRequest{
+	updated, err := svc.Update(ctx, post.ID, user.ID, UpdateRequest{
 		Title:  "New",
 		Status: model.PostStatusPublished,
 		Tags:   []string{"foo"},
@@ -598,7 +597,7 @@ func TestUpdate_ModifiesFields(t *testing.T) {
 	}
 
 	other := seedUser(t, db, "other", model.RoleGuest)
-	if _, err := svc.Update(ctx, idString(post.ID), other.ID, UpdateRequest{Title: "hack"}); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Update(ctx, post.ID, other.ID, UpdateRequest{Title: "hack"}); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
@@ -620,7 +619,7 @@ func TestUpdate_PublishRequiresAuthorRole(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	if _, err := svc.Update(ctx, idString(post.ID), contributor.ID, UpdateRequest{Status: model.PostStatusPublished}); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Update(ctx, post.ID, contributor.ID, UpdateRequest{Status: model.PostStatusPublished}); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("contributor self-publish error = %v, want ErrForbidden", err)
 	}
 	if got := reloadPostStatus(t, db, post.ID); got != model.PostStatusPending {
@@ -630,13 +629,13 @@ func TestUpdate_PublishRequiresAuthorRole(t *testing.T) {
 	// An admin may publish it; afterwards the contributor editing content
 	// without a status change stays allowed.
 	admin := seedUser(t, db, "admin", model.RoleAdmin)
-	if _, err := svc.Update(ctx, idString(post.ID), admin.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Update(ctx, post.ID, admin.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("admin publish error = %v", err)
 	}
 	if got := reloadPostStatus(t, db, post.ID); got != model.PostStatusPublished {
 		t.Fatalf("status = %s, want published", got)
 	}
-	if _, err := svc.Update(ctx, idString(post.ID), contributor.ID, UpdateRequest{Title: "edited"}); err != nil {
+	if _, err := svc.Update(ctx, post.ID, contributor.ID, UpdateRequest{Title: "edited"}); err != nil {
 		t.Fatalf("contributor edit of published post error = %v", err)
 	}
 
@@ -648,7 +647,7 @@ func TestUpdate_PublishRequiresAuthorRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create author draft error: %v", err)
 	}
-	if _, err := svc.Update(ctx, idString(own.ID), author.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Update(ctx, own.ID, author.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("author publish error = %v", err)
 	}
 	if got := reloadPostStatus(t, db, own.ID); got != model.PostStatusPublished {
@@ -675,7 +674,7 @@ func TestUpdate_RejectedPostStatusRules(t *testing.T) {
 	}
 
 	// The author cannot override the rejection by publishing.
-	if _, err := svc.Update(ctx, idString(rejected.ID), author.ID, UpdateRequest{Status: model.PostStatusPublished}); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Update(ctx, rejected.ID, author.ID, UpdateRequest{Status: model.PostStatusPublished}); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("author republish error = %v, want ErrForbidden", err)
 	}
 	if got := reloadPostStatus(t, db, rejected.ID); got != model.PostStatusRejected {
@@ -683,12 +682,12 @@ func TestUpdate_RejectedPostStatusRules(t *testing.T) {
 	}
 
 	// `rejected` is never settable through Update.
-	if _, err := svc.Update(ctx, idString(rejected.ID), author.ID, UpdateRequest{Status: model.PostStatusRejected}); !errors.Is(err, ErrInvalidStatus) {
+	if _, err := svc.Update(ctx, rejected.ID, author.ID, UpdateRequest{Status: model.PostStatusRejected}); !errors.Is(err, ErrInvalidStatus) {
 		t.Fatalf("Update(status=rejected) error = %v, want ErrInvalidStatus", err)
 	}
 
 	// Requeueing for review stays allowed for the author.
-	if _, err := svc.Update(ctx, idString(rejected.ID), author.ID, UpdateRequest{Status: model.PostStatusPending}); err != nil {
+	if _, err := svc.Update(ctx, rejected.ID, author.ID, UpdateRequest{Status: model.PostStatusPending}); err != nil {
 		t.Fatalf("author requeue error = %v", err)
 	}
 	if got := reloadPostStatus(t, db, rejected.ID); got != model.PostStatusPending {
@@ -703,7 +702,7 @@ func TestUpdate_RejectedPostStatusRules(t *testing.T) {
 	if err := db.Create(&adminPost).Error; err != nil {
 		t.Fatalf("seed admin post: %v", err)
 	}
-	if _, err := svc.Update(ctx, idString(adminPost.ID), admin.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
+	if _, err := svc.Update(ctx, adminPost.ID, admin.ID, UpdateRequest{Status: model.PostStatusPublished}); err != nil {
 		t.Fatalf("admin republish error = %v", err)
 	}
 	if got := reloadPostStatus(t, db, adminPost.ID); got != model.PostStatusPublished {
@@ -735,13 +734,13 @@ func TestUpdate_RejectsDuplicateSlug(t *testing.T) {
 	}
 
 	// Try to change second post's slug to match first post's slug
-	_, err = svc.Update(ctx, idString(second.ID), user.ID, UpdateRequest{Slug: "first-post"})
+	_, err = svc.Update(ctx, second.ID, user.ID, UpdateRequest{Slug: "first-post"})
 	if !errors.Is(err, model.ErrSlugTaken) {
 		t.Errorf("expected ErrSlugTaken, got %v", err)
 	}
 
 	// Updating to own slug should succeed (no-op or allowed)
-	updated, err := svc.Update(ctx, idString(second.ID), user.ID, UpdateRequest{Slug: "second-post"})
+	updated, err := svc.Update(ctx, second.ID, user.ID, UpdateRequest{Slug: "second-post"})
 	if err != nil {
 		t.Errorf("updating to own slug should succeed, got %v", err)
 	}
@@ -764,7 +763,7 @@ func TestUpdate_NormalizesUppercaseSlug(t *testing.T) {
 	}
 
 	// Case-only change should be a no-op.
-	updated, err := svc.Update(ctx, idString(post.ID), user.ID, UpdateRequest{Slug: "MY-SLUG"})
+	updated, err := svc.Update(ctx, post.ID, user.ID, UpdateRequest{Slug: "MY-SLUG"})
 	if err != nil {
 		t.Fatalf("Update with case-only change should succeed, got: %v", err)
 	}
@@ -793,7 +792,7 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	db.Create(&model.Like{PostID: post.ID, UserID: author.ID})
 	db.Create(&model.Comment{PostID: post.ID, UserID: author.ID, Content: "c", Status: model.CommentStatusPublished})
 
-	if err := svc.Delete(ctx, idString(post.ID), author.ID); err != nil {
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
 		t.Fatalf("Delete error: %v", err)
 	}
 
@@ -820,7 +819,7 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 	other := seedUser(t, db, "other", model.RoleGuest)
-	if err := svc.Delete(ctx, idString(post2.ID), other.ID); !errors.Is(err, ErrForbidden) {
+	if err := svc.Delete(ctx, post2.ID, other.ID); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
 	}
 }
@@ -850,7 +849,7 @@ func TestUserPosts_HidesOtherUsersUnpublished(t *testing.T) {
 	}
 
 	posts, _, err := svc.UserPosts(ctx, UserPostsQuery{
-		UserIDStr:       strconv.FormatUint(uint64(author.ID), 10),
+		UserID:          author.ID,
 		CurrentUserRole: viewer.Role,
 		CurrentUserID:   viewer.ID,
 		Page:            1,
@@ -865,7 +864,7 @@ func TestUserPosts_HidesOtherUsersUnpublished(t *testing.T) {
 
 	// The author still sees their own draft and pending posts.
 	own, _, err := svc.UserPosts(ctx, UserPostsQuery{
-		UserIDStr:       strconv.FormatUint(uint64(author.ID), 10),
+		UserID:          author.ID,
 		CurrentUserRole: author.Role,
 		CurrentUserID:   author.ID,
 		Page:            1,
@@ -888,7 +887,7 @@ func TestUserPosts_UnknownAuthor(t *testing.T) {
 	author := seedUser(t, db, "author", model.RoleAuthor)
 
 	_, _, err := svc.UserPosts(ctx, UserPostsQuery{
-		UserIDStr:       idString(author.ID),
+		UserID:          author.ID,
 		CurrentUserRole: model.RoleGuest,
 		Page:            1,
 		Limit:           10,
@@ -898,7 +897,7 @@ func TestUserPosts_UnknownAuthor(t *testing.T) {
 	}
 
 	_, _, err = svc.UserPosts(ctx, UserPostsQuery{
-		UserIDStr:       "99999",
+		UserID:          99999,
 		CurrentUserRole: model.RoleGuest,
 		Page:            1,
 		Limit:           10,

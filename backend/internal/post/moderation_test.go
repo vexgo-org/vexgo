@@ -18,7 +18,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	approved, err := svc.Approve(ctx, idString(post.ID))
+	approved, err := svc.Approve(ctx, post.ID)
 	if err != nil {
 		t.Fatalf("Approve error: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Errorf("expected review notification, got %v", notifier.calls)
 	}
 
-	rejected, err := svc.Reject(ctx, idString(post.ID), "too short")
+	rejected, err := svc.Reject(ctx, post.ID, "too short")
 	if err != nil {
 		t.Fatalf("Reject error: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Errorf("unexpected rejected post: %+v", rejected)
 	}
 
-	resubmitted, err := svc.Resubmit(ctx, idString(post.ID))
+	resubmitted, err := svc.Resubmit(ctx, post.ID)
 	if err != nil {
 		t.Fatalf("Resubmit error: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestModeration_ApproveRejectResubmit(t *testing.T) {
 		t.Errorf("unexpected resubmitted post: %+v", resubmitted)
 	}
 
-	if _, err := svc.Resubmit(ctx, idString(post.ID)); !errors.Is(err, ErrBadRequest) {
+	if _, err := svc.Resubmit(ctx, post.ID); !errors.Is(err, ErrBadRequest) {
 		t.Errorf("expected ErrBadRequest, got %v", err)
 	}
 }

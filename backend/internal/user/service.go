@@ -217,7 +217,7 @@ func (s *Service) ApplyForCreator(ctx context.Context, user model.User, reason s
 				Type:        model.NotificationTypeRole,
 				Title:       "New Role Application",
 				Content:     fmt.Sprintf("User %s has applied for %s role", user.Username, targetRole),
-				RelatedID:   fmt.Sprintf("%d", application.ID),
+				RelatedID:   application.ID,
 				RelatedType: model.NotificationRelatedTypeCreatorApplication,
 			}); err != nil {
 				slog.Warn("failed to create role application notification", "err", err)

@@ -88,14 +88,20 @@ func (h *Handler) GetPosts(c *gin.Context) {
 //	@Description	need to resolve a post id to its slug.
 //	@Tags			posts
 //	@Produce		json
-//	@Param			id	path		string	true	"numeric post id"
+//	@Param			id	path		int	true	"numeric post id"
 //	@Success		200	{object}	PostSingleResponse
+//	@Failure		400	{object}	api.ErrorResponse			"invalid post id"
 //	@Failure		403	{object}	api.ErrorResponse			"guest view denied"
 //	@Failure		404	{object}	api.NotFoundWithIDResponse	"post not found"
 //	@Failure		500	{object}	api.ErrorResponse
 //	@Router			/posts/by-id/{id} [get]
 func (h *Handler) GetPostByID(c *gin.Context) {
-	id := c.Param("id")
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post ID"})
+		return
+	}
+
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
 
@@ -225,17 +231,22 @@ func (h *Handler) CreatePost(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id		path		string				true	"post id"
+//	@Param			id		path		int				true	"post id"
 //	@Param			request	body		UpdatePostRequest	true	"updated post fields"
 //	@Success		200		{object}	PostMessageResponse
-//	@Failure		400		{object}	api.ErrorResponse		"invalid slug"
+//	@Failure		400		{object}	api.ErrorResponse		"invalid post id or slug"
 //	@Failure		403		{object}	api.ErrorResponse		"not author or admin"
 //	@Failure		404		{object}	api.ErrorResponse		"post not found"
 //	@Failure		409		{object}	api.CodeErrorResponse	"slug already taken"
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/posts/{id} [put]
 func (h *Handler) UpdatePost(c *gin.Context) {
-	id := c.Param("id")
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post ID"})
+		return
+	}
+
 	userID := middleware.CurrentUserID(c)
 
 	var req UpdatePostRequest
@@ -285,14 +296,20 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 //	@Tags			posts
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id	path		string	true	"post id"
+//	@Param			id	path		int	true	"post id"
 //	@Success		200	{object}	PostDeleteResponse
+//	@Failure		400	{object}	api.ErrorResponse	"invalid post id"
 //	@Failure		403	{object}	api.ErrorResponse	"not author or admin"
 //	@Failure		404	{object}	api.ErrorResponse	"post not found"
 //	@Failure		500	{object}	api.ErrorResponse
 //	@Router			/posts/{id} [delete]
 func (h *Handler) DeletePost(c *gin.Context) {
-	id := c.Param("id")
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post ID"})
+		return
+	}
+
 	userID := middleware.CurrentUserID(c)
 
 	err := h.svc.Delete(c.Request.Context(), id, userID)
@@ -411,7 +428,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 //	@Description	are only visible to the author and to admins.
 //	@Tags			posts
 //	@Produce		json
-//	@Param			id		path		string	true	"author user id or username"
+//	@Param			id		path		int	true	"author user id"
 //	@Param			page	query		int		false	"page number (1-based)"	default(1)
 //	@Param			limit	query		int		false	"page size"				default(10)
 //	@Success		200		{object}	PostListResponse
@@ -420,14 +437,18 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 //	@Failure		500		{object}	api.ErrorResponse
 //	@Router			/posts/user/{id} [get]
 func (h *Handler) GetUserPosts(c *gin.Context) {
-	userIDStr := c.Param("id")
+	uid, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid user ID"})
+		return
+	}
 	page, limit := middleware.ParsePagination(c, 10)
 
 	u, _ := middleware.CurrentUser(c)
 	userRole, userID := u.Role, u.ID
 
 	posts, total, err := h.svc.UserPosts(c.Request.Context(), UserPostsQuery{
-		UserIDStr:       userIDStr,
+		UserID:          uid,
 		CurrentUserRole: userRole,
 		CurrentUserID:   userID,
 		Page:            page,
@@ -843,15 +864,22 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 //	@Tags		posts
 //	@Produce	json
 //	@Security	BearerAuth
-//	@Param		id	path		string	true	"post id"
+//	@Param		id	path		int	true	"post id"
 //	@Success	200	{object}	PostMessageResponse
+//	@Failure	400	{object}	api.ErrorResponse "invalid post id"
 //	@Failure	401	{object}	api.ErrorResponse
 //	@Failure	403	{object}	api.ErrorResponse
 //	@Failure	404	{object}	api.ErrorResponse	"post not found"
 //	@Failure	500	{object}	api.ErrorResponse
 //	@Router		/moderation/approve/{id} [put]
 func (h *Handler) ApprovePost(c *gin.Context) {
-	post, err := h.svc.Approve(c.Request.Context(), c.Param("id"))
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post ID"})
+		return
+	}
+
+	post, err := h.svc.Approve(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
@@ -873,7 +901,7 @@ func (h *Handler) ApprovePost(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id		path		string				true	"post id"
+//	@Param			id		path		int				true	"post id"
 //	@Param			request	body		RejectPostRequest	true	"rejection reason"
 //	@Success		200		{object}	PostMessageResponse
 //	@Failure		400		{object}	api.ErrorResponse	"invalid request"
@@ -889,7 +917,13 @@ func (h *Handler) RejectPost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.svc.Reject(c.Request.Context(), c.Param("id"), req.RejectionReason)
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request parameters"})
+		return
+	}
+
+	post, err := h.svc.Reject(c.Request.Context(), id, req.RejectionReason)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
 			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Post does not exist"})
@@ -911,16 +945,22 @@ func (h *Handler) RejectPost(c *gin.Context) {
 //	@Tags			posts
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id	path		string	true	"post id"
+//	@Param			id	path		int	true	"post id"
 //	@Success		200	{object}	PostMessageResponse
-//	@Failure		400	{object}	api.ErrorResponse	"post is not rejected"
+//	@Failure		400	{object}	api.ErrorResponse	"invalid request"
 //	@Failure		401	{object}	api.ErrorResponse
 //	@Failure		403	{object}	api.ErrorResponse
 //	@Failure		404	{object}	api.ErrorResponse	"post not found"
 //	@Failure		500	{object}	api.ErrorResponse
 //	@Router			/moderation/resubmit/{id} [put]
 func (h *Handler) ResubmitPost(c *gin.Context) {
-	post, err := h.svc.Resubmit(c.Request.Context(), c.Param("id"))
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request parameters"})
+		return
+	}
+
+	post, err := h.svc.Resubmit(c.Request.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrPostNotFound):

@@ -29,7 +29,7 @@ type CodeErrorResponse struct {
 // which id was looked up.
 type NotFoundWithIDResponse struct {
 	Error  string `json:"error" example:"Post does not exist"`
-	PostID string `json:"postId" example:"42"`
+	PostID uint   `json:"postId" example:"42"`
 }
 
 // NotFoundWithSlugResponse is the body of GET /api/posts/{slug}

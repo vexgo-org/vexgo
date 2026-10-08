@@ -30,7 +30,7 @@ type Notification struct {
 	Type          NotificationType        `json:"type"`            // Notification type: comment, like, reply, review, role
 	Title         string                  `json:"title"`           // Notification title
 	Content       string                  `json:"content"`         // Notification content
-	RelatedID     string                  `json:"related_id"`      // Related resource ID
+	RelatedID     uint                    `json:"related_id"`      // Related resource ID
 	RelatedType   NotificationRelatedType `json:"related_type"`    // Related resource type
 	RelatedPostID *uint                   `json:"related_post_id"` // Owning post ID for reply/comment notifications
 	IsRead        bool                    `json:"is_read"`         // Whether it has been read

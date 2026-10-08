@@ -54,7 +54,7 @@ type Notification = {
   type: NotificationType;
   title: string;
   content: string;
-  relatedId: string;
+  relatedId: number;
   relatedType: "post" | "comment";
   relatedPostId: number | null;
   createdAt: string;
@@ -129,7 +129,7 @@ export function NotificationCenterPage() {
           type: string;
           title: string;
           content: string;
-          related_id: string;
+          related_id: number;
           related_type: "post" | "comment";
           related_post_id: number | null;
           created_at: string;
@@ -220,7 +220,7 @@ export function NotificationCenterPage() {
 
   // Navigate to the related content
   const navigateToRelated = async (
-    relatedId: string,
+    relatedId: number,
     relatedType: "post" | "comment",
     relatedPostId: number | null,
   ) => {
@@ -229,7 +229,7 @@ export function NotificationCenterPage() {
     // the post ID.
     const postId =
       relatedType === "comment" && relatedPostId != null
-        ? String(relatedPostId)
+        ? relatedPostId
         : relatedId;
 
     if (relatedType === "post") {

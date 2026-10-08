@@ -99,9 +99,7 @@ export function ModerationPage() {
   const [rejectedPosts, setRejectedPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
-  const [rejectingPostId, setRejectingPostId] = useState<
-    string | number | null
-  >(null);
+  const [rejectingPostId, setRejectingPostId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -155,9 +153,9 @@ export function ModerationPage() {
     setSearchTerm("");
   };
 
-  const handleApprovePost = async (postId: string | number) => {
+  const handleApprovePost = async (postId: number) => {
     try {
-      await unwrap(getVexGoAPI().putModerationApproveId(String(postId)));
+      await unwrap(getVexGoAPI().putModerationApproveId(postId));
       toast.success(t("moderation.approveSuccess"));
       loadData();
     } catch (error) {
@@ -166,7 +164,7 @@ export function ModerationPage() {
     }
   };
 
-  const handleRejectPost = async (postId: string | number) => {
+  const handleRejectPost = async (postId: number) => {
     setRejectingPostId(postId);
     setShowRejectDialog(true);
     setRejectionReason("");
@@ -177,7 +175,7 @@ export function ModerationPage() {
 
     try {
       await unwrap(
-        getVexGoAPI().putModerationRejectId(String(rejectingPostId), {
+        getVexGoAPI().putModerationRejectId(rejectingPostId, {
           rejectionReason,
         }),
       );
@@ -198,9 +196,9 @@ export function ModerationPage() {
     setRejectionReason("");
   };
 
-  const handleResubmitPost = async (postId: string | number) => {
+  const handleResubmitPost = async (postId: number) => {
     try {
-      await unwrap(getVexGoAPI().putModerationResubmitId(String(postId)));
+      await unwrap(getVexGoAPI().putModerationResubmitId(postId));
       toast.success(t("moderation.resubmitSuccess"));
       loadData();
     } catch (error) {

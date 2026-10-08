@@ -221,9 +221,9 @@ export function AdminPage() {
     }
   };
 
-  const handleDeletePost = async (postId: string | number) => {
+  const handleDeletePost = async (postId: number) => {
     try {
-      await unwrap(getVexGoAPI().deletePostsId(String(postId)));
+      await unwrap(getVexGoAPI().deletePostsId(postId));
       // Stay on the post management page and refresh the data
       setActiveTab("posts");
       loadData();
@@ -342,7 +342,7 @@ export function AdminPage() {
                             {t("myPostsPage.cancel")}
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDeletePost(String(post.id))}
+                            onClick={() => handleDeletePost(post.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
                             {t("myPostsPage.delete")}
