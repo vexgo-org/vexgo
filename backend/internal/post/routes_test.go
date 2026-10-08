@@ -862,11 +862,12 @@ func TestUpdatePost_StatusBoundary(t *testing.T) {
 	}
 }
 
-// doLikeRequest issues a request against a like route with an optional bearer
-// token.
-func doLikeRequest(t *testing.T, r *gin.Engine, method, path, token string) *httptest.ResponseRecorder {
+// doRequest issues a request against a route through the real middleware and
+// handler chain, with an optional bearer token and an optional JSON body.
+func doRequest(t *testing.T, r *gin.Engine, method, path, token, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(method, path, nil)
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -890,7 +891,7 @@ func TestLikeRoutes_InvalidPostIDRejected(t *testing.T) {
 	for _, path := range paths {
 		t.Run("get "+path, func(t *testing.T) {
 			r, _ := newTestRouter(t)
-			if w := doLikeRequest(t, r, http.MethodGet, path, ""); w.Code != http.StatusBadRequest {
+			if w := doRequest(t, r, http.MethodGet, path, "", ""); w.Code != http.StatusBadRequest {
 				t.Errorf("GET %s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
 			}
 		})
@@ -898,7 +899,7 @@ func TestLikeRoutes_InvalidPostIDRejected(t *testing.T) {
 		t.Run("post "+path, func(t *testing.T) {
 			r, db := newTestRouter(t)
 			u := seedRoleUser(t, db, model.RoleContributor)
-			w := doLikeRequest(t, r, http.MethodPost, path, mintToken(t, u.ID, u.Role))
+			w := doRequest(t, r, http.MethodPost, path, mintToken(t, u.ID, u.Role), "")
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("POST %s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
 			}
@@ -929,7 +930,7 @@ func TestLikeRoutes_ValidPostIDStillWorks(t *testing.T) {
 	}
 	path := "/api/likes/" + idString(post.ID)
 
-	w := doLikeRequest(t, r, http.MethodPost, path, token)
+	w := doRequest(t, r, http.MethodPost, path, token, "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("valid like: expected 200, got %d (body=%s)", w.Code, w.Body.String())
 	}
@@ -937,12 +938,80 @@ func TestLikeRoutes_ValidPostIDStillWorks(t *testing.T) {
 		t.Errorf("expected the post to be liked, got %s", w.Body.String())
 	}
 
-	w = doLikeRequest(t, r, http.MethodGet, path, token)
+	w = doRequest(t, r, http.MethodGet, path, token, "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("like status: expected 200, got %d (body=%s)", w.Code, w.Body.String())
 	}
 	if !strings.Contains(w.Body.String(), `"likesCount":1`) {
 		t.Errorf("expected like count 1, got %s", w.Body.String())
+	}
+}
+
+// TestPostIDRoutes_InvalidIDRejected pins that every route carrying a post (or
+// author) id parses it as a uint, so a non-numeric, zero or out-of-range value is
+// a client error instead of being carried into the service. Zero is the residue
+// left by a discarded parse error, and GORM resolves it to row 0 rather than
+// failing, so an unguarded route acts on a row that does not exist. The like
+// routes already guard this (TestLikeRoutes_InvalidPostIDRejected), as do
+// categories and tags.
+func TestPostIDRoutes_InvalidIDRejected(t *testing.T) {
+	// Each prefix is a complete route; the invalid id is appended to it.
+	cases := []struct {
+		method string
+		prefix string
+		body   string
+		role   string // empty when the route needs no bearer token
+	}{
+		{method: http.MethodGet, prefix: "/api/posts/by-id/"},
+		{method: http.MethodGet, prefix: "/api/posts/user/"},
+		{method: http.MethodPut, prefix: "/api/posts/", body: `{"title":"hijack"}`, role: model.RoleContributor},
+		{method: http.MethodDelete, prefix: "/api/posts/", role: model.RoleContributor},
+		{method: http.MethodPut, prefix: "/api/moderation/approve/", role: model.RoleAdmin},
+		// RejectPost binds its body before it reads the id, so the guard is only
+		// reached with a well-formed body.
+		{method: http.MethodPut, prefix: "/api/moderation/reject/", body: `{"rejectionReason":"off-topic"}`, role: model.RoleAdmin},
+		{method: http.MethodPut, prefix: "/api/moderation/resubmit/", role: model.RoleAdmin},
+	}
+
+	for _, tc := range cases {
+		for _, id := range []string{"not-a-number", "0", "99999999999999999999"} {
+			t.Run(tc.method+" "+tc.prefix+id, func(t *testing.T) {
+				r, db := newTestRouter(t)
+
+				var token string
+				var authorID uint
+				if tc.role != "" {
+					u := seedRoleUser(t, db, tc.role)
+					authorID, token = u.ID, mintToken(t, u.ID, u.Role)
+				}
+				// A real post the invalid id must never resolve to, so a request
+				// that slipped past the guard would be visible afterwards.
+				post := model.Post{Slug: "seed", Title: "t", Content: "c", Category: "1", Status: model.PostStatusDraft, AuthorID: authorID}
+				if err := db.Create(&post).Error; err != nil {
+					t.Fatalf("seed post: %v", err)
+				}
+				var before int64
+				db.Model(&model.Post{}).Count(&before)
+
+				path := tc.prefix + id
+				w := doRequest(t, r, tc.method, path, token, tc.body)
+				if w.Code != http.StatusBadRequest {
+					t.Errorf("%s: expected 400, got %d (body=%s)", path, w.Code, w.Body.String())
+				}
+
+				var after int64
+				db.Model(&model.Post{}).Count(&after)
+				if after != before {
+					t.Errorf("%s: post count = %d, want %d (request wrote a row)", path, after, before)
+				}
+				var stored model.Post
+				if err := db.First(&stored, post.ID).Error; err != nil {
+					t.Errorf("%s: seeded post %d is gone: %v", path, post.ID, err)
+				} else if stored.Status != model.PostStatusDraft {
+					t.Errorf("%s: seeded post status = %s, want draft", path, stored.Status)
+				}
+			})
+		}
 	}
 }
 
@@ -961,7 +1030,6 @@ func TestGetUserPosts_UnknownAuthorIsNotFound(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/posts/user/"+idString(author.ID), nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("known author without posts: expected 200, got %d (body=%s)", w.Code, w.Body.String())
