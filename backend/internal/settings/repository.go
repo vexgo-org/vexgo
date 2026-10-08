@@ -57,18 +57,34 @@ func (r *gormRepository) SaveSMTPConfig(ctx context.Context, config *model.SMTPC
 
 func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {
 	var config model.GeneralSettings
-	if err := r.db.WithContext(ctx).First(&config).Error; err != nil {
+	if err := r.db.
+		WithContext(ctx).
+		Preload("SiteIcon").
+		First(&config).
+		Error; err != nil {
 		return config, err
 	}
 	return config, nil
 }
 
 func (r *gormRepository) CreateGeneralSettings(ctx context.Context, config *model.GeneralSettings) error {
-	return r.db.WithContext(ctx).Create(config).Error
+	return r.db.
+		WithContext(ctx).
+		Omit("SiteIcon").
+		Create(config).
+		Error
 }
 
 func (r *gormRepository) SaveGeneralSettings(ctx context.Context, config *model.GeneralSettings) error {
-	return r.db.WithContext(ctx).Save(config).Error
+	// The association is omitted: it was only loaded to resolve the icon URL,
+	// and writing it back would upsert an untouched asset row on every save.
+	// The reference itself still lands, because site_icon_id is written from
+	// SiteIconID rather than from the association.
+	return r.db.
+		WithContext(ctx).
+		Omit("SiteIcon").
+		Save(config).
+		Error
 }
 
 func (r *gormRepository) GetAIConfig(ctx context.Context) (model.AIConfig, error) {

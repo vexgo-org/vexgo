@@ -39,10 +39,10 @@ type TestSMTPResponse struct {
 	To      string `json:"to" example:"admin@example.com"`
 }
 
-// GeneralSettingsResponse is the body of GET
-// /api/config/general. Wraps the model so the schema shows
-// up under settings.GeneralSettingsResponse rather than
-// model.GeneralSettings (which is the GORM row).
+// GeneralSettingsResponse is the body of GET and PUT
+// /api/config/general. The site icon travels as a pair: siteIconId is the
+// stored asset reference, and siteIcon is the URL that reference currently
+// resolves to, which is what a caller renders.
 type GeneralSettingsResponse struct {
 	CaptchaEnabled      bool   `json:"captchaEnabled" example:"true"`
 	RegistrationEnabled bool   `json:"registrationEnabled" example:"true"`
@@ -50,6 +50,7 @@ type GeneralSettingsResponse struct {
 	SiteName            string `json:"siteName" example:"My VexGo Site"`
 	SiteDescription     string `json:"siteDescription"`
 	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
+	SiteIconID          *uint  `json:"siteIconId,omitempty" example:"1"`
 	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
 	SiteLanguage        string `json:"siteLanguage" example:"en"`
 }
@@ -62,7 +63,7 @@ type GeneralSettingsUpdateRequest struct {
 	AllowGuestViewPosts bool   `json:"allowGuestViewPosts" example:"false"`
 	SiteName            string `json:"siteName" example:"My VexGo Site"`
 	SiteDescription     string `json:"siteDescription"`
-	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
+	SiteIconID          *uint  `json:"siteIconId" example:"1"`
 	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
 	SiteLanguage        string `json:"siteLanguage" example:"en"`
 }
@@ -70,8 +71,8 @@ type GeneralSettingsUpdateRequest struct {
 // GeneralSettingsUpdateResponse is the body of PUT
 // /api/config/general on success.
 type GeneralSettingsUpdateResponse struct {
-	Message         string                `json:"message" example:"General settings updated successfully"`
-	GeneralSettings model.GeneralSettings `json:"generalSettings"`
+	Message         string                  `json:"message" example:"General settings updated successfully"`
+	GeneralSettings GeneralSettingsResponse `json:"generalSettings"`
 }
 
 // AIConfigResponse is the body of GET /api/config/ai. The

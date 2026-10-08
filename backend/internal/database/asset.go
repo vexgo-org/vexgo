@@ -1,6 +1,8 @@
 package database
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -81,6 +83,54 @@ func backFillAssets(db *gorm.DB) error {
 			Error; err != nil {
 			return fmt.Errorf("failed to backfill asset %d: %w", asset.ID, err)
 		}
+	}
+
+	return nil
+}
+
+// backfillSiteIcon points general_settings.site_icon_id at the asset the
+// legacy site_icon URL names. The column is no longer part of the model, so
+// the old value is read with a raw scan; it is left in place afterwards,
+// unread. An icon that names no asset we manage — an external URL, or an
+// upload that is already gone — resolves to no reference at all, and the
+// favicon falls back to the other sources.
+func backfillSiteIcon(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&model.GeneralSettings{}) ||
+		!db.Migrator().HasColumn(&model.GeneralSettings{}, "site_icon") {
+		return nil
+	}
+
+	var id uint
+	var iconURL string
+
+	err := db.Raw(
+		"SELECT id, site_icon FROM general_settings ORDER BY id LIMIT 1",
+	).Row().Scan(&id, &iconURL)
+	if errors.Is(err, sql.ErrNoRows) || iconURL == "" {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to read the legacy site icon: %w", err)
+	}
+
+	key, err := storageKeyFromURL(iconURL)
+	if err != nil {
+		slog.Warn("legacy site icon is not an upload, leaving it unset", "url", iconURL)
+		return nil
+	}
+
+	var asset model.Asset
+	if err := db.Where("storage_key = ?", key).First(&asset).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return fmt.Errorf("failed to look up the site icon asset: %w", err)
+	}
+
+	if err := db.Model(&model.GeneralSettings{}).
+		Where("id = ? AND site_icon_id IS NULL", id).
+		Update("site_icon_id", asset.ID).Error; err != nil {
+		return fmt.Errorf("failed to backfill the site icon reference: %w", err)
 	}
 
 	return nil
