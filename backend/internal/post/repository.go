@@ -25,7 +25,6 @@ type ListFilter struct {
 type Repository interface {
 	// Posts
 	FindByID(ctx context.Context, id uint) (*model.Post, error)
-	FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error)
 	FindBySlug(ctx context.Context, slug string) (*model.Post, error)
 	FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error)
 	SlugExists(ctx context.Context, slug string) (bool, error)
@@ -113,31 +112,11 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *gormRepository) FindByID(ctx context.Context, id uint) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
-}
-
-func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).Preload("Tags").First(&post, id).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
+	return r.find(ctx, &model.Post{ID: id})
 }
 
 func (r *gormRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).
-		Preload("Author").
-		Preload("Tags").
-		Where("slug = ?", slug).
-		First(&post).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
+	return r.find(ctx, &model.Post{Slug: slug})
 }
 
 func (r *gormRepository) FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error) {
@@ -215,7 +194,12 @@ func (r *gormRepository) HasAuthorAsset(ctx context.Context, authorID, assetID u
 
 // baseQuery returns the post model query with author and tags preloaded.
 func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
-	return r.db.WithContext(ctx).Model(&model.Post{}).Preload("Author").Preload("Tags")
+	return r.db.
+		WithContext(ctx).
+		Model(&model.Post{}).
+		Preload("Author").
+		Preload("Tags").
+		Preload("CoverImage")
 }
 
 // listPage runs the shared count + paginate + order pattern for list queries.
@@ -657,4 +641,15 @@ func (r *gormRepository) BatchFindLikedPostIDs(ctx context.Context, postIDs []ui
 		liked[id] = true
 	}
 	return liked, nil
+}
+
+func (r *gormRepository) find(ctx context.Context, query *model.Post) (*model.Post, error) {
+	var post model.Post
+	if err := r.baseQuery(ctx).
+		Where(query).
+		First(&post).
+		Error; err != nil {
+		return nil, err
+	}
+	return &post, nil
 }

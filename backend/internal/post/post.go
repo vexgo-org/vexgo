@@ -278,7 +278,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 
 // Update modifies a post when the acting user is its author or an admin.
 func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest) (*model.Post, error) {
-	post, err := s.repo.FindByIDPreloadTags(ctx, id)
+	post, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
