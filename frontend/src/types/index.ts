@@ -47,7 +47,7 @@ export interface GeneralSettings {
 
 // Post types
 export interface Post {
-  id: string | number;
+  id: number;
   slug?: string;
   title?: string;
   content?: string;

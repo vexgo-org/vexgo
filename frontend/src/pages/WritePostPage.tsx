@@ -64,6 +64,7 @@ export function WritePostPage() {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
   const isEditMode = !!id;
+  const postId = Number(id);
 
   // Check if user is authenticated
   useEffect(() => {
@@ -138,7 +139,7 @@ export function WritePostPage() {
 
   const loadPost = async () => {
     try {
-      const response = await unwrap(getVexGoAPI().getPostsByIdId(id!));
+      const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
       const post = response.post as LoadedPost;
       console.debug("WritePostPage loaded post:", post);
       console.log("Post content:", post.content);
@@ -320,7 +321,7 @@ export function WritePostPage() {
       };
 
       if (isEditMode) {
-        await unwrap(getVexGoAPI().putPostsId(id!, postData));
+        await unwrap(getVexGoAPI().putPostsId(postId, postData));
       } else {
         await unwrap(getVexGoAPI().postPosts(postData));
       }
