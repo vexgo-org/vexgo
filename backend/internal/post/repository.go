@@ -34,6 +34,7 @@ type Repository interface {
 	Save(ctx context.Context, post *model.Post) error
 	Delete(ctx context.Context, post *model.Post) error
 	IncrementViewCount(ctx context.Context, postID uint) error
+	HasAuthorAsset(ctx context.Context, authorID, assetID uint) (bool, error)
 
 	// List queries posts with role-based visibility, filters and pagination.
 	List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error)
@@ -194,6 +195,22 @@ func (r *gormRepository) Delete(ctx context.Context, post *model.Post) error {
 func (r *gormRepository) IncrementViewCount(ctx context.Context, postID uint) error {
 	return r.db.WithContext(ctx).Model(&model.Post{}).Where("id = ?", postID).
 		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error
+}
+
+func (r *gormRepository) HasAuthorAsset(ctx context.Context, authorID, assetID uint) (bool, error) {
+	var count int64
+	if err := r.db.
+		WithContext(ctx).
+		Model(&model.Asset{}).
+		Where(&model.Asset{
+			ID:     assetID,
+			UserID: authorID,
+		}).
+		Count(&count).
+		Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // baseQuery returns the post model query with author and tags preloaded.
