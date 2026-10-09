@@ -186,6 +186,7 @@ func (r *Renderer) handlePost(c *gin.Context) {
 	if err := r.db.WithContext(c.Request.Context()).
 		Preload("Author").
 		Preload("Tags").
+		Preload("CoverImage").
 		Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
 		First(&post).Error; err != nil {
 		r.renderNotFound(c, theme, site, dict)

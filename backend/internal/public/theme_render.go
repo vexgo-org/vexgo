@@ -469,6 +469,7 @@ func (r *Renderer) popularPostsData(ctx context.Context, limit int) []PostCardDa
 	if err := r.db.WithContext(ctx).Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
+		Preload("CoverImage").
 		Where("status = ?", model.PostStatusPublished).
 		Order("created_at DESC").
 		Limit(popularPoolLimit).
@@ -581,6 +582,7 @@ func (r *Renderer) listPageData(ctx context.Context, q postListQuery) ([]PostCar
 	query := r.db.WithContext(ctx).Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
+		Preload("CoverImage").
 		Where("status = ?", model.PostStatusPublished)
 	if q.AuthorID != 0 {
 		query = query.Where("author_id = ?", q.AuthorID)
