@@ -164,7 +164,11 @@ func (r *gormRepository) Create(ctx context.Context, post *model.Post) error {
 }
 
 func (r *gormRepository) Save(ctx context.Context, post *model.Post) error {
-	return r.db.WithContext(ctx).Save(post).Error
+	return r.db.
+		WithContext(ctx).
+		Omit("CoverImage").
+		Save(post).
+		Error
 }
 
 func (r *gormRepository) Delete(ctx context.Context, post *model.Post) error {
