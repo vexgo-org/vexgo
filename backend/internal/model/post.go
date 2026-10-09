@@ -36,7 +36,6 @@ type Post struct {
 	Title           string     `json:"title" binding:"required" gorm:"size:255"`
 	Content         string     `json:"content" binding:"required" gorm:"type:text"`
 	Excerpt         string     `json:"excerpt" gorm:"type:text"`
-	CoverImage      string     `json:"coverImage" gorm:"size:500"`
 	ViewCount       int        `json:"viewCount" gorm:"default:0"`
 	AuthorID        uint       `json:"authorId"`
 	Author          User       `json:"author" gorm:"foreignKey:AuthorID"`
@@ -51,6 +50,9 @@ type Post struct {
 	IsLiked    bool `json:"isLiked" gorm:"-"`
 	// Non-database field: comment count
 	CommentsCount int `json:"commentsCount" gorm:"-"`
+
+	CoverImageID *uint  `json:"coverImageId,omitempty" gorm:"index"`
+	CoverImage   *Asset `json:"coverImage" gorm:"foreignKey:CoverImageID"`
 }
 
 // Like model
