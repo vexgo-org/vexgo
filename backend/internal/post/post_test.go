@@ -372,6 +372,218 @@ func TestCreate_SavesFieldsAsAuthor(t *testing.T) {
 	}
 }
 
+// TestCreate_ForbidsCoverImageOwnedByAnotherUser is the permission-boundary
+// guard for the cover image reference: a post may only point at an asset its
+// own author uploaded, so one author cannot attach another user's upload (and
+// with it that user's storage) to a post they control.
+func TestCreate_ForbidsCoverImageOwnedByAnotherUser(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	other := seedUser(t, db, "other", model.RoleAuthor)
+	foreign := seedAsset(t, db, other.ID, "/uploads/other.png")
+
+	_, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "stolen-cover",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &foreign.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("Create with another user's asset = %v, want ErrForbidden", err)
+	}
+
+	// An id that names no asset at all is rejected the same way: the check is
+	// "an asset I own exists", not "the id is well-formed".
+	missing := uint(99999)
+	_, err = svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "missing-cover",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &missing,
+		Status:       model.PostStatusPublished,
+	})
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("Create with an unknown asset id = %v, want ErrForbidden", err)
+	}
+
+	// Neither attempt may leave a post behind.
+	var count int64
+	db.Model(&model.Post{}).Count(&count)
+	if count != 0 {
+		t.Errorf("rejected creates stored %d posts, want 0", count)
+	}
+}
+
+// TestCreate_CoverImageResolvesToTheOwnedAsset pins the happy path the
+// ownership check protects: the stored value is the id, and the post handed
+// back carries the asset so the caller can render its URL without a second
+// lookup.
+func TestCreate_CoverImageResolvesToTheOwnedAsset(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "with-cover",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if post.CoverImageID == nil || *post.CoverImageID != cover.ID {
+		t.Fatalf("CoverImageID = %v, want %d", post.CoverImageID, cover.ID)
+	}
+	if post.CoverImage == nil {
+		t.Fatal("CoverImage is nil, want the referenced asset")
+	}
+	if post.CoverImage.URL != "/uploads/cover.png" {
+		t.Errorf("CoverImage.URL = %q, want /uploads/cover.png", post.CoverImage.URL)
+	}
+}
+
+// TestUpdate_ForbidsCoverImageOwnedByAnotherUser mirrors the create guard on
+// the update path, and pins that a rejected swap leaves the existing cover in
+// place rather than half-applied.
+func TestUpdate_ForbidsCoverImageOwnedByAnotherUser(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	other := seedUser(t, db, "other", model.RoleAuthor)
+	own := seedAsset(t, db, author.ID, "/uploads/own.png")
+	foreign := seedAsset(t, db, other.ID, "/uploads/other.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "swap-cover",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &own.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if _, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{
+		Title:        "renamed",
+		CoverImageID: &foreign.ID,
+	}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("Update with another user's asset = %v, want ErrForbidden", err)
+	}
+
+	var stored model.Post
+	if err := db.First(&stored, post.ID).Error; err != nil {
+		t.Fatalf("reload post: %v", err)
+	}
+	if stored.CoverImageID == nil || *stored.CoverImageID != own.ID {
+		t.Errorf("cover_image_id = %v, want the original %d kept", stored.CoverImageID, own.ID)
+	}
+	if stored.Title != "t" {
+		t.Errorf("title = %q, want the rejected update to change nothing", stored.Title)
+	}
+
+	// The author's own asset still swaps in, so the guard rejects the foreign
+	// id rather than every id.
+	if _, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{
+		CoverImageID: &own.ID,
+	}); err != nil {
+		t.Errorf("Update with an owned asset error: %v", err)
+	}
+}
+
+// TestCreate_DanglingCoverImageResolvesToNothing covers the upgrade boundary:
+// the asset behind a stored cover_image_id can be deleted afterwards (or was
+// never ours to begin with), and a post pointing at nothing must still read
+// back cleanly. The id is kept so the reference is recoverable if the asset
+// returns, mirroring the site icon reference.
+func TestCreate_DanglingCoverImageResolvesToNothing(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "dangling",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if err := db.Delete(&cover).Error; err != nil {
+		t.Fatalf("soft delete asset: %v", err)
+	}
+
+	loaded, err := svc.Get(ctx, post.ID, author.Role, author.ID)
+	if err != nil {
+		t.Fatalf("Get error: %v", err)
+	}
+	if loaded.CoverImageID == nil || *loaded.CoverImageID != cover.ID {
+		t.Fatalf("CoverImageID = %v, want the stored %d kept", loaded.CoverImageID, cover.ID)
+	}
+	if loaded.CoverImage != nil {
+		t.Errorf("CoverImage = %+v, want nil for a soft-deleted asset", loaded.CoverImage)
+	}
+
+	// The reference survives an unrelated edit, because cover_image_id is
+	// written from CoverImageID rather than from the association that failed to
+	// load.
+	if _, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{Title: "renamed"}); err != nil {
+		t.Fatalf("Update after asset delete error: %v", err)
+	}
+	var stored model.Post
+	if err := db.First(&stored, post.ID).Error; err != nil {
+		t.Fatalf("reload post: %v", err)
+	}
+	if stored.CoverImageID == nil || *stored.CoverImageID != cover.ID {
+		t.Errorf("cover_image_id = %v, want the dangling reference %d kept", stored.CoverImageID, cover.ID)
+	}
+}
+
+// TestDelete_DanglingCoverImageSkipsTheMissingFile pins the cleanup path: the
+// cover's file is collected from the asset, so a dangling reference must not
+// queue a deletion for a file whose asset is gone.
+func TestDelete_DanglingCoverImageSkipsTheMissingFile(t *testing.T) {
+	svc, _, remover, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "dangling-delete",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if err := db.Delete(&cover).Error; err != nil {
+		t.Fatalf("soft delete asset: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+	if len(remover.deleted) != 0 {
+		t.Errorf("deleted files = %v, want none for a post whose cover asset is gone", remover.deleted)
+	}
+}
+
 func TestCreate_DerivesStatusByRole(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
