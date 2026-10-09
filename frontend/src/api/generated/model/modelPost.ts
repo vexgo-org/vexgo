@@ -5,6 +5,7 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
+import type { ModelAsset } from "./modelAsset";
 import type { ModelPostStatus } from "./modelPostStatus";
 import type { ModelTag } from "./modelTag";
 import type { ModelUser } from "./modelUser";
@@ -16,7 +17,8 @@ export interface ModelPost {
   /** Non-database field: comment count */
   commentsCount?: number;
   content: string;
-  coverImage?: string;
+  coverImage?: ModelAsset;
+  coverImageId?: number;
   createdAt?: string;
   excerpt?: string;
   id?: number;
