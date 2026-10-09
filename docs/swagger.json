@@ -1203,7 +1203,10 @@
                         "type": "string"
                     },
                     "coverImage": {
-                        "type": "string"
+                        "$ref": "#/components/schemas/model.Asset"
+                    },
+                    "coverImageId": {
+                        "type": "integer"
                     },
                     "createdAt": {
                         "type": "string"
@@ -1587,9 +1590,9 @@
                         "example": "\u003cp\u003eHello world\u003c/p\u003e",
                         "type": "string"
                     },
-                    "coverImage": {
-                        "example": "https://example.com/cover.jpg",
-                        "type": "string"
+                    "coverImageId": {
+                        "example": 1,
+                        "type": "integer"
                     },
                     "excerpt": {
                         "example": "A short summary",
@@ -1812,9 +1815,9 @@
                         "example": "\u003cp\u003eHello world\u003c/p\u003e",
                         "type": "string"
                     },
-                    "coverImage": {
-                        "example": "https://example.com/cover.jpg",
-                        "type": "string"
+                    "coverImageId": {
+                        "example": 1,
+                        "type": "integer"
                     },
                     "excerpt": {
                         "example": "A short summary",
