@@ -399,12 +399,17 @@ func (r *Renderer) buildSiteData(ctx context.Context, lang string) *SiteData {
 
 // toPostCard maps a post row to the public card shape consumed by templates.
 func toPostCard(post model.Post) PostCardData {
+	coverURL := ""
+	if post.CoverImage != nil {
+		coverURL = post.CoverImage.URL
+	}
+
 	card := PostCardData{
 		ID:            post.ID,
 		Title:         post.Title,
 		Slug:          post.Slug,
 		Excerpt:       post.Excerpt,
-		CoverImage:    post.CoverImage,
+		CoverImage:    coverURL,
 		Category:      post.Category,
 		CreatedAt:     post.CreatedAt,
 		ViewCount:     post.ViewCount,
