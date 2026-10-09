@@ -247,15 +247,26 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		}
 	}
 
+	// Check the ownership of cover image.
+	if req.CoverImageID != nil {
+		hasAsset, err := s.repo.HasAuthorAsset(ctx, userID, *req.CoverImageID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check ownership of asset: %w", err)
+		}
+		if !hasAsset {
+			return nil, ErrForbidden
+		}
+	}
+
 	post := model.Post{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     initialStatus,
-		AuthorID:   userID,
+		Slug:         req.Slug,
+		Title:        req.Title,
+		Content:      req.Content,
+		Category:     req.Category,
+		Excerpt:      req.Excerpt,
+		CoverImageID: req.CoverImageID,
+		Status:       initialStatus,
+		AuthorID:     userID,
 	}
 
 	if len(req.Tags) > 0 {
@@ -330,9 +341,19 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 	if req.Excerpt != "" {
 		post.Excerpt = req.Excerpt
 	}
-	if req.CoverImage != "" {
-		post.CoverImage = req.CoverImage
+
+	// Check the ownership of cover image.
+	if req.CoverImageID != nil {
+		hasAsset, err := s.repo.HasAuthorAsset(ctx, userID, *req.CoverImageID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check ownership of asset: %w", err)
+		}
+		if !hasAsset {
+			return nil, ErrForbidden
+		}
+		post.CoverImageID = req.CoverImageID
 	}
+
 	if req.Status != "" {
 		if err := validateAuthorStatus(user.Role, req.Status); err != nil {
 			return nil, err
