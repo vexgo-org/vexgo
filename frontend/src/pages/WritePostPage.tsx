@@ -40,7 +40,8 @@ interface LoadedPost {
   title: string;
   content: string;
   excerpt: string;
-  coverImage: string | null;
+  coverImage: { url?: string } | null;
+  coverImageId: number | null;
   category?: string | number;
   tags?:
     | string
@@ -89,6 +90,10 @@ export function WritePostPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [coverImage, setCoverImage] = useState("");
+  const [coverImageId, setCoverImageId] = useState<number | null>(null);
+  const [originalCoverImageId, setOriginalCoverImageId] = useState<
+    number | null
+  >(null);
   const [showCropper, setShowCropper] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -218,8 +223,11 @@ export function WritePostPage() {
       } catch (e) {
         console.error("Failed to parse post.tags:", e, post && post.tags);
         setTags([]);
+        setCoverImageId(post.coverImageId ?? null);
+        setOriginalCoverImageId(post.coverImageId ?? null);
       }
-      setCoverImage(post.coverImage || "");
+      setCoverImage(post.coverImage?.url ?? "");
+      setCoverImageId(post.coverImageId ?? null);
     } catch (error) {
       console.error("Failed to load post:", error);
       navigate("/admin/my-posts");
@@ -258,9 +266,10 @@ export function WritePostPage() {
     setUploadingImage(true);
     try {
       const response = await unwrap(
-        getVexGoAPI().postUpload({ file: croppedFile }),
+        getVexGoAPI().postAssetUpload({ file: croppedFile }),
       );
       setCoverImage(response.file?.url || "");
+      setCoverImageId(response.file?.id || null);
     } catch (err) {
       console.error("Failed to upload cropped image:", err);
       alert(t("writePostPage.uploadFailed"));
@@ -316,7 +325,10 @@ export function WritePostPage() {
         category,
         tags,
         excerpt: excerpt.trim(),
-        coverImage: coverImage || undefined,
+        coverImageId:
+          coverImageId === originalCoverImageId
+            ? undefined
+            : (coverImageId ?? undefined),
         status: isContributor && status === "published" ? "pending" : status,
       };
 
@@ -419,6 +431,11 @@ export function WritePostPage() {
     }
   };
 
+  const handleRemoveCoverImage = () => {
+    setCoverImage("");
+    setCoverImageId(null);
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       {/* The screen has no heading of its own: its heading is the title field.
@@ -476,7 +493,7 @@ export function WritePostPage() {
                   variant="destructive"
                   size="sm"
                   className="absolute top-2 right-2"
-                  onClick={() => setCoverImage("")}
+                  onClick={handleRemoveCoverImage}
                 >
                   <X className="size-4" />
                 </Button>
