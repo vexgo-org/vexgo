@@ -8,7 +8,29 @@ import (
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"gorm.io/gorm"
 )
+
+// seedAsset migrates the asset table on demand and stores an image asset owned
+// by userID, returning it so a test can reference it as a post cover.
+func seedAsset(t *testing.T, db *gorm.DB, userID uint, url string) model.Asset {
+	t.Helper()
+	if err := db.AutoMigrate(&model.Asset{}); err != nil {
+		t.Fatalf("failed to migrate asset: %v", err)
+	}
+	a := model.Asset{
+		OriginalName: url,
+		StorageKey:   url,
+		URL:          url,
+		MimeType:     "image/png",
+		Type:         model.AssetTypeImage,
+		UserID:       userID,
+	}
+	if err := db.Create(&a).Error; err != nil {
+		t.Fatalf("failed to seed asset: %v", err)
+	}
+	return a
+}
 
 func TestList_RoleVisibility(t *testing.T) {
 	svc, _, _, db := newTestService(t)
@@ -319,16 +341,17 @@ func TestCreate_SavesFieldsAsAuthor(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
+	cover := seedAsset(t, db, user.ID, "/img.png")
 
 	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
-		Slug:       "hello-world",
-		Title:      "Hello",
-		Content:    "world",
-		Category:   "1",
-		Tags:       []string{"go", "gin"},
-		Excerpt:    "ex",
-		CoverImage: "/img.png",
-		Status:     model.PostStatusPublished,
+		Slug:         "hello-world",
+		Title:        "Hello",
+		Content:      "world",
+		Category:     "1",
+		Tags:         []string{"go", "gin"},
+		Excerpt:      "ex",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
 	})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
@@ -776,14 +799,15 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	svc, _, remover, db := newTestService(t)
 	ctx := context.Background()
 	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.jpg")
 
 	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
-		Slug:       "delete-test",
-		Title:      "A",
-		Content:    "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
-		Category:   "1",
-		CoverImage: "/uploads/cover.jpg",
-		Status:     model.PostStatusPublished,
+		Slug:         "delete-test",
+		Title:        "A",
+		Content:      "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
 	})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)

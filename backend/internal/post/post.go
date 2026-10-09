@@ -284,7 +284,8 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		return nil, err
 	}
 
-	return &post, nil
+	// Find the post from the database to preload the cover image.
+	return s.repo.FindBySlug(ctx, req.Slug)
 }
 
 // Update modifies a post when the acting user is its author or an admin.
@@ -386,7 +387,8 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 		}
 		return nil, fmt.Errorf("save post: %w", err)
 	}
-	return post, nil
+
+	return s.repo.FindByID(ctx, id)
 }
 
 // Delete removes a post (author or admin only), cleaning up its files,
@@ -411,8 +413,8 @@ func (s *Service) Delete(ctx context.Context, id, userID uint) error {
 
 	// Collect and delete image files (cover + content images)
 	var imagesToDelete []string
-	if post.CoverImage != "" {
-		imagesToDelete = append(imagesToDelete, post.CoverImage)
+	if post.CoverImage != nil {
+		imagesToDelete = append(imagesToDelete, post.CoverImage.URL)
 	}
 	imagesToDelete = append(imagesToDelete, extractImageURLs(post.Content)...)
 
