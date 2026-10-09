@@ -399,12 +399,17 @@ func (r *Renderer) buildSiteData(ctx context.Context, lang string) *SiteData {
 
 // toPostCard maps a post row to the public card shape consumed by templates.
 func toPostCard(post model.Post) PostCardData {
+	coverURL := ""
+	if post.CoverImage != nil {
+		coverURL = post.CoverImage.URL
+	}
+
 	card := PostCardData{
 		ID:            post.ID,
 		Title:         post.Title,
 		Slug:          post.Slug,
 		Excerpt:       post.Excerpt,
-		CoverImage:    post.CoverImage,
+		CoverImage:    coverURL,
 		Category:      post.Category,
 		CreatedAt:     post.CreatedAt,
 		ViewCount:     post.ViewCount,
@@ -464,6 +469,7 @@ func (r *Renderer) popularPostsData(ctx context.Context, limit int) []PostCardDa
 	if err := r.db.WithContext(ctx).Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
+		Preload("CoverImage").
 		Where("status = ?", model.PostStatusPublished).
 		Order("created_at DESC").
 		Limit(popularPoolLimit).
@@ -576,6 +582,7 @@ func (r *Renderer) listPageData(ctx context.Context, q postListQuery) ([]PostCar
 	query := r.db.WithContext(ctx).Model(&model.Post{}).
 		Preload("Author").
 		Preload("Tags").
+		Preload("CoverImage").
 		Where("status = ?", model.PostStatusPublished)
 	if q.AuthorID != 0 {
 		query = query.Where("author_id = ?", q.AuthorID)

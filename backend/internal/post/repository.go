@@ -25,7 +25,6 @@ type ListFilter struct {
 type Repository interface {
 	// Posts
 	FindByID(ctx context.Context, id uint) (*model.Post, error)
-	FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error)
 	FindBySlug(ctx context.Context, slug string) (*model.Post, error)
 	FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error)
 	SlugExists(ctx context.Context, slug string) (bool, error)
@@ -34,6 +33,7 @@ type Repository interface {
 	Save(ctx context.Context, post *model.Post) error
 	Delete(ctx context.Context, post *model.Post) error
 	IncrementViewCount(ctx context.Context, postID uint) error
+	HasAuthorAsset(ctx context.Context, authorID, assetID uint) (bool, error)
 
 	// List queries posts with role-based visibility, filters and pagination.
 	List(ctx context.Context, userRole string, userID uint, f ListFilter) ([]model.Post, int64, error)
@@ -112,31 +112,11 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *gormRepository) FindByID(ctx context.Context, id uint) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
-}
-
-func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).Preload("Tags").First(&post, id).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
+	return r.find(ctx, &model.Post{ID: id})
 }
 
 func (r *gormRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).
-		Preload("Author").
-		Preload("Tags").
-		Where("slug = ?", slug).
-		First(&post).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
+	return r.find(ctx, &model.Post{Slug: slug})
 }
 
 func (r *gormRepository) FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error) {
@@ -184,7 +164,11 @@ func (r *gormRepository) Create(ctx context.Context, post *model.Post) error {
 }
 
 func (r *gormRepository) Save(ctx context.Context, post *model.Post) error {
-	return r.db.WithContext(ctx).Save(post).Error
+	return r.db.
+		WithContext(ctx).
+		Omit("CoverImage").
+		Save(post).
+		Error
 }
 
 func (r *gormRepository) Delete(ctx context.Context, post *model.Post) error {
@@ -196,9 +180,30 @@ func (r *gormRepository) IncrementViewCount(ctx context.Context, postID uint) er
 		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).Error
 }
 
+func (r *gormRepository) HasAuthorAsset(ctx context.Context, authorID, assetID uint) (bool, error) {
+	var count int64
+	if err := r.db.
+		WithContext(ctx).
+		Model(&model.Asset{}).
+		Where(&model.Asset{
+			ID:     assetID,
+			UserID: authorID,
+		}).
+		Count(&count).
+		Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // baseQuery returns the post model query with author and tags preloaded.
 func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
-	return r.db.WithContext(ctx).Model(&model.Post{}).Preload("Author").Preload("Tags")
+	return r.db.
+		WithContext(ctx).
+		Model(&model.Post{}).
+		Preload("Author").
+		Preload("Tags").
+		Preload("CoverImage")
 }
 
 // listPage runs the shared count + paginate + order pattern for list queries.
@@ -640,4 +645,15 @@ func (r *gormRepository) BatchFindLikedPostIDs(ctx context.Context, postIDs []ui
 		liked[id] = true
 	}
 	return liked, nil
+}
+
+func (r *gormRepository) find(ctx context.Context, query *model.Post) (*model.Post, error) {
+	var post model.Post
+	if err := r.baseQuery(ctx).
+		Where(query).
+		First(&post).
+		Error; err != nil {
+		return nil, err
+	}
+	return &post, nil
 }

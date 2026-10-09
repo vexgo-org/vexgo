@@ -186,6 +186,7 @@ func (r *Renderer) handlePost(c *gin.Context) {
 	if err := r.db.WithContext(c.Request.Context()).
 		Preload("Author").
 		Preload("Tags").
+		Preload("CoverImage").
 		Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
 		First(&post).Error; err != nil {
 		r.renderNotFound(c, theme, site, dict)
@@ -213,7 +214,11 @@ func (r *Renderer) handlePost(c *gin.Context) {
 	data.Post.Title = post.Title
 	data.Post.Slug = post.Slug
 	data.Post.Excerpt = post.Excerpt
-	data.Post.CoverImage = post.CoverImage
+
+	if post.CoverImage != nil {
+		data.Post.CoverImage = post.CoverImage.URL
+	}
+
 	data.Post.Category = post.Category
 	data.Post.CreatedAt = post.CreatedAt
 	data.Post.UpdatedAt = post.UpdatedAt

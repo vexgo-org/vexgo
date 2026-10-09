@@ -153,7 +153,14 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 	target := seedUser(t, db, "target", model.RoleAuthor)
 	otherAdmin := seedUser(t, db, "other-admin", model.RoleAdmin)
 
-	post := model.Post{Title: "p", Content: "c", Category: "1", AuthorID: target.ID, Status: model.PostStatusPublished, CoverImage: "/uploads/cover.jpg"}
+	if err := db.AutoMigrate(&model.Asset{}); err != nil {
+		t.Fatalf("failed to migrate asset: %v", err)
+	}
+	cover := model.Asset{URL: "/uploads/cover.jpg", StorageKey: "cover.jpg", MimeType: "image/jpeg", Type: model.AssetTypeImage, UserID: target.ID}
+	if err := db.Create(&cover).Error; err != nil {
+		t.Fatalf("failed to seed asset: %v", err)
+	}
+	post := model.Post{Title: "p", Content: "c", Category: "1", AuthorID: target.ID, Status: model.PostStatusPublished, CoverImageID: &cover.ID, CoverImage: &cover}
 	if err := db.Create(&post).Error; err != nil {
 		t.Fatalf("failed to seed post: %v", err)
 	}
