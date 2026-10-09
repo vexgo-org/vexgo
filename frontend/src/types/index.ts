@@ -56,7 +56,8 @@ export interface Post {
   category?: string;
   categoryInfo?: Category;
   tags?: string[];
-  coverImage?: string | null;
+  coverImage?: { url?: string } | null;
+  coverImageId?: number | null;
   status?: string;
   authorId?: string | number;
   author?: User;
