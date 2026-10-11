@@ -6,6 +6,8 @@
  * OpenAPI spec version: 1.0.0
  */
 import type {
+  AssetMessageResponse,
+  AssetUploadResponse,
   AuthChangePasswordRequestWire,
   AuthCurrentUserResponse,
   AuthGenericMessageResponse,
@@ -66,6 +68,7 @@ import type {
   PagePageMessageResponse,
   PagePageSingleResponse,
   PageUpdatePageRequest,
+  PostAssetUploadBody,
   PostCategoriesListResponse,
   PostConfigThemeUploadBody,
   PostCreateCategoryRequest,
@@ -123,6 +126,39 @@ import type {
 import { customInstance } from "../customAxios";
 
 export const getVexGoAPI = () => {
+  /**
+   * Soft deletes the asset identified by its storage key.
+   * Only the owner or an administrator may delete it.
+   * Requires authentication.
+   * @summary Delete an asset
+   */
+  const postAssetDeleteKey = (key: string) => {
+    return customInstance<AssetMessageResponse>({
+      url: `/asset/delete/${key}`,
+      method: "POST",
+    });
+  };
+
+  /**
+   * Accepts a multipart/form-data body with a single 'file'
+   * part. The storage key is a freshly generated UUID
+   * plus the sanitized extension from the original filename;
+   * any untrusted characters are stripped before persistence.
+   * Requires authentication.
+   * @summary Upload an asset
+   */
+  const postAssetUpload = (postAssetUploadBody: PostAssetUploadBody) => {
+    const formData = new FormData();
+    formData.append(`file`, postAssetUploadBody.file);
+
+    return customInstance<AssetUploadResponse>({
+      url: `/asset/upload`,
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
+    });
+  };
+
   /**
    * Sends a verification link to the new address when
    * SMTP is enabled, or applies the change directly
@@ -1379,6 +1415,8 @@ export const getVexGoAPI = () => {
   };
 
   return {
+    postAssetDeleteKey,
+    postAssetUpload,
     putAuthEmail,
     getAuthEmailVerify,
     postAuthEmailVerifyResend,
@@ -1471,6 +1509,12 @@ export const getVexGoAPI = () => {
     putUsersIdRole,
   };
 };
+export type PostAssetDeleteKeyResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetDeleteKey"]>>
+>;
+export type PostAssetUploadResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetUpload"]>>
+>;
 export type PutAuthEmailResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putAuthEmail"]>>
 >;
