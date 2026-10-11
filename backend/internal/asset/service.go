@@ -63,6 +63,7 @@ func (s *Service) Upload(
 	// Generate URL after uploading.
 	u, err := s.storage.URL(ctx, key)
 	if err != nil {
+		s.rollbackUpload(ctx, key)
 		return nil, err
 	}
 
