@@ -554,10 +554,10 @@ func (r *gormRepository) GetGuestViewSetting(ctx context.Context) bool {
 }
 
 func (r *gormRepository) ListModeration(ctx context.Context, status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
-		Where("status = ?", status)
+	query := r.baseQuery(ctx).
+		Where(&model.Post{
+			Status: status,
+		})
 
 	if search != "" {
 		searchTerm := "%" + search + "%"
