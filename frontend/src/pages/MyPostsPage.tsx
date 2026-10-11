@@ -163,7 +163,7 @@ export function MyPostsPage() {
         </div>
       ) : (
         <>
-          <div className="bg-card overflow-hidden rounded-md border border-border">
+          <div className="overflow-hidden rounded-md border border-border bg-card">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -192,7 +192,7 @@ export function MyPostsPage() {
                     <TableCell>
                       <StatusBadge status={post.status} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground max-w-0">
+                    <TableCell className="max-w-0 text-muted-foreground">
                       <span className="block truncate">
                         {(post.tags ?? []).slice(0, 3).join(", ")}
                       </span>
@@ -285,7 +285,7 @@ export function MyPostsPage() {
                   .map((page, index, array) => (
                     <div key={page} className="flex items-center">
                       {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="text-muted-foreground px-2 text-xs tabular-nums">
+                        <span className="px-2 text-xs text-muted-foreground tabular-nums">
                           …
                         </span>
                       )}

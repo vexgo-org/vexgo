@@ -78,7 +78,7 @@ function ThemeCover({
         loading="lazy"
         referrerPolicy="no-referrer"
         onError={() => setFailed(true)}
-        className={cn("w-full h-full object-cover", imgClassName)}
+        className={cn("size-full object-cover", imgClassName)}
       />
     </div>
   );
@@ -327,7 +327,7 @@ export function ThemePage() {
                   />
                   <div className="flex flex-1 flex-col gap-3 p-4">
                     <div className="flex items-baseline justify-between gap-3">
-                      <h3 className="display text-subtitle min-w-0 truncate">
+                      <h3 className="display min-w-0 truncate text-subtitle">
                         {theme.name}
                       </h3>
                       {isActive && (
@@ -420,7 +420,7 @@ export function ThemePage() {
                               href={selectedTheme.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-accent-ink break-all hover:underline"
+                              className="break-all text-accent-ink hover:underline"
                             >
                               {selectedTheme.url}
                             </a>

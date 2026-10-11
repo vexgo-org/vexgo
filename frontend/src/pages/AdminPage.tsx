@@ -251,7 +251,7 @@ export function AdminPage() {
         <PageHeader title={t("admin.title")} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="border-t-2 border-rule space-y-2 pt-3">
+            <div key={i} className="space-y-2 border-t-2 border-rule pt-3">
               <Skeleton className="h-3 w-16" />
               <Skeleton className="h-8 w-12" />
             </div>
@@ -279,7 +279,7 @@ export function AdminPage() {
         description={t("adminData.noRecords")}
       />
     ) : (
-      <div className="bg-card overflow-hidden rounded-md border border-border">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -308,7 +308,7 @@ export function AdminPage() {
                 <TableCell>
                   <StatusBadge status={post.status} />
                 </TableCell>
-                <TableCell className="text-muted-foreground truncate">
+                <TableCell className="truncate text-muted-foreground">
                   {post.author?.username ?? "—"}
                 </TableCell>
                 <TableCell className="text-muted-foreground tabular-nums">
@@ -408,22 +408,22 @@ export function AdminPage() {
               <li key={link.to}>
                 <Link
                   to={link.to}
-                  className="hover:bg-accent focus-visible:ring-ring/25 flex items-center gap-3 px-1 py-3 transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
+                  className="flex items-center gap-3 px-1 py-3 transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/25 focus-visible:ring-inset"
                 >
                   <link.icon
-                    className="text-muted-foreground size-4 shrink-0"
+                    className="size-4 shrink-0 text-muted-foreground"
                     aria-hidden="true"
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">
                       {t(link.labelKey)}
                     </span>
-                    <span className="text-muted-foreground block truncate text-2xs">
+                    <span className="block truncate text-2xs text-muted-foreground">
                       {t(link.descriptionKey)}
                     </span>
                   </span>
                   <ChevronRight
-                    className="text-muted-foreground/60 size-4 shrink-0"
+                    className="size-4 shrink-0 text-muted-foreground/60"
                     aria-hidden="true"
                   />
                 </Link>
@@ -442,7 +442,7 @@ export function AdminPage() {
 
         <TabsContent value="categories" className="space-y-4">
           {actionError && (
-            <p className="text-destructive text-sm">{actionError}</p>
+            <p className="text-sm text-destructive">{actionError}</p>
           )}
           <Card className="py-4">
             <div className="flex flex-col gap-2 px-5 sm:flex-row">
@@ -472,7 +472,7 @@ export function AdminPage() {
               <EmptyState title={t("adminData.noRecords")} />
             </div>
           ) : (
-            <div className="bg-card overflow-hidden rounded-md border border-border">
+            <div className="overflow-hidden rounded-md border border-border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -494,7 +494,7 @@ export function AdminPage() {
                       <TableCell className="font-medium">
                         {category.name}
                       </TableCell>
-                      <TableCell className="text-muted-foreground max-w-0">
+                      <TableCell className="max-w-0 text-muted-foreground">
                         <span className="block truncate">
                           {category.description || t("common.noDescription")}
                         </span>
@@ -529,7 +529,7 @@ export function AdminPage() {
         </TabsContent>
 
         <TabsContent value="tags" className="space-y-4">
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             {t("adminData.tagsHint")}
           </p>
           {tags.length === 0 ? (
@@ -537,7 +537,7 @@ export function AdminPage() {
               <EmptyState title={t("adminData.noRecords")} />
             </div>
           ) : (
-            <div className="bg-card overflow-hidden rounded-md border border-border">
+            <div className="overflow-hidden rounded-md border border-border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">

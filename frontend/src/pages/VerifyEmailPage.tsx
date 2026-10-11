@@ -70,7 +70,7 @@ export function VerifyEmailPage() {
       <div className="space-y-4">
         {status === "loading" ? (
           <div className="flex justify-center py-2">
-            <Spinner className="text-muted-foreground size-5" />
+            <Spinner className="size-5 text-muted-foreground" />
           </div>
         ) : (
           <Alert

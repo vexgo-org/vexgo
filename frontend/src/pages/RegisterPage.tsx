@@ -312,7 +312,7 @@ export function RegisterPage() {
                 {t("registerPage.usernameLabel")}
               </Label>
               <div className="relative">
-                <User className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <User className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="username"
                   type="text"
@@ -325,14 +325,14 @@ export function RegisterPage() {
                 />
               </div>
               {usernameError && (
-                <p className="text-destructive text-2xs">{usernameError}</p>
+                <p className="text-2xs text-destructive">{usernameError}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">{t("auth.email")}</Label>
               <div className="relative">
-                <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Mail className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
@@ -345,14 +345,14 @@ export function RegisterPage() {
                 />
               </div>
               {emailError && (
-                <p className="text-destructive text-2xs">{emailError}</p>
+                <p className="text-2xs text-destructive">{emailError}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">{t("auth.password")}</Label>
               <div className="relative">
-                <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Lock className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -361,7 +361,7 @@ export function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   aria-invalid={Boolean(passwordError)}
-                  className="pr-9 pl-9"
+                  className="px-9"
                 />
                 <button
                   type="button"
@@ -371,7 +371,7 @@ export function RegisterPage() {
                       ? t("registerPage.hidePassword")
                       : t("registerPage.showPassword")
                   }
-                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {showPassword ? (
                     <EyeOff className="size-4" />
@@ -381,7 +381,7 @@ export function RegisterPage() {
                 </button>
               </div>
               {passwordError && (
-                <p className="text-destructive text-2xs">{passwordError}</p>
+                <p className="text-2xs text-destructive">{passwordError}</p>
               )}
             </div>
 
@@ -390,7 +390,7 @@ export function RegisterPage() {
                 {t("registerPage.confirmPasswordLabel")}
               </Label>
               <div className="relative">
-                <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Lock className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="confirmPassword"
                   type={showPassword ? "text" : "password"}
@@ -403,7 +403,7 @@ export function RegisterPage() {
                 />
               </div>
               {confirmPasswordError && (
-                <p className="text-destructive text-2xs">
+                <p className="text-2xs text-destructive">
                   {confirmPasswordError}
                 </p>
               )}
@@ -412,21 +412,21 @@ export function RegisterPage() {
             {/* Slider captcha area */}
             {captchaEnabled && (
               <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex items-center justify-between">
                   <Label className="text-sm font-medium">
                     {t("registerPage.securityVerification")}
                   </Label>
                   {isCaptchaVerified && (
-                    <span className="text-success flex items-center gap-1 text-2xs">
+                    <span className="flex items-center gap-1 text-2xs text-success">
                       <CheckCircle className="size-3.5" />
                       {t("registerPage.verifiedBadge")}
                     </span>
                   )}
                 </div>
-                <div className="bg-muted/60 rounded-md border p-3">
+                <div className="rounded-md border bg-muted/60 p-3">
                   {isCaptchaVerified ? (
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-success flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-sm text-success">
                         <CheckCircle className="size-4" />
                         {t("registerPage.captchaCompleted")}
                       </div>
@@ -441,7 +441,7 @@ export function RegisterPage() {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground text-sm">
+                      <span className="text-sm text-muted-foreground">
                         {t("registerPage.completeSlider")}
                       </span>
                       <Button
@@ -479,10 +479,10 @@ export function RegisterPage() {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="border-border w-full border-t" />
+                  <span className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-2xs">
-                  <span className="bg-background text-muted-foreground px-2">
+                  <span className="bg-background px-2 text-muted-foreground">
                     {t("registerPage.orContinueWith")}
                   </span>
                 </div>
@@ -510,11 +510,11 @@ export function RegisterPage() {
             </div>
           )}
 
-          <div className="text-muted-foreground mt-5 text-center text-sm">
+          <div className="mt-5 text-center text-sm text-muted-foreground">
             {t("registerPage.haveAccount")}{" "}
             <Link
               to="/admin/login"
-              className="text-accent-ink rounded-sm underline-offset-4 hover:underline"
+              className="rounded-sm text-accent-ink underline-offset-4 hover:underline"
             >
               {t("registerPage.loginNow")}
             </Link>

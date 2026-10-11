@@ -16,8 +16,8 @@ export function ProtectedRoute({
 
   if (isLoading) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <Spinner className="text-muted-foreground size-5" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Spinner className="size-5 text-muted-foreground" />
       </div>
     );
   }

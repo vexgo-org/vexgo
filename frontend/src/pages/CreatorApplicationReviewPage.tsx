@@ -260,7 +260,7 @@ export function CreatorApplicationReviewPage() {
                       <p className="eyebrow mb-1.5">
                         {t("creatorApplication.reasonLabel")}
                       </p>
-                      <p className="border-border border-l-2 pl-3 text-sm leading-relaxed text-muted-foreground">
+                      <p className="border-l-2 border-border pl-3 text-sm leading-relaxed text-muted-foreground">
                         {application.reason}
                       </p>
                     </div>

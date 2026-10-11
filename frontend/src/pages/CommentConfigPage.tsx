@@ -263,7 +263,7 @@ export function CommentConfigPage() {
                   ? t("commentConfig.testing")
                   : t("commentConfig.testConnection")}
               </Button>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="mt-2 text-sm text-muted-foreground">
                 {t("commentConfig.testConnectionHint")}
               </p>
             </div>

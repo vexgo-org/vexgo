@@ -80,7 +80,7 @@ function DialogContent({
         className={cn(
           "fixed z-50 grid bg-card text-card-foreground outline-none",
           variant === "center"
-            ? "ui-popup-dialog top-1/2 left-1/2 w-[calc(100%-2rem)] max-w-lg gap-4 rounded-md border border-border p-5 max-h-[calc(100dvh-2rem)] overflow-y-auto"
+            ? "ui-popup-dialog top-1/2 left-1/2 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg gap-4 overflow-y-auto rounded-md border border-border p-5"
             : "ui-popup-drawer inset-y-0 left-0 w-64 max-w-[80vw] gap-0 border-r border-border p-0",
           className,
         )}

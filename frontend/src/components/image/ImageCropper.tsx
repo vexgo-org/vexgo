@@ -187,7 +187,7 @@ export const ImageCropper: React.FC<Props> = ({
         </div>
 
         <div
-          className="w-full overflow-hidden touch-none flex-1 flex flex-col min-h-0"
+          className="flex min-h-0 w-full flex-1 touch-none flex-col overflow-hidden"
           onWheel={handleWheel}
         >
           <div
@@ -262,7 +262,7 @@ export const ImageCropper: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-3 shrink-0">
+          <div className="mt-3 flex shrink-0 items-center gap-3">
             <label className="text-sm">{t("imageCropper.zoom")}</label>
             <input
               type="range"

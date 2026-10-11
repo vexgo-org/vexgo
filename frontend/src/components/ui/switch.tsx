@@ -28,7 +28,7 @@ function Switch({
         className={cn(
           "pointer-events-none block size-3.5 rounded-xs bg-card shadow-none transition-transform",
           "data-checked:translate-x-4 data-unchecked:translate-x-0",
-          "dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground",
+          "dark:data-checked:bg-primary-foreground dark:data-unchecked:bg-foreground",
         )}
       />
     </BaseSwitch.Root>
