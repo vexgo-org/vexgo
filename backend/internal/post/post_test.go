@@ -459,6 +459,7 @@ func TestUpdate_ForbidsCoverImageOwnedByAnotherUser(t *testing.T) {
 	author := seedUser(t, db, "author", model.RoleAuthor)
 	other := seedUser(t, db, "other", model.RoleAuthor)
 	own := seedAsset(t, db, author.ID, "/uploads/own.png")
+	ownSecond := seedAsset(t, db, author.ID, "/uploads/own2.png")
 	foreign := seedAsset(t, db, other.ID, "/uploads/other.png")
 
 	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
@@ -491,12 +492,105 @@ func TestUpdate_ForbidsCoverImageOwnedByAnotherUser(t *testing.T) {
 		t.Errorf("title = %q, want the rejected update to change nothing", stored.Title)
 	}
 
-	// The author's own asset still swaps in, so the guard rejects the foreign
-	// id rather than every id.
-	if _, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{
-		CoverImageID: &own.ID,
+	// A different owned asset swaps in, so the guard rejects the foreign id
+	// rather than every id.
+	swapped, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{
+		CoverImageID: &ownSecond.ID,
+	})
+	if err != nil {
+		t.Fatalf("Update with an owned asset error: %v", err)
+	}
+	if swapped.CoverImageID == nil || *swapped.CoverImageID != ownSecond.ID {
+		t.Errorf("cover_image_id = %v, want the swapped %d", swapped.CoverImageID, ownSecond.ID)
+	}
+}
+
+// TestUpdate_UnchangedCoverSkipsOwnershipCheck covers the round-trip an API
+// client performs when it loads a post and saves it back unchanged. The cover
+// may well have been uploaded by someone other than the author — an admin can
+// set one on anyone's post — so re-checking ownership of an id the post
+// already carries rejects an unrelated edit over a field the caller did not
+// touch and does not own.
+func TestUpdate_UnchangedCoverSkipsOwnershipCheck(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+	adminCover := seedAsset(t, db, admin.ID, "/uploads/admin.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:     "admin-cover",
+		Title:    "t",
+		Content:  "c",
+		Category: "1",
+		Status:   model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	// An admin sets a cover of their own on someone else's post.
+	if _, err := svc.Update(ctx, post.ID, admin.ID, UpdateRequest{
+		CoverImageID: &adminCover.ID,
 	}); err != nil {
-		t.Errorf("Update with an owned asset error: %v", err)
+		t.Fatalf("admin setting a cover error: %v", err)
+	}
+
+	// The author then edits an unrelated field and echoes the cover back
+	// untouched. Nothing about the reference changes, so the save must succeed.
+	updated, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{
+		Title:        "renamed",
+		CoverImageID: &adminCover.ID,
+	})
+	if err != nil {
+		t.Fatalf("Update echoing an unchanged cover = %v, want success", err)
+	}
+	if updated.Title != "renamed" {
+		t.Errorf("title = %q, want renamed", updated.Title)
+	}
+	if updated.CoverImageID == nil || *updated.CoverImageID != adminCover.ID {
+		t.Errorf("cover_image_id = %v, want the unchanged %d kept", updated.CoverImageID, adminCover.ID)
+	}
+}
+
+// TestUpdate_UnchangedDanglingCoverSkipsOwnershipCheck is the same round-trip
+// one step past the edge: the asset behind the stored cover_image_id has been
+// deleted, so the reference resolves to nothing and no ownership check could
+// ever pass for it. The id is still unchanged, so re-saving it is a no-op and
+// must not be read as a request to attach an asset the caller does not own.
+func TestUpdate_UnchangedDanglingCoverSkipsOwnershipCheck(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "dangling-round-trip",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if err := db.Delete(&cover).Error; err != nil {
+		t.Fatalf("soft delete asset: %v", err)
+	}
+
+	updated, err := svc.Update(ctx, post.ID, author.ID, UpdateRequest{
+		Title:        "renamed",
+		CoverImageID: &cover.ID,
+	})
+	if err != nil {
+		t.Fatalf("Update echoing an unchanged dangling cover = %v, want success", err)
+	}
+	if updated.CoverImage != nil {
+		t.Errorf("CoverImage = %+v, want nil for a soft-deleted asset", updated.CoverImage)
+	}
+	if updated.CoverImageID == nil || *updated.CoverImageID != cover.ID {
+		t.Errorf("cover_image_id = %v, want the dangling %d kept", updated.CoverImageID, cover.ID)
 	}
 }
 

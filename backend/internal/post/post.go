@@ -343,8 +343,12 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 		post.Excerpt = req.Excerpt
 	}
 
-	// Check the ownership of cover image.
-	if req.CoverImageID != nil {
+	// Check the ownership of cover image. The check is skipped for an id the
+	// post already carries: it is compared against the stored column rather
+	// than the loaded association, because a soft-deleted asset leaves the
+	// reference dangling and no ownership check could ever pass for it.
+	if req.CoverImageID != nil &&
+		(post.CoverImageID == nil || *req.CoverImageID != *post.CoverImageID) {
 		hasAsset, err := s.repo.HasAuthorAsset(ctx, userID, *req.CoverImageID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check ownership of asset: %w", err)
