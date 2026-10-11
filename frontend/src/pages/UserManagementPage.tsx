@@ -205,7 +205,7 @@ export function UserManagementPage() {
         actions={
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <div className="relative w-full sm:w-56">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder={t("userManagement.searchPlaceholder")}
@@ -228,7 +228,7 @@ export function UserManagementPage() {
         }
       />
 
-      <div className="bg-card overflow-hidden rounded-md border border-border">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -247,14 +247,14 @@ export function UserManagementPage() {
               <TableRow key={user.id}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <span className="border-border bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-sm border text-2xs font-medium">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-2xs font-medium text-muted-foreground">
                       {user.username.charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
                         {user.username}
                       </span>
-                      <span className="text-muted-foreground block truncate text-2xs">
+                      <span className="block truncate text-2xs text-muted-foreground">
                         {user.email}
                       </span>
                     </span>
@@ -359,7 +359,7 @@ export function UserManagementPage() {
 
       {totalPages > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-muted-foreground text-xs tabular-nums">
+          <div className="text-xs text-muted-foreground tabular-nums">
             {t("userManagement.page", { page: currentPage, totalPages })}
           </div>
           <div className="flex gap-2">

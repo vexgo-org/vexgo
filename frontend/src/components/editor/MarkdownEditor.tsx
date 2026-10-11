@@ -133,7 +133,7 @@ export function MarkdownEditor({
   return (
     <div
       className={cn(
-        "vexgo-md-editor overflow-hidden rounded-lg border bg-background",
+        "overflow-hidden rounded-lg border bg-background",
         mode === "rich" ? "vexgo-md-rich" : "vexgo-md-source",
         className,
       )}

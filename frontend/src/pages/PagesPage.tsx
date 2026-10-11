@@ -130,7 +130,7 @@ export function PagesPage() {
           />
         </div>
       ) : (
-        <div className="bg-card overflow-hidden rounded-md border border-border">
+        <div className="overflow-hidden rounded-md border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -163,7 +163,7 @@ export function PagesPage() {
                   <TableCell>
                     <StatusBadge status={page.status} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
+                  <TableCell className="text-xs text-muted-foreground">
                     {page.showInNav
                       ? t("pagesPage.inNavWithOrder", {
                           order: page.sortOrder,

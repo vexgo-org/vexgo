@@ -23,7 +23,7 @@ export function AuthShell() {
   return (
     <div className="flex min-h-screen bg-background">
       {/* Masthead column */}
-      <aside className="hidden w-[38%] max-w-md shrink-0 flex-col justify-between border-r border-border bg-sidebar px-8 py-8 lg:flex">
+      <aside className="hidden w-[38%] max-w-md shrink-0 flex-col justify-between border-r border-border bg-sidebar p-8 lg:flex">
         <Link to="/admin" className="flex items-center gap-2.5">
           {renderBrand("size-6")}
           <span className="display text-base">{siteName}</span>
@@ -31,7 +31,7 @@ export function AuthShell() {
 
         <div className="space-y-4">
           <div className="rule-ink pb-4">
-            <p className="display text-display break-words">{siteName}</p>
+            <p className="display text-display wrap-break-word">{siteName}</p>
           </div>
           <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
             {t("layout.authTagline")}

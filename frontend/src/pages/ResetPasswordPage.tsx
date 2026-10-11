@@ -145,7 +145,7 @@ export function ResetPasswordPage() {
                     {t("resetPasswordPage.emailLabel")}
                   </Label>
                   <div className="relative">
-                    <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                    <Mail className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
@@ -164,14 +164,14 @@ export function ResetPasswordPage() {
                       {t("resetPasswordPage.newPassword")}
                     </Label>
                     <div className="relative">
-                      <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                      <Lock className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder={t("resetPasswordPage.passwordPlaceholder")}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pr-9 pl-9"
+                        className="px-9"
                         required
                         minLength={6}
                       />
@@ -183,7 +183,7 @@ export function ResetPasswordPage() {
                             ? t("loginPage.hidePassword")
                             : t("loginPage.showPassword")
                         }
-                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+                        className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                       >
                         {showPassword ? (
                           <EyeOff className="size-4" />
@@ -199,7 +199,7 @@ export function ResetPasswordPage() {
                       {t("resetPasswordPage.confirmPassword")}
                     </Label>
                     <div className="relative">
-                      <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                      <Lock className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         id="confirmPassword"
                         type={showPassword ? "text" : "password"}
@@ -236,7 +236,7 @@ export function ResetPasswordPage() {
             <button
               type="button"
               onClick={() => navigate("/admin/login")}
-              className="text-accent-ink focus-visible:ring-ring/25 mx-auto flex items-center justify-center gap-1 text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+              className="mx-auto flex items-center justify-center gap-1 text-sm text-accent-ink underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/25"
             >
               <ArrowLeft className="size-3.5" />
               {t("resetPasswordPage.backToLogin")}

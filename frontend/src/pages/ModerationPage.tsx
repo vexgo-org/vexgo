@@ -66,18 +66,18 @@ function ReviewRow({
             {date}
           </span>
         </div>
-        <h3 className="display text-subtitle mt-2">{post.title}</h3>
-        <p className="text-xs text-muted-foreground mt-1">
+        <h3 className="display mt-2 text-subtitle">{post.title}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
           {t("moderation.author")}: {post.author?.username}
         </p>
         {post.excerpt && (
-          <p className="text-sm leading-relaxed text-muted-foreground mt-2 line-clamp-2">
+          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
             {post.excerpt}
           </p>
         )}
         {post.rejectionReason && (
-          <p className="border-destructive mt-3 border-l-2 pl-3 text-xs leading-relaxed text-muted-foreground">
-            <span className="text-destructive font-medium">
+          <p className="mt-3 border-l-2 border-destructive pl-3 text-xs leading-relaxed text-muted-foreground">
+            <span className="font-medium text-destructive">
               {t("moderation.rejectionReasonInPost")}
             </span>{" "}
             {post.rejectionReason}
@@ -269,7 +269,7 @@ export function ModerationPage() {
         actions={
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <div className="relative w-full sm:w-56">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder={t("moderation.searchPlaceholder")}

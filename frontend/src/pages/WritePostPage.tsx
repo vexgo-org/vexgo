@@ -437,13 +437,13 @@ export function WritePostPage() {
             aria-label={t("writePostPage.titlePlaceholder")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="display focus-visible:border-ring h-auto rounded-none border-0 border-b bg-transparent px-0 py-1 text-title focus-visible:ring-0"
+            className="display h-auto rounded-none border-0 border-b bg-transparent px-0 py-1 text-title focus-visible:border-ring focus-visible:ring-0"
           />
         </div>
 
         {/* Slug */}
         <div>
-          <Label htmlFor="slug" className="block mb-2">
+          <Label htmlFor="slug" className="mb-2 block">
             {t("writePostPage.slugLabel")} *
           </Label>
           <div className="flex gap-2">
@@ -462,7 +462,7 @@ export function WritePostPage() {
         {/* Cover image */}
         <Card>
           <CardContent className="p-4">
-            <Label className="block mb-2">
+            <Label className="mb-2 block">
               {t("writePostPage.coverImage")}
             </Label>
             {coverImage ? (
@@ -482,7 +482,7 @@ export function WritePostPage() {
                 </Button>
               </div>
             ) : (
-              <div className="border-border rounded-md border border-dashed p-8 text-center">
+              <div className="rounded-md border border-dashed border-border p-8 text-center">
                 <input
                   type="file"
                   accept="image/*"
@@ -492,19 +492,19 @@ export function WritePostPage() {
                 />
                 <label
                   htmlFor="cover-image"
-                  className="cursor-pointer flex flex-col items-center"
+                  className="flex cursor-pointer flex-col items-center"
                 >
                   {uploadingImage ? (
-                    <Spinner className="text-muted-foreground mb-2 size-5" />
+                    <Spinner className="mb-2 size-5 text-muted-foreground" />
                   ) : (
-                    <ImageIcon className="text-muted-foreground mb-2 size-5" />
+                    <ImageIcon className="mb-2 size-5 text-muted-foreground" />
                   )}
                   <span className="text-sm">
                     {uploadingImage
                       ? t("writePostPage.uploading")
                       : t("writePostPage.uploadCover")}
                   </span>
-                  <span className="text-muted-foreground mt-1 text-2xs">
+                  <span className="mt-1 text-2xs text-muted-foreground">
                     {t("writePostPage.imageFormat")}
                   </span>
                 </label>
@@ -514,10 +514,10 @@ export function WritePostPage() {
         </Card>
 
         {/* Category and tags */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Category */}
           <div>
-            <Label htmlFor="category" className="block mb-2">
+            <Label htmlFor="category" className="mb-2 block">
               {t("writePostPage.categoryLabel")} *
             </Label>
             <Select value={category} onValueChange={setCategory}>
@@ -581,7 +581,7 @@ export function WritePostPage() {
 
           {/* Tags */}
           <div>
-            <Label htmlFor="tags" className="block mb-2">
+            <Label htmlFor="tags" className="mb-2 block">
               {t("writePostPage.tagsLabel")}
             </Label>
             <div className="flex gap-2">
@@ -630,7 +630,7 @@ export function WritePostPage() {
 
         {/* Excerpt */}
         <div>
-          <Label htmlFor="excerpt" className="block mb-2">
+          <Label htmlFor="excerpt" className="mb-2 block">
             {t("writePostPage.excerptLabel")}
           </Label>
           <Textarea
@@ -644,7 +644,7 @@ export function WritePostPage() {
 
         {/* Rich text editor */}
         <div>
-          <Label className="block mb-2">
+          <Label className="mb-2 block">
             {t("writePostPage.contentLabel")} *
           </Label>
           <MarkdownEditor
@@ -665,7 +665,7 @@ export function WritePostPage() {
         )}
       </div>
       {/* Footer */}
-      <div className="flex items-center justify-between mt-4">
+      <div className="mt-4 flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="size-4" />
           {t("writePostPage.goBack")}

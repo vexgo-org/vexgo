@@ -350,7 +350,7 @@ export function AISettingsPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 border-t pt-4">
             <Button onClick={handleSave} disabled={saving} className="flex-1">
               <Save className="size-4" />
               {saving

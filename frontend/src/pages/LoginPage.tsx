@@ -389,7 +389,7 @@ export function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="email">{t("auth.email")}</Label>
                 <div className="relative">
-                  <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                  <Mail className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
@@ -406,7 +406,7 @@ export function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="password">{t("auth.password")}</Label>
                 <div className="relative">
-                  <Lock className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                  <Lock className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
@@ -414,7 +414,7 @@ export function LoginPage() {
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pr-9 pl-9"
+                    className="px-9"
                     required
                   />
                   <button
@@ -425,7 +425,7 @@ export function LoginPage() {
                         ? t("loginPage.hidePassword")
                         : t("loginPage.showPassword")
                     }
-                    className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+                    className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {showPassword ? (
                       <EyeOff className="size-4" />
@@ -438,21 +438,21 @@ export function LoginPage() {
 
               {captchaEnabled && (
                 <div className="mt-4">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex items-center justify-between">
                     <Label className="text-sm font-medium">
                       {t("loginPage.securityVerification")}
                     </Label>
                     {isCaptchaVerified && (
-                      <span className="text-success flex items-center gap-1 text-micro">
+                      <span className="flex items-center gap-1 text-micro text-success">
                         <CheckCircle className="size-3" />
                         {t("loginPage.verifiedBadge")}
                       </span>
                     )}
                   </div>
-                  <div className="bg-muted/60 rounded-md border p-3">
+                  <div className="rounded-md border bg-muted/60 p-3">
                     {isCaptchaVerified ? (
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-success flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-2 text-sm text-success">
                           <CheckCircle className="size-4" />
                           {t("loginPage.captchaCompleted")}
                         </div>

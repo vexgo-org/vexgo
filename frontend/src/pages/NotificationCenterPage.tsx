@@ -299,12 +299,12 @@ export function NotificationCenterPage() {
           return (
             <div
               key={notification.id}
-              className="bg-card flex items-stretch rounded-md border border-border"
+              className="flex items-stretch rounded-md border border-border bg-card"
             >
               <button
                 type="button"
                 onClick={() => openNotification(notification)}
-                className="hover:bg-accent focus-visible:ring-ring/25 flex min-w-0 flex-1 items-start gap-3 rounded-l-md p-3 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
+                className="flex min-w-0 flex-1 items-start gap-3 rounded-l-md p-3 text-left transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/25 focus-visible:ring-inset"
               >
                 {notification.sender ? (
                   <Avatar className="size-8 shrink-0">
@@ -315,7 +315,7 @@ export function NotificationCenterPage() {
                   </Avatar>
                 ) : (
                   <span
-                    className="bg-muted text-muted-foreground mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm"
+                    className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-muted text-muted-foreground"
                     aria-hidden="true"
                   >
                     <TypeIcon className="size-3.5" />
@@ -328,13 +328,13 @@ export function NotificationCenterPage() {
                       {notification.title}
                     </span>
                     <time
-                      className="text-muted-foreground shrink-0 text-2xs tabular-nums"
+                      className="shrink-0 text-2xs text-muted-foreground tabular-nums"
                       dateTime={notification.createdAt}
                     >
                       {formatDate(notification.createdAt)}
                     </time>
                   </span>
-                  <span className="text-muted-foreground mt-1 block text-sm leading-relaxed">
+                  <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
                     {notification.content}
                   </span>
                   {!notification.isRead && (

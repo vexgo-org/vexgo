@@ -67,13 +67,13 @@ function PasswordField({
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <div className="relative">
-        <Key className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <Key className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           id={id}
           type={visible ? "text" : "password"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="pr-9 pl-9"
+          className="px-9"
           autoComplete={autoComplete}
           minLength={minLength}
           required
@@ -84,7 +84,7 @@ function PasswordField({
           aria-label={
             visible ? t("loginPage.hidePassword") : t("loginPage.showPassword")
           }
-          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 transition-colors"
+          className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
         >
           {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>
@@ -314,12 +314,12 @@ export function ProfilePage() {
                 className="size-full object-cover"
               />
             ) : (
-              <AvatarFallback className="bg-muted text-muted-foreground text-xl">
+              <AvatarFallback className="bg-muted text-xl text-muted-foreground">
                 {user?.username?.charAt(0).toUpperCase()}
               </AvatarFallback>
             )}
           </Avatar>
-          <div className="bg-foreground/40 absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100">
+          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 opacity-0 transition-opacity focus-within:opacity-100 hover:opacity-100">
             {avatarLoading ? (
               <Spinner className="size-5 text-background" />
             ) : (
@@ -335,8 +335,8 @@ export function ProfilePage() {
           />
         </div>
         <div className="min-w-0">
-          <p className="display text-subtitle truncate">{user?.username}</p>
-          <p className="text-muted-foreground truncate text-sm">
+          <p className="display truncate text-subtitle">{user?.username}</p>
+          <p className="truncate text-sm text-muted-foreground">
             {user?.email}
           </p>
           <Badge variant="outline" className="mt-1.5">
@@ -374,7 +374,7 @@ export function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="email">{t("profilePage.emailLabel")}</Label>
               <div className="relative">
-                <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Mail className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
@@ -383,7 +383,7 @@ export function ProfilePage() {
                   className="bg-muted pl-9"
                 />
               </div>
-              <p className="text-muted-foreground text-2xs leading-relaxed">
+              <p className="text-2xs leading-relaxed text-muted-foreground">
                 {t("profilePage.changeEmailTip")}
               </p>
               <Button
@@ -399,7 +399,7 @@ export function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="username">{t("profilePage.usernameLabel")}</Label>
               <div className="relative">
-                <User className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <User className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="username"
                   type="text"
@@ -414,7 +414,7 @@ export function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="birthday">{t("profilePage.birthdayLabel")}</Label>
               <div className="relative">
-                <Calendar className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                <Calendar className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="birthday"
                   type="date"
@@ -530,7 +530,7 @@ export function ProfilePage() {
           <div className="space-y-2 py-1">
             <Label htmlFor="newEmailInput">{t("profilePage.newEmail")}</Label>
             <div className="relative">
-              <Mail className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+              <Mail className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="newEmailInput"
                 type="email"

@@ -126,7 +126,7 @@ function NavRow({
           {!collapsed && item.unreadBadge && unreadCount > 0 && (
             // A count is fine data, not a label: 2xs keeps it out of the
             // letterspaced uppercase treatment `.eyebrow` would apply.
-            <span className="ml-auto text-2xs tabular-nums text-accent-ink">
+            <span className="ml-auto text-2xs text-accent-ink tabular-nums">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
@@ -242,7 +242,7 @@ function SearchForm({
           aria-label={t("layout.searchPlaceholder")}
           /* `min-h-6` keeps the underline field at the 24px minimum target
            * size without turning it back into a box. */
-          className="min-h-6 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus-visible:outline-none"
+          className="min-h-6 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
         />
       </div>
     </form>
@@ -454,7 +454,7 @@ export function AdminShell() {
             <span className="display truncate text-sm">{siteName}</span>
           </span>
 
-          <SearchForm className="hidden min-w-0 max-w-xs flex-1 md:block" />
+          <SearchForm className="hidden max-w-xs min-w-0 flex-1 md:block" />
 
           <div className="ml-auto flex items-center gap-1.5">
             <button
@@ -490,7 +490,7 @@ export function AdminShell() {
 
         {/* The content area stays full-width: editors work in tables and
          * side-by-side fields, which a centred reading column would break. */}
-        <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8">
+        <main className="min-w-0 flex-1 px-4 py-6 lg:p-8">
           <Suspense fallback={<RouteFallback />}>
             <Outlet />
           </Suspense>

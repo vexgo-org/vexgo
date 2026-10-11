@@ -191,7 +191,7 @@ export function GeneralSettingsPage() {
             <Label>{t("generalSettings.siteIcon")}</Label>
             <div className="flex items-center gap-4">
               {config.siteIcon ? (
-                <div className="border-border relative size-16 overflow-hidden rounded-sm border">
+                <div className="relative size-16 overflow-hidden rounded-sm border border-border">
                   <img
                     src={config.siteIcon}
                     alt={t("generalSettings.siteIcon")}
@@ -202,13 +202,13 @@ export function GeneralSettingsPage() {
                     onClick={handleRemoveIcon}
                     aria-label={t("common.remove")}
                     title={t("common.remove")}
-                    className="bg-destructive text-destructive-foreground focus-visible:ring-ring/35 absolute -top-1.5 -right-1.5 rounded-sm p-1 outline-none focus-visible:ring-[3px]"
+                    className="absolute -top-1.5 -right-1.5 rounded-sm bg-destructive p-1 text-destructive-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
                   >
                     <Trash2 className="size-3" />
                   </button>
                 </div>
               ) : (
-                <div className="border-border bg-muted/30 flex size-16 items-center justify-center rounded-sm border border-dashed">
+                <div className="flex size-16 items-center justify-center rounded-sm border border-dashed border-border bg-muted/30">
                   <Settings className="size-5 text-muted-foreground" />
                 </div>
               )}
@@ -222,7 +222,7 @@ export function GeneralSettingsPage() {
                   <Upload />
                   {t("generalSettings.iconUpload")}
                 </Button>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {t("generalSettings.iconDesc")}
                 </p>
                 <input
@@ -294,14 +294,14 @@ export function GeneralSettingsPage() {
             {themeLanguages.length > 0 &&
               config.siteLanguage &&
               !themeLanguages.includes(config.siteLanguage) && (
-                <p className="text-warning text-2xs">
+                <p className="text-2xs text-warning">
                   {t("generalSettings.siteLanguageMissing")}
                 </p>
               )}
           </div>
 
           {/* Enable slider captcha */}
-          <div className="border-border flex items-center justify-between border-t pt-4">
+          <div className="flex items-center justify-between border-t border-border pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="captchaEnabled">
                 {t("generalSettings.captcha")}
@@ -320,7 +320,7 @@ export function GeneralSettingsPage() {
           </div>
 
           {/* Allow registration */}
-          <div className="border-border flex items-center justify-between border-t pt-4">
+          <div className="flex items-center justify-between border-t border-border pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="registrationEnabled">
                 {t("generalSettings.registration")}
@@ -339,7 +339,7 @@ export function GeneralSettingsPage() {
           </div>
 
           {/* Allow guests to view posts */}
-          <div className="border-border flex items-center justify-between border-t pt-4">
+          <div className="flex items-center justify-between border-t border-border pt-4">
             <div className="space-y-0.5">
               <Label htmlFor="allowGuestViewPosts">
                 {t("generalSettings.allowGuestViewPosts")}

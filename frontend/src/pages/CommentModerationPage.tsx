@@ -47,14 +47,14 @@ function CommentRow({
           </span>
           <Badge variant={variant}>{status}</Badge>
         </div>
-        <blockquote className="border-border mt-3 border-l-2 pl-3">
+        <blockquote className="mt-3 border-l-2 border-border pl-3">
           <p className="text-sm leading-relaxed whitespace-pre-wrap">
             {comment.content}
           </p>
         </blockquote>
         {comment.moderationReason && (
-          <p className="border-destructive mt-2 border-l-2 pl-3 text-xs leading-relaxed text-muted-foreground">
-            <span className="text-destructive font-medium">
+          <p className="mt-2 border-l-2 border-destructive pl-3 text-xs leading-relaxed text-muted-foreground">
+            <span className="font-medium text-destructive">
               {t("commentModeration.reasonLabel")}
             </span>{" "}
             {comment.moderationReason}

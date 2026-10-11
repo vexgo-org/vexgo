@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": [],
+  "jsPlugins": ["oxlint-tailwindcss"],
   "categories": {
     "correctness": "off"
   },
@@ -12,6 +13,11 @@
     "denyWarnings": true,
     "typeAware": true,
     "typeCheck": true
+  },
+  "settings": {
+    "tailwindcss": {
+      "entryPoint": "src/index.css"
+    }
   },
   "overrides": [
     {
@@ -77,6 +83,27 @@
         "valid-typeof": "error",
         "no-array-constructor": "error",
         "no-unused-expressions": "error",
+        // Correctness
+        "tailwindcss/no-conflicting-classes": "error",
+        "tailwindcss/no-contradicting-variants": "warn",
+        "tailwindcss/no-dark-without-light": "warn",
+        "tailwindcss/no-duplicate-classes": "warn",
+        "tailwindcss/no-dynamic-classes": "error",
+        "tailwindcss/no-unknown-classes": "error",
+        // Modernization
+        "tailwindcss/enforce-canonical": "warn",
+        "tailwindcss/enforce-negative-arbitrary-values": "warn",
+        "tailwindcss/no-deprecated-classes": "error",
+        "tailwindcss/no-unnecessary-arbitrary-value": "warn",
+        // Consistency
+        "tailwindcss/consistent-variant-order": "warn",
+        "tailwindcss/enforce-consistent-important-position": "warn",
+        "tailwindcss/enforce-consistent-variable-syntax": "warn",
+        "tailwindcss/enforce-shorthand": "warn",
+        "tailwindcss/enforce-sort-order": "warn",
+        "tailwindcss/no-unnecessary-whitespace": "warn",
+        // Design-system guardrails
+        "tailwindcss/no-hardcoded-colors": "warn",
         "typescript/ban-ts-comment": "error",
         "typescript/no-deprecated": "error",
         "typescript/no-duplicate-enum-values": "error",
