@@ -75,6 +75,7 @@ func backFillAssets(db *gorm.DB) error {
 		}
 
 		if err := db.
+			Unscoped().
 			Model(&model.Asset{}).
 			Where("id = ?", asset.ID).
 			Updates(updates).
