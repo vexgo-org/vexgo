@@ -78,7 +78,14 @@ func (h *Handler) Upload(c *gin.Context) {
 			"filename", file.Filename,
 			"err", err,
 		)
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "File upload failed"})
+
+		switch {
+		case errors.Is(err, ErrInvalidExtension):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid file extension"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "File upload failed"})
+		}
+
 		return
 	}
 

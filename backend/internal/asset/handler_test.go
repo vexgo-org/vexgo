@@ -285,3 +285,78 @@ func TestDelete_InternalFailureIsGeneric500(t *testing.T) {
 		}
 	}
 }
+
+// TestUpload_ExtensionRejectionIsClientError is the handler-level half of the
+// stored-XSS guard. A file the browser would render as an executable document
+// (html, svgz, or anything not on the allowlist) is a client input error, so it
+// must be answered 400 — not reported as a server fault — and must leave
+// neither a record nor an object behind.
+func TestUpload_ExtensionRejectionIsClientError(t *testing.T) {
+	for _, name := range []string{
+		"evil.html", "evil.htm", "evil.xhtml", "evil.xml", "evil.js",
+		"payload.svgz", "shell.exe", "archive.tar.gz", "notes",
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, _, db, dataDir := newTestRouter(t)
+			user := seedUser(t, db, "uploader", model.RoleContributor)
+
+			w := doUpload(t, r, user.ID, "file", name, []byte("x"))
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400 for a rejected extension (body: %s)", w.Code, w.Body.String())
+			}
+			if names := storedFiles(t, dataDir); len(names) != 0 {
+				t.Errorf("rejected upload left %v in storage", names)
+			}
+
+			var count int64
+			if err := db.Model(&model.Asset{}).Count(&count).Error; err != nil {
+				t.Fatalf("count error: %v", err)
+			}
+			if count != 0 {
+				t.Errorf("rejected upload created %d asset record(s)", count)
+			}
+		})
+	}
+}
+
+// urlFailingStorage writes the object successfully but fails when the caller
+// asks for its public URL, so the post-Put error branch is reachable with the
+// bytes already in storage.
+type urlFailingStorage struct {
+	storage.Storage
+	err error
+}
+
+func (s urlFailingStorage) URL(context.Context, string) (string, error) { return "", s.err }
+
+// TestUpload_URLFailureRollsBackStorage covers the branch between the write and
+// the database insert: the object exists in storage but no row will ever point
+// at it, so it must be removed rather than left as an orphan nothing can reach
+// or clean up through the API. The backend error is answered generically.
+func TestUpload_URLFailureRollsBackStorage(t *testing.T) {
+	r, h, db, dataDir := newTestRouter(t)
+	user := seedUser(t, db, "uploader", model.RoleContributor)
+
+	h.svc.storage = urlFailingStorage{
+		Storage: storage.NewLocalStorage(dataDir),
+		err:     errors.New("presign: dial tcp 10.0.0.5:9000"),
+	}
+
+	w := doUpload(t, r, user.ID, "file", "photo.jpg", []byte("x"))
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 (body: %s)", w.Code, w.Body.String())
+	}
+	for _, leak := range []string{"10.0.0.5", "presign", "dial tcp"} {
+		if strings.Contains(w.Body.String(), leak) {
+			t.Errorf("internal storage detail leaked to client: %q present in body %s", leak, w.Body.String())
+		}
+	}
+	if names := storedFiles(t, dataDir); len(names) != 0 {
+		t.Errorf("upload left %v in storage, want the object rolled back", names)
+	}
+	if err := db.Model(&model.Asset{}).Count(new(int64)).Error; err != nil {
+		t.Fatalf("count error: %v", err)
+	}
+}
