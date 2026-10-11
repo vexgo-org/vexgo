@@ -728,7 +728,7 @@ func newFaviconRouter(t *testing.T) (*gin.Engine, string, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
 	}
-	if err := db.AutoMigrate(&model.GeneralSettings{}); err != nil {
+	if err := db.AutoMigrate(&model.GeneralSettings{}, &model.Asset{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -738,6 +738,20 @@ func newFaviconRouter(t *testing.T) (*gin.Engine, string, *gorm.DB) {
 	e.Use(middleware.SecurityHeaders())
 	r.RegisterStaticRoutes(e, false)
 	return e, dataDir, db
+}
+
+// seedSiteIcon records an asset and points the site icon setting at it, the way
+// the settings API does. The favicon resolves the reference, so the storage key
+// is what decides which file is served.
+func seedSiteIcon(t *testing.T, db *gorm.DB, storageKey, url string) {
+	t.Helper()
+	asset := model.Asset{StorageKey: storageKey, URL: url}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatalf("seed asset: %v", err)
+	}
+	if err := db.Create(&model.GeneralSettings{SiteIconID: &asset.ID}).Error; err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
 }
 
 // TestFavicon_FallsBackToBundledGlyph is the default the user asked for: with
@@ -777,9 +791,7 @@ func TestFavicon_ConfiguredSiteIconWins(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(mediaDir, "icon.png"), uploaded, 0o600); err != nil {
 		t.Fatalf("write upload: %v", err)
 	}
-	if err := db.Create(&model.GeneralSettings{SiteIcon: "/uploads/icon.png"}).Error; err != nil {
-		t.Fatalf("seed settings: %v", err)
-	}
+	seedSiteIcon(t, db, "icon.png", "/uploads/icon.png")
 
 	w := doPublicRequest(t, e, "/favicon.ico")
 	if w.Code != http.StatusOK {
@@ -787,6 +799,50 @@ func TestFavicon_ConfiguredSiteIconWins(t *testing.T) {
 	}
 	if !bytes.Equal(w.Body.Bytes(), uploaded) {
 		t.Errorf("GET /favicon.ico served %q, want the configured site icon %q", w.Body.String(), uploaded)
+	}
+}
+
+// TestFavicon_StorageKeySelectsTheFile pins what the asset reference buys: the
+// URL only says where the object is served from, so a stale one still resolves
+// to the right file as long as the storage key names it. Serving the URL's
+// basename instead would 302-fall back to another icon the moment the two
+// diverge.
+func TestFavicon_StorageKeySelectsTheFile(t *testing.T) {
+	e, dataDir, db := newFaviconRouter(t)
+
+	mediaDir := filepath.Join(dataDir, "media")
+	if err := os.MkdirAll(mediaDir, 0o750); err != nil {
+		t.Fatalf("mkdir media: %v", err)
+	}
+	uploaded := []byte("stored-under-the-key")
+	if err := os.WriteFile(filepath.Join(mediaDir, "6f1c.png"), uploaded, 0o600); err != nil {
+		t.Fatalf("write upload: %v", err)
+	}
+	// The URL names a file that does not exist; only the storage key does.
+	seedSiteIcon(t, db, "6f1c.png", "/uploads/elsewhere.png")
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /favicon.ico status = %d, want 200", w.Code)
+	}
+	if !bytes.Equal(w.Body.Bytes(), uploaded) {
+		t.Errorf("GET /favicon.ico served %q, want the keyed upload %q", w.Body.String(), uploaded)
+	}
+}
+
+// TestFavicon_ExternalAssetIsRedirected covers an icon stored outside this
+// origin: the browser fetches it itself, so the response is a redirect rather
+// than a read through the local media root.
+func TestFavicon_ExternalAssetIsRedirected(t *testing.T) {
+	e, _, db := newFaviconRouter(t)
+	seedSiteIcon(t, db, "icon.png", "https://cdn.example.com/icon.png")
+
+	w := doPublicRequest(t, e, "/favicon.ico")
+	if w.Code != http.StatusFound {
+		t.Fatalf("GET /favicon.ico status = %d, want 302", w.Code)
+	}
+	if got := w.Header().Get("Location"); got != "https://cdn.example.com/icon.png" {
+		t.Errorf("Location = %q, want the asset URL", got)
 	}
 }
 
@@ -805,9 +861,7 @@ func TestFavicon_SVGIconIsServedAsAnImage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(mediaDir, "icon.svg"), svg, 0o600); err != nil {
 		t.Fatalf("write svg: %v", err)
 	}
-	if err := db.Create(&model.GeneralSettings{SiteIcon: "/uploads/icon.svg"}).Error; err != nil {
-		t.Fatalf("seed settings: %v", err)
-	}
+	seedSiteIcon(t, db, "icon.svg", "/uploads/icon.svg")
 
 	w := doPublicRequest(t, e, "/favicon.ico")
 	if w.Code != http.StatusOK {
@@ -839,9 +893,7 @@ func TestFavicon_HostileUploadIsNotServedAsADocument(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(mediaDir, "deadbeef"), []byte(`<html><body><script>alert(1)</script></body></html>`), 0o600); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
-	if err := db.Create(&model.GeneralSettings{SiteIcon: "/uploads/deadbeef"}).Error; err != nil {
-		t.Fatalf("seed settings: %v", err)
-	}
+	seedSiteIcon(t, db, "deadbeef", "/uploads/deadbeef")
 
 	w := doPublicRequest(t, e, "/favicon.ico")
 	if w.Code != http.StatusOK {

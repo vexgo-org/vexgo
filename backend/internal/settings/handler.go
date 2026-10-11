@@ -16,6 +16,7 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 )
 
@@ -212,16 +213,28 @@ func (h *Handler) GetGeneralSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get general settings"})
 		return
 	}
-	c.JSON(http.StatusOK, GeneralSettingsResponse{
+	c.JSON(http.StatusOK, generalSettingsResponse(config))
+}
+
+// generalSettingsResponse maps the settings row onto the wire shape, resolving
+// the site icon reference into the URL a caller renders. An icon that names no
+// live asset resolves to no URL, and the reference is reported as it is stored
+// so the caller can tell an unresolvable icon from no icon at all.
+func generalSettingsResponse(config model.GeneralSettings) GeneralSettingsResponse {
+	response := GeneralSettingsResponse{
 		CaptchaEnabled:      config.CaptchaEnabled,
 		RegistrationEnabled: config.RegistrationEnabled,
 		AllowGuestViewPosts: config.AllowGuestViewPosts,
 		SiteName:            config.SiteName,
 		SiteDescription:     config.SiteDescription,
-		SiteIcon:            config.SiteIcon,
+		SiteIconID:          config.SiteIconID,
 		ItemsPerPage:        config.ItemsPerPage,
 		SiteLanguage:        normalizeSiteLanguage(config.SiteLanguage),
-	})
+	}
+	if config.SiteIcon != nil {
+		response.SiteIcon = config.SiteIcon.URL
+	}
+	return response
 }
 
 // UpdateGeneralSettings godoc
@@ -255,7 +268,7 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, GeneralSettingsUpdateResponse{
 		Message:         "General settings updated successfully",
-		GeneralSettings: config,
+		GeneralSettings: generalSettingsResponse(config),
 	})
 }
 

@@ -39,6 +39,7 @@ export interface GeneralSettings {
   siteName?: string;
   siteDescription?: string;
   siteIcon?: string;
+  siteIconId?: number | null;
   itemsPerPage?: number;
   siteLanguage?: string;
   createdAt?: string;

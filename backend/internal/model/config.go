@@ -27,11 +27,18 @@ type GeneralSettings struct {
 	AllowGuestViewPosts bool      `json:"allowGuestViewPosts"`                    // Whether guests can view posts
 	SiteName            string    `json:"siteName" gorm:"size:100;default:VexGo"` // Site name
 	SiteDescription     string    `json:"siteDescription" gorm:"type:text"`       // Site description
-	SiteIcon            string    `json:"siteIcon" gorm:"type:text"`              // Site icon URL
 	ItemsPerPage        int       `json:"itemsPerPage" gorm:"default:20"`         // Items per page
 	SiteLanguage        string    `json:"siteLanguage" gorm:"size:10;default:en"` // Default public theme language (e.g. en, zh)
 	CreatedAt           time.Time `json:"created_at"`                             // Creation time
 	UpdatedAt           time.Time `json:"updated_at"`                             // Update time
+
+	// The site icon is stored as an asset reference, not as a URL: a URL is
+	// derived from the storage configuration and changes when that
+	// configuration does, while the asset ID keeps pointing at the same file.
+	// SiteIconID is the writable handle and the only one of the two that has to
+	// be assigned; SiteIcon is loaded on demand for readers that need the URL.
+	SiteIconID *uint  `json:"siteIconId,omitempty" gorm:"index"`
+	SiteIcon   *Asset `json:"-" gorm:"foreignKey:SiteIconID"`
 }
 
 // Captcha stores sliding puzzle captcha information. Only the validation

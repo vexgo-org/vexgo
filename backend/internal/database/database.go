@@ -223,6 +223,10 @@ func AutoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	if err := backfillSiteIcon(db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
