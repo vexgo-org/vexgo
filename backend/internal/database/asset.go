@@ -137,6 +137,85 @@ func backfillSiteIcon(db *gorm.DB) error {
 	return nil
 }
 
+func backfillCoverImage(db *gorm.DB) error {
+	// Skip if the table or the column does not exist.
+	if !db.Migrator().HasTable(&model.Post{}) ||
+		!db.Migrator().HasColumn(&model.Post{}, "cover_image") {
+		return nil
+	}
+
+	type legacyPost struct {
+		ID         uint
+		CoverImage string
+	}
+
+	// Query all posts with cover image URL.
+	var posts []legacyPost
+	if err := db.
+		Raw(`SELECT id, cover_image FROM posts WHERE cover_image IS NOT NULL AND cover_image != '' AND cover_image_id IS NULL`).
+		Scan(&posts).
+		Error; err != nil {
+		return fmt.Errorf("failed to query posts with cover image: %w", err)
+	}
+	if len(posts) == 0 {
+		return nil
+	}
+
+	var errs []error
+	keys := make([]string, len(posts))
+	for i, post := range posts {
+		key, err := storageKeyFromURL(post.CoverImage)
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"generate storage key from URL failed (id=%v,url=%s): %w",
+				post.ID,
+				post.CoverImage,
+				err,
+			))
+			continue
+		}
+		keys[i] = key
+	}
+
+	var assets []model.Asset
+	if err := db.Model(&model.Asset{}).
+		Select("id", "storage_key").
+		Where("storage_key IN ?", keys).
+		Find(&assets).
+		Error; err != nil {
+		errs = append(errs, err)
+		return errors.Join(errs...)
+	}
+
+	assetIDs := make(map[string]uint, len(assets))
+	for _, asset := range assets {
+		assetIDs[asset.StorageKey] = asset.ID
+	}
+
+	unresolved := 0
+
+	for i, post := range posts {
+		assetID, ok := assetIDs[keys[i]]
+		if keys[i] == "" || !ok {
+			unresolved++
+			continue
+		}
+
+		if err := db.Model(&model.Post{}).
+			Where("id = ? AND cover_image_id IS NULL", post.ID).
+			Update("cover_image_id", assetID).
+			Error; err != nil {
+			errs = append(errs, fmt.Errorf("failed to backfill the cover image of post %v: %w", post.ID, err))
+		}
+	}
+
+	if unresolved > 0 {
+		slog.Warn("legacy cover images matched no asset; those posts keep no cover", "posts", unresolved)
+	}
+
+	return errors.Join(errs...)
+}
+
 func storageKeyFromURL(rawURL string) (string, error) {
 	const localStoragePrefix = "/uploads/"
 

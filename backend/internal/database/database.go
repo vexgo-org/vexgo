@@ -227,6 +227,10 @@ func AutoMigrate(db *gorm.DB) error {
 		return err
 	}
 
+	if err := backfillCoverImage(db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
