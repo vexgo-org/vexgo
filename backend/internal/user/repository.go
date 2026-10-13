@@ -114,8 +114,8 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 		postIDs := make([]uint, 0, len(posts))
 		for _, post := range posts {
 			postIDs = append(postIDs, post.ID)
-			if post.CoverImage != "" {
-				fileURLs = append(fileURLs, post.CoverImage)
+			if post.CoverImage != nil {
+				fileURLs = append(fileURLs, post.CoverImage.URL)
 			}
 		}
 		if len(postIDs) > 0 {

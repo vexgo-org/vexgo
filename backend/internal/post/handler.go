@@ -189,14 +189,14 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Create(c.Request.Context(), userRole, userID, CreateRequest{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Tags:       req.Tags,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     model.PostStatus(req.Status),
+		Slug:         req.Slug,
+		Title:        req.Title,
+		Content:      req.Content,
+		Category:     req.Category,
+		Tags:         req.Tags,
+		Excerpt:      req.Excerpt,
+		CoverImageID: req.CoverImageID,
+		Status:       model.PostStatus(req.Status),
 	})
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
@@ -257,14 +257,14 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Update(c.Request.Context(), id, userID, UpdateRequest{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Tags:       req.Tags,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     model.PostStatus(req.Status),
+		Slug:         req.Slug,
+		Title:        req.Title,
+		Content:      req.Content,
+		Category:     req.Category,
+		Tags:         req.Tags,
+		Excerpt:      req.Excerpt,
+		CoverImageID: req.CoverImageID,
+		Status:       model.PostStatus(req.Status),
 	})
 	if err != nil {
 		switch {
