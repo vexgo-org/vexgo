@@ -1101,6 +1101,19 @@ func TestUpdate_NormalizesUppercaseSlug(t *testing.T) {
 	}
 }
 
+// softDeletedAsset reports whether the asset row is still present but marked
+// deleted. It reads Unscoped so a hard delete is distinguishable from a soft
+// one: a missing row and a soft-deleted row are both "gone" to a normal query,
+// but only one of them is what the asset service does.
+func softDeletedAsset(t *testing.T, db *gorm.DB, id uint) bool {
+	t.Helper()
+	var asset model.Asset
+	if err := db.Unscoped().First(&asset, id).Error; err != nil {
+		t.Fatalf("asset %d is gone entirely: %v", id, err)
+	}
+	return asset.DeletedAt.Valid
+}
+
 func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	svc, _, remover, db := newTestService(t)
 	ctx := context.Background()
@@ -1126,8 +1139,14 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 		t.Fatalf("Delete error: %v", err)
 	}
 
-	if len(remover.deleted) != 3 {
-		t.Errorf("expected 3 file deletions, got %v", remover.deleted)
+	// The cover is retired through the asset service, so the row is marked
+	// deleted rather than handed to the FileRemover seam. The two inline images
+	// name no asset we manage and are left alone.
+	if !softDeletedAsset(t, db, cover.ID) {
+		t.Errorf("cover asset %d is not soft-deleted", cover.ID)
+	}
+	if len(remover.deleted) != 0 {
+		t.Errorf("files bypassed the asset service: %v", remover.deleted)
 	}
 
 	var count int64
@@ -1151,6 +1170,218 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	other := seedUser(t, db, "other", model.RoleGuest)
 	if err := svc.Delete(ctx, post2.ID, other.ID); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
+	}
+}
+
+// TestDelete_SoftDeletesCoverAsset pins the post half of the TODO: the cover
+// asset is retired through the asset service, so the row survives as a
+// soft-deleted record instead of being dropped outright.
+func TestDelete_SoftDeletesCoverAsset(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "cover-delete",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if !softDeletedAsset(t, db, cover.ID) {
+		t.Errorf("cover asset %d is not soft-deleted", cover.ID)
+	}
+}
+
+// TestDelete_SoftDeletesContentImageAssets covers the other half: an image
+// embedded in the post body that we do manage has a real asset row behind it,
+// and that row is retired too, not just the cover.
+func TestDelete_SoftDeletesContentImageAssets(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	inBody := seedAsset(t, db, author.ID, "/uploads/inline.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:     "body-delete",
+		Title:    "t",
+		Content:  `before ![shot](/uploads/inline.png) after`,
+		Category: "1",
+		Status:   model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if !softDeletedAsset(t, db, inBody.ID) {
+		t.Errorf("in-body asset %d is not soft-deleted", inBody.ID)
+	}
+}
+
+// TestDelete_LeavesUnmanagedContentURLsAlone guards the blast radius. A post
+// body is free text: it can reference a CDN, a remote tracker, or a file that
+// was removed long ago. None of those is an asset row, so none may be retired,
+// and none may fail the delete.
+func TestDelete_LeavesUnmanagedContentURLsAlone(t *testing.T) {
+	for name, body := range map[string]string{
+		"external": `![shot](https://cdn.example.com/shot.png)`,
+		"missing":  `![shot](/uploads/long-gone.png)`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, _, _, db := newTestService(t)
+			ctx := context.Background()
+			author := seedUser(t, db, "author", model.RoleAuthor)
+			// An unrelated asset, which must survive the post going away.
+			bystander := seedAsset(t, db, author.ID, "/uploads/bystander.png")
+
+			post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+				Slug:     "external-delete",
+				Title:    "t",
+				Content:  body,
+				Category: "1",
+				Status:   model.PostStatusPublished,
+			})
+			if err != nil {
+				t.Fatalf("Create error: %v", err)
+			}
+
+			if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+				t.Fatalf("Delete error: %v", err)
+			}
+
+			if softDeletedAsset(t, db, bystander.ID) {
+				t.Errorf("asset %d was retired by a post that never referenced it", bystander.ID)
+			}
+		})
+	}
+}
+
+// TestDelete_ToleratesCoverReusedAsContentImage pins the dedup boundary. The
+// same upload used as both cover and inline image is one asset, so the second
+// retirement must find it already gone and be ignored rather than treated as a
+// failure — a post would otherwise refuse to delete.
+func TestDelete_ToleratesCoverReusedAsContentImage(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	shared := seedAsset(t, db, author.ID, "/uploads/shared.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "shared-delete",
+		Title:        "t",
+		Content:      `![again](/uploads/shared.png)`,
+		Category:     "1",
+		CoverImageID: &shared.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if !softDeletedAsset(t, db, shared.ID) {
+		t.Errorf("shared asset %d is not soft-deleted", shared.ID)
+	}
+}
+
+// TestDelete_AdminRetiresAnotherAuthorsCoverAsset pins the authorization
+// boundary on the new path. The asset service refuses a delete by anyone who is
+// neither the owner nor an administrator, so deleting another author's post as
+// an admin is the case that has to keep working.
+func TestDelete_AdminRetiresAnotherAuthorsCoverAsset(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+	cover := seedAsset(t, db, author.ID, "/uploads/author-cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "admin-delete",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, admin.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if !softDeletedAsset(t, db, cover.ID) {
+		t.Errorf("cover asset %d is not soft-deleted after an admin delete", cover.ID)
+	}
+}
+
+// TestDelete_RetiresAssetsAndStillCascades pins that retiring the assets is
+// additive: the post, its comments and its likes still go away, exactly as
+// before. A cleanup step that started failing silently could otherwise leave
+// orphaned rows behind.
+func TestDelete_RetiresAssetsAndStillCascades(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedAsset(t, db, author.ID, "/uploads/cover.png")
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:         "cascade-delete",
+		Title:        "t",
+		Content:      "c",
+		Category:     "1",
+		CoverImageID: &cover.ID,
+		Status:       model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+	if err := db.Create(&model.Like{PostID: post.ID, UserID: author.ID}).Error; err != nil {
+		t.Fatalf("seed like: %v", err)
+	}
+	if err := db.Create(&model.Comment{
+		PostID: post.ID, UserID: author.ID, Content: "c", Status: model.CommentStatusPublished,
+	}).Error; err != nil {
+		t.Fatalf("seed comment: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	var count int64
+	for _, tc := range []struct {
+		name  string
+		model any
+	}{
+		{"posts", &model.Post{}},
+		{"likes", &model.Like{}},
+		{"comments", &model.Comment{}},
+	} {
+		if err := db.Model(tc.model).Count(&count).Error; err != nil {
+			t.Fatalf("count %s: %v", tc.name, err)
+		}
+		if count != 0 {
+			t.Errorf("%s not deleted: got %d", tc.name, count)
+		}
 	}
 }
 

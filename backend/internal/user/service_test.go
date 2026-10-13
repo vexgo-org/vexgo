@@ -45,7 +45,9 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Tag{}, &model.Comment{}, &model.Like{}, &model.MediaFile{}, &model.CreatorApplication{}); err != nil {
+	// Asset shares the media_files table with MediaFile and adds deleted_at,
+	// which the cascade queries when it collects the user's uploads.
+	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Tag{}, &model.Comment{}, &model.Like{}, &model.MediaFile{}, &model.Asset{}, &model.CreatorApplication{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -67,6 +69,39 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 		t.Fatalf("failed to seed user: %v", err)
 	}
 	return u
+}
+
+// seedUserAsset migrates the asset model on demand and stores an asset owned by
+// userID. Asset and MediaFile share the media_files table, so this is the same
+// row DeleteUserCascade already collects — with the difference that Asset
+// carries deleted_at, which is what the asset service sets when it retires one.
+func seedUserAsset(t *testing.T, db *gorm.DB, userID uint, key string) model.Asset {
+	t.Helper()
+	asset := model.Asset{
+		OriginalName: key,
+		StorageKey:   key,
+		URL:          "/uploads/" + key,
+		MimeType:     model.MimeTypeFromName(key),
+		Type:         model.AssetTypeFromMIME(model.MimeTypeFromName(key)),
+		UserID:       userID,
+	}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatalf("failed to seed asset: %v", err)
+	}
+	return asset
+}
+
+// assetRetired reports whether the asset row is still present but marked
+// deleted. Unscoped is what separates a soft delete from a hard one: after a
+// hard delete the row is unreadable, and reporting that as "retired" would let
+// a destructive implementation pass this test.
+func assetRetired(t *testing.T, db *gorm.DB, id uint) bool {
+	t.Helper()
+	var asset model.Asset
+	if err := db.Unscoped().First(&asset, id).Error; err != nil {
+		t.Fatalf("asset %d was removed outright instead of retired: %v", id, err)
+	}
+	return asset.DeletedAt.Valid
 }
 
 func TestUpdateRole_NotificationReportsOldRole(t *testing.T) {
@@ -211,12 +246,21 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 	if count != 0 {
 		t.Errorf("expected likes deleted")
 	}
-	db.Model(&model.MediaFile{}).Where("user_id = ?", target.ID).Count(&count)
-	if count != 0 {
-		t.Errorf("expected media files deleted")
+	// The uploads go through the asset service, which retires the rows rather
+	// than destroying them. model.MediaFile carries no deleted_at, so it counts
+	// retired rows too: the right assertion is that they are marked deleted.
+	var asset model.Asset
+	if err := db.Unscoped().First(&asset, cover.ID).Error; err != nil {
+		t.Errorf("cover asset was removed outright instead of retired: %v", err)
+	} else if !asset.DeletedAt.Valid {
+		t.Errorf("cover asset %d is not soft-deleted", cover.ID)
 	}
-	if len(files.deleted) != 2 {
-		t.Errorf("expected cover + media file deletion, got %v", files.deleted)
+	var media model.MediaFile
+	if err := db.Unscoped().First(&media, "user_id = ?", target.ID).Error; err != nil {
+		t.Errorf("user media file was removed outright instead of retired: %v", err)
+	}
+	if len(files.deleted) != 0 {
+		t.Errorf("files bypassed the asset service: %v", files.deleted)
 	}
 }
 
@@ -258,6 +302,126 @@ func TestDeleteUser_ClearsPostTagAssociations(t *testing.T) {
 	}
 	if tagCount != 2 {
 		t.Errorf("expected tags preserved, got %d", tagCount)
+	}
+}
+
+// TestDeleteUser_RetiresAssetsOfDeletedUser pins the user half of the TODO: a
+// deleted user's uploads go through the asset service, which retires the row
+// rather than destroying it. Today the cascade issues a hard DELETE against
+// media_files, so the row disappears and this test fails at the Unscoped read.
+func TestDeleteUser_RetiresAssetsOfDeletedUser(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+	avatar := seedUserAsset(t, db, target.ID, "avatar.png")
+	inline := seedUserAsset(t, db, target.ID, "inline.png")
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	for _, asset := range []model.Asset{avatar, inline} {
+		if !assetRetired(t, db, asset.ID) {
+			t.Errorf("asset %d (%s) is not retired", asset.ID, asset.StorageKey)
+		}
+	}
+}
+
+// TestDeleteUser_LeavesOtherUsersAssetsAlone is the permission boundary: a
+// cascade must not sweep assets it does not own, or deleting one account would
+// silently destroy every other account's uploads.
+func TestDeleteUser_LeavesOtherUsersAssetsAlone(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+	innocent := seedUser(t, db, "innocent", model.RoleAuthor)
+	mine := seedUserAsset(t, db, target.ID, "mine.png")
+	theirs := seedUserAsset(t, db, innocent.ID, "theirs.png")
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	if !assetRetired(t, db, mine.ID) {
+		t.Errorf("deleted user's own asset %d is not retired", mine.ID)
+	}
+	if assetRetired(t, db, theirs.ID) {
+		t.Errorf("asset %d belongs to another user and must survive", theirs.ID)
+	}
+}
+
+// TestDeleteUser_RetiresCoverAssetOfDeletedPosts pins the cross-domain case: an
+// upload that is a deleted user's post cover is covered by the ownership sweep
+// above, and deleting the account must retire it rather than leaving the post
+// row's reference dangling on a live asset.
+func TestDeleteUser_RetiresCoverAssetOfDeletedPosts(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+	cover := seedUserAsset(t, db, target.ID, "cover.png")
+
+	post := model.Post{
+		Title:        "p",
+		Content:      "c",
+		Category:     "1",
+		AuthorID:     target.ID,
+		Status:       model.PostStatusPublished,
+		CoverImageID: &cover.ID,
+	}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("failed to seed post: %v", err)
+	}
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	if !assetRetired(t, db, cover.ID) {
+		t.Errorf("cover asset %d is not retired", cover.ID)
+	}
+
+	var count int64
+	if err := db.Model(&model.Post{}).Where("author_id = ?", target.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count posts: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("posts of the deleted user remain: %d", count)
+	}
+}
+
+// TestDeleteUser_RetiresAlreadyRetiredAssets pins that the cascade tolerates a
+// row it cannot see. An asset the user retired themselves is already gone from
+// every scoped query before the account goes, so a lookup miss is an ordinary
+// outcome and not an error that aborts the account deletion. The assertion that
+// carries the weight is therefore the last one: the user row really went away.
+func TestDeleteUser_RetiresAlreadyRetiredAssets(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+	asset := seedUserAsset(t, db, target.ID, "already.png")
+
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("retire asset up front: %v", err)
+	}
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	if !assetRetired(t, db, asset.ID) {
+		t.Errorf("already-retired asset %d was resurrected", asset.ID)
+	}
+
+	var count int64
+	if err := db.Model(&model.User{}).Where("id = ?", target.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("user was not deleted: %d rows remain", count)
 	}
 }
 

@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -54,7 +56,14 @@ func newTestService(t *testing.T) (*Service, *fakeNotifier, *fakeRemover, *gorm.
 	db := newTestDB(t)
 	notifier := &fakeNotifier{}
 	remover := &fakeRemover{}
-	svc := NewService(Deps{DB: db, Notifier: notifier, Files: remover})
+	// A real asset service over the same database, so Delete's asset cleanup
+	// runs for real and a test can assert on the rows it retires.
+	svc := NewService(Deps{
+		DB:       db,
+		Notifier: notifier,
+		Files:    remover,
+		Assets:   asset.NewService(asset.Deps{DB: db, Storage: storage.NewLocalStorage(t.TempDir())}),
+	})
 	return svc, notifier, remover, db
 }
 
