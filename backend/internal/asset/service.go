@@ -1,6 +1,10 @@
 package asset
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
+
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"gorm.io/gorm"
 )
@@ -29,4 +33,20 @@ func NewService(deps Deps) *Service {
 		storage:      deps.Storage,
 		keyGenerator: NewKeyGenerator(),
 	}
+}
+
+// detectMIMEType detects MIME type from the file header.
+func detectMIMEType(reader *bufio.Reader) (string, error) {
+	header, err := reader.Peek(512)
+	if err != nil &&
+		!errors.Is(err, io.EOF) &&
+		!errors.Is(err, bufio.ErrBufferFull) {
+		return "", fmt.Errorf("read file header: %w", err)
+	}
+
+	if len(header) == 0 {
+		return "", errors.New("empty file")
+	}
+
+	return http.DetectContentType(header), nil
 }
