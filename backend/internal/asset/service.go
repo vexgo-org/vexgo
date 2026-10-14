@@ -123,6 +123,31 @@ func (s *Service) Upload(
 	return asset, nil
 }
 
+// Delete soft deletes an asset.
+func (s *Service) Delete(ctx context.Context, actor Actor, assetID uint) error {
+	// Find the asset.
+	asset, err := s.assets.FindByID(ctx, assetID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("find asset by ID: %w", err)
+	}
+
+	// Check the user permission.
+	// Only allow admin and asset owner to perform deletion.
+	if asset.UserID != actor.ID && !model.IsAdmin(actor.Role) {
+		return ErrForbidden
+	}
+
+	// Soft delete asset only.
+	if err := s.assets.SoftDelete(ctx, asset); err != nil {
+		return fmt.Errorf("soft delete asset: %w", err)
+	}
+
+	return nil
+}
+
 // rollbackUpload removes file from storage when uploading error occurs.
 func (s *Service) rollbackUpload(ctx context.Context, key string) {
 	if err := s.storage.Delete(ctx, key); err != nil {
