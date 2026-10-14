@@ -9,6 +9,7 @@ import (
 
 type AssetRepository interface {
 	Create(ctx context.Context, asset *model.Asset) error
+	FindByID(ctx context.Context, id uint) (*model.Asset, error)
 }
 
 type assetRepository struct {
@@ -24,4 +25,26 @@ func (r *assetRepository) Create(ctx context.Context, asset *model.Asset) error 
 		WithContext(ctx).
 		Create(asset).
 		Error
+}
+
+func (r *assetRepository) FindByID(ctx context.Context, id uint) (*model.Asset, error) {
+	if id == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	return r.find(ctx, &model.Asset{ID: id})
+}
+
+func (r *assetRepository) find(ctx context.Context, query *model.Asset) (*model.Asset, error) {
+	var asset model.Asset
+	if err := r.db.
+		WithContext(ctx).
+		Model(&model.Asset{}).
+		Preload("Blob").
+		Where(query).
+		First(&asset).
+		Error; err != nil {
+		return nil, err
+	}
+	return &asset, nil
 }
