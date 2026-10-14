@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/captcha"
 	"github.com/vexgo-org/vexgo/backend/internal/comment"
@@ -62,6 +63,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		SSO:      sso.Deps{DB: db, JWTSecret: secret},
 		Home:     home.Deps{DB: db, JWTSecret: secret},
 		Settings: settings.Deps{DB: db, JWTSecret: secret},
+		Asset:    asset.Deps{DB: db, JWTSecret: secret},
 	})
 
 	got := make([]string, 0, len(r.Routes()))
@@ -162,6 +164,9 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"POST /api/upload/multiple",
 		"GET /api/upload/my",
 		"DELETE /api/upload/:id",
+		// asset
+		"POST /api/asset/upload",
+		"POST /api/asset/delete/:id",
 		// user
 		"GET /api/users",
 		"PUT /api/users/:id/role",
