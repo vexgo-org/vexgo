@@ -10,6 +10,7 @@ import (
 type AssetRepository interface {
 	Create(ctx context.Context, asset *model.Asset) error
 	FindByID(ctx context.Context, id uint) (*model.Asset, error)
+	SoftDelete(ctx context.Context, asset *model.Asset) error
 }
 
 type assetRepository struct {
@@ -33,6 +34,17 @@ func (r *assetRepository) FindByID(ctx context.Context, id uint) (*model.Asset, 
 	}
 
 	return r.find(ctx, &model.Asset{ID: id})
+}
+
+func (r *assetRepository) SoftDelete(ctx context.Context, asset *model.Asset) error {
+	if asset.ID == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return r.db.
+		WithContext(ctx).
+		Delete(asset).
+		Error
 }
 
 func (r *assetRepository) find(ctx context.Context, query *model.Asset) (*model.Asset, error) {
