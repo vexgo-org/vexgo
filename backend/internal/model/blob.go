@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -29,4 +30,16 @@ type Blob struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+func BlobTypeFromMIME(mimeType string) BlobType {
+	switch {
+	case strings.HasPrefix(mimeType, "image/"):
+		return BlobTypeImage
+	case strings.HasPrefix(mimeType, "video/"):
+		return BlobTypeVideo
+	case strings.HasPrefix(mimeType, "audio/"):
+		return BlobTypeAudio
+	}
+	return BlobTypeUnknown
 }
