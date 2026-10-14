@@ -16,6 +16,11 @@ const (
 	BlobTypeVideo   BlobType = "video"
 )
 
+const (
+	MaxBlobBytes        = 25 << 20
+	MaxBlobRequestBytes = MaxBlobBytes + (1 << 20)
+)
+
 type Blob struct {
 	ID uint `gorm:"primaryKey"`
 
