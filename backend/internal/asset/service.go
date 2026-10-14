@@ -1,8 +1,10 @@
 package asset
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -32,6 +34,18 @@ func NewService(deps Deps) *Service {
 		txManager:    NewTransactionManager(deps.DB),
 		storage:      deps.Storage,
 		keyGenerator: NewKeyGenerator(),
+	}
+}
+
+// rollbackUpload removes file from storage when uploading error occurs.
+func (s *Service) rollbackUpload(ctx context.Context, key string) {
+	if err := s.storage.Delete(ctx, key); err != nil {
+		slog.WarnContext(
+			ctx,
+			"failed to remove uploading file after media creation failed",
+			"storage_key", key,
+			"err", err,
+		)
 	}
 }
 
