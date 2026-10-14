@@ -127,14 +127,14 @@ import { customInstance } from "../customAxios";
 
 export const getVexGoAPI = () => {
   /**
-   * Soft deletes the asset identified by its ID.
+   * Soft deletes the asset identified by its public ID.
    * Only the owner or an administrator may delete it.
    * Requires authentication.
    * @summary Delete an asset
    */
-  const postAssetsDeleteId = (id: number) => {
+  const postAssetsDeletePublicID = (publicID: string) => {
     return customInstance<AssetMessageResponse>({
-      url: `/assets/delete/${id}`,
+      url: `/assets/delete/${publicID}`,
       method: "POST",
     });
   };
@@ -156,6 +156,30 @@ export const getVexGoAPI = () => {
       method: "POST",
       headers: { "Content-Type": "multipart/form-data" },
       data: formData,
+    });
+  };
+
+  /**
+   * Returns the original content of an asset.
+   * @summary Get original asset content
+   */
+  const getAssetsPublicIDOriginal = (publicID: string) => {
+    return customInstance<Blob>({
+      url: `/assets/${publicID}/original`,
+      method: "GET",
+      responseType: "blob",
+    });
+  };
+
+  /**
+   * Returns the original content of an asset.
+   * @summary Get original asset content
+   */
+  const headAssetsPublicIDOriginal = (publicID: string) => {
+    return customInstance<Blob>({
+      url: `/assets/${publicID}/original`,
+      method: "HEAD",
+      responseType: "blob",
     });
   };
 
@@ -1415,8 +1439,10 @@ export const getVexGoAPI = () => {
   };
 
   return {
-    postAssetsDeleteId,
+    postAssetsDeletePublicID,
     postAssetsUpload,
+    getAssetsPublicIDOriginal,
+    headAssetsPublicIDOriginal,
     putAuthEmail,
     getAuthEmailVerify,
     postAuthEmailVerifyResend,
@@ -1509,11 +1535,23 @@ export const getVexGoAPI = () => {
     putUsersIdRole,
   };
 };
-export type PostAssetsDeleteIdResult = NonNullable<
-  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsDeleteId"]>>
+export type PostAssetsDeletePublicIDResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsDeletePublicID"]>
+  >
 >;
 export type PostAssetsUploadResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsUpload"]>>
+>;
+export type GetAssetsPublicIDOriginalResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof getVexGoAPI>["getAssetsPublicIDOriginal"]>
+  >
+>;
+export type HeadAssetsPublicIDOriginalResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof getVexGoAPI>["headAssetsPublicIDOriginal"]>
+  >
 >;
 export type PutAuthEmailResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putAuthEmail"]>>
