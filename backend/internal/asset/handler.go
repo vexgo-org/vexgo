@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/vexgo-org/vexgo/backend/internal/api"
@@ -106,4 +107,72 @@ func (h *Handler) Upload(c *gin.Context) {
 		Message: "File uploaded successfully",
 		ID:      asset.ID,
 	})
+}
+
+// Delete godoc
+//
+//	@Summary		Delete an asset
+//	@Description	Soft deletes the asset identified by its ID.
+//	@Description	Only the owner or an administrator may delete it.
+//	@Description	Requires authentication.
+//	@Tags			assets
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		int	true	"asset id"
+//	@Success		200	{object}	MessageResponse
+//	@Failure		400	{object}	api.ErrorResponse
+//	@Failure		401	{object}	api.ErrorResponse
+//	@Failure		403	{object}	api.ErrorResponse	"not the owner"
+//	@Failure		404	{object}	api.ErrorResponse	"asset does not exist"
+//	@Failure		500	{object}	api.ErrorResponse	"failed to delete asset"
+//	@Router			/asset/delete/{id} [post]
+func (h *Handler) Delete(c *gin.Context) {
+	// Get current user.
+	user, ok := middleware.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid user"})
+		return
+	}
+
+	// Get the asset ID.
+	assetID, ok := parseUintParam(c, "id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid asset ID"})
+		return
+	}
+
+	if err := h.svc.Delete(
+		c.Request.Context(),
+		Actor{
+			ID:   user.ID,
+			Role: user.Role,
+		},
+		assetID,
+	); err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "File does not exist"})
+		case errors.Is(err, ErrForbidden):
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Not authorized to delete this file"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to delete file"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, MessageResponse{Message: "File deleted"})
+}
+
+// parseUintParam parses a numeric route parameter by name, reporting whether it
+// is valid. Zero, non-numeric and out-of-range values cannot identify a row and
+// are treated as missing resources: callers must reject an invalid value
+// instead of proceeding with 0, which would resolve to row 0 and write orphaned
+// records or surface as a 500 rather than a client error. The bit size matches
+// uint so the conversion can never truncate silently.
+func parseUintParam(c *gin.Context, name string) (uint, bool) {
+	id64, err := strconv.ParseUint(c.Param(name), 10, strconv.IntSize)
+	if err != nil || id64 == 0 {
+		return 0, false
+	}
+	return uint(id64), true
 }
