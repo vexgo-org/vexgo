@@ -1,4 +1,4 @@
-package database
+package migration
 
 import (
 	"testing"
@@ -10,7 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func newEncryptionTestDB(t *testing.T) *gorm.DB {
+// openTestDB opens an in-memory SQLite database with a single connection so
+// the database is not lost between statements.
+func openTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -21,6 +23,13 @@ func newEncryptionTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
+	return db
+}
+
+// newEncryptionTestDB adds the three tables the secrets migration touches.
+func newEncryptionTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := openTestDB(t)
 	if err := db.AutoMigrate(&model.SMTPConfig{}, &model.AIConfig{}, &model.CommentModerationConfig{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
@@ -55,7 +64,7 @@ func TestMigrateSecretsAtRest_EncryptsPlaintextSecrets(t *testing.T) {
 		t.Fatalf("failed to create cipher: %v", err)
 	}
 
-	migrated, err := MigrateSecretsAtRest(db, cipher)
+	migrated, err := migrateSecretsAtRest(db, cipher)
 	if err != nil {
 		t.Fatalf("MigrateSecretsAtRest error: %v", err)
 	}
@@ -102,7 +111,7 @@ func TestMigrateSecretsAtRest_Idempotent(t *testing.T) {
 		t.Fatalf("failed to create cipher: %v", err)
 	}
 
-	if _, err := MigrateSecretsAtRest(db, cipher); err != nil {
+	if _, err := migrateSecretsAtRest(db, cipher); err != nil {
 		t.Fatalf("first MigrateSecretsAtRest error: %v", err)
 	}
 
@@ -111,7 +120,7 @@ func TestMigrateSecretsAtRest_Idempotent(t *testing.T) {
 		t.Fatalf("failed to load smtp config: %v", err)
 	}
 
-	migrated, err := MigrateSecretsAtRest(db, cipher)
+	migrated, err := migrateSecretsAtRest(db, cipher)
 	if err != nil {
 		t.Fatalf("second MigrateSecretsAtRest error: %v", err)
 	}
@@ -155,7 +164,7 @@ func TestMigrateSecretsAtRest_SkipsAlreadyEncrypted(t *testing.T) {
 		t.Fatalf("failed to pre-encrypt ai key: %v", err)
 	}
 
-	migrated, err := MigrateSecretsAtRest(db, cipher)
+	migrated, err := migrateSecretsAtRest(db, cipher)
 	if err != nil {
 		t.Fatalf("MigrateSecretsAtRest error: %v", err)
 	}
@@ -169,5 +178,99 @@ func TestMigrateSecretsAtRest_SkipsAlreadyEncrypted(t *testing.T) {
 	}
 	if aiAfter.ApiKey != encrypted {
 		t.Errorf("expected already-encrypted value untouched")
+	}
+}
+
+// TC-ENC-024: with no configured key the service must be a no-op. This is the
+// branch that keeps the no-key plaintext fallback working: encrypting here
+// would make the values unreadable, because there is no cipher to open them.
+func TestMigrateSecrets_NilCipherSkips(t *testing.T) {
+	db := newEncryptionTestDB(t)
+	seedEncryptionFixtures(t, db)
+
+	// Deps.Cipher is left nil, which is what initCipher returns when
+	// settings_encryption_key is unset.
+	if err := NewService(Deps{DB: db}).MigrateSecrets(); err != nil {
+		t.Fatalf("MigrateSecrets: %v", err)
+	}
+
+	var smtp model.SMTPConfig
+	if err := db.First(&smtp, "host = ?", "smtp.example.com").Error; err != nil {
+		t.Fatalf("failed to load smtp config: %v", err)
+	}
+	if smtp.Password != "smtp-plain" {
+		t.Errorf("expected smtp password left plaintext, got %q", smtp.Password)
+	}
+
+	var ai model.AIConfig
+	if err := db.First(&ai, "enabled = ?", true).Error; err != nil {
+		t.Fatalf("failed to load ai config: %v", err)
+	}
+	if ai.ApiKey != "ai-plain" {
+		t.Errorf("expected ai api key left plaintext, got %q", ai.ApiKey)
+	}
+
+	var mod model.CommentModerationConfig
+	if err := db.First(&mod, "llm_review_enabled = ?", true).Error; err != nil {
+		t.Fatalf("failed to load moderation config: %v", err)
+	}
+	if mod.ApiKey != "mod-plain" {
+		t.Errorf("expected moderation api key left plaintext, got %q", mod.ApiKey)
+	}
+}
+
+// TC-ENC-025: the same migration through the exported entry point app.go
+// calls, so the Deps wiring and the nil guard stay covered.
+func TestMigrateSecrets_EncryptsViaService(t *testing.T) {
+	db := newEncryptionTestDB(t)
+	seedEncryptionFixtures(t, db)
+
+	cipher, err := secrets.New("test-encryption-key")
+	if err != nil {
+		t.Fatalf("failed to create cipher: %v", err)
+	}
+
+	if err := NewService(Deps{DB: db, Cipher: cipher}).MigrateSecrets(); err != nil {
+		t.Fatalf("MigrateSecrets: %v", err)
+	}
+
+	var smtp model.SMTPConfig
+	if err := db.First(&smtp, "host = ?", "smtp.example.com").Error; err != nil {
+		t.Fatalf("failed to load smtp config: %v", err)
+	}
+	if !secrets.IsEncrypted(smtp.Password) {
+		t.Errorf("expected smtp password encrypted, got %q", smtp.Password)
+	}
+	if got, err := cipher.Decrypt(smtp.Password); err != nil || got != "smtp-plain" {
+		t.Errorf("smtp password round trip failed: got %q, err %v", got, err)
+	}
+
+	// A second run through the service must stay a no-op.
+	if err := NewService(Deps{DB: db, Cipher: cipher}).MigrateSecrets(); err != nil {
+		t.Fatalf("second MigrateSecrets: %v", err)
+	}
+	var smtpAfter model.SMTPConfig
+	if err := db.First(&smtpAfter, "host = ?", "smtp.example.com").Error; err != nil {
+		t.Fatalf("failed to reload smtp config: %v", err)
+	}
+	if got, err := cipher.Decrypt(smtpAfter.Password); err != nil || got != "smtp-plain" {
+		t.Errorf("smtp password still decryptable after second run: got %q, err %v", got, err)
+	}
+}
+
+// TC-ENC-024: a failure inside the migration is propagated, not swallowed.
+// Swallowing it would let the server boot with plaintext secrets still in the
+// database while logging nothing.
+func TestMigrateSecrets_SurfacesError(t *testing.T) {
+	// No AutoMigrate: every table the migration reads is missing.
+	db := openTestDB(t)
+
+	cipher, err := secrets.New("test-encryption-key")
+	if err != nil {
+		t.Fatalf("failed to create cipher: %v", err)
+	}
+
+	if err := NewService(Deps{DB: db, Cipher: cipher}).MigrateSecrets(); err == nil {
+		t.Fatal("expected error when the secret tables are missing, got nil")
 	}
 }

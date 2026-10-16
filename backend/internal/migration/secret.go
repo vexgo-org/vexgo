@@ -1,4 +1,4 @@
-package database
+package migration
 
 import (
 	"fmt"
@@ -6,14 +6,23 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/secrets"
-
 	"gorm.io/gorm"
 )
 
-// Encrypter is the seam the migration needs from the cipher: sealing a
-// plaintext secret. It is satisfied by secrets.Cipher.
-type Encrypter interface {
-	Encrypt(plaintext string) (string, error)
+func (s *Service) MigrateSecrets() error {
+	if s.cipher == nil {
+		return nil
+	}
+
+	migrated, err := migrateSecretsAtRest(s.db, s.cipher)
+	if err != nil {
+		return fmt.Errorf("migrate secrets at rest: %w", err)
+	}
+	if migrated > 0 {
+		slog.Info("encrypted plaintext secrets at rest", "count", migrated)
+	}
+
+	return nil
 }
 
 // MigrateSecretsAtRest encrypts the plaintext secrets at rest in place: the
@@ -24,7 +33,7 @@ type Encrypter interface {
 // The migration is idempotent: values already carrying the encrypted marker
 // (from a previous run) are left untouched, so repeated startups and re-runs
 // are no-ops.
-func MigrateSecretsAtRest(db *gorm.DB, c Encrypter) (int, error) {
+func migrateSecretsAtRest(db *gorm.DB, c secrets.SecretCipher) (int, error) {
 	// Each target is one secret column: a readable label for error messages,
 	// the owning model, and the column holding the secret.
 	targets := []struct {
