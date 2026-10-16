@@ -1,4 +1,4 @@
-package database
+package migration
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 // comment_moderation_configs table.
 var legacyModerationColumns = []string{"enabled", "auto_approve_enabled", "min_score_threshold"}
 
-// MigrateLegacyModerationConfig maps the single legacy comment moderation
+// migrateLegacyModerationConfig maps the single legacy comment moderation
 // config row onto the new explicit switches, one time at startup:
 //
 //	enabled=false, auto_approve_enabled=true  (old default) → all switches off
@@ -24,7 +24,7 @@ var legacyModerationColumns = []string{"enabled", "auto_approve_enabled", "min_s
 // removes dead schema and makes the migration one-shot: on later startups the
 // columns no longer exist and this function is a no-op, so switch changes an
 // admin makes after the migration are never rewritten.
-func MigrateLegacyModerationConfig(db *gorm.DB) (int, error) {
+func migrateLegacyModerationConfig(db *gorm.DB) (int, error) {
 	table := &model.CommentModerationConfig{}
 	if !db.Migrator().HasTable(table) || !db.Migrator().HasColumn(table, legacyModerationColumns[0]) {
 		return 0, nil

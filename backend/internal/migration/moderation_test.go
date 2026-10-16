@@ -1,4 +1,4 @@
-package database
+package migration
 
 import (
 	"testing"
@@ -84,7 +84,7 @@ func TestMigrateLegacyModerationConfig_Mapping(t *testing.T) {
 	manualHold := seedLegacyConfig(t, db, false, false) // was: pending
 	aiEnabled := seedLegacyConfig(t, db, true, true)    // was: AI moderation on
 
-	migrated, err := MigrateLegacyModerationConfig(db)
+	migrated, err := migrateLegacyModerationConfig(db)
 	if err != nil {
 		t.Fatalf("MigrateLegacyModerationConfig: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestMigrateLegacyModerationConfig_Idempotent(t *testing.T) {
 	}
 	id := seedLegacyConfig(t, db, true, false)
 
-	if _, err := MigrateLegacyModerationConfig(db); err != nil {
+	if _, err := migrateLegacyModerationConfig(db); err != nil {
 		t.Fatalf("first migration: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestMigrateLegacyModerationConfig_Idempotent(t *testing.T) {
 		t.Fatalf("admin update: %v", err)
 	}
 
-	migrated, err := MigrateLegacyModerationConfig(db)
+	migrated, err := migrateLegacyModerationConfig(db)
 	if err != nil {
 		t.Fatalf("second migration: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestMigrateLegacyModerationConfig_NoopCases(t *testing.T) {
 		if err := db.AutoMigrate(&model.CommentModerationConfig{}); err != nil {
 			t.Fatalf("automigrate: %v", err)
 		}
-		migrated, err := MigrateLegacyModerationConfig(db)
+		migrated, err := migrateLegacyModerationConfig(db)
 		if err != nil {
 			t.Fatalf("MigrateLegacyModerationConfig: %v", err)
 		}
@@ -181,7 +181,7 @@ func TestMigrateLegacyModerationConfig_NoopCases(t *testing.T) {
 		if err != nil {
 			t.Fatalf("open test db: %v", err)
 		}
-		if _, err := MigrateLegacyModerationConfig(db); err != nil {
+		if _, err := migrateLegacyModerationConfig(db); err != nil {
 			t.Fatalf("MigrateLegacyModerationConfig: %v", err)
 		}
 	})
