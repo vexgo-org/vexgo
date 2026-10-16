@@ -9,4 +9,6 @@ var (
 	ErrForbidden = errors.New("forbidden")
 	// ErrInvalidExtension means the file extension is not in `allowedExts`.
 	ErrInvalidExtension = errors.New("invalid file extension")
+	// ErrEmptyFile identifies the file to read is empty.
+	ErrEmptyFile = errors.New("empty file")
 )

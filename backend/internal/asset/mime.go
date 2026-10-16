@@ -18,7 +18,7 @@ func DetectMIMEType(reader *bufio.Reader) (string, error) {
 	}
 
 	if len(header) == 0 {
-		return "", errors.New("empty file")
+		return "", ErrEmptyFile
 	}
 
 	return http.DetectContentType(header), nil
