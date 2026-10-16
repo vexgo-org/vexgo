@@ -49,5 +49,10 @@ func (s *Service) MigrateDB() error {
 		return err
 	}
 
+	// Backfill asset and blob from legacy media files.
+	if err := s.backfillAssetBlob(); err != nil {
+		return err
+	}
+
 	return nil
 }
