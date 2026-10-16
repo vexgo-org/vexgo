@@ -776,24 +776,6 @@ func TestUpload_ClassifiesBlobType(t *testing.T) {
 			payload:  append([]byte("ID3\x04\x00\x00\x00\x00\x00\x00"), bytes.Repeat([]byte{0}, 16)...),
 			wantType: model.BlobTypeAudio,
 		},
-		{
-			name:     "text is unknown",
-			filename: "notes.txt",
-			payload:  []byte("just some plain text"),
-			wantType: model.BlobTypeUnknown,
-		},
-		{
-			name:     "pdf is unknown",
-			filename: "paper.pdf",
-			payload:  []byte("%PDF-1.7\ntrailer\n"),
-			wantType: model.BlobTypeUnknown,
-		},
-		{
-			name:     "csv is unknown",
-			filename: "table.csv",
-			payload:  []byte("a,b,c\n1,2,3\n"),
-			wantType: model.BlobTypeUnknown,
-		},
 	}
 
 	for _, tt := range tests {
@@ -813,6 +795,56 @@ func TestUpload_ClassifiesBlobType(t *testing.T) {
 			}
 			if got.Blob.Type != tt.wantType {
 				t.Errorf("Blob Type = %q, want %q (mime %q)", got.Blob.Type, tt.wantType, got.Blob.MimeType)
+			}
+		})
+	}
+}
+
+// TestUpload_RejectsUnsupportedMIMEType covers the other half: content that
+// sniffs to a MIME type no blob type is defined for is refused before anything
+// is written, so a text file wearing a .png name never becomes an asset.
+func TestUpload_RejectsUnsupportedMIMEType(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		payload  []byte
+	}{
+		{name: "plain text", filename: "notes.txt", payload: []byte("just some plain text")},
+		{name: "pdf", filename: "paper.pdf", payload: []byte("%PDF-1.7\ntrailer\n")},
+		{name: "csv", filename: "table.csv", payload: []byte("a,b,c\n1,2,3\n")},
+		{
+			name:     "text behind an image name",
+			filename: "photo.png",
+			payload:  []byte("just some plain text"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, dataDir, db := newTestService(t)
+			user := seedUser(t, db, "uploader", model.RoleContributor)
+
+			got, err := svc.Upload(
+				context.Background(),
+				user.ID,
+				bytes.NewReader(tt.payload),
+				tt.filename,
+				int64(len(tt.payload)),
+			)
+			if !errors.Is(err, model.ErrUnsupportedMIMEType) {
+				t.Fatalf("Upload error = %v, want ErrUnsupportedMIMEType", err)
+			}
+			if got != nil {
+				t.Errorf("expected no asset alongside the error, got %+v", got)
+			}
+			if n := countAssets(t, db); n != 0 {
+				t.Errorf("rejected upload created %d asset record(s)", n)
+			}
+			if n := countBlobs(t, db); n != 0 {
+				t.Errorf("rejected upload created %d blob record(s)", n)
+			}
+			if files := mediaFiles(t, dataDir); len(files) != 0 {
+				t.Errorf("rejected upload left %v in storage", files)
 			}
 		})
 	}
