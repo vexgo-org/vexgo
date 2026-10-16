@@ -534,7 +534,7 @@ func (f *fakeClient) Enabled() bool { return f.loadedConfig != nil && f.loadedCo
 
 // newTestServiceWithClient builds a mailer service with an injected fake
 // SMTP client and cipher, for encryption-at-rest tests.
-func newTestServiceWithClient(t *testing.T, cipher SecretCipher) (*Service, *fakeClient, *gorm.DB) {
+func newTestServiceWithClient(t *testing.T, cipher secrets.SecretCipher) (*Service, *fakeClient, *gorm.DB) {
 	t.Helper()
 	db := newTestDB(t)
 	client := &fakeClient{}

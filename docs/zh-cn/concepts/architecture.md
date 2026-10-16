@@ -90,7 +90,7 @@ type FileRemover interface {
 
 - `notification` 实现 `Notifier`；由 `post`、`comment`、`user` 消费。
 - `storage.Storage` 实现 `FileRemover`；由 `post`、`user`、`auth` 用于文件清理。
-- `captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接缝；`settings` 自行声明 `SecretCipher`，`post`/`home` 自行声明 `ReadCache`。
+- `captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接缝；`post`/`home` 自行声明 `ReadCache`。`secrets` 是另一个例外：作为叶子包，它声明唯一的 `secrets.SecretCipher` 接口，由 `settings`、`comment`、`mailer` 共同消费。
 - 邮件是例外：`mailer.Service` 以具体类型注入 `auth` 与 `settings`。它只负责发送；验证令牌、密码重置与帐号数据仍留在各领域的 repository 中。
 
 ### 缓存后端（`internal/cache/`）
@@ -135,8 +135,8 @@ cmd/vexgo/main.go
 叶子包（无内部导入）：
     model/         ← 数据模型 + 共享接缝，被所有领域包导入
     config/        ← 配置解析，被 cli、app、database、sso、storage 导入
-    secrets/       ← 静态敏感信息的 AES-256-GCM cipher；各领域通过自己的
-                     SecretCipher 接口消费，由 app 装配
+    secrets/       ← 静态敏感信息的 AES-256-GCM cipher；声明共享的
+                     secrets.SecretCipher 接缝，由 settings、comment、mailer 消费
     cache/         ← 内存 + Valkey 后端；各领域通过自己的窄接缝
                      （CounterStore、StateStore、ReadCache）消费
     storage/       ← 本地磁盘与 S3 文件后端（仅导入 config）；由 upload

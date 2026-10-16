@@ -13,6 +13,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
 
 	"gorm.io/gorm"
 )
@@ -36,21 +37,12 @@ var (
 	ErrLLMConfigIncomplete = errors.New("LLM review requires an API key and endpoint")
 )
 
-// SecretCipher is the seam for encrypting the moderation API key at rest. It
-// is implemented by the secrets package and injected so it can be faked
-// in tests. A nil cipher means no key is configured: the key is stored as
-// plaintext.
-type SecretCipher interface {
-	Encrypt(plaintext string) (string, error)
-	Decrypt(stored string) (string, error)
-}
-
 // Deps holds the dependencies required by the comment domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Notifier  Notifier
-	Cipher    SecretCipher
+	Cipher    secrets.SecretCipher
 	// RateLimit stores the per-client request budget for comment creation.
 	// nil keeps the budget in-process; a distributed store shares one budget
 	// across instances.
@@ -65,7 +57,7 @@ type Notifier = model.Notifier
 type Service struct {
 	repo      Repository
 	notifier  Notifier
-	cipher    SecretCipher
+	cipher    secrets.SecretCipher
 	llmClient *http.Client
 }
 
