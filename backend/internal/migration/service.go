@@ -6,23 +6,27 @@ package migration
 
 import (
 	"github.com/vexgo-org/vexgo/backend/internal/secrets"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"gorm.io/gorm"
 )
 
 type Deps struct {
-	DB     *gorm.DB
-	Cipher secrets.SecretCipher
+	DB      *gorm.DB
+	Cipher  secrets.SecretCipher
+	Storage storage.Storage
 }
 
 type Service struct {
-	db     *gorm.DB
-	cipher secrets.SecretCipher
+	db      *gorm.DB
+	cipher  secrets.SecretCipher
+	storage storage.Storage
 }
 
 func NewService(deps Deps) *Service {
 	return &Service{
-		db:     deps.DB,
-		cipher: deps.Cipher,
+		db:      deps.DB,
+		cipher:  deps.Cipher,
+		storage: deps.Storage,
 	}
 }
 
