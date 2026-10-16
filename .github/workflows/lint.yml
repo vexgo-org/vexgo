@@ -38,7 +38,7 @@ jobs:
           just ensure-dist
 
       - name: Install gopls
-        run: go install golang.org/x/tools/gopls@latest
+        run: go install golang.org/x/tools/gopls@v0.23.0
 
       - name: Install deadcode
         run: go install golang.org/x/tools/cmd/deadcode@latest
