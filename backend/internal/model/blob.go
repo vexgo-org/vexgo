@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,11 +11,12 @@ import (
 
 type BlobType string
 
+var ErrUnsupportedMIMEType = errors.New("unsupported MIME type")
+
 const (
-	BlobTypeAudio   BlobType = "audio"
-	BlobTypeImage   BlobType = "image"
-	BlobTypeUnknown BlobType = "unknown"
-	BlobTypeVideo   BlobType = "video"
+	BlobTypeAudio BlobType = "audio"
+	BlobTypeImage BlobType = "image"
+	BlobTypeVideo BlobType = "video"
 )
 
 const (
@@ -37,14 +40,14 @@ type Blob struct {
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
-func BlobTypeFromMIME(mimeType string) BlobType {
+func BlobTypeFromMIME(mimeType string) (BlobType, error) {
 	switch {
 	case strings.HasPrefix(mimeType, "image/"):
-		return BlobTypeImage
+		return BlobTypeImage, nil
 	case strings.HasPrefix(mimeType, "video/"):
-		return BlobTypeVideo
+		return BlobTypeVideo, nil
 	case strings.HasPrefix(mimeType, "audio/"):
-		return BlobTypeAudio
+		return BlobTypeAudio, nil
 	}
-	return BlobTypeUnknown
+	return "", fmt.Errorf("%w: %s", ErrUnsupportedMIMEType, mimeType)
 }

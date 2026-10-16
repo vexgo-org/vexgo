@@ -74,7 +74,11 @@ func (s *Service) Upload(
 	if err != nil {
 		return nil, fmt.Errorf("detect MIME type: %w", err)
 	}
-	blobType := model.BlobTypeFromMIME(mimeType)
+
+	blobType, err := model.BlobTypeFromMIME(mimeType)
+	if err != nil {
+		return nil, err
+	}
 
 	// Put the file to the storage backend.
 	if err := s.storage.Put(
