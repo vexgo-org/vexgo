@@ -101,6 +101,25 @@ func TestBackfillAssetBlob_NoMediaFileTable(t *testing.T) {
 	}
 }
 
+// TestBackfillAssetBlob_NilStoragePanics pins the strict contract: a migration
+// service built without a storage backend must fail loudly. A silent skip would
+// leave a legacy library unmigrated with nothing in the logs to explain it.
+func TestBackfillAssetBlob_NilStoragePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("expected a missing storage backend to panic instead of skipping the migration")
+		}
+	}()
+
+	db := newAutoMigratedDB(t)
+	seedMediaFile(t, db, model.MediaFile{
+		URL:  "/uploads/504e504e-6f6e-4172-8373-f80912233455.png",
+		Size: 1,
+	})
+
+	_ = NewService(Deps{DB: db}).backfillAssetBlob()
+}
+
 // TestBackfillAssetBlob_NoMediaFiles covers an installation that has the table
 // but never uploaded anything.
 func TestBackfillAssetBlob_NoMediaFiles(t *testing.T) {

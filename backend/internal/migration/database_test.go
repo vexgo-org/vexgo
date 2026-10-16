@@ -101,9 +101,8 @@ func TestAutoMigrate_CreatesAllTables(t *testing.T) {
 
 func TestMigrateDB_RunsOnFreshAndExistingSchema(t *testing.T) {
 	// MigrateDB must be safe on a fresh database and idempotent afterwards.
-	db := newAutoMigratedDB(t)
+	svc, _, _ := newMigrationService(t)
 
-	svc := NewService(Deps{DB: db})
 	if err := svc.MigrateDB(); err != nil {
 		t.Fatalf("first MigrateDB: %v", err)
 	}
