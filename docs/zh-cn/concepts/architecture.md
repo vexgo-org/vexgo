@@ -112,8 +112,8 @@ type FileRemover interface {
 
 1. 接收 `cli.Execute()` 解析完成的配置：cobra 负责命令行参数，viper 按「参数 > 配置文件 > 环境变量 > 默认值」分层。
 2. 确保 JWT 密钥存在（开发环境生成随机兜底值）并应用前端地址默认值；SSO 结构体在配置解析阶段派生。
-3. 打开数据库并运行迁移/种子数据。
-4. 从 `settings_encryption_key` 构建静态加密 cipher（未设置时记录警告，敏感信息保持明文存储），并运行 `database.MigrateSecretsAtRest` 将仍为明文的敏感信息就地加密（幂等）。
+3. 打开数据库，运行迁移并写入种子数据。
+4. 从 `settings_encryption_key` 构建静态加密 cipher（未设置时记录警告，敏感信息保持明文存储），并运行 `migration.Service.MigrateSecrets` 将仍为明文的敏感信息就地加密（幂等）。
 5. 创建存储（本地或 S3）。
 6. 实例化每个领域的依赖并将它们装配到路由器中。
 
@@ -129,7 +129,8 @@ cmd/vexgo/main.go
     │       └─→ config        ← 分层解析（参数 > 文件 > 环境变量 > 默认值）
     └─→ internal/app          ← 组合根，导入所有包
             ├─→ config         ← 解析完成的 Config 类型（不导入领域包）
-            ├─→ database       ← Open/AutoMigrate/Seed（导入 config、model）
+            ├─→ database       ← Open/Seed（导入 config、model）
+            ├─→ migration      ← MigrateDB/MigrateSecrets（导入 model、secrets）
             ├─→ router         ← 路由注册（导入所有领域 handler）
             └─→ internal/*     ← 各领域包
 
@@ -292,7 +293,7 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ### 迁移与种子数据
 
-`database.AutoMigrate()` 创建或更新所有模型的表结构。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，并回填文章 slug。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
 
 ## 请求流程
 
@@ -348,7 +349,7 @@ likedPosts     := repo.BatchFindLikedPostIDs(ctx, postIDs, userID)  // 1 次 IN 
 
 - 使用内存 SQLite（`glebarez/sqlite`）进行快速、隔离的数据库测试。
 - 跨领域依赖改用 fake（`fakeNotifier`、`fakeFiles`），避免测试与其他领域耦合。
-- 每个测试使用 `AutoMigrate()` 创建全新数据库，仅注入所需数据。
+- 每个测试创建全新数据库——需要真实表结构时使用 `migration.Service.MigrateDB()`，否则使用针对性的 `AutoMigrate`——并仅注入所需数据。
 
 运行完整测试套件：
 

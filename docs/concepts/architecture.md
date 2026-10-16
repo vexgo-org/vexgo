@@ -112,8 +112,8 @@ The `internal/app/app.go` package is the composition root, also called the wirin
 
 1. Receives the configuration resolved by `cli.Execute()`: cobra parses the flags, and viper layers flags > config file > environment variables > defaults.
 2. Ensures the JWT secret exists (generating a random development fallback) and applies the frontend URL default; the SSO struct is derived during config resolution.
-3. Opens the database and runs migrations/seeding.
-4. Builds the at-rest cipher from `settings_encryption_key` (a warning is logged when unset, meaning secrets stay in plaintext) and runs `database.MigrateSecretsAtRest` to encrypt still-plaintext secrets in place (idempotent).
+3. Opens the database, runs migrations, and seeds default records.
+4. Builds the at-rest cipher from `settings_encryption_key` (a warning is logged when unset, meaning secrets stay in plaintext) and runs `migration.Service.MigrateSecrets` to encrypt still-plaintext secrets in place (idempotent).
 5. Creates storage (local or S3).
 6. Instantiates every domain's dependencies and wires them into the router.
 
@@ -129,7 +129,8 @@ cmd/vexgo/main.go
     │       └─→ config        ← layered resolution (flags > file > env > defaults)
     └─→ internal/app          ← composition root, imports everything
             ├─→ config         ← resolved Config type (no domain imports)
-            ├─→ database       ← Open/AutoMigrate/Seed (imports config, model)
+            ├─→ database       ← Open/Seed (imports config, model)
+            ├─→ migration      ← MigrateDB/MigrateSecrets (imports model, secrets)
             ├─→ router         ← route registration (imports all domain handlers)
             └─→ internal/*     ← domain packages
 
@@ -292,7 +293,7 @@ The database type is determined by the `db_type` config field or `DB_TYPE` envir
 
 ### Migrations and seeding
 
-`database.AutoMigrate()` creates or updates the schema for all models. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
+`migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, and backfills post slugs. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
 
 ## Request flow
 
@@ -348,7 +349,7 @@ Each domain package has its own `_test.go` files. The test infrastructure:
 
 - Uses in-memory SQLite (`glebarez/sqlite`) for fast, isolated database tests.
 - Fakes cross-domain dependencies (`fakeNotifier`, `fakeFiles`) to keep tests decoupled from other domains.
-- Each test creates a fresh database with `AutoMigrate()` and seeds only the data it needs.
+- Each test creates a fresh database — via `migration.Service.MigrateDB()` where the real schema is needed, or a targeted `AutoMigrate` — and seeds only the data it needs.
 
 To run the full test suite:
 
