@@ -90,7 +90,7 @@ The implementations are wired in `internal/app`, so no domain imports another do
 
 - `notification` implements `Notifier`; `post`, `comment`, and `user` consume it.
 - `storage.Storage` implements `FileRemover`; `post`, `user`, and `auth` consume it for file cleanup.
-- `captcha` implements the `CaptchaChecker` seam that `auth` declares; `settings` declares its own `SecretCipher` and `post`/`home` their own `ReadCache` the same way.
+- `captcha` implements the `CaptchaChecker` seam that `auth` declares; `post`/`home` declare their own `ReadCache` the same way. `secrets` is the other exception: as a leaf package it declares the single `secrets.SecretCipher` interface that `settings`, `comment`, and `mailer` all accept.
 - Email is an exception: `mailer.Service` is injected as a concrete type into `auth` and `settings`. It is send-only; verification tokens, password resets, and accounts stay in the domain repositories.
 
 ### Cache backends (`internal/cache/`)
@@ -135,8 +135,8 @@ cmd/vexgo/main.go
 Leaf packages (no internal imports):
     model/         ← data models + shared seams, imported by every domain
     config/        ← configuration parsing, imported by cli, app, database, sso, storage
-    secrets/       ← AES-256-GCM cipher for secrets at rest; domains consume it
-                     through their own SecretCipher interfaces, wired by app
+    secrets/       ← AES-256-GCM cipher for secrets at rest; declares the shared
+                     secrets.SecretCipher seam consumed by settings, comment, mailer
     cache/         ← memory + Valkey backends; domains consume it through their
                      own narrow seams (CounterStore, StateStore, ReadCache)
     storage/       ← local disk and S3 file backends (imports config only); consumed

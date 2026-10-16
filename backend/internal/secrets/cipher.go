@@ -26,9 +26,9 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-// SecretCipher is the seam the settings/comment/mailer Deps structs accept
-// (each declares its own structurally identical SecretCipher interface; any
-// implementation of this one satisfies all of them).
+// SecretCipher is the seam the settings/comment/mailer Deps structs accept,
+// so they share one interface instead of declaring structurally identical
+// copies. A nil cipher means no key is configured: values stay plaintext.
 type SecretCipher interface {
 	Encrypt(plaintext string) (string, error)
 	Decrypt(stored string) (string, error)
