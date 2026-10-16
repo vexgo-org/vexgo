@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -71,7 +70,7 @@ func (s *Service) Upload(
 
 	// Detect MIME type and blob type.
 	bufferedReader := bufio.NewReader(reader)
-	mimeType, err := detectMIMEType(bufferedReader)
+	mimeType, err := DetectMIMEType(bufferedReader)
 	if err != nil {
 		return nil, fmt.Errorf("detect MIME type: %w", err)
 	}
@@ -158,20 +157,4 @@ func (s *Service) rollbackUpload(ctx context.Context, key string) {
 			"err", err,
 		)
 	}
-}
-
-// detectMIMEType detects MIME type from the file header.
-func detectMIMEType(reader *bufio.Reader) (string, error) {
-	header, err := reader.Peek(512)
-	if err != nil &&
-		!errors.Is(err, io.EOF) &&
-		!errors.Is(err, bufio.ErrBufferFull) {
-		return "", fmt.Errorf("read file header: %w", err)
-	}
-
-	if len(header) == 0 {
-		return "", errors.New("empty file")
-	}
-
-	return http.DetectContentType(header), nil
 }

@@ -849,7 +849,7 @@ func TestDetectMIMEType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := detectMIMEType(bufio.NewReader(bytes.NewReader(tt.payload)))
+			got, err := DetectMIMEType(bufio.NewReader(bytes.NewReader(tt.payload)))
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("detectMIMEType(%d bytes) = %q, want an error", len(tt.payload), got)
@@ -876,7 +876,7 @@ func TestDetectMIMEType_DoesNotConsumeStream(t *testing.T) {
 	payload := pngPayload(4096)
 	reader := bufio.NewReader(bytes.NewReader(payload))
 
-	if _, err := detectMIMEType(reader); err != nil {
+	if _, err := DetectMIMEType(reader); err != nil {
 		t.Fatalf("detectMIMEType error: %v", err)
 	}
 
@@ -895,7 +895,7 @@ func TestDetectMIMEType_DoesNotConsumeStream(t *testing.T) {
 func TestDetectMIMEType_PropagatesReadError(t *testing.T) {
 	readErr := errors.New("connection reset")
 
-	_, err := detectMIMEType(bufio.NewReader(errReader{err: readErr}))
+	_, err := DetectMIMEType(bufio.NewReader(errReader{err: readErr}))
 	if !errors.Is(err, readErr) {
 		t.Fatalf("detectMIMEType error = %v, want it to wrap %v", err, readErr)
 	}
