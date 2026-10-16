@@ -9,6 +9,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// MigrateSecrets encrypts the plaintext secrets still stored at rest. It is a
+// no-op when no cipher is configured, so a server without
+// settings_encryption_key keeps storing and reading plaintext.
 func (s *Service) MigrateSecrets() error {
 	if s.cipher == nil {
 		return nil
@@ -25,7 +28,7 @@ func (s *Service) MigrateSecrets() error {
 	return nil
 }
 
-// MigrateSecretsAtRest encrypts the plaintext secrets at rest in place: the
+// migrateSecretsAtRest encrypts the plaintext secrets at rest in place: the
 // SMTP password and the AI / comment-moderation API keys. It runs once at
 // startup when a settings_encryption_key is configured, before any service
 // reads those rows.

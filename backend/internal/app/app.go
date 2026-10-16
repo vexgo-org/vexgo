@@ -96,8 +96,8 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("seed database: %w", err)
 	}
 
-	// Encrypt still-plaintext secrets in place when a key is configured.
-	// Idempotent: values already carrying the encrypted marker are skipped.
+	// Encrypt still-plaintext secrets. A no-op when no key is configured, and
+	// idempotent: values already carrying the encrypted marker are skipped.
 	if err := migrationSvc.MigrateSecrets(); err != nil {
 		return nil, err
 	}
