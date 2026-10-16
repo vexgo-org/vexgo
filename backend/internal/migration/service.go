@@ -1,3 +1,7 @@
+// Package migration runs the startup migrations that bring an existing
+// installation's schema and data up to date. It is invoked once from the
+// composition root, before any domain service reads the rows it touches, and
+// deliberately exposes no handlers or routes.
 package migration
 
 import (
@@ -22,6 +26,9 @@ func NewService(deps Deps) *Service {
 	}
 }
 
+// MigrateDB creates or updates the schema and applies the data migrations
+// that depend on it. Seeding of default records is not part of this: it runs
+// afterwards, from database.Seed.
 func (s *Service) MigrateDB() error {
 	if err := autoMigrate(s.db); err != nil {
 		return err

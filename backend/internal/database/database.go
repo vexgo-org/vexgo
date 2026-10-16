@@ -1,6 +1,7 @@
-// Package database handles the database connection, schema migration and
-// default seed data. It is the single source of the *gorm.DB instance which is
-// injected into every domain package via constructors.
+// Package database handles the database connection and default seed data. It
+// is the single source of the *gorm.DB instance which is injected into every
+// domain package via constructors. Schema creation and the startup data
+// migrations live in the migration package.
 package database
 
 import (

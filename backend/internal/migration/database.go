@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// AutoMigrate creates or updates the database schema for all models.
+// autoMigrate creates or updates the database schema for all models.
 func autoMigrate(db *gorm.DB) error {
 	// Remove duplicate likes (same post+user) before the composite unique
 	// index is created, so pre-existing duplicate data cannot break the
