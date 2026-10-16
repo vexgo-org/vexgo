@@ -6,21 +6,13 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
 	"gorm.io/gorm"
 )
 
-// SecretCipher is the seam for decrypting the SMTP password stored at rest.
-// It is implemented by the secrets package and injected so it can be
-// faked in tests. A nil cipher means no key is configured: the stored
-// password is used as-is.
-type SecretCipher interface {
-	Encrypt(plaintext string) (string, error)
-	Decrypt(stored string) (string, error)
-}
-
 type Deps struct {
 	DB     *gorm.DB
-	Cipher SecretCipher
+	Cipher secrets.SecretCipher
 	// Client overrides the SMTP client; nil uses the real one. Intended for
 	// tests so they can assert on the configuration handed to LoadConfig.
 	Client SMTPMailer
@@ -29,7 +21,7 @@ type Deps struct {
 type Service struct {
 	repo   Repository
 	client SMTPMailer
-	cipher SecretCipher
+	cipher secrets.SecretCipher
 }
 
 // mailCaptureHook, when non-nil, receives the rendered parts of outgoing

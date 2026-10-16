@@ -20,6 +20,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
 
 	"gorm.io/gorm"
 )
@@ -48,21 +49,13 @@ var (
 	ErrCannotDeleteDefault   = errors.New("default theme cannot be deleted")
 )
 
-// SecretCipher is the seam for encrypting secrets at rest. It is implemented
-// by the secrets package and injected so it can be faked in tests. A nil
-// cipher means no key is configured: secrets are stored as plaintext.
-type SecretCipher interface {
-	Encrypt(plaintext string) (string, error)
-	Decrypt(stored string) (string, error)
-}
-
 // Deps holds the dependencies required by the settings domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Themes    *public.Renderer
 	Mailer    *mailer.Service
-	Cipher    SecretCipher
+	Cipher    secrets.SecretCipher
 }
 
 // Service contains the business logic of the settings domain.
@@ -70,7 +63,7 @@ type Service struct {
 	repo   Repository
 	themes *public.Renderer
 	mailer *mailer.Service
-	cipher SecretCipher
+	cipher secrets.SecretCipher
 }
 
 // NewService creates a settings service with the given dependencies.
