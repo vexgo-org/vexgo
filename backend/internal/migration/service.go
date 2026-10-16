@@ -1,18 +1,24 @@
 package migration
 
-import "gorm.io/gorm"
+import (
+	"github.com/vexgo-org/vexgo/backend/internal/secrets"
+	"gorm.io/gorm"
+)
 
 type Deps struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	Cipher secrets.SecretCipher
 }
 
 type Service struct {
-	db *gorm.DB
+	db     *gorm.DB
+	cipher secrets.SecretCipher
 }
 
 func NewService(deps Deps) *Service {
 	return &Service{
-		db: deps.DB,
+		db:     deps.DB,
+		cipher: deps.Cipher,
 	}
 }
 
