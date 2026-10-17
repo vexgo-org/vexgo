@@ -160,6 +160,18 @@ export const getVexGoAPI = () => {
   };
 
   /**
+   * Returns the original content of an asset.
+   * @summary Get original asset content
+   */
+  const getAssetsIdOriginal = (id: number) => {
+    return customInstance<Blob>({
+      url: `/assets/${id}/original`,
+      method: "GET",
+      responseType: "blob",
+    });
+  };
+
+  /**
    * Sends a verification link to the new address when
    * SMTP is enabled, or applies the change directly
    * otherwise. The 200 response indicates the request
@@ -1417,6 +1429,7 @@ export const getVexGoAPI = () => {
   return {
     postAssetsDeleteId,
     postAssetsUpload,
+    getAssetsIdOriginal,
     putAuthEmail,
     getAuthEmailVerify,
     postAuthEmailVerifyResend,
@@ -1514,6 +1527,9 @@ export type PostAssetsDeleteIdResult = NonNullable<
 >;
 export type PostAssetsUploadResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsUpload"]>>
+>;
+export type GetAssetsIdOriginalResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getAssetsIdOriginal"]>>
 >;
 export type PutAuthEmailResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putAuthEmail"]>>

@@ -2638,6 +2638,69 @@
                 ]
             }
         },
+        "/assets/{id}/original": {
+            "get": {
+                "description": "Returns the original content of an asset.",
+                "parameters": [
+                    {
+                        "description": "asset id",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "minimum": 1,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "original asset content"
+                    },
+                    "404": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "failed to get original asset"
+                    },
+                    "503": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "asset content unavailable"
+                    }
+                },
+                "summary": "Get original asset content",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/auth/email": {
             "put": {
                 "description": "Sends a verification link to the new address when\nSMTP is enabled, or applies the change directly\notherwise. The 200 response indicates the request\nwas accepted; the body distinguishes the two paths\nvia the `pending` boolean.",
