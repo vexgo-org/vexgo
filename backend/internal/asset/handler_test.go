@@ -36,13 +36,15 @@ import (
 // minted for the end-to-end route pass h.mw.JWTAuth.
 var handlerJWTSecret = []byte("asset-handler-test-secret-at-least-32-bytes-long")
 
-// handlerFixture carries the handler plus the two engines the tests need:
-// bare routes let a test drive the gin context directly, while guarded routes
-// run the real JWT middleware end to end.
+// handlerFixture carries the handler plus the three engines the tests need:
+// bare routes let a test drive the gin context directly, guarded routes run
+// the real JWT middleware end to end, and routed routes mount RegisterRoutes
+// itself, so the role gate and the documented paths are what a request meets.
 type handlerFixture struct {
 	h       *Handler
 	bare    *gin.Engine
 	guarded *gin.Engine
+	routed  *gin.Engine
 	dataDir string
 	db      *gorm.DB
 }
@@ -68,18 +70,26 @@ func newHandlerFixture(t *testing.T) *handlerFixture {
 	guarded.Use(h.mw.JWTAuth())
 	registerAssetRoutes(guarded, h)
 
+	// This one goes through RegisterRoutes, so the middleware chain and the
+	// paths come from route.go rather than from the test file. The other two
+	// engines exist to drive a single handler; this one proves the routes as
+	// registered are the ones that enforce the role gate.
+	routed := gin.New()
+	h.RegisterRoutes(routed.Group("/api"))
+
 	return &handlerFixture{
 		h:       h,
 		bare:    bare,
 		guarded: guarded,
+		routed:  routed,
 		dataDir: dataDir,
 		db:      db,
 	}
 }
 
-// registerAssetRoutes mounts the documented surface: the param name has to
-// match the swag annotation (`@Param id path int`), since that is the name
-// Handler.Delete reads back with c.Param.
+// registerAssetRoutes mounts the two handlers directly at the fixture's own
+// paths. They intentionally differ from route.go, which owns the documented
+// paths; the routed engine covers those.
 func registerAssetRoutes(r *gin.Engine, h *Handler) {
 	r.POST("/api/asset/upload", h.Upload)
 	r.POST("/api/asset/delete/:id", h.Delete)
@@ -264,6 +274,41 @@ func identityOf(user model.User) map[string]string {
 		"X-Test-User-ID": strconv.FormatUint(uint64(user.ID), 10),
 		"X-Test-Role":    user.Role,
 	}
+}
+
+// bearerOf builds the header the real JWTAuth middleware reads, so a request
+// through the routed engine is authenticated exactly as the API authenticates
+// it.
+func bearerOf(t *testing.T, user model.User) map[string]string {
+	t.Helper()
+	return map[string]string{
+		"Authorization": "Bearer " + mintToken(t, user.ID, user.Role),
+	}
+}
+
+// uploadOnRoutedRoute performs an upload through RegisterRoutes, so every
+// middleware in route.go runs.
+func (f *handlerFixture) uploadOnRoutedRoute(
+	t *testing.T,
+	user model.User,
+	body io.Reader,
+	contentType string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	return perform(t, f.routed, http.MethodPost, "/api/assets/upload",
+		body, contentType, bearerOf(t, user))
+}
+
+// deleteOnRoutedRoute performs a delete through RegisterRoutes, so every
+// middleware in route.go runs.
+func (f *handlerFixture) deleteOnRoutedRoute(
+	t *testing.T,
+	user model.User,
+	assetID uint,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	return perform(t, f.routed, http.MethodPost,
+		"/api/assets/delete/"+strconv.Itoa(int(assetID)), nil, "", bearerOf(t, user))
 }
 
 // --- shared assertions --------------------------------------------------
@@ -819,6 +864,103 @@ func TestHandlerDelete_RequiresAuthenticationOnMountedRoute(t *testing.T) {
 	if err := f.db.First(&model.Asset{}, asset.ID).Error; err != nil {
 		t.Errorf("unauthenticated delete removed the asset: %v", err)
 	}
+}
+
+// TestRoutes_DisallowGuestUpload pins the role gate in route.go. A guest is a
+// valid session, so authentication passes and the permission middleware is the
+// only thing refusing the request: it must answer 403 and leave no asset, no
+// blob and no object behind.
+func TestRoutes_DisallowGuestUpload(t *testing.T) {
+	f := newHandlerFixture(t)
+	guest := seedUser(t, f.db, "guest", model.RoleGuest)
+	body, contentType := multipartBody(t, "file", "photo.png", pngPayload(256))
+
+	recorder := f.uploadOnRoutedRoute(t, guest, body, contentType)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body %s)", recorder.Code, recorder.Body.String())
+	}
+	errorField(t, recorder)
+	assertNothingStored(t, f)
+}
+
+// TestRoutes_DisallowGuestDelete covers both ownership directions, because the
+// gate sits in front of the handler: a guest cannot delete an asset it owns
+// either, so the 403 cannot be confused with the ownership check in
+// Service.Delete.
+func TestRoutes_DisallowGuestDelete(t *testing.T) {
+	f := newHandlerFixture(t)
+	guest := seedUser(t, f.db, "guest", model.RoleGuest)
+	admin := seedUser(t, f.db, "admin", model.RoleAdmin)
+
+	for _, tt := range []struct {
+		name  string
+		owner model.User
+	}{
+		{name: "own asset", owner: guest},
+		{name: "another user's asset", owner: admin},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			asset := seedAsset(t, f.db, tt.owner.ID, "mine.png")
+
+			recorder := f.deleteOnRoutedRoute(t, guest, asset.ID)
+
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want 403 (body %s)", recorder.Code, recorder.Body.String())
+			}
+			errorField(t, recorder)
+			if err := f.db.First(&model.Asset{}, asset.ID).Error; err != nil {
+				t.Errorf("guest delete removed the asset: %v", err)
+			}
+		})
+	}
+}
+
+// TestRoutes_AllowNonGuestRoles pins the other half: the gate names contributor
+// and up, so every one of those roles still reaches the handler. An allowlist
+// that accidentally omits a role would otherwise only show up in production.
+func TestRoutes_AllowNonGuestRoles(t *testing.T) {
+	for _, role := range []string{
+		model.RoleContributor,
+		model.RoleAuthor,
+		model.RoleAdmin,
+		model.RoleSuperAdmin,
+	} {
+		t.Run(role, func(t *testing.T) {
+			f := newHandlerFixture(t)
+			user := seedUser(t, f.db, role, role)
+
+			body, contentType := multipartBody(t, "file", "photo.png", pngPayload(256))
+			upload := f.uploadOnRoutedRoute(t, user, body, contentType)
+			if upload.Code != http.StatusOK {
+				t.Fatalf("upload status = %d, want 200 (body %s)", upload.Code, upload.Body.String())
+			}
+			created := decodeUploadResponse(t, upload)
+
+			del := f.deleteOnRoutedRoute(t, user, created.ID)
+			if del.Code != http.StatusOK {
+				t.Fatalf("delete status = %d, want 200 (body %s)", del.Code, del.Body.String())
+			}
+			if err := f.db.First(&model.Asset{}, created.ID).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
+				t.Errorf("asset %d survived its own delete: %v", created.ID, err)
+			}
+		})
+	}
+}
+
+// TestRoutes_UnknownRoleIsRefused closes the gate from the other side: a role
+// string nobody recognizes must not be treated as permitted.
+func TestRoutes_UnknownRoleIsRefused(t *testing.T) {
+	f := newHandlerFixture(t)
+	stranger := seedUser(t, f.db, "stranger", "wizard")
+	body, contentType := multipartBody(t, "file", "photo.png", pngPayload(256))
+
+	recorder := f.uploadOnRoutedRoute(t, stranger, body, contentType)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body %s)", recorder.Code, recorder.Body.String())
+	}
+	assertNothingStored(t, f)
 }
 
 // TestHandlerDelete_OwnerSucceeds is the happy path: a soft delete, a message,
