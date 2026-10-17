@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -443,12 +444,39 @@ func TestUpload_RejectsInvalidParameters(t *testing.T) {
 		reader   io.Reader
 		filename string
 		size     int64
+		wantErr  error
 	}{
+		// A nil reader is a programming error inside the server rather than a
+		// client mistake, so it has no sentinel to match on.
 		{name: "nil reader", reader: nil, filename: "photo.png", size: int64(len(payload))},
-		{name: "empty filename", reader: strings.NewReader(payload), filename: "", size: int64(len(payload))},
-		{name: "zero size", reader: strings.NewReader(payload), filename: "photo.png", size: 0},
-		{name: "negative size", reader: strings.NewReader(payload), filename: "photo.png", size: -1},
-		{name: "negative size with large magnitude", reader: strings.NewReader(payload), filename: "photo.png", size: -1 << 40},
+		{
+			name:     "empty filename",
+			reader:   strings.NewReader(payload),
+			filename: "",
+			size:     int64(len(payload)),
+			wantErr:  ErrEmptyFilename,
+		},
+		{
+			name:     "zero size",
+			reader:   strings.NewReader(payload),
+			filename: "photo.png",
+			size:     0,
+			wantErr:  ErrInvalidFileSize,
+		},
+		{
+			name:     "negative size",
+			reader:   strings.NewReader(payload),
+			filename: "photo.png",
+			size:     -1,
+			wantErr:  ErrInvalidFileSize,
+		},
+		{
+			name:     "negative size with large magnitude",
+			reader:   strings.NewReader(payload),
+			filename: "photo.png",
+			size:     -1 << 40,
+			wantErr:  ErrInvalidFileSize,
+		},
 		{name: "nil reader and bad size", reader: nil, filename: "photo.png", size: -5},
 	}
 
@@ -467,6 +495,9 @@ func TestUpload_RejectsInvalidParameters(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected an error for invalid parameters, got nil")
 			}
+			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {
+				t.Errorf("Upload error = %v, want %v", err, tt.wantErr)
+			}
 			if got != nil {
 				t.Errorf("expected no asset alongside the error, got %+v", got)
 			}
@@ -475,6 +506,97 @@ func TestUpload_RejectsInvalidParameters(t *testing.T) {
 			}
 			if n := countBlobs(t, db); n != 0 {
 				t.Errorf("rejected upload created %d blob record(s)", n)
+			}
+			if files := mediaFiles(t, dataDir); len(files) != 0 {
+				t.Errorf("rejected upload left %v in storage", files)
+			}
+		})
+	}
+}
+
+// TestUpload_FilenameLengthMatchesColumnLimit pins the length guard to the
+// column it protects. The column counts characters, so a name of exactly
+// MaxAssetFilenameLength multibyte runes is accepted — the case a byte-length
+// check would wrongly refuse — and one rune more is refused before anything is
+// written.
+func TestUpload_FilenameLengthMatchesColumnLimit(t *testing.T) {
+	accepted := []struct {
+		name     string
+		filename string
+	}{
+		{
+			name:     "ascii at the limit",
+			filename: strings.Repeat("a", model.MaxAssetFilenameLength-4) + ".png",
+		},
+		{
+			// 255 three-byte runes, 765 bytes: the reason the guard counts
+			// characters.
+			name:     "multibyte at the limit",
+			filename: strings.Repeat("写", model.MaxAssetFilenameLength-4) + ".png",
+		},
+	}
+
+	for _, tt := range accepted {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, _, db := newTestService(t)
+			user := seedUser(t, db, "uploader", model.RoleContributor)
+			payload := pngPayload(64)
+
+			got, err := svc.Upload(
+				context.Background(),
+				user.ID,
+				strings.NewReader(string(payload)),
+				tt.filename,
+				int64(len(payload)),
+			)
+			if err != nil {
+				t.Fatalf("Upload(%d runes) error: %v", utf8.RuneCountInString(tt.filename), err)
+			}
+			if got.OriginalName != tt.filename {
+				t.Errorf("OriginalName round-trip changed: got %d runes, want %d",
+					utf8.RuneCountInString(got.OriginalName), utf8.RuneCountInString(tt.filename))
+			}
+			if n := countAssets(t, db); n != 1 {
+				t.Errorf("stored %d asset(s), want 1", n)
+			}
+		})
+	}
+
+	rejected := []struct {
+		name     string
+		filename string
+	}{
+		{
+			name:     "ascii over the limit",
+			filename: strings.Repeat("a", model.MaxAssetFilenameLength-3) + ".png",
+		},
+		{
+			name:     "multibyte over the limit",
+			filename: strings.Repeat("写", model.MaxAssetFilenameLength-3) + ".png",
+		},
+	}
+
+	for _, tt := range rejected {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, dataDir, db := newTestService(t)
+			user := seedUser(t, db, "uploader", model.RoleContributor)
+			payload := pngPayload(64)
+
+			got, err := svc.Upload(
+				context.Background(),
+				user.ID,
+				strings.NewReader(string(payload)),
+				tt.filename,
+				int64(len(payload)),
+			)
+			if !errors.Is(err, ErrFilenameTooLong) {
+				t.Fatalf("Upload error = %v, want ErrFilenameTooLong", err)
+			}
+			if got != nil {
+				t.Errorf("expected no asset alongside the error, got %+v", got)
+			}
+			if n := countAssets(t, db); n != 0 {
+				t.Errorf("rejected upload created %d asset record(s)", n)
 			}
 			if files := mediaFiles(t, dataDir); len(files) != 0 {
 				t.Errorf("rejected upload left %v in storage", files)
