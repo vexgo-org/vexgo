@@ -11,4 +11,10 @@ var (
 	ErrInvalidExtension = errors.New("invalid file extension")
 	// ErrEmptyFile identifies the file to read is empty.
 	ErrEmptyFile = errors.New("empty file")
+	// ErrInvalidFileSize means the declared file size is invalid.
+	ErrInvalidFileSize = errors.New("invalid file size")
+	// ErrEmptyFilename means the filename is empty.
+	ErrEmptyFilename = errors.New("filename is empty")
+	// ErrFilenameTooLong means the filename exceeds `model.MaxAssetFilenameLength`.
+	ErrFilenameTooLong = errors.New("filename is too long")
 )
