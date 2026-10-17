@@ -1,5 +1,7 @@
 package asset
 
+import "io"
+
 type Actor struct {
 	ID   uint
 	Role string
@@ -12,4 +14,12 @@ type UploadResponse struct {
 
 type MessageResponse struct {
 	Message string `json:"message" example:"File deleted"`
+}
+
+type OriginalContent struct {
+	Reader io.ReadCloser
+
+	MIMEType string
+	Filename string
+	Size     int64
 }

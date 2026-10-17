@@ -17,4 +17,7 @@ var (
 	ErrEmptyFilename = errors.New("filename is empty")
 	// ErrFilenameTooLong means the filename exceeds `model.MaxAssetFilenameLength`.
 	ErrFilenameTooLong = errors.New("filename is too long")
+	// ErrContentUnavailable means that an asset and a blob records exist in database,
+	// while the physical file is unavailable.
+	ErrContentUnavailable = errors.New("file is unavailable")
 )
