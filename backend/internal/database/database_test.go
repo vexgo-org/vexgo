@@ -12,6 +12,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/database"
 	"github.com/vexgo-org/vexgo/backend/internal/migration"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -33,7 +34,10 @@ func newSeededDB(t *testing.T) *gorm.DB {
 		t.Fatalf("get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := migration.NewService(migration.Deps{DB: db}).MigrateDB(); err != nil {
+	if err := migration.NewService(migration.Deps{
+		DB:      db,
+		Storage: storage.NewLocalStorage(t.TempDir()),
+	}).MigrateDB(); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return db

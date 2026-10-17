@@ -86,8 +86,9 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	migrationSvc := migration.NewService(migration.Deps{
-		DB:     db,
-		Cipher: cipher,
+		DB:      db,
+		Cipher:  cipher,
+		Storage: storage,
 	})
 	if err := migrationSvc.MigrateDB(); err != nil {
 		return nil, fmt.Errorf("migrate database: %w", err)
