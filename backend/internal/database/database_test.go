@@ -1,4 +1,4 @@
-package database
+package database_test
 
 import (
 	"fmt"
@@ -9,13 +9,20 @@ import (
 	"testing"
 
 	"github.com/vexgo-org/vexgo/backend/internal/config"
+	"github.com/vexgo-org/vexgo/backend/internal/database"
+	"github.com/vexgo-org/vexgo/backend/internal/migration"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
-func newMigratedDB(t *testing.T) *gorm.DB {
+// newSeededDB opens an in-memory SQLite database carrying the production
+// schema, so Seed is exercised against exactly the tables migration creates.
+// This file is an external test package so it can import migration even if
+// migration later depends on database: an in-package test would then form an
+// import cycle.
+func newSeededDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -26,8 +33,8 @@ func newMigratedDB(t *testing.T) *gorm.DB {
 		t.Fatalf("get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := AutoMigrate(db); err != nil {
-		t.Fatalf("auto migrate: %v", err)
+	if err := migration.NewService(migration.Deps{DB: db}).MigrateDB(); err != nil {
+		t.Fatalf("migrate: %v", err)
 	}
 	return db
 }
@@ -39,7 +46,7 @@ func newMigratedDB(t *testing.T) *gorm.DB {
 // handle, unlike Linux where unlink on an open file is allowed.
 func openFileBackedDB(t *testing.T, cfg *config.Config, dataDir string) *gorm.DB {
 	t.Helper()
-	db, err := Open(cfg, dataDir)
+	db, err := database.Open(cfg, dataDir)
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -75,84 +82,91 @@ func TestOpen_CreatesMissingDataDir(t *testing.T) {
 	}
 }
 
-func TestAutoMigrate_DeduplicatesExistingLikes(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open test db: %v", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("get sql.DB: %v", err)
-	}
-	sqlDB.SetMaxOpenConns(1)
-	if err := AutoMigrate(db); err != nil {
-		t.Fatalf("first migrate: %v", err)
-	}
-
-	// Simulate legacy data: drop the unique index, insert duplicate likes.
-	if err := db.Migrator().DropIndex(&model.Like{}, "idx_likes_post_user"); err != nil {
-		t.Fatalf("drop index: %v", err)
-	}
-	if err := db.Create(&model.Like{PostID: 1, UserID: 1}).Error; err != nil {
-		t.Fatalf("seed like 1: %v", err)
-	}
-	if err := db.Create(&model.Like{PostID: 1, UserID: 1}).Error; err != nil {
-		t.Fatalf("seed duplicate like: %v", err)
-	}
-	if err := db.Create(&model.Like{PostID: 1, UserID: 2}).Error; err != nil {
-		t.Fatalf("seed like 2: %v", err)
+// TestOpenMariaDBRoutesToMySQL verifies that the "mariadb" DB type is treated
+// identically to "mysql": it must take the MySQL connection path (not fall
+// through to SQLite or PostgreSQL) and use the configured host/port.
+func TestOpenMariaDBRoutesToMySQL(t *testing.T) {
+	port := freePort(t)
+	cfg := &config.Config{
+		DBType:     "mariadb",
+		DBUser:     "vexgo",
+		DBHost:     "127.0.0.1",
+		DBPort:     port,
+		DBName:     "vexgo",
+		DBPassword: "secret",
 	}
 
-	// Re-running AutoMigrate must deduplicate and recreate the index.
-	if err := AutoMigrate(db); err != nil {
-		t.Fatalf("second migrate with duplicates: %v", err)
+	db, err := database.Open(cfg, "")
+	if db != nil {
+		t.Fatalf("expected no DB handle for unreachable MariaDB, got %v", db)
 	}
-	var count int64
-	if err := db.Model(&model.Like{}).Count(&count).Error; err != nil {
-		t.Fatalf("count likes: %v", err)
+	if err == nil {
+		t.Fatal("expected connection error for unreachable MariaDB, got nil")
 	}
-	if count != 2 {
-		t.Errorf("expected 2 likes after dedupe, got %d", count)
+	// The error must originate from the MySQL connection path, proving
+	// "mariadb" routes to openMySQL rather than SQLite/PostgreSQL.
+	if !strings.Contains(err.Error(), "MySQL") {
+		t.Fatalf("expected MySQL connection error, got: %v", err)
+	}
+	// And it must have attempted the configured host/port (config-driven DSN).
+	if !strings.Contains(err.Error(), fmt.Sprintf("127.0.0.1:%d", port)) {
+		t.Fatalf("expected connection attempt at configured host/port, got: %v", err)
 	}
 }
 
-func TestAutoMigrate_CreatesAllTables(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open test db: %v", err)
-	}
-	if err := AutoMigrate(db); err != nil {
-		t.Fatalf("AutoMigrate error: %v", err)
+// TestOpenMariaDBViaEnv verifies the "mariadb" type resolves from the
+// DB_TYPE environment variable and uses the DB_PORT env fallback.
+func TestOpenMariaDBViaEnv(t *testing.T) {
+	t.Setenv("DB_TYPE", "mariadb")
+	port := freePort(t)
+	t.Setenv("DB_PORT", fmt.Sprintf("%d", port))
+
+	cfg := &config.Config{
+		DBType: "", // force fallback to environment variable
+		DBHost: "127.0.0.1",
+		DBName: "vexgo",
+		DBUser: "vexgo",
 	}
 
-	// Every model registered in AutoMigrate must produce a table.
-	for _, m := range []any{
-		&model.Post{},
-		&model.User{},
-		&model.Tag{},
-		&model.Category{},
-		&model.Comment{},
-		&model.Like{},
-		&model.MediaFile{},
-		&model.SMTPConfig{},
-		&model.Captcha{},
-		&model.GeneralSettings{},
-		&model.CommentModerationConfig{},
-		&model.AIConfig{},
-		&model.SSOBinding{},
-		&model.ThemeConfig{},
-		&model.Notification{},
-		&model.CreatorApplication{},
-	} {
-		if !db.Migrator().HasTable(m) {
-			t.Errorf("expected table for %T", m)
-		}
+	db, err := database.Open(cfg, "")
+	if db != nil {
+		t.Fatalf("expected no DB handle, got %v", db)
+	}
+	if err == nil {
+		t.Fatal("expected connection error, got nil")
+	}
+	if !strings.Contains(err.Error(), "MySQL") {
+		t.Fatalf("expected MariaDB (via env) to route to MySQL path, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), fmt.Sprintf("127.0.0.1:%d", port)) {
+		t.Fatalf("expected DB_PORT env fallback to be used, got: %v", err)
+	}
+}
+
+// TestOpenMySQLStillRoutesToMySQL guards against regressions: the explicit
+// "mysql" type must continue to take the MySQL path.
+func TestOpenMySQLStillRoutesToMySQL(t *testing.T) {
+	port := freePort(t)
+	cfg := &config.Config{
+		DBType: "mysql",
+		DBHost: "127.0.0.1",
+		DBPort: port,
+		DBName: "vexgo",
+		DBUser: "vexgo",
+	}
+
+	db, err := database.Open(cfg, "")
+	if db != nil {
+		t.Fatalf("expected no DB handle, got %v", db)
+	}
+	if err == nil || !strings.Contains(err.Error(), "MySQL") {
+		t.Fatalf("expected MySQL routing, got err=%v", err)
 	}
 }
 
 func TestSeed_CreatesDefaults(t *testing.T) {
-	db := newMigratedDB(t)
-	if err := Seed(db); err != nil {
+	db := newSeededDB(t)
+	if err := database.Seed(db); err != nil {
 		t.Fatalf("Seed error: %v", err)
 	}
 
@@ -212,11 +226,11 @@ func TestSeed_CreatesDefaults(t *testing.T) {
 }
 
 func TestSeed_Idempotent(t *testing.T) {
-	db := newMigratedDB(t)
-	if err := Seed(db); err != nil {
+	db := newSeededDB(t)
+	if err := database.Seed(db); err != nil {
 		t.Fatalf("first Seed error: %v", err)
 	}
-	if err := Seed(db); err != nil {
+	if err := database.Seed(db); err != nil {
 		t.Fatalf("second Seed error: %v", err)
 	}
 
@@ -238,7 +252,7 @@ func TestSeed_Idempotent(t *testing.T) {
 }
 
 func TestSeed_PreservesExistingAdmin(t *testing.T) {
-	db := newMigratedDB(t)
+	db := newSeededDB(t)
 	// Pre-existing admin with a custom email must not be overwritten.
 	existing := model.User{
 		Username:      "admin",
@@ -251,7 +265,7 @@ func TestSeed_PreservesExistingAdmin(t *testing.T) {
 		t.Fatalf("seed existing admin: %v", err)
 	}
 
-	if err := Seed(db); err != nil {
+	if err := database.Seed(db); err != nil {
 		t.Fatalf("Seed error: %v", err)
 	}
 	var admin model.User
@@ -275,86 +289,4 @@ func freePort(t *testing.T) int {
 	port := l.Addr().(*net.TCPAddr).Port
 	_ = l.Close()
 	return port
-}
-
-// TestOpenMariaDBRoutesToMySQL verifies that the "mariadb" DB type is treated
-// identically to "mysql": it must take the MySQL connection path (not fall
-// through to SQLite or PostgreSQL) and use the configured host/port.
-func TestOpenMariaDBRoutesToMySQL(t *testing.T) {
-	port := freePort(t)
-	cfg := &config.Config{
-		DBType:     "mariadb",
-		DBUser:     "vexgo",
-		DBHost:     "127.0.0.1",
-		DBPort:     port,
-		DBName:     "vexgo",
-		DBPassword: "secret",
-	}
-
-	db, err := Open(cfg, "")
-	if db != nil {
-		t.Fatalf("expected no DB handle for unreachable MariaDB, got %v", db)
-	}
-	if err == nil {
-		t.Fatal("expected connection error for unreachable MariaDB, got nil")
-	}
-	// The error must originate from the MySQL connection path, proving
-	// "mariadb" routes to openMySQL rather than SQLite/PostgreSQL.
-	if !strings.Contains(err.Error(), "MySQL") {
-		t.Fatalf("expected MySQL connection error, got: %v", err)
-	}
-	// And it must have attempted the configured host/port (config-driven DSN).
-	if !strings.Contains(err.Error(), fmt.Sprintf("127.0.0.1:%d", port)) {
-		t.Fatalf("expected connection attempt at configured host/port, got: %v", err)
-	}
-}
-
-// TestOpenMariaDBViaEnv verifies the "mariadb" type resolves from the
-// DB_TYPE environment variable and uses the DB_PORT env fallback.
-func TestOpenMariaDBViaEnv(t *testing.T) {
-	t.Setenv("DB_TYPE", "mariadb")
-	port := freePort(t)
-	t.Setenv("DB_PORT", fmt.Sprintf("%d", port))
-
-	cfg := &config.Config{
-		DBType: "", // force fallback to environment variable
-		DBHost: "127.0.0.1",
-		DBName: "vexgo",
-		DBUser: "vexgo",
-	}
-
-	db, err := Open(cfg, "")
-	if db != nil {
-		t.Fatalf("expected no DB handle, got %v", db)
-	}
-	if err == nil {
-		t.Fatal("expected connection error, got nil")
-	}
-	if !strings.Contains(err.Error(), "MySQL") {
-		t.Fatalf("expected MariaDB (via env) to route to MySQL path, got: %v", err)
-	}
-	if !strings.Contains(err.Error(), fmt.Sprintf("127.0.0.1:%d", port)) {
-		t.Fatalf("expected DB_PORT env fallback to be used, got: %v", err)
-	}
-}
-
-// TestOpenMySQLStillRoutesToMySQL guards against regressions: the explicit
-// "mysql" type must continue to take the MySQL path.
-func TestOpenMySQLStillRoutesToMySQL(t *testing.T) {
-	port := freePort(t)
-	cfg := &config.Config{
-		DBType: "mysql",
-		DBHost: "127.0.0.1",
-		DBPort: port,
-		DBName: "vexgo",
-		DBUser: "vexgo",
-	}
-
-	db, err := Open(cfg, "")
-	if db != nil {
-		t.Fatalf("expected no DB handle, got %v", db)
-	}
-	if err == nil || !strings.Contains(err.Error(), "MySQL") {
-		t.Fatalf("expected MySQL routing, got err=%v", err)
-	}
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/home"
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/migration"
 	"github.com/vexgo-org/vexgo/backend/internal/notification"
 	"github.com/vexgo-org/vexgo/backend/internal/page"
 	"github.com/vexgo-org/vexgo/backend/internal/post"
@@ -83,23 +84,22 @@ func New(cfg *config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	if err := database.AutoMigrate(db); err != nil {
-		return nil, fmt.Errorf("auto migrate: %w", err)
+
+	migrationSvc := migration.NewService(migration.Deps{
+		DB:     db,
+		Cipher: cipher,
+	})
+	if err := migrationSvc.MigrateDB(); err != nil {
+		return nil, fmt.Errorf("migrate database: %w", err)
 	}
 	if err := database.Seed(db); err != nil {
 		return nil, fmt.Errorf("seed database: %w", err)
 	}
 
-	// Encrypt still-plaintext secrets in place when a key is configured.
-	// Idempotent: values already carrying the encrypted marker are skipped.
-	if cipher != nil {
-		migrated, err := database.MigrateSecretsAtRest(db, cipher)
-		if err != nil {
-			return nil, fmt.Errorf("migrate secrets at rest: %w", err)
-		}
-		if migrated > 0 {
-			slog.Info("encrypted plaintext secrets at rest", "count", migrated)
-		}
+	// Encrypt still-plaintext secrets. A no-op when no key is configured, and
+	// idempotent: values already carrying the encrypted marker are skipped.
+	if err := migrationSvc.MigrateSecrets(); err != nil {
+		return nil, err
 	}
 
 	// gin.New (no default logger) + explicit recovery: request logging is done

@@ -1,6 +1,7 @@
-// Package database handles the database connection, schema migration and
-// default seed data. It is the single source of the *gorm.DB instance which is
-// injected into every domain package via constructors.
+// Package database handles the database connection and default seed data. It
+// is the single source of the *gorm.DB instance which is injected into every
+// domain package via constructors. Schema creation and the startup data
+// migrations live in the migration package.
 package database
 
 import (
@@ -170,97 +171,6 @@ func openSQLite(dataDir string) (*gorm.DB, error) {
 	}
 	slog.Info("successfully connected to SQLite database")
 	return db, nil
-}
-
-// AutoMigrate creates or updates the database schema for all models.
-func AutoMigrate(db *gorm.DB) error {
-	// Remove duplicate likes (same post+user) before the composite unique
-	// index is created, so pre-existing duplicate data cannot break the
-	// migration. On a fresh database the table does not exist yet and this
-	// is a no-op.
-	if db.Migrator().HasTable(&model.Like{}) {
-		if err := db.Exec(
-			"DELETE FROM likes WHERE id NOT IN (SELECT MIN(id) FROM likes GROUP BY post_id, user_id)",
-		).Error; err != nil {
-			return fmt.Errorf("deduplicate likes: %w", err)
-		}
-	}
-
-	if err := db.AutoMigrate(
-		&model.Post{},
-		&model.Page{},
-		&model.User{},
-		&model.Tag{},
-		&model.Category{},
-		&model.Comment{},
-		&model.Like{},
-		&model.MediaFile{},
-		&model.SMTPConfig{},
-		&model.Captcha{},
-		&model.GeneralSettings{},
-		&model.CommentModerationConfig{},
-		&model.AIConfig{},
-		&model.SSOBinding{},
-		&model.ThemeConfig{},
-		&model.Notification{},
-		&model.CreatorApplication{},
-	); err != nil {
-		return err
-	}
-
-	// Map the legacy single AI-moderation toggle onto the explicit moderation
-	// switches before anything reads the config row.
-	if _, err := MigrateLegacyModerationConfig(db); err != nil {
-		return err
-	}
-
-	// Backfill slugs for existing posts that don't have one yet.
-	return backfillSlugs(db)
-}
-
-// backfillSlugs generates unique slugs for existing posts that have an empty
-// slug column, deriving them from each post's title.
-func backfillSlugs(db *gorm.DB) error {
-	if !db.Migrator().HasTable(&model.Post{}) {
-		return nil
-	}
-
-	var posts []model.Post
-	if err := db.Select("id", "title").Where("slug = '' OR slug IS NULL").Find(&posts).Error; err != nil {
-		return fmt.Errorf("backfill slugs failed: %w", err)
-	}
-	if len(posts) == 0 {
-		return nil
-	}
-
-	for _, post := range posts {
-		base := model.SlugFromTitle(post.Title)
-		if base == "" {
-			base = "post"
-		}
-		// Fall back to a stable post-id-based slug when the generated slug
-		// fails validation (e.g. pure-numeric slugs like "2023").
-		if err := model.ValidateSlug(base); err != nil {
-			base = fmt.Sprintf("post-%d", post.ID)
-		}
-		slug := base
-		counter := 1
-		for {
-			// Check for collision with an existing slug in the database.
-			var existing model.Post
-			err := db.Where("slug = ? AND id != ?", slug, post.ID).First(&existing).Error
-			if err != nil {
-				break // no collision
-			}
-			counter++
-			slug = fmt.Sprintf("%s-%d", base, counter)
-		}
-		if err := db.Model(&post).UpdateColumn("slug", slug).Error; err != nil {
-			return fmt.Errorf("backfill slugs failed (post_id=%d): %w", post.ID, err)
-		}
-	}
-
-	return nil
 }
 
 // defaultAdminUsername is the login name of the seeded super admin account.
