@@ -156,6 +156,38 @@ func (s *Service) Delete(ctx context.Context, actor Actor, assetID uint) error {
 	return nil
 }
 
+// ResolveOriginal resolves original content of an asset,
+// and returns content and metadata of the asset.
+func (s *Service) ResolveOriginal(ctx context.Context, assetID uint) (*OriginalContent, error) {
+	if assetID == 0 {
+		return nil, ErrNotFound
+	}
+
+	asset, err := s.assets.FindByID(ctx, assetID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, fmt.Errorf("find asset: %d: %w", assetID, err)
+	}
+
+	reader, err := s.storage.Open(ctx, asset.Blob.StorageKey)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, ErrContentUnavailable
+		}
+		return nil, fmt.Errorf("open storage object for asset %d: %w", assetID, err)
+	}
+
+	return &OriginalContent{
+		Reader:   reader,
+		MIMEType: asset.Blob.MimeType,
+		Size:     asset.Blob.Size,
+		Filename: asset.OriginalName,
+	}, nil
+}
+
 // rollbackUpload removes file from storage when uploading error occurs.
 func (s *Service) rollbackUpload(ctx context.Context, key string) {
 	if err := s.storage.Delete(ctx, key); err != nil {
