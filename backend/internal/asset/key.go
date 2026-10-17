@@ -22,10 +22,17 @@ import (
 // extensionless file is an opaque byte stream the browser refuses to render as
 // an image.
 var allowedExts = map[string]struct{}{
-	".jpg": {}, ".jpeg": {}, ".png": {}, ".gif": {}, ".webp": {}, ".avif": {},
-	".bmp": {}, ".ico": {}, ".tif": {}, ".tiff": {}, ".svg": {},
-	".mp4": {}, ".webm": {}, ".mov": {}, ".mp3": {}, ".wav": {}, ".ogg": {}, ".m4a": {},
-	".pdf": {}, ".txt": {}, ".md": {}, ".csv": {},
+	".bmp":  {},
+	".gif":  {},
+	".ico":  {},
+	".jpeg": {},
+	".jpg":  {},
+	".mp3":  {},
+	".mp4":  {},
+	".png":  {},
+	".wav":  {},
+	".webm": {},
+	".webp": {},
 }
 
 type KeyGenerator interface {
