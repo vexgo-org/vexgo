@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"unicode/utf8"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -56,6 +57,10 @@ func (s *Service) Upload(
 
 	if filename == "" {
 		return nil, errors.New("filename is empty")
+	}
+
+	if utf8.RuneCountInString(filename) > model.MaxAssetFilenameLength {
+		return nil, ErrFilenameTooLong
 	}
 
 	if size <= 0 {
