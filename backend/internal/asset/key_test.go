@@ -1,12 +1,17 @@
 package asset
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 func TestKeyGenerator_Generate(t *testing.T) {
@@ -17,35 +22,24 @@ func TestKeyGenerator_Generate(t *testing.T) {
 		wantErr  bool
 	}{
 		// Allowed extensions survive, in the allowlist's own casing.
-		{name: "jpg", filename: "photo.jpg", wantExt: ".jpg"},
-		{name: "jpeg", filename: "photo.jpeg", wantExt: ".jpeg"},
-		{name: "png", filename: "photo.png", wantExt: ".png"},
-		{name: "gif", filename: "loop.gif", wantExt: ".gif"},
-		{name: "webp", filename: "photo.webp", wantExt: ".webp"},
-		{name: "avif", filename: "photo.avif", wantExt: ".avif"},
 		{name: "bmp", filename: "photo.bmp", wantExt: ".bmp"},
+		{name: "gif", filename: "loop.gif", wantExt: ".gif"},
 		{name: "ico", filename: "favicon.ico", wantExt: ".ico"},
-		{name: "tiff", filename: "scan.tiff", wantExt: ".tiff"},
-		{name: "svg", filename: "icon.svg", wantExt: ".svg"},
-		{name: "mp4", filename: "clip.mp4", wantExt: ".mp4"},
-		{name: "webm", filename: "clip.webm", wantExt: ".webm"},
-		{name: "mov", filename: "clip.mov", wantExt: ".mov"},
+		{name: "jpeg", filename: "photo.jpeg", wantExt: ".jpeg"},
+		{name: "jpg", filename: "photo.jpg", wantExt: ".jpg"},
 		{name: "mp3", filename: "song.mp3", wantExt: ".mp3"},
+		{name: "mp4", filename: "clip.mp4", wantExt: ".mp4"},
+		{name: "png", filename: "photo.png", wantExt: ".png"},
 		{name: "wav", filename: "song.wav", wantExt: ".wav"},
-		{name: "ogg", filename: "song.ogg", wantExt: ".ogg"},
-		{name: "m4a", filename: "song.m4a", wantExt: ".m4a"},
-		{name: "pdf", filename: "paper.pdf", wantExt: ".pdf"},
-		{name: "txt", filename: "notes.txt", wantExt: ".txt"},
-		{name: "md", filename: "notes.md", wantExt: ".md"},
-		{name: "csv", filename: "table.csv", wantExt: ".csv"},
+		{name: "webm", filename: "clip.webm", wantExt: ".webm"},
+		{name: "webp", filename: "photo.webp", wantExt: ".webp"},
 
 		// Casing is normalized, including mixed case.
 		{name: "uppercase extension", filename: "PHOTO.JPG", wantExt: ".jpg"},
 		{name: "mixed case extension", filename: "Song.Mp3", wantExt: ".mp3"},
-		{name: "uppercase svg", filename: "ICON.SVG", wantExt: ".svg"},
 
 		// Only the final segment's extension counts.
-		{name: "multiple dots", filename: "report.final.pdf", wantExt: ".pdf"},
+		{name: "multiple dots", filename: "report.final.png", wantExt: ".png"},
 		{name: "dot in directory-like prefix", filename: "v1.2/photo.png", wantExt: ".png"},
 		{name: "spaces in name", filename: "my holiday photo.png", wantExt: ".png"},
 		{name: "unicode name", filename: "写真.png", wantExt: ".png"},
@@ -75,15 +69,36 @@ func TestKeyGenerator_Generate(t *testing.T) {
 		{name: "html with double extension", filename: "photo.png.html", wantErr: true},
 		{name: "uppercase html", filename: "PAGE.HTML", wantErr: true},
 
+		// Rejected: media and document formats whose sniffed MIME type has no
+		// blob type, so an upload of them can never reach storage. They must not
+		// come back when a type is added: TestAllowedExtsAreAcceptedByBlobType
+		// fails for any extension BlobTypeFromMIME refuses.
+		{name: "svg", filename: "icon.svg", wantErr: true},
+		{name: "uppercase svg", filename: "ICON.SVG", wantErr: true},
+		{name: "pdf", filename: "paper.pdf", wantErr: true},
+		{name: "txt", filename: "notes.txt", wantErr: true},
+		{name: "md", filename: "notes.md", wantErr: true},
+		{name: "csv", filename: "table.csv", wantErr: true},
+
 		// Rejected: everything outside the allowlist.
+		{name: "apk", filename: "app.apk", wantErr: true},
+		{name: "avif", filename: "photo.avif", wantErr: true},
+		{name: "csv", filename: "table.csv", wantErr: true},
+		{name: "docx", filename: "report.docx", wantErr: true},
 		{name: "exe", filename: "installer.exe", wantErr: true},
 		{name: "gz", filename: "archive.tar.gz", wantErr: true},
-		{name: "zip", filename: "archive.zip", wantErr: true},
-		{name: "sh", filename: "run.sh", wantErr: true},
+		{name: "m4a", filename: "song.m4a", wantErr: true},
+		{name: "md", filename: "notes.md", wantErr: true},
+		{name: "mov", filename: "clip.mov", wantErr: true},
+		{name: "ogg", filename: "song.ogg", wantErr: true},
+		{name: "pdf", filename: "paper.pdf", wantErr: true},
 		{name: "php", filename: "index.php", wantErr: true},
+		{name: "sh", filename: "run.sh", wantErr: true},
+		{name: "svg", filename: "icon.svg", wantErr: true},
 		{name: "svgz", filename: "icon.svgz", wantErr: true},
-		{name: "apk", filename: "app.apk", wantErr: true},
-		{name: "docx", filename: "report.docx", wantErr: true},
+		{name: "tiff", filename: "scan.tiff", wantErr: true},
+		{name: "txt", filename: "notes.txt", wantErr: true},
+		{name: "zip", filename: "archive.zip", wantErr: true},
 	}
 
 	generator := NewKeyGenerator()
@@ -128,6 +143,54 @@ func TestKeyGenerator_Generate(t *testing.T) {
 			}
 			if stem == "" {
 				t.Errorf("Generate(%q) = %q, want a UUID stem", tt.filename, key)
+			}
+		})
+	}
+}
+
+// samplePayloads holds one representative header per allowed extension, shaped
+// so http.DetectContentType recognizes it as that format. A format the
+// sniffer cannot recognize cannot be given a blob type, which is the whole
+// point of the test below.
+var samplePayloads = map[string][]byte{
+	".bmp":  append([]byte("BM"), make([]byte, 32)...),
+	".gif":  append([]byte("GIF89a"), make([]byte, 32)...),
+	".ico":  append([]byte{0x00, 0x00, 0x01, 0x00}, make([]byte, 32)...),
+	".jpeg": append([]byte("\xFF\xD8\xFF\xE0"), make([]byte, 32)...),
+	".jpg":  append([]byte("\xFF\xD8\xFF\xE0"), make([]byte, 32)...),
+	".mp3":  append([]byte("ID3\x04\x00\x00\x00\x00\x00\x00"), make([]byte, 32)...),
+	".mp4":  append([]byte("\x00\x00\x00\x18ftypmp42"), make([]byte, 32)...),
+	".png":  append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 32)...),
+	".wav":  append([]byte("RIFF\x00\x00\x00\x00WAVE"), make([]byte, 32)...),
+	".webm": append([]byte{0x1A, 0x45, 0xDF, 0xA3}, make([]byte, 32)...),
+	".webp": append([]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), make([]byte, 32)...),
+}
+
+// TestAllowedExtsAreAcceptedByBlobType pins the invariant the allowlist only
+// appears to have: an extension is useless when the MIME type sniffed from the
+// content has no blob type, because Service.Upload refuses it before anything
+// is written. Every entry in `allowedExts` must therefore survive both
+// DetectMIMEType and model.BlobTypeFromMIME, so the list cannot drift away
+// from the type mapping again. It also fails when an extension is added
+// without a sample payload here, keeping the two lists in step.
+func TestAllowedExtsAreAcceptedByBlobType(t *testing.T) {
+	for _, ext := range slices.Sorted(maps.Keys(allowedExts)) {
+		t.Run(ext, func(t *testing.T) {
+			payload, ok := samplePayloads[ext]
+			if !ok {
+				t.Fatalf("%s is in allowedExts but has no sample payload in this test", ext)
+			}
+
+			mimeType, err := DetectMIMEType(bufio.NewReader(bytes.NewReader(payload)))
+			if err != nil {
+				t.Fatalf("DetectMIMEType(%s) error: %v", ext, err)
+			}
+
+			if _, err := model.BlobTypeFromMIME(mimeType); err != nil {
+				t.Errorf(
+					"%s is allowed but its content sniffs as %q, which has no blob type: %v",
+					ext, mimeType, err,
+				)
 			}
 		})
 	}

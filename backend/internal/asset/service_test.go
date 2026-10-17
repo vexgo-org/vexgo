@@ -514,7 +514,20 @@ func TestUpload_RejectsEmptyPayload(t *testing.T) {
 }
 
 func TestUpload_RejectsDisallowedExtension(t *testing.T) {
-	for _, filename := range []string{"evil.html", "evil.js", "evil.exe", "evil.xml", "noextension"} {
+	// The document and media formats that used to be allowed are listed here
+	// too: none of them sniffs to a MIME type with a blob type, so every upload
+	// wearing one is refused before anything is written.
+	for _, filename := range []string{
+		"evil.exe",
+		"evil.html",
+		"evil.js",
+		"evil.xml",
+		"icon.svg",
+		"noextension",
+		"notes.txt",
+		"paper.pdf",
+		"table.csv",
+	} {
 		t.Run(filename, func(t *testing.T) {
 			svc, dataDir, db := newTestService(t)
 			user := seedUser(t, db, "uploader", model.RoleContributor)
@@ -759,8 +772,11 @@ func TestUpload_ClassifiesBlobType(t *testing.T) {
 		wantType model.BlobType
 	}{
 		{
-			name:     "image from signature",
-			filename: "mislabelled.txt",
+			// The extension is allowlisted but the bytes are not media, so the
+			// blob type is taken from the content and the extension it does not
+			// match cannot save it.
+			name:     "image from signature, not extension",
+			filename: "mislabelled.jpg",
 			payload:  pngPayload(32),
 			wantType: model.BlobTypeImage,
 		},
@@ -809,12 +825,14 @@ func TestUpload_RejectsUnsupportedMIMEType(t *testing.T) {
 		filename string
 		payload  []byte
 	}{
-		{name: "plain text", filename: "notes.txt", payload: []byte("just some plain text")},
-		{name: "pdf", filename: "paper.pdf", payload: []byte("%PDF-1.7\ntrailer\n")},
-		{name: "csv", filename: "table.csv", payload: []byte("a,b,c\n1,2,3\n")},
+		{
+			name:     "plain text",
+			filename: "photo.png",
+			payload:  []byte("just some plain text"),
+		},
 		{
 			name:     "text behind an image name",
-			filename: "photo.png",
+			filename: "clip.mp4",
 			payload:  []byte("just some plain text"),
 		},
 	}
