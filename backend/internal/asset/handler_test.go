@@ -692,6 +692,51 @@ func TestHandlerUpload_RejectsMalformedForm(t *testing.T) {
 	}
 }
 
+// TestHandlerUpload_RejectsInvalidFileContent covers the client mistakes the
+// service refuses after the request was well formed: content whose sniffed MIME
+// type has no blob type, and a filename too long for the column. Each is the
+// client's to fix, so each is a 400 rather than the 500 the handler used to
+// answer, and none of them may leave an object behind.
+func TestHandlerUpload_RejectsInvalidFileContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		content  []byte
+	}{
+		{
+			name:     "pdf is not a blob type",
+			filename: "paper.pdf",
+			content:  []byte("%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"),
+		},
+		{
+			name:     "text behind an image name",
+			filename: "photo.png",
+			content:  []byte("just some plain text"),
+		},
+		{
+			name:     "filename over the column limit",
+			filename: strings.Repeat("a", model.MaxAssetFilenameLength) + ".png",
+			content:  pngPayload(128),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newHandlerFixture(t)
+			user := seedUser(t, f.db, "uploader", model.RoleContributor)
+
+			body, contentType := multipartBody(t, "file", tt.filename, tt.content)
+			recorder := f.uploadAs(t, user, body, contentType)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400 (body %s)", recorder.Code, recorder.Body.String())
+			}
+			errorField(t, recorder)
+			assertNothingStored(t, f)
+		})
+	}
+}
+
 // TestHandlerUpload_RejectsDisallowedExtension: the allowlist is enforced, and
 // the rejection is the client's to fix, so it is a 400 and never a stored row.
 func TestHandlerUpload_RejectsDisallowedExtension(t *testing.T) {
