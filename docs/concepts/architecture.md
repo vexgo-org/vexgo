@@ -21,6 +21,7 @@ backend/
   internal/
     api/                     # wire types shared by the REST surface (responses, error bodies)
     app/                     # composition root: wires all dependencies together
+    asset/                   # asset management: uploads and soft-deleted assets over immutable blobs
     auth/                    # registration, login, JWT, profile, password reset, email verification
     cache/                   # cache backends: in-process memory + Valkey (valkey-io/valkey-go)
     captcha/                 # sliding-puzzle captcha generation and verification
@@ -41,7 +42,7 @@ backend/
     settings/                # admin configuration (SMTP, AI, general, theme)
     sso/                     # GitHub / Google / OIDC login
     storage/                 # file backends behind the Storage seam (local disk or S3)
-    upload/                  # upload endpoints and the media-file records
+    upload/                  # legacy upload endpoints and the media-file records, being replaced by asset/
     user/                    # user management, roles, creator applications
 ```
 

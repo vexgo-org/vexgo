@@ -21,6 +21,7 @@ backend/
   internal/
     api/                     # REST 接口共享的传输类型（响应体、错误结构）
     app/                     # 组合根：组装所有依赖
+    asset/                   # 资产管理：基于不可变 blob 的上传与软删除
     auth/                    # 注册、登录、JWT、个人资料、密码重置、邮箱验证
     cache/                   # 缓存后端：进程内内存 + Valkey（valkey-io/valkey-go）
     captcha/                 # 滑块验证码的生成与校验
@@ -41,7 +42,7 @@ backend/
     settings/                # 管理员配置（SMTP、AI、通用、主题）
     sso/                     # GitHub / Google / OIDC 登录
     storage/                 # Storage 接缝后的文件后端（本地磁盘或 S3）
-    upload/                  # 上传接口与媒体文件记录
+    upload/                  # 旧版上传接口与媒体文件记录，正由 asset/ 取代
     user/                    # 用户管理、角色、创作者申请
 ```
 
