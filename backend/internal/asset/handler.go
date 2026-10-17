@@ -38,7 +38,7 @@ func NewHandler(deps Deps) *Handler {
 //	@Security		BearerAuth
 //	@Param			file	formData	file	true	"file to upload"
 //	@Success		200		{object}	UploadResponse
-//	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form"
+//	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form, rejected file type, or invalid filename"
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		500		{object}	api.ErrorResponse	"failed to persist file"
 //	@Router			/assets/upload [post]
@@ -94,8 +94,13 @@ func (h *Handler) Upload(c *gin.Context) {
 		)
 
 		switch {
-		case errors.Is(err, ErrInvalidExtension):
-			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid file extension"})
+		case errors.Is(err, ErrInvalidExtension),
+			errors.Is(err, model.ErrUnsupportedMIMEType),
+			errors.Is(err, ErrEmptyFile),
+			errors.Is(err, ErrInvalidFileSize),
+			errors.Is(err, ErrEmptyFilename),
+			errors.Is(err, ErrFilenameTooLong):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid file"})
 		default:
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "File upload failed"})
 		}

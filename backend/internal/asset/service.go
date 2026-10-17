@@ -56,7 +56,7 @@ func (s *Service) Upload(
 	}
 
 	if filename == "" {
-		return nil, errors.New("filename is empty")
+		return nil, ErrEmptyFilename
 	}
 
 	if utf8.RuneCountInString(filename) > model.MaxAssetFilenameLength {
@@ -64,7 +64,7 @@ func (s *Service) Upload(
 	}
 
 	if size <= 0 {
-		return nil, errors.New("invalid file size")
+		return nil, ErrInvalidFileSize
 	}
 
 	// Generate UUID storage key from filename.
