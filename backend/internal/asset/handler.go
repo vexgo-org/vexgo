@@ -3,6 +3,7 @@ package asset
 import (
 	"errors"
 	"log/slog"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -166,6 +167,62 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, MessageResponse{Message: "File deleted"})
+}
+
+// Original godoc
+//
+//	@Summary		Get original asset content
+//	@Description	Returns the original content of an asset.
+//	@Tags			assets
+//	@Produce		application/octet-stream
+//	@Param			id	path		int					true	"asset id"	minimum(1)
+//	@Success		200	{file}		binary				"original asset content"
+//	@Failure		404	{object}	api.ErrorResponse	"asset not found"
+//	@Failure		503	{object}	api.ErrorResponse	"asset content unavailable"
+//	@Failure		500	{object}	api.ErrorResponse	"failed to get original asset"
+//	@Router			/assets/{id}/original [get]
+func (h *Handler) Original(c *gin.Context) {
+	assetID, ok := parseUintParam(c, "id")
+	if !ok {
+		c.Status(http.StatusNotFound)
+		return
+	}
+
+	content, err := h.svc.ResolveOriginal(c.Request.Context(), assetID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			c.Status(http.StatusNotFound)
+		case errors.Is(err, ErrContentUnavailable):
+			c.JSON(http.StatusServiceUnavailable, api.ErrorResponse{Error: "Asset content unavailable"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get original asset"})
+		}
+		return
+	}
+	defer content.Reader.Close()
+
+	headers := map[string]string{
+		"Cache-Control":          "public, max-age=31536000, immutable",
+		"X-Content-Type-Options": "nosniff",
+	}
+
+	if content.Filename != "" {
+		headers["Content-Disposition"] = mime.FormatMediaType(
+			"inline",
+			map[string]string{
+				"filename": content.Filename,
+			},
+		)
+	}
+
+	c.DataFromReader(
+		http.StatusOK,
+		content.Size,
+		content.MIMEType,
+		content.Reader,
+		headers,
+	)
 }
 
 // parseUintParam parses a numeric route parameter by name, reporting whether it
