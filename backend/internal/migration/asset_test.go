@@ -17,7 +17,7 @@ const (
 	// pngPayload starts with the PNG magic bytes, so http.DetectContentType
 	// reports image/png no matter which extension the key carries.
 	pngPayload = "\x89PNG\r\n\x1a\nfake-image-bytes"
-	// textPayload sniffs as text/plain, which maps to BlobTypeUnknown.
+	// textPayload sniffs as text/plain, which carries no blob type.
 	textPayload = "hello, world"
 )
 
@@ -319,9 +319,10 @@ func TestBackfillAssetBlob_TypeComesFromContentNotExtension(t *testing.T) {
 	}
 }
 
-// TestBackfillAssetBlob_TypeIsUnknownForNonMediaContent covers a text file: it
-// migrates, but the type stays unknown.
-func TestBackfillAssetBlob_TypeIsUnknownForNonMediaContent(t *testing.T) {
+// TestBackfillAssetBlob_SkipsUnsupportedMIMEType covers a text file: it is not
+// an image, video or audio blob, so the row is skipped instead of migrated with
+// a bogus type.
+func TestBackfillAssetBlob_SkipsUnsupportedMIMEType(t *testing.T) {
 	svc, db, local := newMigrationService(t)
 
 	const key = "d41d8cd98f00b204e9800998ecf8427e.txt"
@@ -329,18 +330,13 @@ func TestBackfillAssetBlob_TypeIsUnknownForNonMediaContent(t *testing.T) {
 	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: int64(len(textPayload))})
 
 	if err := svc.backfillAssetBlob(); err != nil {
-		t.Fatalf("backfill: %v", err)
+		t.Fatalf("an unsupported MIME type must not fail the migration: %v", err)
 	}
-
-	blob, ok := findBlobByKey(t, db, key)
-	if !ok {
-		t.Fatalf("expected a blob for key %q", key)
+	if count := countRows(t, db, &model.Blob{}); count != 0 {
+		t.Errorf("expected 0 blobs, got %d", count)
 	}
-	if blob.Type != model.BlobTypeUnknown {
-		t.Errorf("expected Type unknown, got %q", blob.Type)
-	}
-	if !strings.HasPrefix(blob.MimeType, "text/plain") {
-		t.Errorf("expected a text/* MimeType, got %q", blob.MimeType)
+	if count := countRows(t, db, &model.Asset{}); count != 0 {
+		t.Errorf("expected 0 assets, got %d", count)
 	}
 }
 

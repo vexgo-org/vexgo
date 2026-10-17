@@ -95,7 +95,18 @@ func (s *Service) backfillAssetBlob() error {
 			continue
 		}
 
-		blobType := model.BlobTypeFromMIME(mimeType)
+		blobType, err := model.BlobTypeFromMIME(mimeType)
+		if err != nil {
+			slog.Error(
+				"invalid MIME type",
+				"id", mediaFile.ID,
+				"filename", key,
+				"type", mimeType,
+				"err", err,
+			)
+			reader.Close()
+			continue
+		}
 
 		blobSize, err := io.Copy(io.Discard, buffered)
 		if err != nil {
