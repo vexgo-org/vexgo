@@ -6,6 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const MaxAssetFilenameLength = 255
+
 type Asset struct {
 	ID uint `gorm:"primaryKey"`
 
