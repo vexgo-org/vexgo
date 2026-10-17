@@ -41,7 +41,7 @@ func NewHandler(deps Deps) *Handler {
 //	@Failure		400		{object}	api.ErrorResponse	"missing or malformed form"
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		500		{object}	api.ErrorResponse	"failed to persist file"
-//	@Router			/asset/upload [post]
+//	@Router			/assets/upload [post]
 func (h *Handler) Upload(c *gin.Context) {
 	// Extract user ID.
 	userID := middleware.CurrentUserID(c)
@@ -125,7 +125,7 @@ func (h *Handler) Upload(c *gin.Context) {
 //	@Failure		403	{object}	api.ErrorResponse	"not the owner"
 //	@Failure		404	{object}	api.ErrorResponse	"asset does not exist"
 //	@Failure		500	{object}	api.ErrorResponse	"failed to delete asset"
-//	@Router			/asset/delete/{id} [post]
+//	@Router			/assets/delete/{id} [post]
 func (h *Handler) Delete(c *gin.Context) {
 	// Get current user.
 	user, ok := middleware.CurrentUser(c)
