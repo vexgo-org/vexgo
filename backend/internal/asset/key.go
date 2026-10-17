@@ -8,19 +8,21 @@ import (
 	"github.com/google/uuid"
 )
 
-// allowedExts is the allowlist of extensions kept on the stored
-// file. Local uploads are served from this origin, so a file the browser would
-// render as an executable document is a stored XSS vector: html, htm, xhtml,
-// xml and js are therefore deliberately absent. Any other extension is dropped;
-// the handler then serves the resulting extensionless file as
-// application/octet-stream, which cannot execute.
+// allowedExts is the allowlist of extensions kept on the stored file. An
+// extension that is not listed is rejected with ErrInvalidExtension before
+// anything is written, so this list is the complete set of formats an upload
+// can be stored under.
 //
-// SVG is the one document-like type on the list, because an <img> never runs
-// script inside an SVG and the media routes neutralize direct navigation by
-// serving it with a sandboxing CSP (see public.mediaSVGContentType). Dropping
-// its extension instead is what made uploaded SVG icons invisible: an
-// extensionless file is an opaque byte stream the browser refuses to render as
-// an image.
+// Two filters decide membership. Local uploads are served from this origin, so
+// a file the browser would render as an executable document is a stored XSS
+// vector: html, htm, xhtml, xml and js are deliberately absent. The other is
+// the blob type: model.BlobTypeFromMIME only maps image, video and audio, so a
+// format whose sniffed MIME type falls outside those three — pdf, plain text,
+// svg, and the containers Go's sniffer cannot recognize — is absent too, since
+// an upload of it could never become a blob.
+//
+// TestAllowedExtsAreAcceptedByBlobType enforces both halves: an extension may
+// not be added here unless the sniffer gives its content a blob type.
 var allowedExts = map[string]struct{}{
 	".bmp":  {},
 	".gif":  {},
