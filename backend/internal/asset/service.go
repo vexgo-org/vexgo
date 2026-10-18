@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -168,18 +169,17 @@ func (s *Service) Delete(ctx context.Context, actor Actor, assetID uint) error {
 
 // ResolveOriginal resolves original content of an asset,
 // and returns content and metadata of the asset.
-func (s *Service) ResolveOriginal(ctx context.Context, assetID uint) (*OriginalContent, error) {
-	if assetID == 0 {
+func (s *Service) ResolveOriginal(ctx context.Context, publicID uuid.UUID) (*OriginalContent, error) {
+	if publicID == uuid.Nil {
 		return nil, ErrNotFound
 	}
 
-	asset, err := s.assets.FindByID(ctx, assetID)
+	asset, err := s.assets.FindPublicByPublicID(ctx, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
-
-		return nil, fmt.Errorf("find asset: %d: %w", assetID, err)
+		return nil, fmt.Errorf("find asset: %w", err)
 	}
 
 	reader, err := s.storage.Open(ctx, asset.Blob.StorageKey)
@@ -187,7 +187,7 @@ func (s *Service) ResolveOriginal(ctx context.Context, assetID uint) (*OriginalC
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, ErrContentUnavailable
 		}
-		return nil, fmt.Errorf("open storage object for asset %d: %w", assetID, err)
+		return nil, fmt.Errorf("open storage object for asset %d: %w", asset.ID, err)
 	}
 
 	return &OriginalContent{

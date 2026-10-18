@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -175,20 +176,20 @@ func (h *Handler) Delete(c *gin.Context) {
 //	@Description	Returns the original content of an asset.
 //	@Tags			assets
 //	@Produce		application/octet-stream
-//	@Param			id	path		int					true	"asset id"	minimum(1)
-//	@Success		200	{file}		binary				"original asset content"
-//	@Failure		404	{object}	api.ErrorResponse	"asset not found"
-//	@Failure		503	{object}	api.ErrorResponse	"asset content unavailable"
-//	@Failure		500	{object}	api.ErrorResponse	"failed to get original asset"
-//	@Router			/assets/{id}/original [get]
+//	@Param			publicID	path	string	true	"asset public id"
+//	@Success		200			{file}	binary	"original asset content"
+//	@Failure		404			"asset not found"
+//	@Failure		503			{object}	api.ErrorResponse	"asset content unavailable"
+//	@Failure		500			{object}	api.ErrorResponse	"failed to get original asset"
+//	@Router			/assets/{publicID}/original [get]
 func (h *Handler) Original(c *gin.Context) {
-	assetID, ok := parseUintParam(c, "id")
-	if !ok {
+	publicID, err := uuid.Parse(c.Param("publicID"))
+	if err != nil {
 		c.Status(http.StatusNotFound)
 		return
 	}
 
-	content, err := h.svc.ResolveOriginal(c.Request.Context(), assetID)
+	content, err := h.svc.ResolveOriginal(c.Request.Context(), publicID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
