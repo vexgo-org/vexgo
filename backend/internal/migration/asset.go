@@ -27,6 +27,22 @@ func (s *Service) backfillAssetBlob() error {
 		return fmt.Errorf("find all media file: %w", err)
 	}
 
+	// Load every blob key once, so the loop skips already-migrated media with
+	// a map lookup instead of a query per row. Unscoped keeps the soft-deleted
+	// blobs, whose keys still occupy the unique index.
+	var storageKeys []string
+	if err := s.db.Model(&model.Blob{}).
+		Unscoped().
+		Pluck("storage_key", &storageKeys).
+		Error; err != nil {
+		return fmt.Errorf("list migrated storage keys: %w", err)
+	}
+
+	migrated := make(map[string]struct{}, len(storageKeys))
+	for _, storageKey := range storageKeys {
+		migrated[storageKey] = struct{}{}
+	}
+
 	slog.Info("migrating media files", "count", len(mediaFiles))
 
 	count := 0
@@ -46,20 +62,7 @@ func (s *Service) backfillAssetBlob() error {
 			}
 		}
 
-		var existing model.Blob
-		switch err := s.db.Unscoped().
-			Where(&model.Blob{StorageKey: key}).
-			First(&existing).
-			Error; {
-		case err == nil:
-			continue
-		case !errors.Is(err, gorm.ErrRecordNotFound):
-			slog.Error(
-				"look up blob for media file failed",
-				"id", mediaFile.ID,
-				"filename", key,
-				"err", err,
-			)
+		if _, ok := migrated[key]; ok {
 			continue
 		}
 
@@ -152,6 +155,7 @@ func (s *Service) backfillAssetBlob() error {
 		}
 
 		count++
+		migrated[key] = struct{}{}
 		reader.Close()
 	}
 

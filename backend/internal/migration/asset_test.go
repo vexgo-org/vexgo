@@ -3,14 +3,18 @@ package migration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -740,5 +744,87 @@ func TestMigrateDB_MigratesMediaOfAnExistingInstallation(t *testing.T) {
 		if asset.UserID != uint(i+1) {
 			t.Errorf("expected UserID %d for %q, got %d", i+1, key, asset.UserID)
 		}
+	}
+}
+
+// countingLogger counts the statements GORM sends, so a test can assert the
+// backfill does not fall back to one lookup per row.
+type countingLogger struct {
+	logger.Interface
+
+	mu      sync.Mutex
+	queries int
+}
+
+// Trace counts every statement, including ones that end in an error: a lookup
+// matching no row still costs a round trip, which is what this guards.
+func (l *countingLogger) Trace(
+	_ context.Context,
+	_ time.Time,
+	_ func() (string, int64),
+	_ error,
+) {
+	l.mu.Lock()
+	l.queries++
+	l.mu.Unlock()
+}
+
+func (l *countingLogger) QueryCount() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.queries
+}
+
+// TestBackfillAssetBlob_ReadsBlobKeysInOneQuery pins the bulk read: the backfill
+// must fetch every existing storage key in a single statement, so the query
+// count does not grow with the size of the media library. A per-row lookup
+// costs one extra statement per row on top of everything else.
+func TestBackfillAssetBlob_ReadsBlobKeysInOneQuery(t *testing.T) {
+	const rowCount = 25
+
+	counter := &countingLogger{Interface: logger.Discard}
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: counter})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	if err := autoMigrate(db); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	local := storage.NewLocalStorage(t.TempDir())
+	svc := NewService(Deps{DB: db, Storage: local})
+
+	for i := range rowCount {
+		key := fmt.Sprintf("query-count-%02d.png", i)
+		putObject(t, local, key, pngPayload)
+		seedMediaFile(t, db, model.MediaFile{
+			URL:  "/uploads/" + key,
+			Size: int64(len(pngPayload)),
+		})
+	}
+
+	before := counter.QueryCount()
+	if err := svc.backfillAssetBlob(); err != nil {
+		t.Fatalf("backfill: %v", err)
+	}
+
+	// One insert for the blob and one for the asset per row, plus the three
+	// bulk statements: the media_files table check, the media read, and the
+	// single blob key read.
+	issued := counter.QueryCount() - before
+	if want := rowCount*2 + 3; issued > want {
+		t.Errorf(
+			"backfill issued %d queries for %d media files, want at most %d",
+			issued, rowCount, want,
+		)
+	}
+
+	if count := countRows(t, db, &model.Blob{}); count != rowCount {
+		t.Errorf("expected %d blobs, got %d", rowCount, count)
 	}
 }
