@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +22,8 @@ const (
 )
 
 type Asset struct {
-	ID uint `gorm:"primaryKey"`
+	ID       uint      `gorm:"primaryKey"`
+	PublicID uuid.UUID `gorm:"not null;uniqueIndex"`
 
 	// OriginalName is the client-supplied filename, kept as display metadata
 	// only; the stored object is addressed by the blob's storage key. Limited
