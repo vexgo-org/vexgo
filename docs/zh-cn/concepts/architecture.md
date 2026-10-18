@@ -130,7 +130,7 @@ cmd/vexgo/main.go
     └─→ internal/app          ← 组合根，导入所有包
             ├─→ config         ← 解析完成的 Config 类型（不导入领域包）
             ├─→ database       ← Open/Seed（导入 config、model）
-            ├─→ migration      ← MigrateDB/MigrateSecrets（导入 model、secrets）
+            ├─→ migration      ← MigrateDB/MigrateSecrets（导入 model、secrets、asset、storage）
             ├─→ router         ← 路由注册（导入所有领域 handler）
             └─→ internal/*     ← 各领域包
 
@@ -142,7 +142,8 @@ cmd/vexgo/main.go
     cache/         ← 内存 + Valkey 后端；各领域通过自己的窄接缝
                      （CounterStore、StateStore、ReadCache）消费
     storage/       ← 本地磁盘与 S3 文件后端（仅导入 config）；由 upload
-                     上传媒体，以及 model.FileRemover 清理路径消费
+                     上传媒体、migration 的媒体回填，以及
+                     model.FileRemover 清理路径消费
 
 共享层：
     middleware/    ← JWT 认证、角色权限、请求日志（仅导入 model）
@@ -293,7 +294,16 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ### 迁移与种子数据
 
-`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，并回填文章 slug。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，并将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+
+媒体回填在每次启动时运行，且是幂等的：已有 blob 的存储键会被跳过，且所有已有键通过一次查询读入，因此开销不会随媒体库规模增长。键取自记录的 `StorageKey`，或取自其 URL 的 `/uploads/` 前缀；MIME 类型由文件头嗅探得出，而非依赖扩展名。旧版 `media_files` 记录本身会保留，因为尚未迁移的内容仍然指向它们。
+
+有两类旧版记录会被有意跳过，每条都会记录其 `id` 与键：
+
+- 嗅探出的类型不是图片、视频或音频的文件——即旧版的 PDF、SVG、`.md`、`.csv` 与 `.txt` 上传，因为 `model.BlobType` 没有对应类型。文章与设置仍以 URL 引用这些文件。
+- 仍托管在 S3 上的记录。键是从 URL 前缀还原的，因此 URL 为绝对地址的记录会被跳过，而不会去本地文件里解析。
+
+最后一条启动日志会报告已迁移行数与已读取行数，这是查看上述两类记录合计影响多少行的最快方式。
 
 ## 请求流程
 
