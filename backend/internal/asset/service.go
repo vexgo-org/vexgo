@@ -88,6 +88,11 @@ func (s *Service) Upload(
 		return nil, err
 	}
 
+	publicID, err := s.publicIDGenerator.New()
+	if err != nil {
+		return nil, fmt.Errorf("generate asset public ID: %w", err)
+	}
+
 	// Put the file to the storage backend.
 	if err := s.storage.Put(
 		ctx,
@@ -109,6 +114,8 @@ func (s *Service) Upload(
 	asset := &model.Asset{
 		OriginalName: filename,
 		UserID:       userID,
+		PublicID:     publicID,
+		Visibility:   model.AssetVisibilityPublic,
 	}
 
 	// Record blob and asset in database within a transaction.
