@@ -13,6 +13,13 @@ import (
 // multibyte names well before the column would overflow.
 const MaxAssetFilenameLength = 255
 
+type AssetVisibility string
+
+const (
+	AssetVisibilityPublic  AssetVisibility = "public"
+	AssetVisibilityPrivate AssetVisibility = "private"
+)
+
 type Asset struct {
 	ID uint `gorm:"primaryKey"`
 
@@ -28,6 +35,8 @@ type Asset struct {
 	// Physical file of this asset.
 	BlobID uint `gorm:"not null;index"`
 	Blob   Blob `gorm:"foreignKey:BlobID"`
+
+	Visibility AssetVisibility `gorm:"not null;index;default:public"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
