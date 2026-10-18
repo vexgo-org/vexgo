@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/vexgo-org/vexgo/backend/internal/asset"
+	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"gorm.io/gorm"
 )
@@ -21,6 +22,7 @@ func (s *Service) backfillAssetBlob() error {
 	}
 
 	var mediaFiles []model.MediaFile
+	publicIDGenerator := idgen.NewUUIDv7Generator()
 
 	// Query all media file records.
 	if err := s.db.Find(&mediaFiles).Error; err != nil {
@@ -133,10 +135,17 @@ func (s *Service) backfillAssetBlob() error {
 				return err
 			}
 
+			publicID, err := publicIDGenerator.New()
+			if err != nil {
+				return err
+			}
+
 			newAsset := model.Asset{
 				OriginalName: key,
 				UserID:       mediaFile.UserID,
 				BlobID:       blob.ID,
+				PublicID:     publicID,
+				Visibility:   model.AssetVisibilityPublic,
 			}
 			if err := tx.Create(&newAsset).Error; err != nil {
 				return err
