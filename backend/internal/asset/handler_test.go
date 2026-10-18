@@ -1203,6 +1203,13 @@ func (r *recordingAssetRepo) FindByID(_ context.Context, id uint) (*model.Asset,
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (r *recordingAssetRepo) FindPublicByPublicID(
+	context.Context,
+	uuid.UUID,
+) (*model.Asset, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+
 func (r *recordingAssetRepo) SoftDelete(context.Context, *model.Asset) error {
 	return nil
 }

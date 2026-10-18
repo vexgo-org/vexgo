@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
@@ -58,7 +59,9 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 }
 
 // seedAsset inserts an asset (with its blob) directly, bypassing Upload, so a
-// test can set up a row whose storage side was never really populated.
+// test can set up a row whose storage side was never really populated. The row
+// carries a real public ID and the public visibility, because those are what
+// every path that reads an asset by URL goes through.
 func seedAsset(t *testing.T, db *gorm.DB, ownerID uint, name string) model.Asset {
 	t.Helper()
 	blob := model.Blob{
@@ -70,11 +73,37 @@ func seedAsset(t *testing.T, db *gorm.DB, ownerID uint, name string) model.Asset
 	if err := db.Create(&blob).Error; err != nil {
 		t.Fatalf("failed to seed blob: %v", err)
 	}
-	asset := model.Asset{OriginalName: name, UserID: ownerID, BlobID: blob.ID}
+	publicID, err := uuid.NewV7()
+	if err != nil {
+		t.Fatalf("failed to generate a public ID: %v", err)
+	}
+	asset := model.Asset{
+		OriginalName: name,
+		UserID:       ownerID,
+		BlobID:       blob.ID,
+		PublicID:     publicID,
+		Visibility:   model.AssetVisibilityPublic,
+	}
 	if err := db.Create(&asset).Error; err != nil {
 		t.Fatalf("failed to seed asset: %v", err)
 	}
 	return asset
+}
+
+// setVisibility flips an existing asset's visibility, so the public read path
+// can be handed a row the lookup has to refuse.
+func setVisibility(
+	t *testing.T,
+	db *gorm.DB,
+	assetID uint,
+	visibility model.AssetVisibility,
+) {
+	t.Helper()
+	if err := db.Model(&model.Asset{}).
+		Where("id = ?", assetID).
+		Update("visibility", visibility).Error; err != nil {
+		t.Fatalf("failed to set visibility on asset %d: %v", assetID, err)
+	}
 }
 
 func countRows(t *testing.T, db *gorm.DB, value any) int64 {
@@ -212,6 +241,10 @@ type stubAssetRepo struct {
 	findErr error
 	delErr  error
 
+	// lookups records every public ID the service asked for, so a test can
+	// prove a request never reached the database at all.
+	lookups []uuid.UUID
+
 	created []*model.Asset
 	deleted []uint
 }
@@ -225,6 +258,23 @@ func (s *stubAssetRepo) Create(_ context.Context, asset *model.Asset) error {
 }
 
 func (s *stubAssetRepo) FindByID(context.Context, uint) (*model.Asset, error) {
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	if s.find == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return s.find, nil
+}
+
+// FindPublicByPublicID answers exactly like FindByID: a test that cares about
+// the lookup itself goes through the real repository, and one that only needs a
+// row or a failure is served from here.
+func (s *stubAssetRepo) FindPublicByPublicID(
+	_ context.Context,
+	publicID uuid.UUID,
+) (*model.Asset, error) {
+	s.lookups = append(s.lookups, publicID)
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
@@ -312,8 +362,18 @@ func (f failingKeyGenerator) Generate(string) (string, error) {
 	return "", f.err
 }
 
+// failingPublicIDGenerator stands in for a UUID generator that cannot produce a
+// value, which is the only way to reach that failure branch.
+type failingPublicIDGenerator struct{ err error }
+
+func (f failingPublicIDGenerator) New() (uuid.UUID, error) {
+	return uuid.Nil, f.err
+}
+
 // newFakeService wires a Service around fakes, which is the only way to reach
-// the failure paths the real database and storage would not produce.
+// the failure paths the real database and storage would not produce. The ID
+// generator is the real one unless a test replaces it, so the fake builder
+// mirrors NewService instead of leaving a nil seam behind.
 func newFakeService(
 	repos Repositories,
 	store storage.Storage,
@@ -321,11 +381,12 @@ func newFakeService(
 	keys KeyGenerator,
 ) *Service {
 	return &Service{
-		assets:       repos.Assets(),
-		blobs:        repos.Blobs(),
-		txManager:    tx,
-		storage:      store,
-		keyGenerator: keys,
+		assets:            repos.Assets(),
+		blobs:             repos.Blobs(),
+		txManager:         tx,
+		storage:           store,
+		keyGenerator:      keys,
+		publicIDGenerator: idgen.NewUUIDv7Generator(),
 	}
 }
 
@@ -410,6 +471,74 @@ func TestUpload_CreatesBlobAndAsset(t *testing.T) {
 
 	if files := mediaFiles(t, dataDir); len(files) != 1 {
 		t.Errorf("media dir holds %v, want exactly the one uploaded object", files)
+	}
+}
+
+// TestUpload_MintsAPublicIDAndMarksTheAssetPublic pins the two fields the
+// public read path depends on: without a public ID the asset is unreachable
+// under /assets/:publicID/original, and without the public visibility the
+// lookup refuses a row that just came out of an upload.
+func TestUpload_MintsAPublicIDAndMarksTheAssetPublic(t *testing.T) {
+	svc, _, db := newTestService(t)
+	user := seedUser(t, db, "uploader", model.RoleContributor)
+	payload := pngPayload(64)
+
+	got, err := svc.Upload(
+		context.Background(),
+		user.ID,
+		bytes.NewReader(payload),
+		"photo.png",
+		int64(len(payload)),
+	)
+	if err != nil {
+		t.Fatalf("Upload error: %v", err)
+	}
+	if got.PublicID == uuid.Nil {
+		t.Error("PublicID is nil, want a generated one")
+	}
+
+	// The returned value is what the SPA turns into a URL, and the stored row
+	// is what the next request reads back.
+	var stored model.Asset
+	if err := db.First(&stored, got.ID).Error; err != nil {
+		t.Fatalf("asset record not saved: %v", err)
+	}
+	if stored.PublicID != got.PublicID {
+		t.Errorf("stored PublicID = %s, want %s", stored.PublicID, got.PublicID)
+	}
+	if stored.Visibility != model.AssetVisibilityPublic {
+		t.Errorf("Visibility = %q, want %q", stored.Visibility, model.AssetVisibilityPublic)
+	}
+}
+
+// TestUpload_MintsDistinctPublicIDsPerAsset covers the unique index behind them:
+// a generator that handed out one value twice would make the second upload fail
+// its insert, and with it the whole transaction.
+func TestUpload_MintsDistinctPublicIDsPerAsset(t *testing.T) {
+	svc, _, db := newTestService(t)
+	user := seedUser(t, db, "uploader", model.RoleContributor)
+	payload := pngPayload(64)
+
+	seen := make(map[uuid.UUID]struct{}, 2)
+	for _, name := range []string{"first.png", "second.png"} {
+		got, err := svc.Upload(
+			context.Background(),
+			user.ID,
+			bytes.NewReader(payload),
+			name,
+			int64(len(payload)),
+		)
+		if err != nil {
+			t.Fatalf("Upload(%s) error: %v", name, err)
+		}
+		if _, duplicate := seen[got.PublicID]; duplicate {
+			t.Fatalf("public ID %s was minted twice", got.PublicID)
+		}
+		seen[got.PublicID] = struct{}{}
+	}
+
+	if n := countAssets(t, db); n != 2 {
+		t.Errorf("stored %d asset(s), want 2", n)
 	}
 }
 
@@ -703,6 +832,45 @@ func TestUpload_FailsWhenKeyGenerationFails(t *testing.T) {
 	}
 	if len(store.puts) != 0 {
 		t.Errorf("storage was written before the key existed: %+v", store.puts)
+	}
+}
+
+// TestUpload_FailsWhenPublicIDGenerationFails pins the ordering that keeps this
+// failure cheap: the ID is minted before the object is written, so a generator
+// that cannot produce one leaves no row and no orphan in storage.
+func TestUpload_FailsWhenPublicIDGenerationFails(t *testing.T) {
+	db := newTestDB(t)
+	user := seedUser(t, db, "uploader", model.RoleContributor)
+	store := &fakeStorage{}
+	svc := newFakeService(
+		mixedRepositories{assets: &stubAssetRepo{}, blobs: &stubBlobRepo{}},
+		store,
+		&fakeTxManager{repos: mixedRepositories{}},
+		NewKeyGenerator(),
+	)
+	svc.publicIDGenerator = failingPublicIDGenerator{err: errDB}
+
+	got, err := svc.Upload(
+		context.Background(),
+		user.ID,
+		bytes.NewReader(pngPayload(64)),
+		"photo.png",
+		64,
+	)
+	if !errors.Is(err, errDB) {
+		t.Fatalf("Upload error = %v, want it to wrap the ID generator failure", err)
+	}
+	if got != nil {
+		t.Errorf("expected no asset alongside the error, got %+v", got)
+	}
+	if len(store.puts) != 0 {
+		t.Errorf("storage was written before the public ID existed: %+v", store.puts)
+	}
+	if n := countAssets(t, db); n != 0 {
+		t.Errorf("failed upload created %d asset record(s)", n)
+	}
+	if n := countBlobs(t, db); n != 0 {
+		t.Errorf("failed upload created %d blob record(s)", n)
 	}
 }
 
@@ -1389,5 +1557,90 @@ func TestAssetRepository_SoftDeleteHidesRowFromFind(t *testing.T) {
 	}
 	if _, err := repo.FindByID(context.Background(), asset.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Errorf("FindByID after soft delete = %v, want gorm.ErrRecordNotFound", err)
+	}
+}
+
+// TestAssetRepository_FindPublicByPublicIDPreloadsBlob covers what the read path
+// relies on: the lookup is by public ID, but the caller still needs the blob to
+// open the object.
+func TestAssetRepository_FindPublicByPublicIDPreloadsBlob(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "photo.png")
+	repo := NewAssetRepository(db)
+
+	found, err := repo.FindPublicByPublicID(context.Background(), asset.PublicID)
+	if err != nil {
+		t.Fatalf("FindPublicByPublicID error: %v", err)
+	}
+	if found.ID != asset.ID {
+		t.Errorf("ID = %d, want %d", found.ID, asset.ID)
+	}
+	if found.Blob.StorageKey == "" {
+		t.Error("preloaded blob has no storage key")
+	}
+}
+
+// TestAssetRepository_FindPublicByPublicIDRefusesPrivateAsset is the gate the
+// public route depends on: a private asset has to be indistinguishable from one
+// that does not exist, because the response is the only thing an anonymous
+// caller sees.
+func TestAssetRepository_FindPublicByPublicIDRefusesPrivateAsset(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "draft.png")
+	setVisibility(t, db, asset.ID, model.AssetVisibilityPrivate)
+	repo := NewAssetRepository(db)
+
+	if _, err := repo.FindPublicByPublicID(context.Background(), asset.PublicID); !errors.Is(
+		err,
+		gorm.ErrRecordNotFound,
+	) {
+		t.Errorf("FindPublicByPublicID on a private asset = %v, want gorm.ErrRecordNotFound", err)
+	}
+}
+
+// TestAssetRepository_FindPublicByPublicIDNilIDSelectsNoRow is the lookup edge.
+// A `Where(&Asset{PublicID: uuid.Nil})` drops the zero value from the query and
+// falls back to "first row", so a nil ID would serve an arbitrary asset
+// instead of nothing. The guard is the only thing standing between the two.
+func TestAssetRepository_FindPublicByPublicIDNilIDSelectsNoRow(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	first := seedAsset(t, db, owner.ID, "first.png")
+	repo := NewAssetRepository(db)
+
+	found, err := repo.FindPublicByPublicID(context.Background(), uuid.Nil)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("FindPublicByPublicID(uuid.Nil) = %v, want gorm.ErrRecordNotFound", err)
+	}
+	if found != nil {
+		t.Errorf("a nil public ID returned asset %d", found.ID)
+	}
+
+	// Reported separately from the error: serving the first row is the worse
+	// half of the same bug.
+	if err := db.First(&model.Asset{}, first.ID).Error; err != nil {
+		t.Errorf("a nil public ID disturbed an unrelated asset: %v", err)
+	}
+}
+
+// TestAssetRepository_FindPublicByPublicIDHidesSoftDeletedAsset keeps the delete
+// contract on the public read path: a deleted asset stops being reachable by its
+// public URL, not merely invisible in the admin list.
+func TestAssetRepository_FindPublicByPublicIDHidesSoftDeletedAsset(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "photo.png")
+	repo := NewAssetRepository(db)
+
+	if err := repo.SoftDelete(context.Background(), &model.Asset{ID: asset.ID}); err != nil {
+		t.Fatalf("SoftDelete error: %v", err)
+	}
+	if _, err := repo.FindPublicByPublicID(
+		context.Background(),
+		asset.PublicID,
+	); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("FindPublicByPublicID after soft delete = %v, want gorm.ErrRecordNotFound", err)
 	}
 }

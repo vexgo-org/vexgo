@@ -13,6 +13,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -189,6 +190,15 @@ func TestBackfillAssetBlob_MigratesLegacyRowFromURL(t *testing.T) {
 	if asset.ID == 0 {
 		t.Error("expected the asset to be persisted with an ID")
 	}
+	// A migrated asset is reachable under /assets/:publicID/original, which
+	// needs both of these: an unminted ID would never match the lookup, and
+	// anything but the public visibility is refused by it.
+	if asset.PublicID == uuid.Nil {
+		t.Error("expected the backfill to mint a public ID")
+	}
+	if asset.Visibility != model.AssetVisibilityPublic {
+		t.Errorf("expected Visibility %q, got %q", model.AssetVisibilityPublic, asset.Visibility)
+	}
 }
 
 // TestBackfillAssetBlob_PrefersStorageKeyOverURL covers rows that already carry
@@ -210,6 +220,55 @@ func TestBackfillAssetBlob_PrefersStorageKeyOverURL(t *testing.T) {
 
 	if _, ok := findBlobByKey(t, db, key); !ok {
 		t.Errorf("expected the stored StorageKey to be used, found no blob for %q", key)
+	}
+}
+
+// TestBackfillAssetBlob_MintsDistinctPublicIDs pins the batch case against the
+// unique index on public_id: two rows that share an ID would let the first
+// insert through and fail every later one, so the backfill would quietly stop
+// after a single migrated file.
+func TestBackfillAssetBlob_MintsDistinctPublicIDs(t *testing.T) {
+	svc, db, local := newMigrationService(t)
+
+	keys := []string{
+		"9c1f2ab4-52e3-4f2e-9a0b-1c2d3e4f5a6b.png",
+		"b0d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f.png",
+		"c4d5e6f7-a8b9-4d0e-8f1a-2b3c4d5e6f70.png",
+	}
+	for _, key := range keys {
+		putObject(t, local, key, pngPayload)
+		seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	}
+
+	if err := svc.backfillAssetBlob(); err != nil {
+		t.Fatalf("backfill: %v", err)
+	}
+
+	var assets []model.Asset
+	if err := db.Find(&assets).Error; err != nil {
+		t.Fatalf("find assets: %v", err)
+	}
+	if len(assets) != len(keys) {
+		t.Fatalf("migrated %d asset(s), want %d", len(assets), len(keys))
+	}
+
+	seen := make(map[uuid.UUID]struct{}, len(assets))
+	for _, asset := range assets {
+		if asset.PublicID == uuid.Nil {
+			t.Fatalf("asset %d was migrated without a public ID", asset.ID)
+		}
+		if asset.Visibility != model.AssetVisibilityPublic {
+			t.Errorf(
+				"asset %d has visibility %q, want %q",
+				asset.ID,
+				asset.Visibility,
+				model.AssetVisibilityPublic,
+			)
+		}
+		if _, duplicate := seen[asset.PublicID]; duplicate {
+			t.Fatalf("public ID %s was minted twice", asset.PublicID)
+		}
+		seen[asset.PublicID] = struct{}{}
 	}
 }
 
