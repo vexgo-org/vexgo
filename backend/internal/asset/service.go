@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"unicode/utf8"
 
+	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"gorm.io/gorm"
@@ -21,22 +22,24 @@ type Deps struct {
 }
 
 type Service struct {
-	assets       AssetRepository
-	blobs        BlobRepository
-	txManager    TransactionManager
-	storage      storage.Storage
-	keyGenerator KeyGenerator
+	assets            AssetRepository
+	blobs             BlobRepository
+	txManager         TransactionManager
+	storage           storage.Storage
+	keyGenerator      KeyGenerator
+	publicIDGenerator idgen.Generator
 }
 
 func NewService(deps Deps) *Service {
 	repos := newRepositories(deps.DB)
 
 	return &Service{
-		assets:       repos.Assets(),
-		blobs:        repos.Blobs(),
-		txManager:    NewTransactionManager(deps.DB),
-		storage:      deps.Storage,
-		keyGenerator: NewKeyGenerator(),
+		assets:            repos.Assets(),
+		blobs:             repos.Blobs(),
+		txManager:         NewTransactionManager(deps.DB),
+		storage:           deps.Storage,
+		keyGenerator:      NewKeyGenerator(),
+		publicIDGenerator: idgen.NewUUIDv7Generator(),
 	}
 }
 
