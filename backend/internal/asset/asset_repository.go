@@ -11,6 +11,7 @@ import (
 type AssetRepository interface {
 	Create(ctx context.Context, asset *model.Asset) error
 	FindByID(ctx context.Context, id uint) (*model.Asset, error)
+	FindByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
 	FindPublicByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
 	SoftDelete(ctx context.Context, asset *model.Asset) error
 }
@@ -36,6 +37,14 @@ func (r *assetRepository) FindByID(ctx context.Context, id uint) (*model.Asset, 
 	}
 
 	return r.find(ctx, &model.Asset{ID: id})
+}
+
+func (r *assetRepository) FindByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error) {
+	if publicID == uuid.Nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	return r.find(ctx, &model.Asset{PublicID: publicID})
 }
 
 func (r *assetRepository) FindPublicByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error) {
