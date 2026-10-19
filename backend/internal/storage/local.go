@@ -97,9 +97,9 @@ func (s *LocalStorage) Put(
 	return nil
 }
 
-// Open returns a reader over the stored object. The returned ReadCloser owns
-// the os.Root the file was opened through, so closing it releases both.
-func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
+// Open returns a reader over the stored object. The returned ReadSeekCloser
+// owns the os.Root the file was opened through, so closing it releases both.
+func (s *LocalStorage) Open(_ context.Context, key string) (io.ReadSeekCloser, error) {
 	cleanedKey, err := unwrapCleanKey(key)
 	if err != nil {
 		return nil, err

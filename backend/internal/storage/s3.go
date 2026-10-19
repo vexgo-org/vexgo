@@ -107,10 +107,10 @@ func (s *S3Storage) Put(
 	return nil
 }
 
-// Open returns a reader over the stored object. GetObject defers the request
-// until the first read, so a missing object only surfaces here — hence the
-// Stat, which turns that into ErrNotFound instead of a read-time error.
-func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+// Open returns a seekable reader over the stored object. GetObject defers the
+// request until the first read, so a missing object only surfaces here — hence
+// the Stat, which turns that into ErrNotFound instead of a read-time error.
+func (s *S3Storage) Open(ctx context.Context, key string) (io.ReadSeekCloser, error) {
 	if err := s.checkClientInitialized(); err != nil {
 		return nil, err
 	}
