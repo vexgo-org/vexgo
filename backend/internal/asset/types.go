@@ -1,6 +1,10 @@
 package asset
 
-import "io"
+import (
+	"io"
+
+	"github.com/google/uuid"
+)
 
 type Actor struct {
 	ID   uint
@@ -8,8 +12,8 @@ type Actor struct {
 }
 
 type UploadResponse struct {
-	Message string `json:"message" example:"File uploaded successfully"`
-	ID      uint   `json:"asset_id" example:"1"`
+	Message  string    `json:"message" example:"File uploaded successfully"`
+	PublicID uuid.UUID `json:"asset_public_id" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
 }
 
 type MessageResponse struct {

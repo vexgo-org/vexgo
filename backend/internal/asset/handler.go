@@ -111,8 +111,8 @@ func (h *Handler) Upload(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, UploadResponse{
-		Message: "File uploaded successfully",
-		ID:      asset.ID,
+		Message:  "File uploaded successfully",
+		PublicID: asset.PublicID,
 	})
 }
 
