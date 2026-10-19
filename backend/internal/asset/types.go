@@ -25,5 +25,4 @@ type OriginalContent struct {
 
 	MIMEType string
 	Filename string
-	Size     int64
 }

@@ -193,7 +193,6 @@ func (s *Service) ResolveOriginal(ctx context.Context, publicID uuid.UUID) (*Ori
 	return &OriginalContent{
 		Reader:   reader,
 		MIMEType: asset.Blob.MimeType,
-		Size:     asset.Blob.Size,
 		Filename: asset.OriginalName,
 	}, nil
 }
