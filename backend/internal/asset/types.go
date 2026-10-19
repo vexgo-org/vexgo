@@ -21,7 +21,7 @@ type MessageResponse struct {
 }
 
 type OriginalContent struct {
-	Reader io.ReadCloser
+	Reader io.ReadSeekCloser
 
 	MIMEType string
 	Filename string
