@@ -49,7 +49,7 @@ type originalStore struct {
 	closed bool
 }
 
-func (s *originalStore) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+func (s *originalStore) Open(ctx context.Context, key string) (io.ReadSeekCloser, error) {
 	s.opens = append(s.opens, key)
 	if s.err != nil {
 		return nil, s.err
@@ -58,17 +58,17 @@ func (s *originalStore) Open(ctx context.Context, key string) (io.ReadCloser, er
 	if err != nil {
 		return nil, err
 	}
-	return &trackedReadCloser{ReadCloser: reader, onClose: func() { s.closed = true }}, nil
+	return &trackedReadCloser{ReadSeekCloser: reader, onClose: func() { s.closed = true }}, nil
 }
 
 type trackedReadCloser struct {
-	io.ReadCloser
+	io.ReadSeekCloser
 	onClose func()
 }
 
 func (r *trackedReadCloser) Close() error {
 	r.onClose()
-	return r.ReadCloser.Close()
+	return r.ReadSeekCloser.Close()
 }
 
 func newOriginalFixture(t *testing.T, err error) *originalFixture {

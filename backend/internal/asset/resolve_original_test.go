@@ -55,7 +55,7 @@ type stubOpenStorage struct {
 	opens []string
 }
 
-func (s *stubOpenStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
+func (s *stubOpenStorage) Open(_ context.Context, key string) (io.ReadSeekCloser, error) {
 	s.opens = append(s.opens, key)
 	return nil, s.err
 }
