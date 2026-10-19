@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -224,18 +223,4 @@ func (h *Handler) Original(c *gin.Context) {
 		content.Reader,
 		headers,
 	)
-}
-
-// parseUintParam parses a numeric route parameter by name, reporting whether it
-// is valid. Zero, non-numeric and out-of-range values cannot identify a row and
-// are treated as missing resources: callers must reject an invalid value
-// instead of proceeding with 0, which would resolve to row 0 and write orphaned
-// records or surface as a 500 rather than a client error. The bit size matches
-// uint so the conversion can never truncate silently.
-func parseUintParam(c *gin.Context, name string) (uint, bool) {
-	id64, err := strconv.ParseUint(c.Param(name), 10, strconv.IntSize)
-	if err != nil || id64 == 0 {
-		return 0, false
-	}
-	return uint(id64), true
 }
