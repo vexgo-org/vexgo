@@ -143,14 +143,14 @@ func (s *Service) Upload(
 }
 
 // Delete soft deletes an asset.
-func (s *Service) Delete(ctx context.Context, actor Actor, assetID uint) error {
+func (s *Service) Delete(ctx context.Context, actor Actor, publicID uuid.UUID) error {
 	// Find the asset.
-	asset, err := s.assets.FindByID(ctx, assetID)
+	asset, err := s.assets.FindByPublicID(ctx, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		}
-		return fmt.Errorf("find asset by ID: %w", err)
+		return fmt.Errorf("find asset by public ID: %w", err)
 	}
 
 	// Check the user permission.

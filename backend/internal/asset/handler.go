@@ -119,20 +119,20 @@ func (h *Handler) Upload(c *gin.Context) {
 // Delete godoc
 //
 //	@Summary		Delete an asset
-//	@Description	Soft deletes the asset identified by its ID.
+//	@Description	Soft deletes the asset identified by its public ID.
 //	@Description	Only the owner or an administrator may delete it.
 //	@Description	Requires authentication.
 //	@Tags			assets
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id	path		int	true	"asset id"
-//	@Success		200	{object}	MessageResponse
-//	@Failure		400	{object}	api.ErrorResponse
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		403	{object}	api.ErrorResponse	"not the owner"
-//	@Failure		404	{object}	api.ErrorResponse	"asset does not exist"
-//	@Failure		500	{object}	api.ErrorResponse	"failed to delete asset"
-//	@Router			/assets/delete/{id} [post]
+//	@Param			publicID	path		string	true	"asset public id"
+//	@Success		200			{object}	MessageResponse
+//	@Failure		400			{object}	api.ErrorResponse
+//	@Failure		401			{object}	api.ErrorResponse
+//	@Failure		403			{object}	api.ErrorResponse	"not the owner"
+//	@Failure		404			{object}	api.ErrorResponse	"asset does not exist"
+//	@Failure		500			{object}	api.ErrorResponse	"failed to delete asset"
+//	@Router			/assets/delete/{publicID} [post]
 func (h *Handler) Delete(c *gin.Context) {
 	// Get current user.
 	user, ok := middleware.CurrentUser(c)
@@ -141,9 +141,9 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Get the asset ID.
-	assetID, ok := parseUintParam(c, "id")
-	if !ok {
+	// Get the asset public ID.
+	publicID, err := uuid.Parse(c.Param("publicID"))
+	if err != nil {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid asset ID"})
 		return
 	}
@@ -154,7 +154,7 @@ func (h *Handler) Delete(c *gin.Context) {
 			ID:   user.ID,
 			Role: user.Role,
 		},
-		assetID,
+		publicID,
 	); err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
