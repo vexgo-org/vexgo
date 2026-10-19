@@ -41,9 +41,9 @@ type Storage interface {
 		contentType string,
 	) error
 
-	// Open returns a reader over the stored object, or ErrNotFound when the key
-	// holds nothing. The caller closes it.
-	Open(ctx context.Context, key string) (io.ReadCloser, error)
+	// Open returns a seekable reader over the stored object, or ErrNotFound when
+	// the key holds nothing. The caller closes it.
+	Open(ctx context.Context, key string) (io.ReadSeekCloser, error)
 
 	// Delete removes the object. A key that holds nothing is not an error, so
 	// deleting an already-deleted object stays idempotent.

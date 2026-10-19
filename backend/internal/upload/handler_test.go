@@ -229,7 +229,7 @@ func (s failingStorage) Put(context.Context, string, io.Reader, int64, string) e
 
 func (s failingStorage) Delete(context.Context, string) error { return nil }
 
-func (s failingStorage) Open(context.Context, string) (io.ReadCloser, error) { return nil, s.err }
+func (s failingStorage) Open(context.Context, string) (io.ReadSeekCloser, error) { return nil, s.err }
 
 func (s failingStorage) URL(context.Context, string) (string, error) { return "", s.err }
 

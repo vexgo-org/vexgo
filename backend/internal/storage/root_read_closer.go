@@ -4,7 +4,7 @@ import "os"
 
 // rootReadCloser is the reader LocalStorage.Open hands out. It pairs the opened
 // file with the os.Root it was opened through: both are descriptors, and the
-// caller only ever closes the io.ReadCloser.
+// caller only ever closes the io.ReadSeekCloser.
 type rootReadCloser struct {
 	file *os.File
 	root *os.Root
@@ -25,4 +25,8 @@ func (r *rootReadCloser) Close() error {
 	}
 
 	return rootErr
+}
+
+func (r *rootReadCloser) Seek(offset int64, whence int) (int64, error) {
+	return r.file.Seek(offset, whence)
 }
