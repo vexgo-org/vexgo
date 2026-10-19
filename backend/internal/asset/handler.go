@@ -182,6 +182,7 @@ func (h *Handler) Delete(c *gin.Context) {
 //	@Failure		503			{object}	api.ErrorResponse	"asset content unavailable"
 //	@Failure		500			{object}	api.ErrorResponse	"failed to get original asset"
 //	@Router			/assets/{publicID}/original [get]
+//	@Router			/assets/{publicID}/original [head]
 func (h *Handler) Original(c *gin.Context) {
 	publicID, err := uuid.Parse(c.Param("publicID"))
 	if err != nil {

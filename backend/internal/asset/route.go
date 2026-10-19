@@ -17,4 +17,5 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	api.POST("/assets/delete/:publicID", h.mw.JWTAuth(), noGuest, h.Delete)
 
 	api.GET("/assets/:publicID/original", h.Original)
+	api.HEAD("/assets/:publicID/original", h.Original)
 }
