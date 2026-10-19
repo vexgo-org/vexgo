@@ -324,7 +324,7 @@ func TestHandlerOriginal_NotFoundAfterDelete(t *testing.T) {
 	if err := f.h.svc.Delete(
 		context.Background(),
 		Actor{ID: owner.ID, Role: owner.Role},
-		asset.ID,
+		asset.PublicID,
 	); err != nil {
 		t.Fatalf("failed to delete asset: %v", err)
 	}

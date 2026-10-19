@@ -92,7 +92,7 @@ func newHandlerFixture(t *testing.T) *handlerFixture {
 // paths; the routed engine covers those.
 func registerAssetRoutes(r *gin.Engine, h *Handler) {
 	r.POST("/api/asset/upload", h.Upload)
-	r.POST("/api/asset/delete/:id", h.Delete)
+	r.POST("/api/asset/delete/:publicID", h.Delete)
 }
 
 // testIdentity stands in for middleware.Auth.JWTAuth on the bare engine, so a
@@ -255,16 +255,16 @@ func (f *handlerFixture) uploadAnonymous(
 	return perform(t, f.bare, http.MethodPost, "/api/asset/upload", body, contentType, nil)
 }
 
-// deleteAs performs a delete as the given user through the bare engine. assetID
-// goes into the path verbatim, so a test can send shapes a real client would
-// never produce on purpose.
+// deleteAs performs a delete as the given user through the bare engine. The
+// public ID goes into the path verbatim, so a test can send shapes a real
+// client would never produce on purpose.
 func (f *handlerFixture) deleteAs(
 	t *testing.T,
 	user model.User,
-	assetID string,
+	publicID string,
 ) *httptest.ResponseRecorder {
 	t.Helper()
-	return perform(t, f.bare, http.MethodPost, "/api/asset/delete/"+assetID, nil, "", identityOf(user))
+	return perform(t, f.bare, http.MethodPost, "/api/asset/delete/"+publicID, nil, "", identityOf(user))
 }
 
 // identityOf builds the headers testIdentity turns into an authenticated
@@ -304,11 +304,11 @@ func (f *handlerFixture) uploadOnRoutedRoute(
 func (f *handlerFixture) deleteOnRoutedRoute(
 	t *testing.T,
 	user model.User,
-	assetID uint,
+	publicID uuid.UUID,
 ) *httptest.ResponseRecorder {
 	t.Helper()
 	return perform(t, f.routed, http.MethodPost,
-		"/api/assets/delete/"+strconv.Itoa(int(assetID)), nil, "", bearerOf(t, user))
+		"/api/assets/delete/"+publicID.String(), nil, "", bearerOf(t, user))
 }
 
 // --- shared assertions --------------------------------------------------
@@ -464,16 +464,22 @@ func TestHandlerUpload_StoresAssetAndBlob(t *testing.T) {
 		t.Fatalf("no asset row was created: %v", err)
 	}
 
-	// The body is UploadResponse: a message plus the id the SPA refers to the
-	// asset by. Nothing more is documented, so nothing else may be serialized.
+	// The body is UploadResponse: a message plus the public ID the SPA refers
+	// to the asset by. Nothing more is documented, so nothing else may be
+	// serialized.
 	response := decodeUploadResponse(t, recorder)
 	if response.Message == "" {
 		t.Error("message is empty, want a human-readable confirmation")
 	}
-	if response.ID != asset.ID {
-		t.Errorf("asset_id = %d, want the created asset %d", response.ID, asset.ID)
+	if response.PublicID != asset.PublicID {
+		t.Errorf("asset_public_id = %s, want the created asset %s", response.PublicID, asset.PublicID)
 	}
-	assertKeysAre(t, recorder, "message", "asset_id")
+	assertKeysAre(t, recorder, "message", "asset_public_id")
+	// The public ID has to cross the wire as a canonical UUID string, because
+	// that is what the SPA pastes back into the URL.
+	if got := decodeJSON(t, recorder)["asset_public_id"]; got != asset.PublicID.String() {
+		t.Errorf("asset_public_id = %v, want the string %q", got, asset.PublicID.String())
+	}
 
 	// The storage key is deliberately not part of the response: it is
 	// addressed server side, and handing it out would let a client reach the
@@ -884,7 +890,7 @@ func TestHandlerDelete_RequiresAuthentication(t *testing.T) {
 	asset := seedAsset(t, f.db, owner.ID, "mine.png")
 
 	recorder := perform(t, f.bare, http.MethodPost,
-		"/api/asset/delete/"+strconv.Itoa(int(asset.ID)), nil, "", nil)
+		"/api/asset/delete/"+asset.PublicID.String(), nil, "", nil)
 
 	if recorder.Code < 400 || recorder.Code >= 500 {
 		t.Fatalf("status = %d, want a client error (body %s)", recorder.Code, recorder.Body.String())
@@ -901,7 +907,7 @@ func TestHandlerDelete_RequiresAuthenticationOnMountedRoute(t *testing.T) {
 	asset := seedAsset(t, f.db, owner.ID, "mine.png")
 
 	recorder := perform(t, f.guarded, http.MethodPost,
-		"/api/asset/delete/"+strconv.Itoa(int(asset.ID)), nil, "", nil)
+		"/api/asset/delete/"+asset.PublicID.String(), nil, "", nil)
 
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401 (body %s)", recorder.Code, recorder.Body.String())
@@ -948,7 +954,7 @@ func TestRoutes_DisallowGuestDelete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			asset := seedAsset(t, f.db, tt.owner.ID, "mine.png")
 
-			recorder := f.deleteOnRoutedRoute(t, guest, asset.ID)
+			recorder := f.deleteOnRoutedRoute(t, guest, asset.PublicID)
 
 			if recorder.Code != http.StatusForbidden {
 				t.Fatalf("status = %d, want 403 (body %s)", recorder.Code, recorder.Body.String())
@@ -982,12 +988,13 @@ func TestRoutes_AllowNonGuestRoles(t *testing.T) {
 			}
 			created := decodeUploadResponse(t, upload)
 
-			del := f.deleteOnRoutedRoute(t, user, created.ID)
+			del := f.deleteOnRoutedRoute(t, user, created.PublicID)
 			if del.Code != http.StatusOK {
 				t.Fatalf("delete status = %d, want 200 (body %s)", del.Code, del.Body.String())
 			}
-			if err := f.db.First(&model.Asset{}, created.ID).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
-				t.Errorf("asset %d survived its own delete: %v", created.ID, err)
+			err := f.db.Where("public_id = ?", created.PublicID).First(&model.Asset{}).Error
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				t.Errorf("asset %s survived its own delete: %v", created.PublicID, err)
 			}
 		})
 	}
@@ -1016,7 +1023,7 @@ func TestHandlerDelete_OwnerSucceeds(t *testing.T) {
 	asset := seedAsset(t, f.db, owner.ID, "mine.png")
 	key := writeObject(t, f.db, f.dataDir, asset.BlobID, "stored-bytes")
 
-	recorder := f.deleteAs(t, owner, strconv.Itoa(int(asset.ID)))
+	recorder := f.deleteAs(t, owner, asset.PublicID.String())
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body %s)", recorder.Code, recorder.Body.String())
@@ -1048,11 +1055,30 @@ func TestHandlerDelete_OwnerSucceeds(t *testing.T) {
 	assertObject(t, f.dataDir, key, "stored-bytes")
 }
 
+// TestHandlerDelete_OwnerCanDeletePrivateAsset: the visibility gate belongs to
+// the public read path, not to deletion; a private asset must not become
+// undeletable.
+func TestHandlerDelete_OwnerCanDeletePrivateAsset(t *testing.T) {
+	f := newHandlerFixture(t)
+	owner := seedUser(t, f.db, "owner", model.RoleContributor)
+	asset := seedAsset(t, f.db, owner.ID, "draft.png")
+	setVisibility(t, f.db, asset.ID, model.AssetVisibilityPrivate)
+
+	recorder := f.deleteAs(t, owner, asset.PublicID.String())
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %s)", recorder.Code, recorder.Body.String())
+	}
+	if err := f.db.First(&model.Asset{}, asset.ID).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("private asset survived its owner's delete: %v", err)
+	}
+}
+
 func TestHandlerDelete_TwiceReturnsNotFound(t *testing.T) {
 	f := newHandlerFixture(t)
 	owner := seedUser(t, f.db, "owner", model.RoleContributor)
 	asset := seedAsset(t, f.db, owner.ID, "twice.png")
-	id := strconv.Itoa(int(asset.ID))
+	id := asset.PublicID.String()
 
 	if recorder := f.deleteAs(t, owner, id); recorder.Code != http.StatusOK {
 		t.Fatalf("first delete status = %d, want 200 (body %s)",
@@ -1067,20 +1093,19 @@ func TestHandlerDelete_TwiceReturnsNotFound(t *testing.T) {
 	errorField(t, recorder)
 }
 
-// TestHandlerDelete_NotFound uses ids the parser accepts as `@Param id path int`
-// but that name nothing, so the handler gets as far as the lookup and the answer
-// is a 404. Ids too large to parse are a malformed request and are covered by
-// TestHandlerDelete_RejectsUnusableIDParam. (The width is strconv.IntSize, so
-// anything past 2^32 is fine on the 64-bit targets this project builds.)
+// TestHandlerDelete_NotFound uses well-formed public IDs that name nothing, so
+// the handler gets as far as the lookup and the answer is a 404. Malformed
+// values are covered by TestHandlerDelete_RejectsUnusablePublicIDParam; a bare
+// numeric id, the pre-public-ID URL format, is one of them now.
 func TestHandlerDelete_NotFound(t *testing.T) {
 	f := newHandlerFixture(t)
 	admin := seedUser(t, f.db, "admin", model.RoleAdmin)
 
-	for _, id := range []string{"9999", "100000", "4294967296"} {
-		recorder := f.deleteAs(t, admin, id)
+	for _, publicID := range []uuid.UUID{uuid.New(), uuid.New()} {
+		recorder := f.deleteAs(t, admin, publicID.String())
 		if recorder.Code != http.StatusNotFound {
 			t.Errorf("delete of absent asset %s: status = %d, want 404 (body %s)",
-				id, recorder.Code, recorder.Body.String())
+				publicID, recorder.Code, recorder.Body.String())
 		}
 		errorField(t, recorder)
 	}
@@ -1096,7 +1121,7 @@ func TestHandlerDelete_AdminCanDeleteAnotherUsersAsset(t *testing.T) {
 			admin := seedUser(t, f.db, "admin", role)
 			asset := seedAsset(t, f.db, owner.ID, "theirs.png")
 
-			recorder := f.deleteAs(t, admin, strconv.Itoa(int(asset.ID)))
+			recorder := f.deleteAs(t, admin, asset.PublicID.String())
 
 			if recorder.Code != http.StatusOK {
 				t.Fatalf("status = %d, want 200 (body %s)", recorder.Code, recorder.Body.String())
@@ -1124,7 +1149,7 @@ func TestHandlerDelete_ForbiddenForOtherUsers(t *testing.T) {
 			other := seedUser(t, f.db, "other", role)
 			asset := seedAsset(t, f.db, owner.ID, "theirs.png")
 
-			recorder := f.deleteAs(t, other, strconv.Itoa(int(asset.ID)))
+			recorder := f.deleteAs(t, other, asset.PublicID.String())
 
 			if recorder.Code != http.StatusForbidden {
 				t.Fatalf("status = %d, want 403 (body %s)", recorder.Code, recorder.Body.String())
@@ -1137,16 +1162,18 @@ func TestHandlerDelete_ForbiddenForOtherUsers(t *testing.T) {
 	}
 }
 
-// TestHandlerDelete_RejectsUnusableIDParam covers every shape the `:id` path
-// param can arrive in that is not a usable asset id, as declared by
-// `@Param id path int`. None may be coerced into one, because the coercion is
-// what turns a typo into someone else's asset.
+// TestHandlerDelete_RejectsUnusablePublicIDParam covers every shape the
+// `:publicID` path param can arrive in that is not a usable public ID, as
+// declared by `@Param publicID path string`. None may be coerced into one,
+// because the coercion is what turns a typo into someone else's asset — and a
+// bare numeric id, the pre-public-ID URL format, is one such typo.
 //
 // It also pins that a rejected param stops the request: writing the 400 is not
-// enough, the handler must not go on to ask the service about the zero id it
-// parsed.
-func TestHandlerDelete_RejectsUnusableIDParam(t *testing.T) {
-	for _, id := range []string{
+// enough, the handler must not go on to ask the service about the unusable ID
+// it parsed.
+func TestHandlerDelete_RejectsUnusablePublicIDParam(t *testing.T) {
+	for _, publicID := range []string{
+		"1", // the old numeric URL format
 		"abc",
 		"12abc",
 		"1.5",
@@ -1156,10 +1183,12 @@ func TestHandlerDelete_RejectsUnusableIDParam(t *testing.T) {
 		"12%20",
 		"0x1f",
 		"1e3",
-		"0",                       // parses, but identifies nothing
-		"99999999999999999999999", // overflows the parse entirely
+		"0",
+		"99999999999999999999999",
+		"0192",                                 // a UUID truncated to its timestamp prefix
+		"01920000-0000-7000-8000-00000000000g", // a UUID with a non-hex character
 	} {
-		t.Run("id="+id, func(t *testing.T) {
+		t.Run("publicID="+publicID, func(t *testing.T) {
 			f := newHandlerFixture(t)
 			admin := seedUser(t, f.db, "admin", model.RoleAdmin)
 			asset := seedAsset(t, f.db, admin.ID, "mine.png")
@@ -1170,36 +1199,43 @@ func TestHandlerDelete_RejectsUnusableIDParam(t *testing.T) {
 			f.h.svc = &Service{assets: repo}
 
 			recorder := perform(t, f.bare, http.MethodPost,
-				"/api/asset/delete/"+id, nil, "", identityOf(admin))
+				"/api/asset/delete/"+publicID, nil, "", identityOf(admin))
 
 			if recorder.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400 (body %s)", recorder.Code, recorder.Body.String())
 			}
 			errorField(t, recorder)
-			if len(repo.lookups) != 0 {
+			if len(repo.publicLookups) != 0 {
 				t.Errorf("the handler kept going after rejecting %q: looked up %v",
-					id, repo.lookups)
+					publicID, repo.publicLookups)
 			}
 			if err := f.db.First(&model.Asset{}, asset.ID).Error; err != nil {
-				t.Errorf("a malformed id deleted an asset: %v", err)
+				t.Errorf("a malformed public ID deleted an asset: %v", err)
 			}
 		})
 	}
 }
 
-// recordingAssetRepo counts the ids it is asked for, so a test can tell "the
-// handler refused and never called the service" apart from "the service was
-// called and changed nothing".
+// recordingAssetRepo counts the public IDs it is asked for, so a test can tell
+// "the handler refused and never called the service" apart from "the service
+// was called and changed nothing".
 type recordingAssetRepo struct {
-	lookups []uint
+	publicLookups []uuid.UUID
 }
 
 func (r *recordingAssetRepo) Create(context.Context, *model.Asset) error {
 	return nil
 }
 
-func (r *recordingAssetRepo) FindByID(_ context.Context, id uint) (*model.Asset, error) {
-	r.lookups = append(r.lookups, id)
+func (r *recordingAssetRepo) FindByID(context.Context, uint) (*model.Asset, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (r *recordingAssetRepo) FindByPublicID(
+	_ context.Context,
+	publicID uuid.UUID,
+) (*model.Asset, error) {
+	r.publicLookups = append(r.publicLookups, publicID)
 	return nil, gorm.ErrRecordNotFound
 }
 
@@ -1214,89 +1250,23 @@ func (r *recordingAssetRepo) SoftDelete(context.Context, *model.Asset) error {
 	return nil
 }
 
-// TestParseUintParam covers the trust-boundary parser directly, including the
-// cases a route cannot produce on its own. Zero is the one that matters most:
-// it parses cleanly but would otherwise resolve to "row 0".
-func TestParseUintParam(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	tests := []struct {
-		name   string
-		value  string
-		want   uint
-		wantOK bool
-	}{
-		{name: "small id", value: "1", want: 1, wantOK: true},
-		{name: "large id", value: "100000", want: 100000, wantOK: true},
-		{name: "above 2^32", value: "4294967296", want: 4294967296, wantOK: true},
-		{name: "leading zeros", value: "007", want: 7, wantOK: true},
-		{name: "zero", value: "0"},
-		{name: "empty", value: ""},
-		{name: "missing param", value: ""},
-		{name: "negative", value: "-1"},
-		{name: "explicit plus", value: "+1"},
-		{name: "letters", value: "abc"},
-		{name: "trailing letters", value: "12abc"},
-		{name: "decimal point", value: "1.5"},
-		{name: "exponent", value: "1e3"},
-		{name: "hex", value: "0x1f"},
-		{name: "padded with spaces", value: " 12 "},
-		{name: "unicode digits", value: "١٢"},
-		{name: "overflows uint", value: "99999999999999999999999999"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recorder := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(recorder)
-			c.Params = gin.Params{{Key: "id", Value: tt.value}}
-
-			got, ok := parseUintParam(c, "id")
-			if ok != tt.wantOK {
-				t.Fatalf("parseUintParam(%q) ok = %v, want %v", tt.value, ok, tt.wantOK)
-			}
-			if !tt.wantOK {
-				if got != 0 {
-					t.Errorf("parseUintParam(%q) = %d, want 0 alongside the failure", tt.value, got)
-				}
-				return
-			}
-			if got != tt.want {
-				t.Errorf("parseUintParam(%q) = %d, want %d", tt.value, got, tt.want)
-			}
-		})
-	}
-}
-
-// TestParseUintParam_IgnoresOtherParamNames checks the lookup is by name: a
-// value parked under a different key must not satisfy an `id` request.
-func TestParseUintParam_IgnoresOtherParamNames(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Params = gin.Params{{Key: "key", Value: "12"}}
-
-	if got, ok := parseUintParam(c, "id"); ok || got != 0 {
-		t.Errorf("parseUintParam(id) on a `key` param = (%d, %v), want (0, false)", got, ok)
-	}
-}
-
-// TestHandlerDelete_RejectsZeroID is the lookup edge: 0 parses as an int but
-// identifies nothing, so it must not select the first asset in the table.
-func TestHandlerDelete_RejectsZeroID(t *testing.T) {
+// TestHandlerDelete_NilPublicIDIsNotFound is the lookup edge: the nil UUID
+// parses cleanly but identifies nothing, so it must not select the first asset
+// in the table.
+func TestHandlerDelete_NilPublicIDIsNotFound(t *testing.T) {
 	f := newHandlerFixture(t)
 	admin := seedUser(t, f.db, "admin", model.RoleAdmin)
 	first := seedAsset(t, f.db, admin.ID, "first.png")
 	seedAsset(t, f.db, admin.ID, "second.png")
 
-	recorder := f.deleteAs(t, admin, "0")
+	recorder := f.deleteAs(t, admin, uuid.Nil.String())
 
-	if recorder.Code < 400 {
-		t.Fatalf("status = %d, want a client error (body %s)", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 (body %s)", recorder.Code, recorder.Body.String())
 	}
+	errorField(t, recorder)
 	if err := f.db.First(&model.Asset{}, first.ID).Error; err != nil {
-		t.Errorf("delete(0) removed an unrelated asset: %v", err)
+		t.Errorf("a nil public ID removed an unrelated asset: %v", err)
 	}
 	if n := countAssets(t, f.db); n != 2 {
 		t.Errorf("visible asset count = %d, want both assets intact", n)
@@ -1317,7 +1287,7 @@ func TestHandlerDelete_UnknownRoleCannotDeleteAnotherUsersAsset(t *testing.T) {
 	f.h.svc = &Service{assets: repo}
 
 	recorder := perform(t, f.bare, http.MethodPost,
-		"/api/asset/delete/"+strconv.Itoa(int(asset.ID)), nil, "", map[string]string{
+		"/api/asset/delete/"+asset.PublicID.String(), nil, "", map[string]string{
 			"X-Test-User-ID": strconv.FormatUint(uint64(stranger.ID), 10),
 			"X-Test-No-Role": "1",
 		})
@@ -1325,8 +1295,8 @@ func TestHandlerDelete_UnknownRoleCannotDeleteAnotherUsersAsset(t *testing.T) {
 	if recorder.Code < 400 || recorder.Code >= 500 {
 		t.Fatalf("status = %d, want a client error (body %s)", recorder.Code, recorder.Body.String())
 	}
-	if len(repo.lookups) != 0 {
-		t.Errorf("a roleless caller reached the service with %v", repo.lookups)
+	if len(repo.publicLookups) != 0 {
+		t.Errorf("a roleless caller reached the service with %v", repo.publicLookups)
 	}
 	if err := f.db.First(&model.Asset{}, asset.ID).Error; err != nil {
 		t.Errorf("a roleless delete removed someone else's asset: %v", err)
@@ -1345,7 +1315,7 @@ func TestHandlerDelete_IgnoresRoleClaimWhenDatabaseDisagrees(t *testing.T) {
 	asset := seedAsset(t, f.db, owner.ID, "theirs.png")
 
 	recorder := perform(t, f.guarded, http.MethodPost,
-		"/api/asset/delete/"+strconv.Itoa(int(asset.ID)), nil, "", map[string]string{
+		"/api/asset/delete/"+asset.PublicID.String(), nil, "", map[string]string{
 			"Authorization": "Bearer " + mintToken(t, demoted.ID, model.RoleAdmin),
 		})
 
@@ -1366,7 +1336,7 @@ func TestHandlerDelete_AllowsAdminOnMountedRoute(t *testing.T) {
 	asset := seedAsset(t, f.db, owner.ID, "theirs.png")
 
 	recorder := perform(t, f.guarded, http.MethodPost,
-		"/api/asset/delete/"+strconv.Itoa(int(asset.ID)), nil, "", map[string]string{
+		"/api/asset/delete/"+asset.PublicID.String(), nil, "", map[string]string{
 			"Authorization": "Bearer " + mintToken(t, admin.ID, model.RoleAdmin),
 		})
 
@@ -1387,7 +1357,7 @@ func TestHandlerDelete_HidesRepositoryFailures(t *testing.T) {
 	asset := seedAsset(t, f.db, owner.ID, "mine.png")
 	f.h.svc = &Service{assets: &stubAssetRepo{findErr: errors.New("dial tcp 10.0.0.5:5432: refused")}}
 
-	recorder := f.deleteAs(t, owner, strconv.Itoa(int(asset.ID)))
+	recorder := f.deleteAs(t, owner, asset.PublicID.String())
 
 	if recorder.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500 (body %s)", recorder.Code, recorder.Body.String())
