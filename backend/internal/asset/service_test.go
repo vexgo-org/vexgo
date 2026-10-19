@@ -194,7 +194,7 @@ func (f *fakeStorage) Put(
 	return f.putErr
 }
 
-func (f *fakeStorage) Open(context.Context, string) (io.ReadCloser, error) {
+func (f *fakeStorage) Open(context.Context, string) (io.ReadSeekCloser, error) {
 	return nil, storage.ErrNotFound
 }
 
