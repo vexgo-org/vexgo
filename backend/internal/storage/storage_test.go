@@ -104,3 +104,59 @@ func TestWriteUploadFile_Success(t *testing.T) {
 		t.Error("expected the file to be closed")
 	}
 }
+
+// Seek lets a caller serve ranges: it must resolve each whence the way the file
+// does, and a read after it must continue from the new position.
+func TestLocalStorage_OpenSeek(t *testing.T) {
+	storage := NewLocalStorage(t.TempDir())
+	ctx := context.Background()
+	const payload = "hello world"
+
+	if err := storage.Put(
+		ctx,
+		"post.txt",
+		strings.NewReader(payload),
+		int64(len(payload)),
+		"",
+	); err != nil {
+		t.Fatalf("Put error: %v", err)
+	}
+
+	reader, err := storage.Open(ctx, "post.txt")
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	size, err := reader.Seek(0, io.SeekEnd)
+	if err != nil {
+		t.Fatalf("Seek to end error: %v", err)
+	}
+	if size != int64(len(payload)) {
+		t.Errorf("Seek to end = %d, want %d", size, len(payload))
+	}
+
+	if _, err := reader.Seek(6, io.SeekStart); err != nil {
+		t.Fatalf("Seek to offset error: %v", err)
+	}
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read after seek: %v", err)
+	}
+	if string(got) != "world" {
+		t.Errorf("content after seek = %q, want %q", got, "world")
+	}
+
+	if _, err := reader.Seek(-5, io.SeekEnd); err != nil {
+		t.Fatalf("Seek from end error: %v", err)
+	}
+
+	got, err = io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read after seek from end: %v", err)
+	}
+	if string(got) != "world" {
+		t.Errorf("content after seek from end = %q, want %q", got, "world")
+	}
+}
