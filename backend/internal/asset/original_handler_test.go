@@ -19,10 +19,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Tests for Handler.Original, the GET /assets/:id/original route. They pin the
-// wire contract a blog theme depends on: the exact bytes, the blob's MIME type
-// and size, and the headers that decide whether a browser renders the file or
-// executes it. They also pin the failure mapping (404 / 503 / 500) and that the
+// Tests for Handler.Original, the GET and HEAD /assets/:publicID/original
+// route. They pin the wire contract a blog theme depends on: the exact bytes,
+// the range protocol media elements need, the blob's MIME type and size, and
+// the headers that decide whether a browser renders the file or executes it. They also pin the failure mapping (404 / 503 / 500) and that the
 // route is mounted public, since embedded post media has to load for readers
 // who hold no session.
 
@@ -86,23 +86,35 @@ func newOriginalFixture(t *testing.T, err error) *originalFixture {
 
 	engine := gin.New()
 	engine.GET("/api/assets/:publicID/original", h.Original)
+	engine.HEAD("/api/assets/:publicID/original", h.Original)
 
 	return &originalFixture{h: h, engine: engine, db: db, dataDir: dataDir, store: store}
 }
 
-// get requests the route with a raw public ID, so a test can send shapes a real
-// client would never produce.
-func (f *originalFixture) get(t *testing.T, rawID string) *httptest.ResponseRecorder {
+// request issues method at the route with a raw public ID and extra headers, so
+// a test can send shapes a real client would never produce.
+func (f *originalFixture) request(
+	t *testing.T,
+	method string,
+	rawID string,
+	headers map[string]string,
+) *httptest.ResponseRecorder {
 	t.Helper()
 	return perform(
 		t,
 		f.engine,
-		http.MethodGet,
+		method,
 		"/api/assets/"+rawID+"/original",
 		nil,
 		"",
-		nil,
+		headers,
 	)
+}
+
+// get requests the route with a raw public ID.
+func (f *originalFixture) get(t *testing.T, rawID string) *httptest.ResponseRecorder {
+	t.Helper()
+	return f.request(t, http.MethodGet, rawID, nil)
 }
 
 // originalOf requests the asset by the public ID its URL carries.
@@ -142,6 +154,117 @@ func TestHandlerOriginal_ServesStoredBytesWithBlobMetadata(t *testing.T) {
 	}
 	if got := recorder.Header().Get("Content-Length"); got != strconv.Itoa(len(content)) {
 		t.Errorf("Content-Length = %q, want the blob size %d", got, len(content))
+	}
+}
+
+// TestHandlerOriginal_ServesRangeRequests pins the range protocol media
+// elements and download managers rely on: a byte range must come back as 206
+// with exactly the requested slice, the matching Content-Range, and
+// Accept-Ranges advertising that seeking is possible at all.
+func TestHandlerOriginal_ServesRangeRequests(t *testing.T) {
+	f := newOriginalFixture(t, nil)
+	owner := seedUser(t, f.db, "author", model.RoleAuthor)
+	content := pngPayload(64)
+	asset := f.seedOwnedAsset(t, owner, "photo.png", "image/png", content)
+
+	tests := []struct {
+		name             string
+		rangeHeader      string
+		wantStart        int
+		wantEnd          int
+		wantContentRange string
+	}{
+		{"prefix", "bytes=0-3", 0, 4, "bytes 0-3/64"},
+		{"middle", "bytes=10-19", 10, 20, "bytes 10-19/64"},
+		{"open ended", "bytes=60-", 60, 64, "bytes 60-63/64"},
+		{"suffix", "bytes=-4", 60, 64, "bytes 60-63/64"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := f.request(t, http.MethodGet, asset.PublicID.String(), map[string]string{
+				"Range": tt.rangeHeader,
+			})
+
+			if recorder.Code != http.StatusPartialContent {
+				t.Fatalf("status = %d, want 206 (body %s)", recorder.Code, recorder.Body.String())
+			}
+			wantBody := content[tt.wantStart:tt.wantEnd]
+			if got := recorder.Body.Bytes(); string(got) != string(wantBody) {
+				t.Errorf("body = %q, want the bytes %d-%d", got, tt.wantStart, tt.wantEnd-1)
+			}
+			if got := recorder.Header().Get("Content-Range"); got != tt.wantContentRange {
+				t.Errorf("Content-Range = %q, want %q", got, tt.wantContentRange)
+			}
+			if got := recorder.Header().Get("Content-Length"); got != strconv.Itoa(len(wantBody)) {
+				t.Errorf("Content-Length = %q, want %d", got, len(wantBody))
+			}
+			if got := recorder.Header().Get("Accept-Ranges"); got != "bytes" {
+				t.Errorf("Accept-Ranges = %q, want %q", got, "bytes")
+			}
+		})
+	}
+}
+
+// TestHandlerOriginal_RejectsUnsatisfiableRange pins the 416 answer: a range
+// that begins past the end of the object must not silently fall back to the
+// whole file, and Content-Range must report the real size.
+func TestHandlerOriginal_RejectsUnsatisfiableRange(t *testing.T) {
+	f := newOriginalFixture(t, nil)
+	owner := seedUser(t, f.db, "author", model.RoleAuthor)
+	asset := f.seedOwnedAsset(t, owner, "photo.png", "image/png", pngPayload(64))
+
+	recorder := f.request(t, http.MethodGet, asset.PublicID.String(), map[string]string{
+		"Range": "bytes=999-1000",
+	})
+
+	if recorder.Code != http.StatusRequestedRangeNotSatisfiable {
+		t.Fatalf("status = %d, want 416 (body %s)", recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Content-Range"); got != "bytes */64" {
+		t.Errorf("Content-Range = %q, want %q", got, "bytes */64")
+	}
+}
+
+// TestHandlerOriginal_AnswersHeadWithMetadataOnly pins HEAD: a probe learns the
+// size and type without the server reading the object into a body.
+func TestHandlerOriginal_AnswersHeadWithMetadataOnly(t *testing.T) {
+	f := newOriginalFixture(t, nil)
+	owner := seedUser(t, f.db, "author", model.RoleAuthor)
+	content := pngPayload(64)
+	asset := f.seedOwnedAsset(t, owner, "photo.png", "image/png", content)
+
+	recorder := f.request(t, http.MethodHead, asset.PublicID.String(), nil)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	if got := recorder.Header().Get("Content-Length"); got != strconv.Itoa(len(content)) {
+		t.Errorf("Content-Length = %q, want %d", got, len(content))
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "image/png" {
+		t.Errorf("Content-Type = %q, want %q", got, "image/png")
+	}
+	if got := recorder.Header().Get("Accept-Ranges"); got != "bytes" {
+		t.Errorf("Accept-Ranges = %q, want %q", got, "bytes")
+	}
+	if recorder.Body.Len() != 0 {
+		t.Errorf("body = %d bytes, want none for HEAD", recorder.Body.Len())
+	}
+}
+
+// TestHandlerOriginal_AnswersHeadNotFound mirrors the missing-asset path for
+// HEAD: the same 404, with no body.
+func TestHandlerOriginal_AnswersHeadNotFound(t *testing.T) {
+	f := newOriginalFixture(t, nil)
+
+	recorder := f.request(t, http.MethodHead, uuid.Must(uuid.NewV7()).String(), nil)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", recorder.Code)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Errorf("body = %d bytes, want none for HEAD", recorder.Body.Len())
 	}
 }
 

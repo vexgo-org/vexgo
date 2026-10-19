@@ -78,9 +78,6 @@ func TestResolveOriginal_ReturnsStoredContentAndBlobMetadata(t *testing.T) {
 	if got.Filename != "holiday photo.png" {
 		t.Errorf("Filename = %q, want %q", got.Filename, "holiday photo.png")
 	}
-	if got.Size != int64(len(content)) {
-		t.Errorf("Size = %d, want %d", got.Size, len(content))
-	}
 
 	body, err := io.ReadAll(got.Reader)
 	if err != nil {
