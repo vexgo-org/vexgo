@@ -203,7 +203,7 @@ func (h *Handler) Original(c *gin.Context) {
 	defer content.Reader.Close()
 
 	headers := map[string]string{
-		"Cache-Control":          "public, max-age=31536000, immutable",
+		"Cache-Control":          "private, max-age=31536000, immutable",
 		"X-Content-Type-Options": "nosniff",
 	}
 

@@ -145,12 +145,13 @@ func TestHandlerOriginal_ServesStoredBytesWithBlobMetadata(t *testing.T) {
 	}
 }
 
-// TestHandlerOriginal_ForcesDownloadSafeHeaders pins the two headers that decide
-// whether the browser renders the file as an image or as a document: the stored
-// MIME type alone must not be trusted, since a blob sniffed as HTML would run
-// script on this origin. nosniff forbids the browser from second-guessing it,
-// and the immutable cache header says the bytes behind an id never change,
-// because every upload mints a fresh id.
+// TestHandlerOriginal_ForcesDownloadSafeHeaders pins the headers that decide
+// how a browser handles the file: the stored MIME type alone must not be
+// trusted, since a blob sniffed as HTML would run script on this origin, so
+// nosniff forbids the browser from second-guessing it. The cache stays
+// private: every upload mints a fresh id, so the bytes are immutable and the
+// browser may keep its copy for a year, but the asset can still be deleted or
+// made private and there is no purge path — a shared cache must never hold it.
 func TestHandlerOriginal_ForcesDownloadSafeHeaders(t *testing.T) {
 	f := newOriginalFixture(t, nil)
 	owner := seedUser(t, f.db, "author", model.RoleAuthor)
@@ -162,6 +163,12 @@ func TestHandlerOriginal_ForcesDownloadSafeHeaders(t *testing.T) {
 		t.Errorf("X-Content-Type-Options = %q, want %q", got, "nosniff")
 	}
 	cacheControl := recorder.Header().Get("Cache-Control")
+	if !strings.Contains(cacheControl, "private") {
+		t.Errorf("Cache-Control = %q, want it to keep the asset out of shared caches", cacheControl)
+	}
+	if strings.Contains(cacheControl, "public") {
+		t.Errorf("Cache-Control = %q, want no public caching for an asset that can be deleted or made private", cacheControl)
+	}
 	if !strings.Contains(cacheControl, "immutable") {
 		t.Errorf("Cache-Control = %q, want it to mark the asset immutable", cacheControl)
 	}
