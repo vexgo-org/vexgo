@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -205,6 +206,7 @@ func (h *Handler) Original(c *gin.Context) {
 	headers := map[string]string{
 		"Cache-Control":          "private, max-age=31536000, immutable",
 		"X-Content-Type-Options": "nosniff",
+		"Content-Type":           content.MIMEType,
 	}
 
 	if content.Filename != "" {
@@ -216,11 +218,15 @@ func (h *Handler) Original(c *gin.Context) {
 		)
 	}
 
-	c.DataFromReader(
-		http.StatusOK,
-		content.Size,
-		content.MIMEType,
+	for k, v := range headers {
+		c.Header(k, v)
+	}
+
+	http.ServeContent(
+		c.Writer,
+		c.Request,
+		content.Filename,
+		time.Time{},
 		content.Reader,
-		headers,
 	)
 }
