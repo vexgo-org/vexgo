@@ -28,11 +28,12 @@ backend/
     cli/                     # cobra 命令行：参数、帮助、版本、.env 加载
     comment/                 # 评论和 AI 内容审核
     config/                  # 基于 viper 的分层配置解析，JWT、S3、SSO 初始化
-    database/                # 连接、自动迁移、种子数据
+    database/                # 连接与种子数据
     home/                    # 站点统计
     mailer/                  # SMTP 邮件构建与发送
     notification/            # 站内通知
     middleware/              # JWT 认证、角色权限、请求日志
+    migration/               # 启动迁移：表结构、数据回填、敏感信息加密
     model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）
     page/                    # 自定义页面（/:slug）
     post/                    # 文章 CRUD、分类、标签、点赞
@@ -152,7 +153,8 @@ cmd/vexgo/main.go
     auth/          ← 被 comment、post、sso 使用（隐私过滤）
     notification/  ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
     storage/       ← storage.Storage 实现 model.FileRemover，被 user、auth、post
-                     用于文件清理；upload 领域通过它存储媒体
+                     用于文件清理；upload 与 asset 领域通过它存储媒体，
+                     migration 的媒体回填也会读取它
     captcha/       ← 实现 auth 声明的验证码检查接缝 auth.CaptchaChecker
     public/        ← 被 settings 用作主题渲染器接缝
     mailer/        ← 以具体类型 *mailer.Service 注入 auth 与 settings（只负责发送）
@@ -268,8 +270,9 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 ## 存储
 
 - 上传文件默认存到本地数据目录，启用 S3 后存到任意 S3 兼容对象存储（AWS S3、MinIO、Garage 等）。
-- 两种后端都放在 `internal/storage` 下，共用一个 `Storage` 接口（`Put`/`Open`/`Delete`/`URL`），因此 `upload` 不需要知道拿到的是哪个后端，测试也可以换成指向临时目录的 `LocalStorage`。具体后端由 `app.initStorage` 选择并注入。
-- 对象一律按 key 寻址，绝不使用 URL。因此 `MediaFile` 同时记录两者：`storage_key` 供 `Delete` 使用，`url` 给浏览器访问。key 在进入后端前先由 `cleanKey` 归一化并拦截，`LocalStorage` 还用 `os.Root` 约束每一次操作，恶意 key 无法逃出 `data/media`。
+- 两种后端都放在 `internal/storage` 下，共用一个 `Storage` 接口（`Put`/`Open`/`Delete`/`URL`），因此 `upload` 与 `asset` 不需要知道拿到的是哪个后端，测试也可以换成指向临时目录的 `LocalStorage`。具体后端由 `app.initStorage` 选择并注入。
+- 对象一律按 key 寻址，绝不使用 URL。`asset` 领域是替代性的上传路径：`Asset` 是面向用户的记录（稳定的 `public_id`、可见性），指向不可变的 `Blob`（存储 key、MIME 类型、大小）。原始内容通过 `/api/assets/{publicID}/original`（`GET`/`HEAD`）提供；只有公开资源可解析，私有资源返回 404。旧版 `/uploads/...` URL 继续可用。旧版 `MediaFile` 记录在已记录 key 时会把存储 key（供 `Delete` 使用）与浏览器 `url` 一并保存。
+- key 在进入后端前先由 `cleanKey` 归一化并拦截，`LocalStorage` 还用 `os.Root` 约束每一次操作，恶意 key 无法逃出 `data/media`。
 - 元数据（用户、文章、评论、设置）存储在数据库：默认 SQLite，生产环境用 PostgreSQL/MySQL。
 
 ## 通知
@@ -296,14 +299,17 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 `migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，并将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
 
-媒体回填在每次启动时运行，且是幂等的：已有 blob 的存储键会被跳过，且所有已有键通过一次查询读入，因此开销不会随媒体库规模增长。键取自记录的 `StorageKey`，或取自其 URL 的 `/uploads/` 前缀；MIME 类型由文件头嗅探得出，而非依赖扩展名。旧版 `media_files` 记录本身会保留，因为尚未迁移的内容仍然指向它们。
+媒体回填在每次启动时运行，且是幂等的：已有 blob 的存储键会被跳过，且所有已有键通过一次查询读入，因此不会逐行查询。键取自记录的 `StorageKey`，或取自其 URL 的 `/uploads/` 前缀；MIME 类型由文件头嗅探得出，而非依赖扩展名。带有 `StorageKey` 的记录通过当前配置的存储后端打开，因此 S3 部署也能迁移这些记录。旧版 `media_files` 记录本身会保留，因为尚未迁移的内容仍然指向它们。迁移后的资源均为公开可见。
 
-有两类旧版记录会被有意跳过，每条都会记录其 `id` 与键：
+有三类旧版记录会被有意跳过，每条都会记录其 `id` 与对应的 key 或 URL：
 
 - 嗅探出的类型不是图片、视频或音频的文件——即旧版的 PDF、SVG、`.md`、`.csv` 与 `.txt` 上传，因为 `model.BlobType` 没有对应类型。文章与设置仍以 URL 引用这些文件。
-- 仍托管在 S3 上的记录。键是从 URL 前缀还原的，因此 URL 为绝对地址的记录会被跳过，而不会去本地文件里解析。
+- 空文件。
+- URL 为绝对地址且没有记录 `StorageKey` 的记录——即尚未记录 key 之前写入的上传，包括旧版 S3 上传。没有 key 就没有可打开或改写的内容。
 
-最后一条启动日志会报告已迁移行数与已读取行数，这是查看上述两类记录合计影响多少行的最快方式。
+因其他原因失败的行（对象缺失、文件不可读、数据库错误）会记录为错误，并在下次启动时重试。
+
+最后一条启动日志会报告已迁移行数与已读取行数；差值包含被跳过和失败的行。
 
 ## 请求流程
 

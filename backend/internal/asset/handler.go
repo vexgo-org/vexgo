@@ -3,10 +3,12 @@ package asset
 import (
 	"errors"
 	"log/slog"
+	"mime"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -109,28 +111,28 @@ func (h *Handler) Upload(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, UploadResponse{
-		Message: "File uploaded successfully",
-		ID:      asset.ID,
+		Message:  "File uploaded successfully",
+		PublicID: asset.PublicID,
 	})
 }
 
 // Delete godoc
 //
 //	@Summary		Delete an asset
-//	@Description	Soft deletes the asset identified by its ID.
+//	@Description	Soft deletes the asset identified by its public ID.
 //	@Description	Only the owner or an administrator may delete it.
 //	@Description	Requires authentication.
 //	@Tags			assets
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			id	path		int	true	"asset id"
-//	@Success		200	{object}	MessageResponse
-//	@Failure		400	{object}	api.ErrorResponse
-//	@Failure		401	{object}	api.ErrorResponse
-//	@Failure		403	{object}	api.ErrorResponse	"not the owner"
-//	@Failure		404	{object}	api.ErrorResponse	"asset does not exist"
-//	@Failure		500	{object}	api.ErrorResponse	"failed to delete asset"
-//	@Router			/assets/delete/{id} [post]
+//	@Param			publicID	path		string	true	"asset public id"
+//	@Success		200			{object}	MessageResponse
+//	@Failure		400			{object}	api.ErrorResponse
+//	@Failure		401			{object}	api.ErrorResponse
+//	@Failure		403			{object}	api.ErrorResponse	"not the owner"
+//	@Failure		404			{object}	api.ErrorResponse	"asset does not exist"
+//	@Failure		500			{object}	api.ErrorResponse	"failed to delete asset"
+//	@Router			/assets/delete/{publicID} [post]
 func (h *Handler) Delete(c *gin.Context) {
 	// Get current user.
 	user, ok := middleware.CurrentUser(c)
@@ -139,9 +141,9 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Get the asset ID.
-	assetID, ok := parseUintParam(c, "id")
-	if !ok {
+	// Get the asset public ID.
+	publicID, err := uuid.Parse(c.Param("publicID"))
+	if err != nil {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid asset ID"})
 		return
 	}
@@ -152,7 +154,7 @@ func (h *Handler) Delete(c *gin.Context) {
 			ID:   user.ID,
 			Role: user.Role,
 		},
-		assetID,
+		publicID,
 	); err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):
@@ -168,16 +170,64 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, MessageResponse{Message: "File deleted"})
 }
 
-// parseUintParam parses a numeric route parameter by name, reporting whether it
-// is valid. Zero, non-numeric and out-of-range values cannot identify a row and
-// are treated as missing resources: callers must reject an invalid value
-// instead of proceeding with 0, which would resolve to row 0 and write orphaned
-// records or surface as a 500 rather than a client error. The bit size matches
-// uint so the conversion can never truncate silently.
-func parseUintParam(c *gin.Context, name string) (uint, bool) {
-	id64, err := strconv.ParseUint(c.Param(name), 10, strconv.IntSize)
-	if err != nil || id64 == 0 {
-		return 0, false
+// Original godoc
+//
+//	@Summary		Get original asset content
+//	@Description	Returns the original content of an asset.
+//	@Tags			assets
+//	@Produce		application/octet-stream
+//	@Param			publicID	path	string	true	"asset public id"
+//	@Success		200			{file}	binary	"original asset content"
+//	@Failure		404			"asset not found"
+//	@Failure		503			{object}	api.ErrorResponse	"asset content unavailable"
+//	@Failure		500			{object}	api.ErrorResponse	"failed to get original asset"
+//	@Router			/assets/{publicID}/original [get]
+//	@Router			/assets/{publicID}/original [head]
+func (h *Handler) Original(c *gin.Context) {
+	publicID, err := uuid.Parse(c.Param("publicID"))
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
 	}
-	return uint(id64), true
+
+	content, err := h.svc.ResolveOriginal(c.Request.Context(), publicID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			c.Status(http.StatusNotFound)
+		case errors.Is(err, ErrContentUnavailable):
+			c.JSON(http.StatusServiceUnavailable, api.ErrorResponse{Error: "Asset content unavailable"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get original asset"})
+		}
+		return
+	}
+	defer content.Reader.Close()
+
+	headers := map[string]string{
+		"Cache-Control":          "private, max-age=31536000, immutable",
+		"X-Content-Type-Options": "nosniff",
+		"Content-Type":           content.MIMEType,
+	}
+
+	if content.Filename != "" {
+		headers["Content-Disposition"] = mime.FormatMediaType(
+			"inline",
+			map[string]string{
+				"filename": content.Filename,
+			},
+		)
+	}
+
+	for k, v := range headers {
+		c.Header(k, v)
+	}
+
+	http.ServeContent(
+		c.Writer,
+		c.Request,
+		content.Filename,
+		time.Time{},
+		content.Reader,
+	)
 }

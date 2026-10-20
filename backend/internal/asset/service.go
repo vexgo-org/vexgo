@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"gorm.io/gorm"
@@ -21,22 +23,24 @@ type Deps struct {
 }
 
 type Service struct {
-	assets       AssetRepository
-	blobs        BlobRepository
-	txManager    TransactionManager
-	storage      storage.Storage
-	keyGenerator KeyGenerator
+	assets            AssetRepository
+	blobs             BlobRepository
+	txManager         TransactionManager
+	storage           storage.Storage
+	keyGenerator      KeyGenerator
+	publicIDGenerator idgen.Generator
 }
 
 func NewService(deps Deps) *Service {
 	repos := newRepositories(deps.DB)
 
 	return &Service{
-		assets:       repos.Assets(),
-		blobs:        repos.Blobs(),
-		txManager:    NewTransactionManager(deps.DB),
-		storage:      deps.Storage,
-		keyGenerator: NewKeyGenerator(),
+		assets:            repos.Assets(),
+		blobs:             repos.Blobs(),
+		txManager:         NewTransactionManager(deps.DB),
+		storage:           deps.Storage,
+		keyGenerator:      NewKeyGenerator(),
+		publicIDGenerator: idgen.NewUUIDv7Generator(),
 	}
 }
 
@@ -85,6 +89,11 @@ func (s *Service) Upload(
 		return nil, err
 	}
 
+	publicID, err := s.publicIDGenerator.New()
+	if err != nil {
+		return nil, fmt.Errorf("generate asset public ID: %w", err)
+	}
+
 	// Put the file to the storage backend.
 	if err := s.storage.Put(
 		ctx,
@@ -106,6 +115,8 @@ func (s *Service) Upload(
 	asset := &model.Asset{
 		OriginalName: filename,
 		UserID:       userID,
+		PublicID:     publicID,
+		Visibility:   model.AssetVisibilityPublic,
 	}
 
 	// Record blob and asset in database within a transaction.
@@ -132,14 +143,14 @@ func (s *Service) Upload(
 }
 
 // Delete soft deletes an asset.
-func (s *Service) Delete(ctx context.Context, actor Actor, assetID uint) error {
+func (s *Service) Delete(ctx context.Context, actor Actor, publicID uuid.UUID) error {
 	// Find the asset.
-	asset, err := s.assets.FindByID(ctx, assetID)
+	asset, err := s.assets.FindByPublicID(ctx, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		}
-		return fmt.Errorf("find asset by ID: %w", err)
+		return fmt.Errorf("find asset by public ID: %w", err)
 	}
 
 	// Check the user permission.
@@ -154,6 +165,36 @@ func (s *Service) Delete(ctx context.Context, actor Actor, assetID uint) error {
 	}
 
 	return nil
+}
+
+// ResolveOriginal resolves original content of an asset,
+// and returns content and metadata of the asset.
+func (s *Service) ResolveOriginal(ctx context.Context, publicID uuid.UUID) (*OriginalContent, error) {
+	if publicID == uuid.Nil {
+		return nil, ErrNotFound
+	}
+
+	asset, err := s.assets.FindPublicByPublicID(ctx, publicID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("find asset: %w", err)
+	}
+
+	reader, err := s.storage.Open(ctx, asset.Blob.StorageKey)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, ErrContentUnavailable
+		}
+		return nil, fmt.Errorf("open storage object for asset %d: %w", asset.ID, err)
+	}
+
+	return &OriginalContent{
+		Reader:   reader,
+		MIMEType: asset.Blob.MimeType,
+		Filename: asset.OriginalName,
+	}, nil
 }
 
 // rollbackUpload removes file from storage when uploading error occurs.

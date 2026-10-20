@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -13,8 +14,16 @@ import (
 // multibyte names well before the column would overflow.
 const MaxAssetFilenameLength = 255
 
+type AssetVisibility string
+
+const (
+	AssetVisibilityPublic  AssetVisibility = "public"
+	AssetVisibilityPrivate AssetVisibility = "private"
+)
+
 type Asset struct {
-	ID uint `gorm:"primaryKey"`
+	ID       uint      `gorm:"primaryKey"`
+	PublicID uuid.UUID `gorm:"not null;uniqueIndex"`
 
 	// OriginalName is the client-supplied filename, kept as display metadata
 	// only; the stored object is addressed by the blob's storage key. Limited
@@ -28,6 +37,8 @@ type Asset struct {
 	// Physical file of this asset.
 	BlobID uint `gorm:"not null;index"`
 	Blob   Blob `gorm:"foreignKey:BlobID"`
+
+	Visibility AssetVisibility `gorm:"not null;index;default:public"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

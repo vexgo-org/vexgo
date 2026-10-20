@@ -61,9 +61,9 @@
             },
             "asset.UploadResponse": {
                 "properties": {
-                    "asset_id": {
-                        "example": 1,
-                        "type": "integer"
+                    "asset_public_id": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
+                        "type": "string"
                     },
                     "message": {
                         "example": "File uploaded successfully",
@@ -2474,17 +2474,17 @@
         "url": ""
     },
     "paths": {
-        "/assets/delete/{id}": {
+        "/assets/delete/{publicID}": {
             "post": {
-                "description": "Soft deletes the asset identified by its ID.\nOnly the owner or an administrator may delete it.\nRequires authentication.",
+                "description": "Soft deletes the asset identified by its public ID.\nOnly the owner or an administrator may delete it.\nRequires authentication.",
                 "parameters": [
                     {
-                        "description": "asset id",
+                        "description": "asset public id",
                         "in": "path",
-                        "name": "id",
+                        "name": "publicID",
                         "required": true,
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 ],
@@ -2633,6 +2633,114 @@
                     }
                 ],
                 "summary": "Upload an asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{publicID}/original": {
+            "get": {
+                "description": "Returns the original content of an asset.",
+                "parameters": [
+                    {
+                        "description": "asset public id",
+                        "in": "path",
+                        "name": "publicID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "original asset content"
+                    },
+                    "404": {
+                        "description": "asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "failed to get original asset"
+                    },
+                    "503": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "asset content unavailable"
+                    }
+                },
+                "summary": "Get original asset content",
+                "tags": [
+                    "assets"
+                ]
+            },
+            "head": {
+                "description": "Returns the original content of an asset.",
+                "parameters": [
+                    {
+                        "description": "asset public id",
+                        "in": "path",
+                        "name": "publicID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "original asset content"
+                    },
+                    "404": {
+                        "description": "asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "failed to get original asset"
+                    },
+                    "503": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "asset content unavailable"
+                    }
+                },
+                "summary": "Get original asset content",
                 "tags": [
                     "assets"
                 ]

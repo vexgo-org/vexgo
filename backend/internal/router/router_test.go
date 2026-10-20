@@ -166,7 +166,9 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"DELETE /api/upload/:id",
 		// asset
 		"POST /api/assets/upload",
-		"POST /api/assets/delete/:id",
+		"POST /api/assets/delete/:publicID",
+		"GET /api/assets/:publicID/original",
+		"HEAD /api/assets/:publicID/original",
 		// user
 		"GET /api/users",
 		"PUT /api/users/:id/role",
