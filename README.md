@@ -585,17 +585,19 @@ backend/
   internal/
     api/             # wire types shared by the REST surface (responses, error bodies)
     app/             # composition root: wires storage, DB, and every domain
+    asset/           # asset management: uploads and soft-deleted assets over immutable blobs
     auth/            # registration, login, JWT, profile, password reset, email verification
     cache/           # cache backends: in-process memory + Valkey
     captcha/         # sliding-puzzle captcha generation and verification
     cli/             # cobra command line: flags, help, version, .env loading
     comment/         # comments and AI-powered moderation
     config/          # layered config resolution via viper (flags > file > env > defaults), JWT, S3, SSO setup (pure setup, no backend imports)
-    database/        # connection, auto-migration, seeding
+    database/        # connection and seeding
     home/            # site statistics
     mailer/          # SMTP mail building and sending
     notification/    # in-app notifications
     middleware/      # JWT auth, role-based permissions, request logging
+    migration/       # startup migrations: schema, backfills, secret encryption
     model/           # GORM data models + shared seams (Notifier, FileRemover)
     page/            # custom pages served at /:slug
     post/            # post CRUD, categories, tags, likes
@@ -605,7 +607,7 @@ backend/
     settings/        # admin configuration (SMTP, AI, general, theme)
     sso/             # GitHub / Google / OIDC login
     storage/         # file backends behind the Storage seam (local disk or S3)
-    upload/          # upload endpoints and the media-file records
+    upload/          # legacy upload endpoints and the media-file records, being replaced by asset/
     user/            # user management, roles, creator applications
 ```
 
@@ -633,8 +635,8 @@ import (
 
 - Leaf packages: `config/`, `model/`, `secrets/`, and `cache/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
 - Shared layer: `middleware/` (JWT auth, role permissions, request logging) depends only on `model`.
-- Cross-domain edges: `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `upload` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
-- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, creates storage and the `public.Renderer`, and wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
+- Cross-domain edges: `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`, and `migration` depends on `model`, `secrets`, `asset`, and `storage`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `storage.Storage` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
+- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, runs the startup migrations, creates storage and the `public.Renderer`, and wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
 ## Contributing
 

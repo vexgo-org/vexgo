@@ -133,16 +133,18 @@ backend/
   internal/
     api/                   # wire types shared by the REST surface
     app/                   # composition root: wires storage, DB, and every domain
+    asset/                 # asset management over immutable blobs (replaces upload/)
     auth/                  # authentication, JWT, email verification
     cache/                 # cache backends: in-process memory + Valkey
     captcha/               # sliding-puzzle captcha
     cli/                   # cobra command line
     comment/               # comments and moderation
     config/                # flag, env, and config-file parsing
-    database/              # DB connection, migrations, seeding
+    database/              # DB connection and seeding
     home/                  # homepage data endpoints
     mailer/                # email sending (SMTP)
     middleware/            # JWT auth and permission middleware
+    migration/             # startup migrations: schema, backfills, secret encryption
     model/                 # GORM data models + shared seams (Notifier, FileRemover)
     notification/          # notifications
     page/                  # custom pages served at /:slug
@@ -153,7 +155,7 @@ backend/
     settings/              # site settings endpoints
     sso/                   # OAuth2 / OIDC login
     storage/               # file backends behind the Storage seam (local disk or S3)
-    upload/                # upload endpoints and the media-file records
+    upload/                # legacy upload endpoints and the media-file records
     user/                  # user management
 frontend/
   src/
@@ -222,7 +224,7 @@ Follow these principles:
 - respect the `backend/internal` package boundaries and keep the dependency graph clean (for example, `model` must not import application logic, and `config` must stay a pure setup module)
 - use the `vexgo` module path in imports (`github.com/vexgo-org/vexgo/backend/internal/...`)
 - pass dependencies explicitly (see `router.Deps` and the `Deps` structs in each domain) instead of relying on global mutable state
-- keep services database-agnostic: depend on the domain `Repository` interface, put GORM queries in `repository.go`, and use the shared seams in `model/interfaces.go` (`Notifier`, `FileRemover`, `Mailer`) for cross-domain calls
+- keep services database-agnostic: depend on the domain `Repository` interface, put GORM queries in `repository.go`, and use the shared seams in `model/interfaces.go` (`Notifier`, `FileRemover`) for cross-domain calls
 
 ### TypeScript / React
 

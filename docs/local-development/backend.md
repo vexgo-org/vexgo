@@ -32,6 +32,7 @@ Supporting pieces:
 
 - `backend/internal/router`: `RegisterAPIRoutes` mounts every domain under `/api` (optional-JWT middleware at the group level) from the aggregate `router.Deps`. `router_test.go` locks the method+path surface: adding, removing, or renaming a route means updating that list deliberately.
 - `backend/internal/app`: wires every domain; `backend/cmd/vexgo/main.go` only resolves config and calls it.
+- `backend/internal/database`: connection only (`Open`/`Seed`). `backend/internal/migration`: startup migrations — `MigrateDB` (schema, legacy moderation switches, slug and media backfills) and `MigrateSecrets` (encrypt plaintext secrets at rest). `internal/app` calls both between `database.Open` and the domain wiring; the package has no handlers or routes.
 - Leaf packages importing no other backend package: `config`, `model`, `secrets`, `cache`. `model` holds GORM models plus the `Notifier`/`FileRemover` seams (`model/interfaces.go`); it must not import application logic.
 - `backend/internal/public`: SSR engine, theme serving, embedded assets. `backend/internal/settings`: site settings and theme management.
 - Cross-domain calls go through consumer-declared interfaces (`notification` implements `model.Notifier`, `storage.Storage` implements `model.FileRemover`). `mailer.Service` is an exception: injected as concrete `*mailer.Service` into `auth` and `settings`.

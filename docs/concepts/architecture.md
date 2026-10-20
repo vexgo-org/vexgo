@@ -28,11 +28,12 @@ backend/
     cli/                     # cobra command line: flags, help, version, .env loading
     comment/                 # comments and AI-powered moderation
     config/                  # layered config resolution via viper, JWT, S3, SSO setup
-    database/                # connection, auto-migration, seeding
+    database/                # connection and seeding
     home/                    # site statistics
     mailer/                  # SMTP mail building and sending
     notification/            # in-app notifications
     middleware/              # JWT auth, role-based permissions, request logging
+    migration/               # startup migrations: schema, backfills, secret encryption
     model/                   # GORM data models + shared seams (Notifier, FileRemover)
     page/                    # custom pages served at /:slug
     post/                    # post CRUD, categories, tags, likes
@@ -152,7 +153,8 @@ Cross-domain edges:
     auth/          ← used by comment, post, sso (for privacy filtering)
     notification/  ← implements model.Notifier, used by comment, post, user as notification seam
     storage/       ← storage.Storage implements model.FileRemover, used by user, auth,
-                     post for file cleanup; the upload domain stores media through it
+                     post for file cleanup; the upload and asset domains store media
+                     through it, and migration reads it for the media backfill
     captcha/       ← implements auth.CaptchaChecker, the captcha-check seam auth declares
     public/        ← used by settings as the theme-renderer seam
     mailer/        ← injected as a concrete *mailer.Service into auth and settings (send-only)
@@ -268,8 +270,9 @@ The callback URLs are:
 ## Storage
 
 - Uploads go to the local data directory by default, or to any S3-compatible object storage (AWS S3, MinIO, Garage, ...) when S3 is enabled.
-- Both live behind `internal/storage` as one `Storage` interface (`Put`/`Open`/`Delete`/`URL`), so `upload` never learns which backend it got and tests can swap in `LocalStorage` over a temp directory. `app.initStorage` picks the backend and injects it.
-- Objects are addressed by key, never by URL. A `MediaFile` row therefore stores both: `storage_key` is what `Delete` takes, `url` is what browsers get. Keys are normalized and screened by `cleanKey` before they reach a backend, and `LocalStorage` confines every operation with `os.Root`, so a hostile key cannot escape `data/media`.
+- Both live behind `internal/storage` as one `Storage` interface (`Put`/`Open`/`Delete`/`URL`), so `upload` and `asset` never learn which backend they got and tests can swap in `LocalStorage` over a temp directory. `app.initStorage` picks the backend and injects it.
+- Objects are addressed by key, never by URL. The `asset` domain is the replacement upload path: an `Asset` is the user-facing record (stable `public_id`, visibility) over an immutable `Blob` (storage key, MIME type, size). Original content is served at `/api/assets/{publicID}/original` (`GET`/`HEAD`); only public assets resolve, so a private asset is a 404. Legacy `/uploads/...` URLs keep working. Legacy `MediaFile` rows keep the storage key (what `Delete` takes) beside the browser `url` when a key was recorded.
+- Keys are normalized and screened by `cleanKey` before they reach a backend, and `LocalStorage` confines every operation with `os.Root`, so a hostile key cannot escape `data/media`.
 - Metadata (users, posts, comments, settings) lives in the database: SQLite by default, PostgreSQL/MySQL for production.
 
 ## Notifications
@@ -296,14 +299,17 @@ The database type is determined by the `db_type` config field or `DB_TYPE` envir
 
 `migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, backfills post slugs, and converts legacy `media_files` rows into `Asset` + `Blob` records. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
 
-The media backfill runs on every startup and is idempotent: a storage key that already owns a blob is skipped, and all existing keys are read in a single query, so the cost does not grow with the size of the library. The key comes from the row's `StorageKey`, or from the `/uploads/` prefix of its URL; the MIME type is sniffed from the file header rather than the extension. The legacy `media_files` rows themselves are kept, because content that has not been migrated yet still points at them.
+The media backfill runs on every startup and is idempotent: a storage key that already owns a blob is skipped, and all existing keys are read in a single query, so the pass does not issue a query per row. The key comes from the row's `StorageKey`, or from the `/uploads/` prefix of its URL; the MIME type is sniffed from the file header rather than the extension. Rows with a `StorageKey` are opened through the configured storage backend, so S3-backed installs migrate their keyed rows too. The legacy `media_files` rows themselves are kept, because content that has not been migrated yet still points at them. Migrated assets are public.
 
-Two classes of legacy row are deliberately left unmigrated, each logged with its `id` and key:
+Three classes of legacy row are deliberately skipped, each logged with its `id` and the offending key or URL:
 
 - Files whose sniffed type is not an image, video or audio type — legacy PDF, SVG, `.md`, `.csv` and `.txt` uploads, because `model.BlobType` has no type for them. Posts and settings still reference these by URL.
-- Rows still hosted on S3. The key is recovered from the URL prefix, so a row whose URL is absolute is skipped rather than resolved against the local files.
+- Empty files.
+- Rows whose URL is absolute and that have no recorded `StorageKey` — uploads written before keys were stored, including legacy S3 uploads. Without a key there is nothing to open or rewrite.
 
-The final startup log reports how many rows were migrated against how many were read, which is the quickest way to see how many rows the two cases above accounted for.
+Rows that fail for another reason (missing object, unreadable file, database error) are logged as errors and retried on the next startup.
+
+The final startup log reports how many rows were migrated against how many were read; the difference includes skipped and failed rows.
 
 ## Request flow
 
