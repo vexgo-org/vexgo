@@ -39,5 +39,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.ThemeConfig{},
 		&model.Notification{},
 		&model.CreatorApplication{},
+		&model.Asset{},
+		&model.Blob{},
 	)
 }

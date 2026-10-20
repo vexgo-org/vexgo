@@ -130,7 +130,7 @@ cmd/vexgo/main.go
     └─→ internal/app          ← composition root, imports everything
             ├─→ config         ← resolved Config type (no domain imports)
             ├─→ database       ← Open/Seed (imports config, model)
-            ├─→ migration      ← MigrateDB/MigrateSecrets (imports model, secrets)
+            ├─→ migration      ← MigrateDB/MigrateSecrets (imports model, secrets, asset, storage)
             ├─→ router         ← route registration (imports all domain handlers)
             └─→ internal/*     ← domain packages
 
@@ -142,7 +142,8 @@ Leaf packages (no internal imports):
     cache/         ← memory + Valkey backends; domains consume it through their
                      own narrow seams (CounterStore, StateStore, ReadCache)
     storage/       ← local disk and S3 file backends (imports config only); consumed
-                     by upload and by the model.FileRemover cleanup paths
+                     by upload, by the media backfill in migration, and by the
+                     model.FileRemover cleanup paths
 
 Shared layer:
     middleware/     ← JWT auth, role permissions, request logging (imports model only)
@@ -293,7 +294,16 @@ The database type is determined by the `db_type` config field or `DB_TYPE` envir
 
 ### Migrations and seeding
 
-`migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, and backfills post slugs. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
+`migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, backfills post slugs, and converts legacy `media_files` rows into `Asset` + `Blob` records. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
+
+The media backfill runs on every startup and is idempotent: a storage key that already owns a blob is skipped, and all existing keys are read in a single query, so the cost does not grow with the size of the library. The key comes from the row's `StorageKey`, or from the `/uploads/` prefix of its URL; the MIME type is sniffed from the file header rather than the extension. The legacy `media_files` rows themselves are kept, because content that has not been migrated yet still points at them.
+
+Two classes of legacy row are deliberately left unmigrated, each logged with its `id` and key:
+
+- Files whose sniffed type is not an image, video or audio type — legacy PDF, SVG, `.md`, `.csv` and `.txt` uploads, because `model.BlobType` has no type for them. Posts and settings still reference these by URL.
+- Rows still hosted on S3. The key is recovered from the URL prefix, so a row whose URL is absolute is skipped rather than resolved against the local files.
+
+The final startup log reports how many rows were migrated against how many were read, which is the quickest way to see how many rows the two cases above accounted for.
 
 ## Request flow
 
