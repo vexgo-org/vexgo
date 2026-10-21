@@ -49,11 +49,35 @@ var (
 	ErrCannotDeleteDefault   = errors.New("default theme cannot be deleted")
 )
 
+// ThemeManager is the seam to the public domain's theme management. The
+// settings domain owns the theme catalog (install, activate, delete) and the
+// public domain owns the themes themselves, so the settings domain declares
+// the operations it needs and the public service satisfies them.
+type ThemeManager interface {
+	// GetAvailableThemes lists the installed themes, the embedded default one
+	// included.
+	GetAvailableThemes() []public.ThemeInfo
+	// ThemeExists reports whether a theme is installed.
+	ThemeExists(themeID string) bool
+	// AvailableLanguages lists the i18n language codes a theme ships.
+	AvailableLanguages(themeID string) []string
+	// ValidateThemeTemplates reports whether every template of a theme parses.
+	ValidateThemeTemplates(themeID string) error
+	// InvalidateThemeCache drops the cached templates of a theme.
+	InvalidateThemeCache(themeID string)
+	// ThemePreviewURL mints a signed, short-lived preview link for a theme.
+	ThemePreviewURL(themeID string) (string, error)
+	// EnsureThemeSeeds creates the theme's seed pages for missing slugs.
+	EnsureThemeSeeds(ctx context.Context, themeID string) (int, error)
+	// DataDir returns the data directory holding the installed themes.
+	DataDir() string
+}
+
 // Deps holds the dependencies required by the settings domain.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Themes    *public.Renderer
+	Themes    ThemeManager
 	Mailer    *mailer.Service
 	Cipher    secrets.SecretCipher
 }
@@ -61,7 +85,7 @@ type Deps struct {
 // Service contains the business logic of the settings domain.
 type Service struct {
 	repo   Repository
-	themes *public.Renderer
+	themes ThemeManager
 	mailer *mailer.Service
 	cipher secrets.SecretCipher
 }

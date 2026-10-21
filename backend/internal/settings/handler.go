@@ -66,7 +66,7 @@ const (
 // Handler exposes the settings domain over HTTP.
 type Handler struct {
 	svc    *Service
-	themes *public.Renderer
+	themes ThemeManager
 	mw     *middleware.Auth
 }
 

@@ -292,6 +292,11 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 	}
 }
 
+// UserLookup resolves a user id to the account it names. It lets callers
+// outside the middleware chain resolve the account through their own
+// persistence layer instead of handing a database handle to the middleware.
+type UserLookup func(ctx context.Context, id uint) (model.User, error)
+
 // TokenUser validates a raw bearer token and resolves it to the current
 // database user, applying every rule JWTAuth applies to a request: the token
 // must be HS256-signed with this server's secret, carry a usable user_id, and
@@ -301,16 +306,15 @@ func (a *Auth) OptionalJWTAuth() gin.HandlerFunc {
 // It is the shared entry point for callers outside the middleware chain (the
 // public renderer's draft-page preview) so they cannot re-derive authorization
 // from the token's role claim. The returned role is read from the database, and
-// the absence of a database fails closed rather than trusting the signature
-// alone.
+// a missing lookup fails closed rather than trusting the signature alone.
 //
 // The lookup runs under the caller's context, so a cancelled request does not
 // leave the user query running.
-func TokenUser(ctx context.Context, db *gorm.DB, secret []byte, rawToken string) (model.User, bool) {
-	hasDatabase := db != nil
+func TokenUser(ctx context.Context, secret []byte, rawToken string, lookup UserLookup) (model.User, bool) {
+	hasLookup := lookup != nil
 	hasToken := rawToken != ""
 	hasSecret := len(secret) > 0
-	if !hasDatabase || !hasToken || !hasSecret {
+	if !hasLookup || !hasToken || !hasSecret {
 		return model.User{}, false
 	}
 
@@ -334,8 +338,8 @@ func TokenUser(ctx context.Context, db *gorm.DB, secret []byte, rawToken string)
 		return model.User{}, false
 	}
 
-	var user model.User
-	if err := db.WithContext(ctx).First(&user, userID).Error; err != nil {
+	user, err := lookup(ctx, userID)
+	if err != nil {
 		// The token names an account that no longer exists; never fall back
 		// to its role claim.
 		return model.User{}, false

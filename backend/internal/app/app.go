@@ -110,19 +110,24 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.RequestLogger())
 	r.Use(middleware.SecurityHeaders())
 
-	renderer := public.NewRenderer(db, fmt.Sprintf("http://%s", cfg.GetListenAddr()), cfg.DataDir)
-	renderer.SetJWTSecret(cfg.JWTSecret)
-
-	// A configured theme_dir (set by `vexgo dev --theme-dir`) overrides the
-	// active theme with a local directory so a developer can iterate on a
-	// theme without rebuilding the embed.
+	// The public domain serves the server-side rendered pages, the themes and
+	// the embedded admin SPA. A configured theme_dir (set by
+	// `vexgo dev --theme-dir`) overrides the active theme with a local
+	// directory so a developer can iterate on a theme without rebuilding the
+	// embed.
+	publicSvc := public.NewService(public.Deps{
+		DB:        db,
+		JWTSecret: cfg.JWTSecret,
+		BaseURL:   fmt.Sprintf("http://%s", cfg.GetListenAddr()),
+		DataDir:   cfg.DataDir,
+		ThemeDir:  cfg.ThemeDir,
+	})
 	if cfg.ThemeDir != "" {
-		renderer.SetThemeDir(cfg.ThemeDir)
 		slog.Info("dev theme directory configured", "dir", cfg.ThemeDir)
 	}
 	// Theme-owned seed pages (e.g. the default theme's timeline/links) are
 	// created for missing slugs only; user edits are never overwritten.
-	if n, err := renderer.EnsureThemeSeeds(context.Background(), renderer.ActiveThemeID()); err != nil {
+	if n, err := publicSvc.EnsureThemeSeeds(context.Background(), publicSvc.ActiveThemeID(context.Background())); err != nil {
 		if errors.Is(err, public.ErrDevTheme) {
 			return nil, fmt.Errorf("load dev theme: %w", err)
 		}
@@ -131,7 +136,7 @@ func New(cfg *config.Config) (*App, error) {
 	} else if n > 0 {
 		slog.Info("created theme seed pages", "count", n)
 	}
-	slog.Info("base url set for server-side rendering", "baseURL", renderer.BaseURL())
+	slog.Info("base url set for server-side rendering", "baseURL", publicSvc.BaseURL())
 
 	configureProxies(r, cfg)
 
@@ -211,7 +216,7 @@ func New(cfg *config.Config) (*App, error) {
 		Settings: settings.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-			Themes:    renderer,
+			Themes:    publicSvc,
 			Mailer:    mailerSvc,
 			Cipher:    cipher,
 		},
@@ -222,7 +227,7 @@ func New(cfg *config.Config) (*App, error) {
 		},
 	})
 
-	renderer.RegisterStaticRoutes(r, cfg.S3Enabled)
+	public.NewHandler(publicSvc).RegisterRoutes(r, cfg.S3Enabled)
 
 	return &App{cfg: cfg, db: db, engine: r}, nil
 }
