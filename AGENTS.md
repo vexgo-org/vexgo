@@ -17,12 +17,12 @@ VexGo is a self-hosted blog CMS: a Go backend (Gin + GORM) serving the JSON API,
 
 ## Public pages and themes
 
-- Public routes render Go templates from the active theme: `/`, `/post/:slug`, `/posts/:slug`, `/user/:id`, custom pages at `/:slug`, assets under `/theme-assets/`. Every non-public route lives under `/admin/...`; legacy top-level URLs 301-redirect there with the query string intact, so emailed `?token=...` links keep working. Engine: `theme_render.go` + `theme_handlers.go`.
+- Public routes render Go templates from the active theme: `/`, `/post/:slug`, `/posts/:slug`, `/user/:id`, custom pages at `/:slug`, assets under `/theme-assets/`. Every non-public route lives under `/admin/...`; legacy top-level URLs 301-redirect there with the query string intact, so emailed `?token=...` links keep working. Engine: `render.go` (theme templates) + `handler.go` (SSR routes).
 - A theme is a directory: `vexgo-theme.json` manifest, `index.html`/`post.html`/`page.html`/`user.html`/`404.html`, optional `i18n/`, `seed/`, `assets/`. The built-in theme is built from the standalone `vexgo-org/vexgo-default-theme` repo by `just build-theme`; uploaded themes are extracted to `data/theme/<id>/`.
 - Template data: `.Site`, `.Posts`, `.Post`, `.User`, `.Pagination`, `.Query`, plus `.PopularPosts`/`.PopularTags` on the home page; helpers `date`, `truncate`, `userURL`, `categoryURL`. Markdown renders through goldmark in safe mode (GFM).
 - Comments are rendered by a vanilla-JS widget: `<div id="vexgo-comments" data-post-id="{{.Post.ID}}"></div>` + `<script src="/theme-assets/comments.js" defer></script>`. It uses the public comment API with the admin SPA's localStorage session.
 - Trap: `go()` expressions inside HTML attributes must not contain double quotes. React escapes them to `&quot;`, which breaks template parsing. Use the helper funcs instead.
-- Full reference: `docs/concepts/theming.md`, `docs/guides/theme-development.md`, `docs/reference/theme-templates.md`.
+- Full reference: `docs/concepts/theming.md`, `docs/local-development/theme-development.md`, `docs/reference/theme-templates.md`.
 
 ## Commands
 
@@ -54,7 +54,7 @@ just generate         # swag -> docs/swagger.json -> orval -> frontend client
 
 - Go: `gofumpt -extra` + `golangci-lint`; import through the full module path; thread `context.Context` through every layer (handlers pass `c.Request.Context()`); propagate errors with context instead of swallowing them; pass dependencies through `Deps` structs. The only global mutable state is the test seam `mailer.SetMailCaptureHook`, which tests restore with `t.Cleanup`.
 - Config keys live in `keyDefaults` (`internal/config/config.go`) with a matching `mapstructure` tag; viper layers flags > file > env > defaults, so never re-introduce per-source parsing.
-- Cross-domain calls go through consumer-declared interfaces where practical (`notification` implements `model.Notifier`, `storage.Storage` implements `model.FileRemover`). `mailer.Service` is an exception: injected as the concrete `*mailer.Service` into `auth` and `settings`, send-only, with account/token persistence in the domain repositories.
+- Cross-domain calls go through consumer-declared interfaces where practical (`notification` implements `model.Notifier`, `storage.Storage` implements `model.FileRemover`, `*public.Service` implements `settings.ThemeManager` for the theme catalog). `mailer.Service` is an exception: injected as the concrete `*mailer.Service` into `auth` and `settings`, send-only, with account/token persistence in the domain repositories.
 - `cache` holds the memory and Valkey backends behind one `Cache` interface; consumers declare narrow seams (`middleware.CounterStore`, `sso.StateStore`) and `internal/app` picks the backend from `cache_enabled` and `valkey_enabled`/`valkey_url`.
 - `secrets` encrypts DB-stored secrets at rest with AES-256-GCM (SMTP password, AI/comment-moderation keys): the package declares the shared `secrets.SecretCipher` seam, `settings`, `comment`, and `mailer` still declare their own structurally identical `SecretCipher` in their `Deps` (any `*secrets.Cipher` satisfies all of them), `internal/app` builds it from `settings_encryption_key` (unset → plaintext), and `migration.Service.MigrateSecrets` encrypts existing plaintext at startup.
 - `cli` defines the cobra command line, binds flags to viper, and imports only `config`.

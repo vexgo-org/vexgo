@@ -1,6 +1,6 @@
 # 主题模板参考
 
-> VexGo 主题可用的全部文件、字段、函数与限制。设计原理见[主题系统](/zh-cn/concepts/theming)，实操步骤见[主题开发指南](/zh-cn/guides/theme-development)。
+> VexGo 主题可用的全部文件、字段、函数与限制。设计原理见[主题系统](/zh-cn/concepts/theming)，实操步骤见[主题开发指南](/zh-cn/local-development/theme-development)。
 
 ## 主题目录结构
 
@@ -325,5 +325,5 @@ frontmatter 之后的内容即 Markdown 正文。slug 必须匹配 `^[a-z0-9-]{1
 ## 相关阅读
 
 - [主题系统](/zh-cn/concepts/theming)：渲染器如何使用这些文件。
-- [主题开发指南](/zh-cn/guides/theme-development)：编写并安装主题。
+- [主题开发指南](/zh-cn/local-development/theme-development)：编写并安装主题。
 - [架构](/zh-cn/concepts/architecture)：渲染器在后端中的位置。

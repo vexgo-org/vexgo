@@ -1,6 +1,6 @@
 # Theming
 
-> How VexGo turns a theme directory into server-rendered pages: the request pipeline, how templates are resolved, how the language is chosen, what gets cached, and what happens to a theme's seed pages. For step-by-step instructions, see the [Theme Development guide](/guides/theme-development); for exact field and function tables, see the [Theme Templates reference](/reference/theme-templates).
+> How VexGo turns a theme directory into server-rendered pages: the request pipeline, how templates are resolved, how the language is chosen, what gets cached, and what happens to a theme's seed pages. For step-by-step instructions, see the [Theme Development guide](/local-development/theme-development); for exact field and function tables, see the [Theme Templates reference](/reference/theme-templates).
 
 ## Overview
 
@@ -117,6 +117,6 @@ Because the public SSR surface and the admin surface share an origin, the theme 
 
 ## Related reading
 
-- [Theme Development guide](/guides/theme-development): build, package and install a theme.
+- [Theme Development guide](/local-development/theme-development): build, package and install a theme.
 - [Theme Templates reference](/reference/theme-templates): every template context field, helper and file format.
 - [Architecture](/concepts/architecture): where the renderer sits in the backend.

@@ -601,7 +601,7 @@ backend/
     model/           # GORM data models + shared seams (Notifier, FileRemover)
     page/            # custom pages served at /:slug
     post/            # post CRUD, categories, tags, likes
-    public/          # embedded frontend, themes, SSR renderer, static routes
+    public/          # embedded frontend, themes, SSR service + handler, static routes
     router/          # route registration (composes every domain)
     secrets/         # AES-256-GCM encryption of secrets stored in the database
     settings/        # admin configuration (SMTP, AI, general, theme)
@@ -635,8 +635,8 @@ import (
 
 - Leaf packages: `config/`, `model/`, `secrets/`, and `cache/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
 - Shared layer: `middleware/` (JWT auth, role permissions, request logging) depends only on `model`.
-- Cross-domain edges: `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `database` depends on `config` and `model`, and `migration` depends on `model`, `secrets`, `asset`, and `storage`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `storage.Storage` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
-- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, runs the startup migrations, creates storage and the `public.Renderer`, and wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
+- Cross-domain edges: `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `public` depends on `page` (theme seed pages) and implements the `settings.ThemeManager` seam; `database` depends on `config` and `model`, and `migration` depends on `model`, `secrets`, `asset`, and `storage`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `storage.Storage` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
+- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, runs the startup migrations, creates storage and the `public.Service`, and wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
 
 ## Contributing
 

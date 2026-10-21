@@ -1,6 +1,6 @@
 # Theme Templates Reference
 
-> The exact files, fields, functions and limits a VexGo theme can use. For the reasoning behind the system see [Theming](/concepts/theming); for a walkthrough see the [Theme Development guide](/guides/theme-development).
+> The exact files, fields, functions and limits a VexGo theme can use. For the reasoning behind the system see [Theming](/concepts/theming); for a walkthrough see the [Theme Development guide](/local-development/theme-development).
 
 ## Theme directory layout
 
@@ -325,5 +325,5 @@ Additional validation: the archive must contain a readable `vexgo-theme.json` (a
 ## Related reading
 
 - [Theming](/concepts/theming): how the renderer uses these files.
-- [Theme Development guide](/guides/theme-development): building and installing a theme.
+- [Theme Development guide](/local-development/theme-development): building and installing a theme.
 - [Architecture](/concepts/architecture): where the renderer sits in the backend.

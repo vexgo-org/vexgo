@@ -37,7 +37,7 @@ backend/
     model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）
     page/                    # 自定义页面（/:slug）
     post/                    # 文章 CRUD、分类、标签、点赞
-    public/                  # 嵌入的前端、主题、SSR 渲染器、静态路由
+    public/                  # 嵌入的前端、主题、SSR 服务与处理器、静态路由
     router/                  # 路由注册（组合所有领域）
     secrets/                 # 数据库中敏感信息的 AES-256-GCM 加密
     settings/                # 管理员配置（SMTP、AI、通用、主题）
@@ -94,6 +94,7 @@ type FileRemover interface {
 - `storage.Storage` 实现 `FileRemover`；由 `post`、`user`、`auth` 用于文件清理。
 - `captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接缝；`post`/`home` 自行声明 `ReadCache`。`secrets` 是另一个例外：作为叶子包，它声明唯一的 `secrets.SecretCipher` 接口，由 `settings`、`comment`、`mailer` 共同消费。
 - 邮件是例外：`mailer.Service` 以具体类型注入 `auth` 与 `settings`。它只负责发送；验证令牌、密码重置与帐号数据仍留在各领域的 repository 中。
+- `public` 也是例外：它在启动时持有具体的 `*page.Service`，用于创建主题自带的种子页。
 
 ### 缓存后端（`internal/cache/`）
 
@@ -156,7 +157,8 @@ cmd/vexgo/main.go
                      用于文件清理；upload 与 asset 领域通过它存储媒体，
                      migration 的媒体回填也会读取它
     captcha/       ← 实现 auth 声明的验证码检查接缝 auth.CaptchaChecker
-    public/        ← 被 settings 用作主题渲染器接缝
+    public/        ← 主题目录与预览链接，实现 settings.ThemeManager 接缝
+    page/          ← 被 public 用来创建主题自带的种子页
     mailer/        ← 以具体类型 *mailer.Service 注入 auth 与 settings（只负责发送）
 ```
 
@@ -226,7 +228,7 @@ VexGo 有两条审核管线，文章和评论各一条。两者都围绕 `status
 
 ## 主题系统
 
-公开页面由服务端渲染：`internal/public` 中的渲染器执行当前主题的 Go 模板并返回渲染好的 HTML，因此访客无需执行 JavaScript 即可阅读内容。内置的默认主题始终可用，管理员可通过管理面板上传 ZIP 格式的主题。当前主题是数据库中的一个值，无需重启即可在运行时切换。
+公开页面由服务端渲染：`internal/public` 中的 SSR 服务执行当前主题的 Go 模板并返回渲染好的 HTML，因此访客无需执行 JavaScript 即可阅读内容。内置的默认主题始终可用，管理员可通过管理面板上传 ZIP 格式的主题。当前主题是数据库中的一个值，无需重启即可在运行时切换。
 
 一个主题就是「模板 + 可选的翻译、种子页面和静态资源」构成的目录：
 
@@ -370,13 +372,13 @@ likedPosts     := repo.BatchFindLikedPostIDs(ctx, postIDs, userID)  // 1 次 IN 
 运行完整测试套件：
 
 ```bash
-cd backend && go test ./...
+go test ./backend/...
 ```
 
 查看覆盖率：
 
 ```bash
-cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/notification/...
+go test -cover ./backend/internal/post/... ./backend/internal/user/... ./backend/internal/comment/... ./backend/internal/notification/...
 ```
 
 ## 相关阅读

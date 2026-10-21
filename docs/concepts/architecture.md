@@ -37,7 +37,7 @@ backend/
     model/                   # GORM data models + shared seams (Notifier, FileRemover)
     page/                    # custom pages served at /:slug
     post/                    # post CRUD, categories, tags, likes
-    public/                  # embedded frontend, themes, SSR renderer, static routes
+    public/                  # embedded frontend, themes, SSR service + handler, static routes
     router/                  # route registration (composes every domain)
     secrets/                 # AES-256-GCM encryption of secrets stored in the database
     settings/                # admin configuration (SMTP, AI, general, theme)
@@ -94,6 +94,7 @@ The implementations are wired in `internal/app`, so no domain imports another do
 - `storage.Storage` implements `FileRemover`; `post`, `user`, and `auth` consume it for file cleanup.
 - `captcha` implements the `CaptchaChecker` seam that `auth` declares; `post`/`home` declare their own `ReadCache` the same way. `secrets` is the other exception: as a leaf package it declares the single `secrets.SecretCipher` interface that `settings`, `comment`, and `mailer` all accept.
 - Email is an exception: `mailer.Service` is injected as a concrete type into `auth` and `settings`. It is send-only; verification tokens, password resets, and accounts stay in the domain repositories.
+- `public` is an exception too: it holds a concrete `*page.Service` to create a theme's seed pages at startup.
 
 ### Cache backends (`internal/cache/`)
 
@@ -156,7 +157,8 @@ Cross-domain edges:
                      post for file cleanup; the upload and asset domains store media
                      through it, and migration reads it for the media backfill
     captcha/       ← implements auth.CaptchaChecker, the captcha-check seam auth declares
-    public/        ← used by settings as the theme-renderer seam
+    public/        ← implements the settings.ThemeManager seam (theme catalog, preview links)
+    page/          ← used by public to create a theme's seed pages
     mailer/        ← injected as a concrete *mailer.Service into auth and settings (send-only)
 ```
 
@@ -226,7 +228,7 @@ The moderation configuration (switches, prompt, keywords, model) lives in the da
 
 ## Theme system
 
-Public pages are rendered server-side: the renderer in `internal/public` executes Go templates from the active theme and returns finished HTML, so visitors do not need JavaScript to read content. The embedded default theme is always available, and admins can upload additional themes as ZIP archives from the admin panel. The active theme is a database value and can be switched at runtime without a restart.
+Public pages are rendered server-side: the public domain's SSR service in `internal/public` executes Go templates from the active theme and returns finished HTML, so visitors do not need JavaScript to read content. The embedded default theme is always available, and admins can upload additional themes as ZIP archives from the admin panel. The active theme is a database value and can be switched at runtime without a restart.
 
 A theme is a directory of templates plus optional translations, seed pages and static assets:
 
@@ -370,13 +372,13 @@ Each domain package has its own `_test.go` files. The test infrastructure:
 To run the full test suite:
 
 ```bash
-cd backend && go test ./...
+go test ./backend/...
 ```
 
 To check coverage:
 
 ```bash
-cd backend && go test -cover ./internal/post/... ./internal/user/... ./internal/comment/... ./internal/notification/...
+go test -cover ./backend/internal/post/... ./backend/internal/user/... ./backend/internal/comment/... ./backend/internal/notification/...
 ```
 
 ## Related reading

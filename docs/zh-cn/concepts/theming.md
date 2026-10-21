@@ -1,6 +1,6 @@
 # 主题系统
 
-> VexGo 如何把一个主题目录变成服务端渲染的页面：请求管线、模板解析规则、语言选择、缓存机制，以及主题自带的种子页面会经历什么。具体操作请看[主题开发指南](/zh-cn/guides/theme-development)，精确的字段与函数表请看[主题模板参考](/zh-cn/reference/theme-templates)。
+> VexGo 如何把一个主题目录变成服务端渲染的页面：请求管线、模板解析规则、语言选择、缓存机制，以及主题自带的种子页面会经历什么。具体操作请看[主题开发指南](/zh-cn/local-development/theme-development)，精确的字段与函数表请看[主题模板参考](/zh-cn/reference/theme-templates)。
 
 ## 概览
 
@@ -117,6 +117,6 @@ seed/links.md
 
 ## 相关阅读
 
-- [主题开发指南](/zh-cn/guides/theme-development)：编写、打包并安装主题。
+- [主题开发指南](/zh-cn/local-development/theme-development)：编写、打包并安装主题。
 - [主题模板参考](/zh-cn/reference/theme-templates)：全部模板上下文字段、辅助函数与文件格式。
 - [架构](/zh-cn/concepts/architecture)：渲染器在后端中的位置。
