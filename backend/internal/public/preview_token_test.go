@@ -14,11 +14,10 @@ import (
 // console uses: mint a signed link, then open it in a tab that carries no
 // Authorization header.
 func TestThemePreviewLink_RendersPreviewWithoutAuth(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
-	renderer.SetJWTSecret(previewTestSecret)
+	r, svc, _ := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
 
-	link, err := renderer.ThemePreviewURL("alt")
+	link, err := svc.ThemePreviewURL("alt")
 	if err != nil {
 		t.Fatalf("ThemePreviewURL: %v", err)
 	}
@@ -40,15 +39,14 @@ func TestThemePreviewLink_RendersPreviewWithoutAuth(t *testing.T) {
 // expired, cross-theme and missing tokens must all fall back to the active
 // theme instead of rendering a non-active one.
 func TestThemePreviewLink_RejectsInvalidTokens(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
-	renderer.SetJWTSecret(previewTestSecret)
+	r, svc, _ := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
 
-	validToken, err := renderer.ThemePreviewToken("alt")
+	validToken, err := svc.ThemePreviewToken("alt")
 	if err != nil {
 		t.Fatalf("ThemePreviewToken: %v", err)
 	}
-	expired, err := renderer.themePreviewTokenAt("alt", time.Now().Add(-2*ThemePreviewTTL))
+	expired, err := svc.themePreviewTokenAt("alt", time.Now().Add(-2*ThemePreviewTTL))
 	if err != nil {
 		t.Fatalf("mint expired token: %v", err)
 	}
@@ -84,11 +82,10 @@ func TestThemePreviewLink_RejectsInvalidTokens(t *testing.T) {
 // with the preview's own links, so following one stays on the previewed theme
 // instead of falling back to the active theme.
 func TestThemePreviewLink_KeepsThemeAcrossNavigation(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
-	renderer.SetJWTSecret(previewTestSecret)
+	r, svc, _ := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
 
-	link, err := renderer.ThemePreviewURL("alt")
+	link, err := svc.ThemePreviewURL("alt")
 	if err != nil {
 		t.Fatalf("ThemePreviewURL: %v", err)
 	}
@@ -96,7 +93,7 @@ func TestThemePreviewLink_KeepsThemeAcrossNavigation(t *testing.T) {
 		t.Errorf("preview links dropped the signature:\n%s", body)
 	}
 
-	token, err := renderer.ThemePreviewToken("alt")
+	token, err := svc.ThemePreviewToken("alt")
 	if err != nil {
 		t.Fatalf("ThemePreviewToken: %v", err)
 	}
@@ -117,8 +114,7 @@ func TestThemePreviewLink_KeepsThemeAcrossNavigation(t *testing.T) {
 // preview token authorizes the ?theme= switch only, never the ?preview=1 draft
 // page view, which requires a live admin token.
 func TestThemePreviewLink_DoesNotUnlockDrafts(t *testing.T) {
-	r, renderer, db := newPublicRouter(t)
-	renderer.SetJWTSecret(previewTestSecret)
+	r, svc, db := newPublicRouter(t)
 
 	if err := db.AutoMigrate(&model.Page{}); err != nil {
 		t.Fatalf("migrate pages: %v", err)
@@ -134,7 +130,7 @@ func TestThemePreviewLink_DoesNotUnlockDrafts(t *testing.T) {
 		t.Fatalf("seed draft page: %v", err)
 	}
 
-	token, err := renderer.ThemePreviewToken(DefaultTheme)
+	token, err := svc.ThemePreviewToken(DefaultTheme)
 	if err != nil {
 		t.Fatalf("ThemePreviewToken: %v", err)
 	}

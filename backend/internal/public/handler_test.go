@@ -15,12 +15,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 )
 
 // newPublicRouter builds a gin engine with the public routes registered and
 // an in-memory database seeded with one published post.
-func newPublicRouter(t *testing.T) (*gin.Engine, *Renderer, *gorm.DB) {
+func newPublicRouter(t *testing.T) (*gin.Engine, *Service, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -133,10 +134,15 @@ func newPublicRouter(t *testing.T) (*gin.Engine, *Renderer, *gorm.DB) {
 		t.Fatalf("seed comment: %v", err)
 	}
 
-	r := NewRenderer(db, "http://localhost", t.TempDir())
+	svc := NewService(Deps{
+		DB:        db,
+		JWTSecret: previewTestSecret,
+		BaseURL:   "http://localhost",
+		DataDir:   t.TempDir(),
+	})
 	e := gin.New()
-	r.RegisterStaticRoutes(e, true)
-	return e, r, db
+	NewHandler(svc).RegisterRoutes(e, true)
+	return e, svc, db
 }
 
 func doPublicRequest(t *testing.T, r *gin.Engine, path string) *httptest.ResponseRecorder {
@@ -290,10 +296,10 @@ func TestPublicRoutes_PostPageIncludesCommentWidget(t *testing.T) {
 }
 
 func TestPopularDataHelpers(t *testing.T) {
-	_, renderer, db := newPublicRouter(t)
+	_, svc, db := newPublicRouter(t)
 	ctx := t.Context()
 
-	posts := renderer.popularPostsData(ctx, 5)
+	posts := svc.popularPostsData(ctx, 5)
 	if len(posts) != 3 {
 		t.Fatalf("popularPostsData = %d posts, want 3: %+v", len(posts), posts)
 	}
@@ -307,7 +313,7 @@ func TestPopularDataHelpers(t *testing.T) {
 		t.Errorf("popularPostsData like counts wrong: %+v", posts)
 	}
 
-	tags := renderer.popularTagsData(ctx, 10)
+	tags := svc.popularTagsData(ctx, 10)
 	if len(tags) != 3 {
 		t.Fatalf("popularTagsData = %d tags, want 3: %+v", len(tags), tags)
 	}
@@ -316,10 +322,10 @@ func TestPopularDataHelpers(t *testing.T) {
 	}
 
 	// A narrower limit trims both lists.
-	if got := renderer.popularPostsData(ctx, 1); len(got) != 1 || got[0].Slug != "popular-post" {
+	if got := svc.popularPostsData(ctx, 1); len(got) != 1 || got[0].Slug != "popular-post" {
 		t.Errorf("popularPostsData limit ignored: %+v", got)
 	}
-	if got := renderer.popularTagsData(ctx, 1); len(got) != 1 || got[0].Name != "go" {
+	if got := svc.popularTagsData(ctx, 1); len(got) != 1 || got[0].Name != "go" {
 		t.Errorf("popularTagsData limit ignored: %+v", got)
 	}
 
@@ -331,10 +337,10 @@ func TestPopularDataHelpers(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed draft: %v", err)
 	}
-	if got := renderer.popularPostsData(ctx, 5); len(got) != 3 {
+	if got := svc.popularPostsData(ctx, 5); len(got) != 3 {
 		t.Errorf("draft post leaked into popular posts: %+v", got)
 	}
-	if got := renderer.popularTagsData(ctx, 10); got[0].Count != 2 {
+	if got := svc.popularTagsData(ctx, 10); got[0].Count != 2 {
 		t.Errorf("draft tag usage leaked into popular tags: %+v", got)
 	}
 }
@@ -355,11 +361,11 @@ func TestPublicRoutes_SearchFilter(t *testing.T) {
 	}
 }
 
-// installPreviewTheme writes a minimal theme to the renderer's data dir so
+// installPreviewTheme writes a minimal theme to the service's data dir so
 // preview tests can request a theme that is not the active one.
-func installPreviewTheme(t *testing.T, r *Renderer, themeID string) {
+func installPreviewTheme(t *testing.T, s *Service, themeID string) {
 	t.Helper()
-	themeDir := filepath.Join(r.DataDir(), ThemesDir, themeID)
+	themeDir := filepath.Join(s.DataDir(), ThemesDir, themeID)
 	if err := os.MkdirAll(filepath.Join(themeDir, "assets"), 0o755); err != nil {
 		t.Fatalf("mkdir theme: %v", err)
 	}
@@ -379,13 +385,12 @@ func installPreviewTheme(t *testing.T, r *Renderer, themeID string) {
 			t.Fatalf("write theme file %s: %v", name, err)
 		}
 	}
-	r.InvalidateThemeCache(themeID)
+	s.InvalidateThemeCache(themeID)
 }
 
-// seedPreviewAdmin inserts an admin account and enables preview authentication
-// on the renderer, returning a bearer token that authorizes the ?theme= and
-// ?preview= preview switches.
-func seedPreviewAdmin(t *testing.T, renderer *Renderer, db *gorm.DB) string {
+// seedPreviewAdmin inserts an admin account, returning a bearer token that
+// authorizes the ?theme= and ?preview= preview switches.
+func seedPreviewAdmin(t *testing.T, db *gorm.DB) string {
 	t.Helper()
 	admin := model.User{
 		Username:        "previewadmin",
@@ -396,7 +401,6 @@ func seedPreviewAdmin(t *testing.T, renderer *Renderer, db *gorm.DB) string {
 	if err := db.Create(&admin).Error; err != nil {
 		t.Fatalf("seed preview admin: %v", err)
 	}
-	renderer.SetJWTSecret(previewTestSecret)
 	return previewToken(t, admin.ID, model.RoleAdmin, 1, time.Now())
 }
 
@@ -404,9 +408,9 @@ func seedPreviewAdmin(t *testing.T, renderer *Renderer, db *gorm.DB) string {
 // the default theme active, previewing another theme must load that theme's
 // CSS (subresource requests carry no ?theme=), not the active theme's.
 func TestThemePreview_NonActiveThemeScopesAssets(t *testing.T) {
-	r, renderer, db := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
-	token := seedPreviewAdmin(t, renderer, db)
+	r, svc, db := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
+	token := seedPreviewAdmin(t, db)
 
 	w := doAuthedGet(t, r, "/?theme=alt", token)
 	if w.Code != http.StatusOK {
@@ -442,9 +446,9 @@ func TestThemePreview_NonActiveThemeScopesAssets(t *testing.T) {
 // TestThemePreview_KeepsThemeAcrossNavigation verifies links inside a preview
 // keep the previewed theme when followed.
 func TestThemePreview_KeepsThemeAcrossNavigation(t *testing.T) {
-	r, renderer, db := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
-	token := seedPreviewAdmin(t, renderer, db)
+	r, svc, db := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
+	token := seedPreviewAdmin(t, db)
 
 	w := doAuthedGet(t, r, "/?theme=alt", token)
 	if w.Code != http.StatusOK {
@@ -475,8 +479,8 @@ func TestThemePreview_KeepsThemeAcrossNavigation(t *testing.T) {
 // TestThemePreview_NoOverrideUnchanged ensures normal requests keep the stable
 // /theme-assets/ prefix and do not gain a theme query parameter.
 func TestThemePreview_NoOverrideUnchanged(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
+	r, svc, _ := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
 
 	w := doPublicRequest(t, r, "/")
 	if w.Code != http.StatusOK {
@@ -495,10 +499,9 @@ func TestThemePreview_NoOverrideUnchanged(t *testing.T) {
 // switch: it exists for the admin console's preview, so a visitor — anonymous or
 // merely signed in — must not be able to render a theme that is not active.
 func TestThemePreview_RequiresAdmin(t *testing.T) {
-	r, renderer, db := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
+	r, svc, db := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
 
-	renderer.SetJWTSecret(previewTestSecret)
 	contributor := model.User{
 		Username:        "writer",
 		Email:           "writer@example.com",
@@ -541,8 +544,8 @@ func TestThemePreview_RequiresAdmin(t *testing.T) {
 // assets stay public; the manifest and templates must not, since the route
 // would otherwise expose every theme's sources to anyone who knows its id.
 func TestThemeFileRoute_ServesOnlyAssets(t *testing.T) {
-	r, renderer, _ := newPublicRouter(t)
-	installPreviewTheme(t, renderer, "alt")
+	r, svc, _ := newPublicRouter(t)
+	installPreviewTheme(t, svc, "alt")
 
 	// Assets are served, including the embedded default theme's.
 	for _, path := range []string{"/themes/alt/assets/style.css", "/themes/default/assets/style.css"} {
@@ -604,12 +607,12 @@ func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
 		t.Fatalf("seed decoy: %v", err)
 	}
 
-	renderer := NewRenderer(db, "http://localhost", dataDir)
+	svc := NewService(Deps{DB: db, BaseURL: "http://localhost", DataDir: dataDir})
 	e := gin.New()
 	// Register the same baseline headers production uses, so the SVG policy is
 	// asserted as it will actually be sent.
 	e.Use(middleware.SecurityHeaders())
-	renderer.RegisterStaticRoutes(e, false)
+	NewHandler(svc).RegisterRoutes(e, false)
 
 	for _, tc := range []struct {
 		path string
@@ -733,10 +736,10 @@ func newFaviconRouter(t *testing.T) (*gin.Engine, string, *gorm.DB) {
 	}
 
 	dataDir := t.TempDir()
-	r := NewRenderer(db, "http://localhost", dataDir)
+	svc := NewService(Deps{DB: db, BaseURL: "http://localhost", DataDir: dataDir})
 	e := gin.New()
 	e.Use(middleware.SecurityHeaders())
-	r.RegisterStaticRoutes(e, false)
+	NewHandler(svc).RegisterRoutes(e, false)
 	return e, dataDir, db
 }
 
@@ -746,7 +749,7 @@ func newFaviconRouter(t *testing.T) (*gin.Engine, string, *gorm.DB) {
 func TestFavicon_FallsBackToBundledGlyph(t *testing.T) {
 	e, _, _ := newFaviconRouter(t)
 
-	want, err := ReadAsset(DefaultFaviconAsset)
+	want, err := readAsset(DefaultFaviconAsset)
 	if err != nil {
 		t.Fatalf("read bundled favicon %s: %v — run `just build-frontend`", DefaultFaviconAsset, err)
 	}
@@ -868,5 +871,179 @@ func TestFavicon_LocalFileBeatsBundledGlyph(t *testing.T) {
 	}
 	if !bytes.Equal(w.Body.Bytes(), local) {
 		t.Errorf("GET /favicon.ico served %q, want the local file %q", w.Body.String(), local)
+	}
+}
+
+// newPageTestRouter builds a router whose database holds one published and one
+// draft custom page.
+func newPageTestRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}, &model.Page{}, &model.Post{}, &model.GeneralSettings{}, &model.ThemeConfig{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	admin := model.User{Username: "admin", Email: "admin@example.com", Role: model.RoleAdmin}
+	if err := db.Create(&admin).Error; err != nil {
+		t.Fatalf("seed admin: %v", err)
+	}
+	pages := []model.Page{
+		{Slug: "about", Title: "About", Content: "Hello **world**", ShowInNav: true, SortOrder: 1, Status: model.PageStatusPublished, AuthorID: admin.ID},
+		{Slug: "secret", Title: "Secret", Content: "draft", Status: model.PageStatusDraft, AuthorID: admin.ID},
+	}
+	if err := db.Create(&pages).Error; err != nil {
+		t.Fatalf("seed pages: %v", err)
+	}
+	svc := NewService(Deps{DB: db, BaseURL: "http://localhost", DataDir: t.TempDir()})
+	e := gin.New()
+	NewHandler(svc).RegisterRoutes(e, true)
+	return e
+}
+
+func TestPageRoutes_PublishedRendersDraftHidden(t *testing.T) {
+	e := newPageTestRouter(t)
+
+	w := doPublicRequest(t, e, "/about")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /about status = %d, body: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "About") {
+		t.Errorf("page html missing title:\n%s", w.Body.String())
+	}
+
+	w = doPublicRequest(t, e, "/secret")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("draft page should 404 for guests, got %d", w.Code)
+	}
+
+	w = doPublicRequest(t, e, "/no-such-page")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("unknown slug should 404, got %d", w.Code)
+	}
+
+	// System routes keep precedence over the /:slug catch-all.
+	w = doPublicRequest(t, e, "/admin")
+	if w.Code != http.StatusOK {
+		t.Errorf("GET /admin should serve SPA, got %d", w.Code)
+	}
+}
+
+func TestPageNav_AppearsInIndex(t *testing.T) {
+	e := newPageTestRouter(t)
+	w := doPublicRequest(t, e, "/")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET / status = %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `href="/about"`) {
+		t.Errorf("index should link nav page /about:\n%s", w.Body.String())
+	}
+}
+
+// previewTestSecret signs the tokens used by the draft-preview tests. It must
+// match the secret handed to the public service.
+var previewTestSecret = []byte("public-preview-test-secret")
+
+// previewToken signs a user token with the claims middleware.TokenUser checks.
+func previewToken(t *testing.T, userID uint, role string, passwordVersion int, issuedAt time.Time) string {
+	t.Helper()
+	claims := jwt.MapClaims{
+		"user_id":          float64(userID),
+		"username":         "previewer",
+		"role":             role,
+		"password_version": float64(passwordVersion),
+		"iat":              float64(issuedAt.Unix()),
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(previewTestSecret)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return signed
+}
+
+func doAuthedGet(t *testing.T, r *gin.Engine, path, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// TestDraftPreview_RequiresCurrentAdminRole is the regression guard for preview
+// authorization: the admin decision must come from the stored account, not from
+// the token's role claim. A token that still says "role: admin" for a demoted
+// account — or one invalidated by a password change or naming a deleted user —
+// must not unlock an unpublished page.
+func TestDraftPreview_RequiresCurrentAdminRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.Page{},
+		&model.Post{},
+		&model.GeneralSettings{},
+		&model.ThemeConfig{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	admin := model.User{Username: "admin", Email: "admin@example.com", Role: model.RoleAdmin, PasswordVersion: 1}
+	demoted := model.User{Username: "exadmin", Email: "exadmin@example.com", Role: model.RoleAuthor, PasswordVersion: 1}
+	for _, u := range []*model.User{&admin, &demoted} {
+		if err := db.Create(u).Error; err != nil {
+			t.Fatalf("seed user: %v", err)
+		}
+	}
+	pages := []model.Page{
+		{Slug: "about", Title: "About", Content: "public", Status: model.PageStatusPublished, AuthorID: admin.ID},
+		{Slug: "secret", Title: "Secret", Content: "draft", Status: model.PageStatusDraft, AuthorID: admin.ID},
+	}
+	if err := db.Create(&pages).Error; err != nil {
+		t.Fatalf("seed pages: %v", err)
+	}
+
+	svc := NewService(Deps{
+		DB:        db,
+		JWTSecret: previewTestSecret,
+		BaseURL:   "http://localhost",
+		DataDir:   t.TempDir(),
+	})
+	e := gin.New()
+	NewHandler(svc).RegisterRoutes(e, true)
+
+	now := time.Now()
+	tests := []struct {
+		name  string
+		token string
+		want  int
+	}{
+		{"anonymous preview is denied", "", http.StatusNotFound},
+		{"admin token unlocks the draft", previewToken(t, admin.ID, model.RoleAdmin, 1, now), http.StatusOK},
+		{"demoted admin cannot use its stale claim", previewToken(t, demoted.ID, model.RoleAdmin, 1, now), http.StatusNotFound},
+		{"stale password version is denied", previewToken(t, admin.ID, model.RoleAdmin, 0, now), http.StatusNotFound},
+		{"deleted user is denied", previewToken(t, 99999, model.RoleAdmin, 1, now), http.StatusNotFound},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := doAuthedGet(t, e, "/secret?preview=1", tc.token)
+			if w.Code != tc.want {
+				t.Fatalf("GET /secret?preview=1 status = %d, want %d", w.Code, tc.want)
+			}
+		})
+	}
+
+	// The published page stays reachable without any preview privileges.
+	if w := doAuthedGet(t, e, "/about", ""); w.Code != http.StatusOK {
+		t.Fatalf("GET /about status = %d, want 200", w.Code)
 	}
 }

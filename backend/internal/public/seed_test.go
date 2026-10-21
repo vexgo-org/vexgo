@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func newSeedTestRenderer(t *testing.T) (*Renderer, *gorm.DB, string) {
+func newSeedTestService(t *testing.T) (*Service, *gorm.DB, string) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
@@ -27,7 +27,7 @@ func newSeedTestRenderer(t *testing.T) (*Renderer, *gorm.DB, string) {
 		t.Fatalf("migrate: %v", err)
 	}
 	dataDir := t.TempDir()
-	return NewRenderer(db, "http://localhost", dataDir), db, dataDir
+	return NewService(Deps{DB: db, BaseURL: "http://localhost", DataDir: dataDir}), db, dataDir
 }
 
 func seedAdminUser(t *testing.T, db *gorm.DB) model.User {
@@ -90,13 +90,13 @@ func TestParseSeedFile_DefaultsAndBadValues(t *testing.T) {
 }
 
 func TestLoadThemeSeeds_CustomTheme(t *testing.T) {
-	r, _, dataDir := newSeedTestRenderer(t)
+	s, _, dataDir := newSeedTestService(t)
 	writeCustomThemeSeed(t, dataDir, "blue", "about.md", "---\ntitle: About\n---\nHi\n")
 	writeCustomThemeSeed(t, dataDir, "blue", "admin.md", "---\ntitle: Admin\n---\nReserved\n")
 	writeCustomThemeSeed(t, dataDir, "blue", "Uppercase.md", "---\ntitle: Upper\n---\nSkipped\n")
 	writeCustomThemeSeed(t, dataDir, "blue", "note.txt", "not a seed")
 
-	seeds, err := r.LoadThemeSeeds("blue")
+	seeds, err := s.LoadThemeSeeds("blue")
 	if err != nil {
 		t.Fatalf("LoadThemeSeeds: %v", err)
 	}
@@ -106,8 +106,8 @@ func TestLoadThemeSeeds_CustomTheme(t *testing.T) {
 }
 
 func TestLoadThemeSeeds_MissingDir(t *testing.T) {
-	r, _, _ := newSeedTestRenderer(t)
-	seeds, err := r.LoadThemeSeeds("default")
+	s, _, _ := newSeedTestService(t)
+	seeds, err := s.LoadThemeSeeds("default")
 	if err != nil {
 		t.Fatalf("default theme seeds: %v", err)
 	}
@@ -119,20 +119,20 @@ func TestLoadThemeSeeds_MissingDir(t *testing.T) {
 		t.Errorf("timeline seed wrong: %+v", seeds[1])
 	}
 
-	r2, _, _ := newSeedTestRenderer(t)
+	s2, _, _ := newSeedTestService(t)
 	// A missing theme directory (or one without seed/) means "no seeds",
 	// never an error: EnsureThemeSeeds stays a safe no-op there.
-	seeds, err = r2.LoadThemeSeeds("no-such-theme")
+	seeds, err = s2.LoadThemeSeeds("no-such-theme")
 	if err != nil || seeds != nil {
 		t.Errorf("missing theme should yield no seeds, got seeds=%v err=%v", seeds, err)
 	}
-	if _, err := r2.LoadThemeSeeds("../escape"); err == nil {
+	if _, err := s2.LoadThemeSeeds("../escape"); err == nil {
 		t.Errorf("invalid theme id should error")
 	}
 }
 
 func TestEnsureThemeSeeds_CreatesSkipsAndPreserves(t *testing.T) {
-	r, db, dataDir := newSeedTestRenderer(t)
+	s, db, dataDir := newSeedTestService(t)
 	admin := seedAdminUser(t, db)
 	ctx := context.Background()
 
@@ -146,7 +146,7 @@ func TestEnsureThemeSeeds_CreatesSkipsAndPreserves(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	created, err := r.EnsureThemeSeeds(ctx, "blue")
+	created, err := s.EnsureThemeSeeds(ctx, "blue")
 	if err != nil {
 		t.Fatalf("EnsureThemeSeeds: %v", err)
 	}
@@ -177,25 +177,25 @@ func TestEnsureThemeSeeds_CreatesSkipsAndPreserves(t *testing.T) {
 	}
 
 	// Second run is a no-op.
-	created, err = r.EnsureThemeSeeds(ctx, "blue")
+	created, err = s.EnsureThemeSeeds(ctx, "blue")
 	if err != nil || created != 0 {
 		t.Errorf("second run should create nothing, got created=%d err=%v", created, err)
 	}
 }
 
 func TestEnsureThemeSeeds_DraftAndNoAdmin(t *testing.T) {
-	r, db, dataDir := newSeedTestRenderer(t)
+	s, db, dataDir := newSeedTestService(t)
 	ctx := context.Background()
 	writeCustomThemeSeed(t, dataDir, "blue", "soon.md", "---\ntitle: Soon\nstatus: draft\n---\nLater\n")
 
 	// Without any admin user there is nobody to attribute pages to.
-	created, err := r.EnsureThemeSeeds(ctx, "blue")
+	created, err := s.EnsureThemeSeeds(ctx, "blue")
 	if err != nil || created != 0 {
 		t.Errorf("expected skip without admin, got created=%d err=%v", created, err)
 	}
 
 	seedAdminUser(t, db)
-	created, err = r.EnsureThemeSeeds(ctx, "blue")
+	created, err = s.EnsureThemeSeeds(ctx, "blue")
 	if err != nil || created != 1 {
 		t.Fatalf("expected 1 created, got %d err=%v", created, err)
 	}

@@ -32,16 +32,6 @@ const (
 // digits and hyphens. Files whose names do not qualify are skipped.
 var seedSlugRe = regexp.MustCompile(`^[a-z0-9-]{1,100}$`)
 
-// SeedPage is one parsed theme seed file.
-type SeedPage struct {
-	Slug      string
-	Title     string
-	Content   string
-	ShowInNav bool
-	SortOrder int
-	Status    model.PageStatus
-}
-
 // parseSeedFile parses a seed/<slug>.md file. The optional frontmatter block
 // (--- ... ---) carries title (default: slug), showInNav, sortOrder and
 // status (default: published); everything after it is the Markdown body.
@@ -96,8 +86,8 @@ func applySeedFrontmatter(seed *SeedPage, block string) {
 // seed directory means the theme ships no seeds (nil, nil). Unreadable files
 // and invalid slugs are skipped with a warning so one bad file cannot block
 // the rest.
-func (r *Renderer) LoadThemeSeeds(themeID string) ([]SeedPage, error) {
-	base, err := r.themeFS(themeID)
+func (s *Service) LoadThemeSeeds(themeID string) ([]SeedPage, error) {
+	base, err := s.themeFS(themeID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,49 +123,41 @@ func (r *Renderer) LoadThemeSeeds(themeID string) ([]SeedPage, error) {
 	return seeds, nil
 }
 
-// ActiveThemeID returns the currently active theme id.
-func (r *Renderer) ActiveThemeID() string {
-	return r.activeTheme()
-}
-
 // EnsureThemeSeeds creates a theme's seed pages for slugs that do not exist
 // yet and returns how many rows were created. Existing rows (including user
 // edits) are never touched; reserved or invalid slugs are skipped with a
 // warning. It is safe to run on every startup and on every theme activation.
-func (r *Renderer) EnsureThemeSeeds(ctx context.Context, themeID string) (int, error) {
-	seeds, err := r.LoadThemeSeeds(themeID)
+func (s *Service) EnsureThemeSeeds(ctx context.Context, themeID string) (int, error) {
+	if s.repo == nil || s.pages == nil {
+		return 0, nil
+	}
+	seeds, err := s.LoadThemeSeeds(themeID)
 	if err != nil {
 		return 0, err
 	}
 	if len(seeds) == 0 {
 		return 0, nil
 	}
-	var author model.User
-	if err := r.db.WithContext(ctx).
-		Where("role = ?", model.RoleSuperAdmin).
-		Order("id ASC").
-		First(&author).Error; err != nil {
-		if err := r.db.WithContext(ctx).
-			Where("role = ?", model.RoleAdmin).
-			Order("id ASC").
-			First(&author).Error; err != nil {
+	author, err := s.repo.FindFirstUserByRole(ctx, model.RoleSuperAdmin)
+	if err != nil {
+		author, err = s.repo.FindFirstUserByRole(ctx, model.RoleAdmin)
+		if err != nil {
 			slog.Warn("skipping theme seeds without an admin author", "theme", themeID)
 			return 0, nil
 		}
 	}
-	svc := page.NewService(page.Deps{DB: r.db, JWTSecret: r.jwtSecret})
 	created := 0
 	for _, seed := range seeds {
 		// The seeder only needs the lookup to answer "does this slug exist?",
 		// and it runs as an administrator, so the author filter is a no-op.
-		_, err := svc.GetBySlug(ctx, seed.Slug, 0, model.RoleSuperAdmin)
+		_, err := s.pages.GetBySlug(ctx, seed.Slug, 0, model.RoleSuperAdmin)
 		if err == nil {
 			continue
 		}
 		if !errors.Is(err, page.ErrPageNotFound) {
 			return created, err
 		}
-		_, err = svc.Create(ctx, model.RoleSuperAdmin, author.ID, page.CreatePageRequest{
+		_, err = s.pages.Create(ctx, model.RoleSuperAdmin, author.ID, page.CreatePageRequest{
 			Slug: seed.Slug, Title: seed.Title, Content: seed.Content,
 			ShowInNav: seed.ShowInNav, SortOrder: seed.SortOrder, Status: string(seed.Status),
 		})
