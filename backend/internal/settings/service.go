@@ -907,7 +907,8 @@ func toGeneralSettingResponse(config *model.GeneralSettings) *GeneralSettingsRes
 	}
 
 	if config.SiteIcon != nil {
-		resp.SiteIcon = asset.OriginalURL(config.SiteIcon.PublicID)
+		resp.SiteIconPublicID = &config.SiteIcon.PublicID
+		resp.SiteIconURL = asset.OriginalURL(config.SiteIcon.PublicID)
 	}
 
 	return resp
