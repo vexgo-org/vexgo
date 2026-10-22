@@ -54,5 +54,10 @@ func (s *Service) MigrateDB() error {
 		return err
 	}
 
+	// Map the legacy site icon URL onto the asset created above.
+	if err := s.backfillSiteIcon(); err != nil {
+		return err
+	}
+
 	return nil
 }

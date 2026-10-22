@@ -4,6 +4,7 @@
 package settings
 
 import (
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 )
@@ -44,34 +45,35 @@ type TestSMTPResponse struct {
 // up under settings.GeneralSettingsResponse rather than
 // model.GeneralSettings (which is the GORM row).
 type GeneralSettingsResponse struct {
-	CaptchaEnabled      bool   `json:"captchaEnabled" example:"true"`
-	RegistrationEnabled bool   `json:"registrationEnabled" example:"true"`
-	AllowGuestViewPosts bool   `json:"allowGuestViewPosts" example:"false"`
-	SiteName            string `json:"siteName" example:"My VexGo Site"`
-	SiteDescription     string `json:"siteDescription"`
-	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
-	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
-	SiteLanguage        string `json:"siteLanguage" example:"en"`
+	CaptchaEnabled      bool       `json:"captchaEnabled" example:"true"`
+	RegistrationEnabled bool       `json:"registrationEnabled" example:"true"`
+	AllowGuestViewPosts bool       `json:"allowGuestViewPosts" example:"false"`
+	SiteName            string     `json:"siteName" example:"My VexGo Site"`
+	SiteDescription     string     `json:"siteDescription"`
+	SiteIconURL         string     `json:"siteIconURL" example:"/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original"`
+	SiteIconPublicID    *uuid.UUID `json:"siteIconPublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	ItemsPerPage        int        `json:"itemsPerPage" example:"20"`
+	SiteLanguage        string     `json:"siteLanguage" example:"en"`
 }
 
 // GeneralSettingsUpdateRequest is the body of PUT
 // /api/config/general.
 type GeneralSettingsUpdateRequest struct {
-	CaptchaEnabled      bool   `json:"captchaEnabled" example:"true"`
-	RegistrationEnabled bool   `json:"registrationEnabled" example:"true"`
-	AllowGuestViewPosts bool   `json:"allowGuestViewPosts" example:"false"`
-	SiteName            string `json:"siteName" example:"My VexGo Site"`
-	SiteDescription     string `json:"siteDescription"`
-	SiteIcon            string `json:"siteIcon" example:"https://example.com/icon.png"`
-	ItemsPerPage        int    `json:"itemsPerPage" example:"20"`
-	SiteLanguage        string `json:"siteLanguage" example:"en"`
+	CaptchaEnabled      bool       `json:"captchaEnabled" example:"true"`
+	RegistrationEnabled bool       `json:"registrationEnabled" example:"true"`
+	AllowGuestViewPosts bool       `json:"allowGuestViewPosts" example:"false"`
+	SiteName            string     `json:"siteName" example:"My VexGo Site"`
+	SiteDescription     string     `json:"siteDescription"`
+	SiteIconPublicID    *uuid.UUID `json:"siteIconPublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	ItemsPerPage        int        `json:"itemsPerPage" example:"20"`
+	SiteLanguage        string     `json:"siteLanguage" example:"en"`
 }
 
 // GeneralSettingsUpdateResponse is the body of PUT
 // /api/config/general on success.
 type GeneralSettingsUpdateResponse struct {
-	Message         string                `json:"message" example:"General settings updated successfully"`
-	GeneralSettings model.GeneralSettings `json:"generalSettings"`
+	Message                 string                   `json:"message" example:"General settings updated successfully"`
+	GeneralSettingsResponse *GeneralSettingsResponse `json:"generalSettings"`
 }
 
 // AIConfigResponse is the body of GET /api/config/ai. The

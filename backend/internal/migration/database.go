@@ -43,3 +43,27 @@ func autoMigrate(db *gorm.DB) error {
 		&model.Blob{},
 	)
 }
+
+// dropLegacyColumn drops one column that is no longer part of the model. The
+// table name comes from the model, the column is looked up by its raw name
+// because the current schema no longer contains it. Migrator.DropColumn
+// cannot be used here: it rebuilds the table from the current model schema,
+// which would silently leave the legacy column in place. The identifiers come
+// from the model and package constants, never user input.
+func dropLegacyColumn(db *gorm.DB, value any, column string) error {
+	stmt := &gorm.Statement{DB: db}
+	if err := stmt.Parse(value); err != nil {
+		return fmt.Errorf("parse %T schema: %w", value, err)
+	}
+	if !db.Migrator().HasTable(value) || !db.Migrator().HasColumn(value, column) {
+		return nil
+	}
+	var query string
+	switch db.Name() {
+	case "mysql":
+		query = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`", stmt.Schema.Table, column)
+	default: // sqlite and postgres accept double-quoted identifiers
+		query = fmt.Sprintf(`ALTER TABLE "%s" DROP COLUMN "%s"`, stmt.Schema.Table, column)
+	}
+	return db.Exec(query).Error
+}

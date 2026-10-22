@@ -212,16 +212,9 @@ func (h *Handler) GetGeneralSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get general settings"})
 		return
 	}
-	c.JSON(http.StatusOK, GeneralSettingsResponse{
-		CaptchaEnabled:      config.CaptchaEnabled,
-		RegistrationEnabled: config.RegistrationEnabled,
-		AllowGuestViewPosts: config.AllowGuestViewPosts,
-		SiteName:            config.SiteName,
-		SiteDescription:     config.SiteDescription,
-		SiteIcon:            config.SiteIcon,
-		ItemsPerPage:        config.ItemsPerPage,
-		SiteLanguage:        normalizeSiteLanguage(config.SiteLanguage),
-	})
+
+	resp := toGeneralSettingResponse(&config)
+	c.JSON(http.StatusOK, resp)
 }
 
 // UpdateGeneralSettings godoc
@@ -253,9 +246,10 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 		return
 	}
 
+	generalSettingsResp := toGeneralSettingResponse(&config)
 	c.JSON(http.StatusOK, GeneralSettingsUpdateResponse{
-		Message:         "General settings updated successfully",
-		GeneralSettings: config,
+		Message:                 "General settings updated successfully",
+		GeneralSettingsResponse: generalSettingsResp,
 	})
 }
 

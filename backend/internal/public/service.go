@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/page"
@@ -115,7 +116,10 @@ func (s *Service) buildSiteData(ctx context.Context, lang string) *SiteData {
 				site.Name = settings.SiteName
 			}
 			site.Description = settings.SiteDescription
-			site.Icon = settings.SiteIcon
+
+			if settings.SiteIcon != nil {
+				site.Icon = asset.OriginalURL(settings.SiteIcon.PublicID)
+			}
 			if settings.ItemsPerPage > 0 {
 				site.ItemsPerPage = settings.ItemsPerPage
 			}
@@ -390,19 +394,6 @@ func (s *Service) activeTheme(ctx context.Context) string {
 		return DefaultTheme
 	}
 	return config.ActiveTheme
-}
-
-// SiteIcon returns the configured site icon URL, or an empty string when no
-// icon is configured or the settings are unreadable.
-func (s *Service) SiteIcon(ctx context.Context) string {
-	if s.repo == nil {
-		return ""
-	}
-	settings, err := s.repo.GetGeneralSettings(ctx)
-	if err != nil {
-		return ""
-	}
-	return settings.SiteIcon
 }
 
 // previewThemeOverride returns the theme selected by the ?theme= preview

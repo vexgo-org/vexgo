@@ -56,7 +56,7 @@ func migrateLegacyModerationConfig(db *gorm.DB) (int, error) {
 	}
 
 	for _, column := range legacyModerationColumns {
-		if err := dropLegacyModerationColumn(db, column); err != nil {
+		if err := dropLegacyColumn(db, table, column); err != nil {
 			return migrated, fmt.Errorf("drop legacy moderation column %s: %w", column, err)
 		}
 	}
@@ -78,23 +78,4 @@ func legacySwitchUpdates(enabled, autoApprove bool) map[string]any {
 	default:
 		return nil
 	}
-}
-
-// dropLegacyModerationColumn drops one legacy column if it still exists.
-// Migrator.DropColumn cannot be used here: it rebuilds the table from the
-// current model schema, which no longer contains the legacy fields. The
-// identifiers are package constants, never user input.
-func dropLegacyModerationColumn(db *gorm.DB, column string) error {
-	if !db.Migrator().HasTable(&model.CommentModerationConfig{}) ||
-		!db.Migrator().HasColumn(&model.CommentModerationConfig{}, column) {
-		return nil
-	}
-	var query string
-	switch db.Name() {
-	case "mysql":
-		query = fmt.Sprintf("ALTER TABLE `comment_moderation_configs` DROP COLUMN `%s`", column)
-	default: // sqlite and postgres accept double-quoted identifiers
-		query = fmt.Sprintf(`ALTER TABLE "comment_moderation_configs" DROP COLUMN "%s"`, column)
-	}
-	return db.Exec(query).Error
 }
