@@ -61,7 +61,11 @@
             },
             "asset.UploadResponse": {
                 "properties": {
-                    "asset_public_id": {
+                    "assetOriginalURL": {
+                        "example": "/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original",
+                        "type": "string"
+                    },
+                    "assetPublicID": {
                         "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
                         "type": "string"
                     },
@@ -984,54 +988,6 @@
                     "CreatorApplicationStatusApproved",
                     "CreatorApplicationStatusRejected"
                 ]
-            },
-            "model.GeneralSettings": {
-                "properties": {
-                    "allowGuestViewPosts": {
-                        "description": "Whether guests can view posts",
-                        "type": "boolean"
-                    },
-                    "captchaEnabled": {
-                        "description": "Whether captcha verification is enabled",
-                        "type": "boolean"
-                    },
-                    "created_at": {
-                        "description": "Creation time",
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "itemsPerPage": {
-                        "description": "Items per page",
-                        "type": "integer"
-                    },
-                    "registrationEnabled": {
-                        "description": "Whether registration is allowed",
-                        "type": "boolean"
-                    },
-                    "siteDescription": {
-                        "description": "Site description",
-                        "type": "string"
-                    },
-                    "siteIcon": {
-                        "description": "Site icon URL",
-                        "type": "string"
-                    },
-                    "siteLanguage": {
-                        "description": "Default public theme language (e.g. en, zh)",
-                        "type": "string"
-                    },
-                    "siteName": {
-                        "description": "Site name",
-                        "type": "string"
-                    },
-                    "updated_at": {
-                        "description": "Update time",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
             },
             "model.MediaFile": {
                 "properties": {
@@ -1990,8 +1946,12 @@
                     "siteDescription": {
                         "type": "string"
                     },
-                    "siteIcon": {
-                        "example": "https://example.com/icon.png",
+                    "siteIconPublicID": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
+                        "type": "string"
+                    },
+                    "siteIconURL": {
+                        "example": "/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original",
                         "type": "string"
                     },
                     "siteLanguage": {
@@ -2026,8 +1986,8 @@
                     "siteDescription": {
                         "type": "string"
                     },
-                    "siteIcon": {
-                        "example": "https://example.com/icon.png",
+                    "siteIconPublicID": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
                         "type": "string"
                     },
                     "siteLanguage": {
@@ -2044,7 +2004,7 @@
             "settings.GeneralSettingsUpdateResponse": {
                 "properties": {
                     "generalSettings": {
-                        "$ref": "#/components/schemas/model.GeneralSettings"
+                        "$ref": "#/components/schemas/settings.GeneralSettingsResponse"
                     },
                     "message": {
                         "example": "General settings updated successfully",

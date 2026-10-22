@@ -12,7 +12,8 @@ export interface SettingsGeneralSettingsResponse {
   itemsPerPage?: number;
   registrationEnabled?: boolean;
   siteDescription?: string;
-  siteIcon?: string;
+  siteIconPublicID?: string;
+  siteIconURL?: string;
   siteLanguage?: string;
   siteName?: string;
 }
