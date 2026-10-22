@@ -9,6 +9,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Repository is the persistence interface for the settings domain.
@@ -74,7 +75,10 @@ func (r *gormRepository) CreateGeneralSettings(ctx context.Context, config *mode
 }
 
 func (r *gormRepository) SaveGeneralSettings(ctx context.Context, config *model.GeneralSettings) error {
-	return r.db.WithContext(ctx).Save(config).Error
+	return r.db.WithContext(ctx).
+		Omit(clause.Associations).
+		Save(config).
+		Error
 }
 
 func (r *gormRepository) GetAIConfig(ctx context.Context) (model.AIConfig, error) {
