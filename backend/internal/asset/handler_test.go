@@ -474,11 +474,15 @@ func TestHandlerUpload_StoresAssetAndBlob(t *testing.T) {
 	if response.PublicID != asset.PublicID {
 		t.Errorf("asset_public_id = %s, want the created asset %s", response.PublicID, asset.PublicID)
 	}
-	assertKeysAre(t, recorder, "message", "asset_public_id")
+	assertKeysAre(t, recorder, "message", "assetPublicID", "assetOriginalURL")
 	// The public ID has to cross the wire as a canonical UUID string, because
 	// that is what the SPA pastes back into the URL.
-	if got := decodeJSON(t, recorder)["asset_public_id"]; got != asset.PublicID.String() {
-		t.Errorf("asset_public_id = %v, want the string %q", got, asset.PublicID.String())
+	if got := decodeJSON(t, recorder)["assetPublicID"]; got != asset.PublicID.String() {
+		t.Errorf("assetPublicID = %v, want the string %q", got, asset.PublicID.String())
+	}
+
+	if got := decodeJSON(t, recorder)["assetOriginalURL"]; got != OriginalURL(asset.PublicID) {
+		t.Errorf("assetOriginalURL = %v, want the string %q", got, OriginalURL(asset.PublicID))
 	}
 
 	// The storage key is deliberately not part of the response: it is
