@@ -57,7 +57,10 @@ func (r *gormRepository) SaveSMTPConfig(ctx context.Context, config *model.SMTPC
 
 func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {
 	var config model.GeneralSettings
-	if err := r.db.WithContext(ctx).First(&config).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Preload("SiteIcon").
+		First(&config).
+		Error; err != nil {
 		return config, err
 	}
 	return config, nil
