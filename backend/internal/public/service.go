@@ -396,19 +396,6 @@ func (s *Service) activeTheme(ctx context.Context) string {
 	return config.ActiveTheme
 }
 
-// SiteIcon returns the configured site icon URL, or an empty string when no
-// icon is configured or the settings are unreadable.
-func (s *Service) SiteIcon(ctx context.Context) string {
-	if s.repo == nil {
-		return ""
-	}
-	settings, err := s.repo.GetGeneralSettings(ctx)
-	if err != nil {
-		return ""
-	}
-	return settings.SiteIcon
-}
-
 // previewThemeOverride returns the theme selected by the ?theme= preview
 // switch, the signature to carry across the preview's own links, and whether
 // this request is entitled to use the switch. The switch exists for the admin

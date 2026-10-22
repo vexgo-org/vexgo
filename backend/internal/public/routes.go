@@ -35,11 +35,6 @@ func (h *Handler) RegisterRoutes(e *gin.Engine, s3Enabled bool) {
 	e.GET("/post/:slug", h.handlePost)
 	e.GET("/user/:id", h.handleUser)
 
-	// Favicon: allow overrides via configured site icon (highest priority),
-	// then ./data/favicon.ico, then the active theme's favicon, then the
-	// bundled admin glyph as the last resort.
-	e.GET("/favicon.ico", h.handleFavicon)
-
 	// Theme file route: /themes/:id/assets/*path serves a theme's static
 	// assets, which an admin theme preview needs because browser subresource
 	// requests (CSS, JS, images) cannot carry the bearer token. Everything else
