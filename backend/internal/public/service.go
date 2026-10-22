@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/page"
@@ -115,7 +116,10 @@ func (s *Service) buildSiteData(ctx context.Context, lang string) *SiteData {
 				site.Name = settings.SiteName
 			}
 			site.Description = settings.SiteDescription
-			site.Icon = settings.SiteIcon
+
+			if settings.SiteIcon != nil {
+				site.Icon = asset.OriginalURL(settings.SiteIcon.PublicID)
+			}
 			if settings.ItemsPerPage > 0 {
 				site.ItemsPerPage = settings.ItemsPerPage
 			}
