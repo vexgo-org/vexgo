@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -273,7 +274,7 @@ type GeneralSettingsRequest struct {
 	AllowGuestViewPosts bool
 	SiteName            string
 	SiteDescription     string
-	SiteIcon            string
+	SiteIconPublicID    *uuid.UUID
 	ItemsPerPage        int
 	SiteLanguage        string
 }
@@ -313,6 +314,15 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 
 // UpdateGeneralSettings creates or updates the general settings.
 func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettingsRequest) (model.GeneralSettings, error) {
+	var siteIconID *uint = nil
+	if req.SiteIconPublicID != nil {
+		id, err := s.repo.FindIconIDByPublicID(ctx, *req.SiteIconPublicID)
+		// Leave site icon ID to be `nil` if there are errors in database.
+		if err == nil {
+			siteIconID = &id
+		}
+	}
+
 	config, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -323,7 +333,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 				AllowGuestViewPosts: req.AllowGuestViewPosts,
 				SiteName:            req.SiteName,
 				SiteDescription:     req.SiteDescription,
-				SiteIcon:            req.SiteIcon,
+				SiteIconID:          siteIconID,
 				ItemsPerPage:        req.ItemsPerPage,
 				SiteLanguage:        normalizeSiteLanguage(req.SiteLanguage),
 			}
@@ -340,7 +350,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		config.AllowGuestViewPosts = req.AllowGuestViewPosts
 		config.SiteName = req.SiteName
 		config.SiteDescription = req.SiteDescription
-		config.SiteIcon = req.SiteIcon
+		config.SiteIconID = siteIconID
 		config.ItemsPerPage = req.ItemsPerPage
 		config.SiteLanguage = normalizeSiteLanguage(req.SiteLanguage)
 

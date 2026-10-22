@@ -5,6 +5,7 @@ package settings
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -27,6 +28,8 @@ type Repository interface {
 	GetThemeConfig(ctx context.Context) (model.ThemeConfig, error)
 	CreateThemeConfig(ctx context.Context, config *model.ThemeConfig) error
 	SaveThemeConfig(ctx context.Context, config *model.ThemeConfig) error
+
+	FindIconIDByPublicID(ctx context.Context, publicID uuid.UUID) (uint, error)
 }
 
 // gormRepository is the GORM-backed implementation of Repository.
@@ -104,4 +107,16 @@ func (r *gormRepository) CreateThemeConfig(ctx context.Context, config *model.Th
 
 func (r *gormRepository) SaveThemeConfig(ctx context.Context, config *model.ThemeConfig) error {
 	return r.db.WithContext(ctx).Save(config).Error
+}
+
+func (r *gormRepository) FindIconIDByPublicID(ctx context.Context, publicID uuid.UUID) (uint, error) {
+	var asset model.Asset
+	if err := r.db.WithContext(ctx).
+		Select("id").
+		Where("public_id = ?", publicID).
+		Take(&asset).
+		Error; err != nil {
+		return 0, err
+	}
+	return asset.ID, nil
 }
