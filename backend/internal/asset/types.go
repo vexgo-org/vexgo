@@ -12,8 +12,9 @@ type Actor struct {
 }
 
 type UploadResponse struct {
-	Message  string    `json:"message" example:"File uploaded successfully"`
-	PublicID uuid.UUID `json:"asset_public_id" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	Message     string    `json:"message" example:"File uploaded successfully"`
+	PublicID    uuid.UUID `json:"assetPublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	OriginalURL string    `json:"assetOriginalURL" example:"/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original"`
 }
 
 type MessageResponse struct {
