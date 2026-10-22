@@ -246,9 +246,10 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 		return
 	}
 
+	generalSettingsResp := toGeneralSettingResponse(&config)
 	c.JSON(http.StatusOK, GeneralSettingsUpdateResponse{
-		Message:         "General settings updated successfully",
-		GeneralSettings: config,
+		Message:                 "General settings updated successfully",
+		GeneralSettingsResponse: generalSettingsResp,
 	})
 }
 

@@ -72,8 +72,8 @@ type GeneralSettingsUpdateRequest struct {
 // GeneralSettingsUpdateResponse is the body of PUT
 // /api/config/general on success.
 type GeneralSettingsUpdateResponse struct {
-	Message         string                `json:"message" example:"General settings updated successfully"`
-	GeneralSettings model.GeneralSettings `json:"generalSettings"`
+	Message                 string                   `json:"message" example:"General settings updated successfully"`
+	GeneralSettingsResponse *GeneralSettingsResponse `json:"generalSettings"`
 }
 
 // AIConfigResponse is the body of GET /api/config/ai. The
