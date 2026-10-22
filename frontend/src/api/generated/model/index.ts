@@ -81,7 +81,6 @@ export * from "./modelCommentModerationConfig";
 export * from "./modelCommentStatus";
 export * from "./modelCreatorApplication";
 export * from "./modelCreatorApplicationStatus";
-export * from "./modelGeneralSettings";
 export * from "./modelMediaFile";
 export * from "./modelNotification";
 export * from "./modelNotificationRelatedType";

@@ -7,6 +7,7 @@
  */
 
 export interface AssetUploadResponse {
-  asset_public_id?: string;
+  assetOriginalURL?: string;
+  assetPublicID?: string;
   message?: string;
 }
