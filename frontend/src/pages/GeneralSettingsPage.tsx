@@ -38,7 +38,8 @@ export function GeneralSettingsPage() {
     allowGuestViewPosts: true,
     siteName: t("common.siteName") || "VexGo",
     siteDescription: "",
-    siteIcon: "",
+    siteIconPublicID: undefined,
+    siteIconURL: undefined,
     itemsPerPage: 20,
     siteLanguage: "en",
     createdAt: "",
@@ -112,10 +113,12 @@ export function GeneralSettingsPage() {
     }
 
     try {
-      const response = await unwrap(getVexGoAPI().postUpload({ file }));
-      if (response.file?.url) {
-        setConfig({ ...config, siteIcon: response.file.url });
-      }
+      const response = await unwrap(getVexGoAPI().postAssetsUpload({ file }));
+      setConfig({
+        ...config,
+        siteIconPublicID: response.assetPublicID,
+        siteIconURL: response.assetOriginalURL,
+      });
       toast.success(t("generalSettings.iconUploadSuccess"));
     } catch (error) {
       console.error("Failed to upload icon:", error);
@@ -128,7 +131,11 @@ export function GeneralSettingsPage() {
   };
 
   const handleRemoveIcon = () => {
-    setConfig({ ...config, siteIcon: "" });
+    setConfig({
+      ...config,
+      siteIconPublicID: undefined,
+      siteIconURL: undefined,
+    });
   };
 
   if (loading) {
@@ -190,10 +197,10 @@ export function GeneralSettingsPage() {
           <div className="space-y-2">
             <Label>{t("generalSettings.siteIcon")}</Label>
             <div className="flex items-center gap-4">
-              {config.siteIcon ? (
+              {config.siteIconURL ? (
                 <div className="relative size-16 overflow-hidden rounded-sm border border-border">
                   <img
-                    src={config.siteIcon}
+                    src={config.siteIconURL}
                     alt={t("generalSettings.siteIcon")}
                     className="size-full object-cover"
                   />

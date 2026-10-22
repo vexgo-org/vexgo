@@ -24,8 +24,8 @@ export function useSiteSettings() {
           document.title = response.data.siteName;
         }
 
-        if (response.data.siteIcon) {
-          setSiteIcon(response.data.siteIcon);
+        if (response.data.siteIconURL) {
+          setSiteIcon(response.data.siteIconURL);
           let link =
             document.querySelector<HTMLLinkElement>("link[rel~='icon']");
           if (!link) {
@@ -38,7 +38,7 @@ export function useSiteSettings() {
           // clear the media query that would otherwise keep it out of one
           // color scheme.
           link.media = "";
-          link.href = response.data.siteIcon;
+          link.href = response.data.siteIconURL;
         }
       } catch {
         // Non-fatal: the console still works with the bundled name and icon.
