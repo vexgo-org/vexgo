@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
@@ -299,7 +300,8 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 				AllowGuestViewPosts: true,
 				SiteName:            "VexGo",
 				SiteDescription:     "",
-				SiteIcon:            "",
+				SiteIconID:          nil,
+				SiteIcon:            nil,
 				ItemsPerPage:        20,
 				SiteLanguage:        public.DefaultLanguage,
 			}, nil
@@ -880,4 +882,23 @@ func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (st
 	}
 
 	return config.ActiveTheme, nil
+}
+
+// toGeneralSettingResponse transforms `model.GeneralSettings` to `GeneralSettingsResponse`.
+func toGeneralSettingResponse(config *model.GeneralSettings) *GeneralSettingsResponse {
+	resp := &GeneralSettingsResponse{
+		CaptchaEnabled:      config.CaptchaEnabled,
+		RegistrationEnabled: config.RegistrationEnabled,
+		AllowGuestViewPosts: config.AllowGuestViewPosts,
+		SiteName:            config.SiteName,
+		SiteDescription:     config.SiteDescription,
+		ItemsPerPage:        config.ItemsPerPage,
+		SiteLanguage:        normalizeSiteLanguage(config.SiteLanguage),
+	}
+
+	if config.SiteIcon != nil {
+		resp.SiteIcon = asset.OriginalURL(config.SiteIcon.PublicID)
+	}
+
+	return resp
 }
