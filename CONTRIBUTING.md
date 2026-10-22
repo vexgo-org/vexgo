@@ -149,7 +149,7 @@ backend/
     notification/          # notifications
     page/                  # custom pages served at /:slug
     post/                  # blog post CRUD
-    public/                # embedded frontend assets and SSR renderer
+    public/                # embedded frontend assets, theme engine, SSR service and handler
     router/                # route registration
     secrets/               # AES-256-GCM encryption of secrets at rest
     settings/              # site settings endpoints

@@ -42,7 +42,7 @@ func aiStubService(t *testing.T, chatStatus int, chatBody []byte) *Service {
 	db := newTestDB(t)
 	svc := NewService(Deps{
 		DB:     db,
-		Themes: public.NewRenderer(db, "http://localhost", t.TempDir()),
+		Themes: public.NewService(public.Deps{DB: db, BaseURL: "http://localhost", DataDir: t.TempDir()}),
 		Mailer: mailer.NewService(mailer.Deps{DB: db}),
 	})
 	if err := db.Create(&model.AIConfig{

@@ -86,7 +86,7 @@ func ResolveLanguage(queryLang, cookieLang, acceptHeader, siteDefault string) st
 // resolveRequestLanguage resolves the theme language for one SSR request. A
 // valid ?lang= value is persisted into a 1-year cookie so pagination and
 // follow-up visits keep the choice without repeating the query param.
-func (r *Renderer) resolveRequestLanguage(c *gin.Context, siteDefault string) string {
+func (s *Service) resolveRequestLanguage(c *gin.Context, siteDefault string) string {
 	lang := ResolveLanguage(
 		c.Query(LangQueryParam),
 		cookieValue(c, LangCookieName),
@@ -108,13 +108,10 @@ func cookieValue(c *gin.Context, name string) string {
 	return value
 }
 
-// Dict is one language's flat key -> text lookup for a theme.
-type Dict map[string]string
-
 // loadLangDict reads i18n/<lang>.json from a theme. The second return value
 // reports whether the file existed and parsed.
-func (r *Renderer) loadLangDict(themeID, lang string) (Dict, bool) {
-	content, ok := r.readThemeFile(themeID, "i18n/"+lang+".json")
+func (s *Service) loadLangDict(themeID, lang string) (Dict, bool) {
+	content, ok := s.readThemeFile(themeID, "i18n/"+lang+".json")
 	if !ok {
 		return nil, false
 	}
@@ -129,13 +126,13 @@ func (r *Renderer) loadLangDict(themeID, lang string) (Dict, bool) {
 // (en < site default < visitor language) so missing keys degrade per key
 // instead of failing the whole page. The backend never hardcodes any
 // language: whatever the theme ships under i18n/ is what can be served.
-func (r *Renderer) loadMergedDict(themeID, lang, siteDefault string) Dict {
+func (s *Service) loadMergedDict(themeID, lang, siteDefault string) Dict {
 	merged := Dict{}
 	for _, candidate := range []string{DefaultLanguage, NormalizeLanguage(siteDefault), NormalizeLanguage(lang)} {
 		if candidate == "" {
 			continue
 		}
-		if dict, ok := r.loadLangDict(themeID, candidate); ok {
+		if dict, ok := s.loadLangDict(themeID, candidate); ok {
 			maps.Copy(merged, dict)
 		}
 	}
@@ -158,8 +155,8 @@ func (d Dict) translate(key string) string {
 // AvailableLanguages lists the language codes a theme ships under i18n/.
 // It powers the admin site-language dropdown; an empty list means the theme
 // predates i18n and just renders its hardcoded strings.
-func (r *Renderer) AvailableLanguages(themeID string) []string {
-	base, err := r.themeFS(themeID)
+func (s *Service) AvailableLanguages(themeID string) []string {
+	base, err := s.themeFS(themeID)
 	if err != nil {
 		return nil
 	}

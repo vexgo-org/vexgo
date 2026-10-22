@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"net/url"
 	"strconv"
 	"strings"
@@ -20,10 +19,6 @@ const ThemePreviewParam = "theme_token"
 // link is a bearer capability — the admin console opens it in a new tab, which
 // cannot carry the Authorization header — so it expires quickly.
 const ThemePreviewTTL = 10 * time.Minute
-
-// ErrNoPreviewSecret means the renderer has no JWT secret, so it can neither
-// sign nor verify preview links.
-var ErrNoPreviewSecret = errors.New("theme preview is unavailable: no signing secret configured")
 
 // Domain-separation labels. The preview key and MAC are derived from the JWT
 // secret through these distinct labels, so the JWT signing key is never used
@@ -54,24 +49,24 @@ func themePreviewMAC(secret []byte, themeID string, expires int64) []byte {
 // ThemePreviewToken mints a token authorizing the ?theme= preview switch for
 // themeID until now+ThemePreviewTTL. It fails when no secret is configured,
 // because a preview that cannot be verified must never be handed out.
-func (r *Renderer) ThemePreviewToken(themeID string) (string, error) {
-	return r.themePreviewTokenAt(themeID, time.Now())
+func (s *Service) ThemePreviewToken(themeID string) (string, error) {
+	return s.themePreviewTokenAt(themeID, time.Now())
 }
 
 // themePreviewTokenAt mints a token as of now, so expiry is testable.
-func (r *Renderer) themePreviewTokenAt(themeID string, now time.Time) (string, error) {
-	if len(r.jwtSecret) == 0 {
+func (s *Service) themePreviewTokenAt(themeID string, now time.Time) (string, error) {
+	if len(s.jwtSecret) == 0 {
 		return "", ErrNoPreviewSecret
 	}
 	expires := now.Add(ThemePreviewTTL).Unix()
-	sig := base64.RawURLEncoding.EncodeToString(themePreviewMAC(r.jwtSecret, themeID, expires))
+	sig := base64.RawURLEncoding.EncodeToString(themePreviewMAC(s.jwtSecret, themeID, expires))
 	return strconv.FormatInt(expires, 10) + "." + sig, nil
 }
 
 // ThemePreviewURL mints a same-origin preview URL:
 // /?theme=<id>&theme_token=<token>.
-func (r *Renderer) ThemePreviewURL(themeID string) (string, error) {
-	token, err := r.ThemePreviewToken(themeID)
+func (s *Service) ThemePreviewURL(themeID string) (string, error) {
+	token, err := s.ThemePreviewToken(themeID)
 	if err != nil {
 		return "", err
 	}
@@ -84,8 +79,8 @@ func (r *Renderer) ThemePreviewURL(themeID string) (string, error) {
 // validThemePreviewToken reports whether token authorizes a preview of themeID.
 // The signature comparison is constant time, so a caller cannot learn the
 // expected signature byte by byte.
-func (r *Renderer) validThemePreviewToken(themeID, token string) bool {
-	if len(r.jwtSecret) == 0 || token == "" {
+func (s *Service) validThemePreviewToken(themeID, token string) bool {
+	if len(s.jwtSecret) == 0 || token == "" {
 		return false
 	}
 	expiresPart, signaturePart, found := strings.Cut(token, ".")
@@ -100,5 +95,5 @@ func (r *Renderer) validThemePreviewToken(themeID, token string) bool {
 	if err != nil {
 		return false
 	}
-	return hmac.Equal(signature, themePreviewMAC(r.jwtSecret, themeID, expires))
+	return hmac.Equal(signature, themePreviewMAC(s.jwtSecret, themeID, expires))
 }

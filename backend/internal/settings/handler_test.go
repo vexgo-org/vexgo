@@ -65,10 +65,15 @@ func newTestAdminRouter(t *testing.T) (*gin.Engine, *gorm.DB, *secrets.Cipher) {
 	if err != nil {
 		t.Fatalf("create cipher: %v", err)
 	}
-	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
 	// The theme preview link endpoint signs its URL with the server secret, so
-	// the renderer needs it even though these tests exercise the HTTP layer.
-	renderer.SetJWTSecret(handlerTestJWTSecret)
+	// the public service needs it even though these tests exercise the HTTP
+	// layer.
+	renderer := public.NewService(public.Deps{
+		DB:        db,
+		JWTSecret: handlerTestJWTSecret,
+		BaseURL:   "http://localhost",
+		DataDir:   t.TempDir(),
+	})
 	deps := Deps{
 		DB:        db,
 		JWTSecret: handlerTestJWTSecret,

@@ -37,7 +37,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
 	db := newTestDB(t)
-	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
+	renderer := public.NewService(public.Deps{DB: db, BaseURL: "http://localhost", DataDir: t.TempDir()})
 	return NewService(Deps{DB: db, Themes: renderer, Mailer: mailer.NewService(mailer.Deps{DB: db})}), db
 }
 
@@ -348,7 +348,7 @@ func newTestServiceWithCipher(t *testing.T) (*Service, *gorm.DB, *secrets.Cipher
 	if err != nil {
 		t.Fatalf("failed to create cipher: %v", err)
 	}
-	renderer := public.NewRenderer(db, "http://localhost", t.TempDir())
+	renderer := public.NewService(public.Deps{DB: db, BaseURL: "http://localhost", DataDir: t.TempDir()})
 	svc := NewService(Deps{DB: db, Themes: renderer, Mailer: mailer.NewService(mailer.Deps{DB: db}), Cipher: cipher})
 	return svc, db, cipher
 }

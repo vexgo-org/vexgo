@@ -5,20 +5,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
-
-	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
-// newTestRenderer builds a Renderer without a database (engine tests never
-// touch it) and with a temp data dir.
-func newTestRenderer(t *testing.T) *Renderer {
+// newTestService builds a public service without a database (engine tests
+// never touch it) and with a temp data dir.
+func newTestService(t *testing.T) *Service {
 	t.Helper()
-	return NewRenderer(nil, "http://vexgo.example", t.TempDir())
+	return NewService(Deps{BaseURL: "http://vexgo.example", DataDir: t.TempDir()})
 }
 
 // assertNoPlaceholders fails when the rendered html still carries unrendered
@@ -105,10 +102,10 @@ func TestRenderMarkdown_Paragraph(t *testing.T) {
 // TestRenderDefaultThemeTemplates guards the built-in theme: every page must
 // render without leftover {{ }} placeholders and with the injected data.
 func TestRenderDefaultThemeTemplates(t *testing.T) {
-	r := newTestRenderer(t)
+	s := newTestService(t)
 	site := &SiteData{Name: "VexGo Test", URL: "http://vexgo.example", ItemsPerPage: 20}
 
-	index, err := r.renderTheme(DefaultTheme, IndexTemplate, IndexData{
+	index, err := s.renderTheme(DefaultTheme, IndexTemplate, IndexData{
 		Site:  site,
 		Posts: []PostCardData{{Title: "First Post", URL: "/post/first", Excerpt: "excerpt"}},
 		Pagination: &PaginationData{
@@ -130,7 +127,7 @@ func TestRenderDefaultThemeTemplates(t *testing.T) {
 		}
 	}
 
-	post, err := r.renderTheme(DefaultTheme, PostTemplate, PostData{
+	post, err := s.renderTheme(DefaultTheme, PostTemplate, PostData{
 		Site: site,
 	})
 	_ = post
@@ -140,7 +137,7 @@ func TestRenderDefaultThemeTemplates(t *testing.T) {
 	postData.Post.Title = "Hello <World>"
 	postData.Post.ContentHTML = "<p>rendered</p>"
 	postData.Post.CreatedAt = time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
-	post, err = r.renderTheme(DefaultTheme, PostTemplate, postData)
+	post, err = s.renderTheme(DefaultTheme, PostTemplate, postData)
 	if err != nil {
 		t.Fatalf("render post: %v", err)
 	}
@@ -153,7 +150,7 @@ func TestRenderDefaultThemeTemplates(t *testing.T) {
 		t.Errorf("post content not rendered as HTML:\n%s", post)
 	}
 
-	user, err := r.renderTheme(DefaultTheme, UserTemplate, UserData{
+	user, err := s.renderTheme(DefaultTheme, UserTemplate, UserData{
 		Site: site,
 		User: struct {
 			ID         uint
@@ -175,7 +172,7 @@ func TestRenderDefaultThemeTemplates(t *testing.T) {
 		}
 	}
 
-	nf, err := r.renderTheme(DefaultTheme, NotFoundTemplate, NotFoundData{Site: site})
+	nf, err := s.renderTheme(DefaultTheme, NotFoundTemplate, NotFoundData{Site: site})
 	if err != nil {
 		t.Fatalf("render 404: %v", err)
 	}
@@ -185,8 +182,8 @@ func TestRenderDefaultThemeTemplates(t *testing.T) {
 // TestRenderCustomThemeFromDisk exercises the third-party theme path: a theme
 // uploaded to data/theme/<id> is parsed from disk and rendered.
 func TestRenderCustomThemeFromDisk(t *testing.T) {
-	r := newTestRenderer(t)
-	themeDir := filepath.Join(r.dataDir, ThemesDir, "fancy")
+	s := newTestService(t)
+	themeDir := filepath.Join(s.dataDir, ThemesDir, "fancy")
 	if err := os.MkdirAll(themeDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +196,7 @@ func TestRenderCustomThemeFromDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := r.renderTheme("fancy", IndexTemplate, IndexData{
+	out, err := s.renderTheme("fancy", IndexTemplate, IndexData{
 		Site:  &SiteData{Name: "Fancy Site"},
 		Posts: []PostCardData{{Title: "Post A", URL: "/post/a"}, {Title: "Post B", URL: "/post/b"}},
 	})
@@ -217,8 +214,8 @@ func TestRenderCustomThemeFromDisk(t *testing.T) {
 // TestRenderCustomTheme_MissingPage ensures asking for a page the theme does
 // not provide is an error, which handlers turn into a 404.
 func TestRenderCustomTheme_MissingPage(t *testing.T) {
-	r := newTestRenderer(t)
-	themeDir := filepath.Join(r.dataDir, ThemesDir, "minimal")
+	s := newTestService(t)
+	themeDir := filepath.Join(s.dataDir, ThemesDir, "minimal")
 	if err := os.MkdirAll(themeDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +223,7 @@ func TestRenderCustomTheme_MissingPage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := r.renderTheme("minimal", PostTemplate, PostData{}); err == nil {
+	if _, err := s.renderTheme("minimal", PostTemplate, PostData{}); err == nil {
 		t.Fatal("expected error rendering a page the theme does not provide")
 	}
 }
@@ -236,8 +233,6 @@ func TestRenderCustomTheme_MissingPage(t *testing.T) {
 // and is re-read from disk on every request so developer edits are served
 // without a restart.
 func TestDevThemeDirOverridesActiveTheme(t *testing.T) {
-	r := newTestRenderer(t)
-
 	devDir := filepath.Join(t.TempDir(), "dev-theme")
 	if err := os.MkdirAll(devDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -245,14 +240,14 @@ func TestDevThemeDirOverridesActiveTheme(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(devDir, IndexTemplate), []byte("DEV {{.Site.Name}}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r.SetThemeDir(devDir)
+	s := NewService(Deps{BaseURL: "http://vexgo.example", DataDir: t.TempDir(), ThemeDir: devDir})
 
 	// The dev directory wins over the configured data/theme layout.
-	if got := r.activeTheme(); got != DevTheme {
+	if got := s.activeTheme(t.Context()); got != DevTheme {
 		t.Fatalf("active theme should be DevTheme, got %q", got)
 	}
 
-	out, err := r.renderTheme(r.activeTheme(), IndexTemplate, IndexData{
+	out, err := s.renderTheme(s.activeTheme(t.Context()), IndexTemplate, IndexData{
 		Site: &SiteData{Name: "Dev Site"},
 	})
 	if err != nil {
@@ -267,8 +262,6 @@ func TestDevThemeDirOverridesActiveTheme(t *testing.T) {
 // theme's template on disk is visible to the next render without restarting
 // the server or invalidating any cache.
 func TestDevThemeDirReflectsEdits(t *testing.T) {
-	r := newTestRenderer(t)
-
 	devDir := filepath.Join(t.TempDir(), "dev-theme")
 	if err := os.MkdirAll(devDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -276,9 +269,9 @@ func TestDevThemeDirReflectsEdits(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(devDir, IndexTemplate), []byte("v1 {{.Site.Name}}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r.SetThemeDir(devDir)
+	s := NewService(Deps{BaseURL: "http://vexgo.example", DataDir: t.TempDir(), ThemeDir: devDir})
 
-	out, err := r.renderTheme(DevTheme, IndexTemplate, IndexData{Site: &SiteData{Name: "S"}})
+	out, err := s.renderTheme(DevTheme, IndexTemplate, IndexData{Site: &SiteData{Name: "S"}})
 	if err != nil {
 		t.Fatalf("render v1: %v", err)
 	}
@@ -290,7 +283,7 @@ func TestDevThemeDirReflectsEdits(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(devDir, IndexTemplate), []byte("v2 {{.Site.Name}}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err = r.renderTheme(DevTheme, IndexTemplate, IndexData{Site: &SiteData{Name: "S"}})
+	out, err = s.renderTheme(DevTheme, IndexTemplate, IndexData{Site: &SiteData{Name: "S"}})
 	if err != nil {
 		t.Fatalf("render v2: %v", err)
 	}
@@ -303,15 +296,13 @@ func TestDevThemeDirReflectsEdits(t *testing.T) {
 // directory ships no templates, so a misconfigured --theme-dir fails loudly
 // instead of rendering the default theme silently.
 func TestDevThemeDirMissingTemplate(t *testing.T) {
-	r := newTestRenderer(t)
-
 	devDir := filepath.Join(t.TempDir(), "empty-theme")
 	if err := os.MkdirAll(devDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	r.SetThemeDir(devDir)
+	s := NewService(Deps{BaseURL: "http://vexgo.example", DataDir: t.TempDir(), ThemeDir: devDir})
 
-	if _, err := r.renderTheme(DevTheme, IndexTemplate, IndexData{}); !errors.Is(err, ErrNoThemeTemplates) {
+	if _, err := s.renderTheme(DevTheme, IndexTemplate, IndexData{}); !errors.Is(err, ErrNoThemeTemplates) {
 		t.Fatalf("expected ErrNoThemeTemplates, got %v", err)
 	}
 }
@@ -323,10 +314,13 @@ func TestDevThemeDirMissingTemplate(t *testing.T) {
 // ("no such file or directory") and Windows ("The system cannot find the file
 // specified.").
 func TestDevThemeDirNotExist(t *testing.T) {
-	r := newTestRenderer(t)
-	r.SetThemeDir(filepath.Join(t.TempDir(), "no-such-theme"))
+	s := NewService(Deps{
+		BaseURL:  "http://vexgo.example",
+		DataDir:  t.TempDir(),
+		ThemeDir: filepath.Join(t.TempDir(), "no-such-theme"),
+	})
 
-	if _, err := r.themeFS(DevTheme); err == nil {
+	if _, err := s.themeFS(DevTheme); err == nil {
 		t.Fatal("themeFS should reject a non-existent dev theme dir")
 	} else if !errors.Is(err, ErrDevTheme) {
 		t.Fatalf("expected the error to wrap ErrDevTheme, got %v", err)
@@ -338,94 +332,75 @@ func TestDevThemeDirNotExist(t *testing.T) {
 // TestRenderTheme_RejectsTraversal ensures hostile theme ids never touch the
 // file system outside the themes directory.
 func TestRenderTheme_RejectsTraversal(t *testing.T) {
-	r := newTestRenderer(t)
+	s := newTestService(t)
 	for _, id := range []string{"../evil", "a/b", `a\b`, "..", "."} {
-		if _, err := r.loadTheme(id); err == nil {
+		if _, err := s.loadTheme(id); err == nil {
 			t.Errorf("theme id %q should be rejected", id)
 		}
 	}
 }
 
-// TestToPostCard maps a post row to its card shape.
-func TestToPostCard(t *testing.T) {
-	card := toPostCard(model.Post{
-		ID:     7,
-		Title:  "T",
-		Slug:   "t",
-		Tags:   []model.Tag{{Name: "go"}, {Name: "web"}},
-		Author: model.User{ID: 3, Username: "alice"},
-	})
-	if card.URL != "/post/t" || card.AuthorName != "alice" || len(card.Tags) != 2 {
-		t.Errorf("card mapping wrong: %+v", card)
+// TestThemeCachesAreUsableWithoutInitialization pins the zero-value contract of
+// the two theme caches. Each map is created lazily on its first write, so a
+// process that never runs an initializer still renders a theme instead of
+// panicking on a nil map write. The maps are reset to nil here to exercise
+// exactly that path.
+func TestThemeCachesAreUsableWithoutInitialization(t *testing.T) {
+	s := newTestService(t)
+
+	s.themeCache.Lock()
+	s.themeCache.themes = nil
+	s.themeCache.Unlock()
+
+	s.themeSourcesCache.Lock()
+	s.themeSourcesCache.themes = nil
+	s.themeSourcesCache.Unlock()
+
+	if _, err := s.loadTheme(DefaultTheme); err != nil {
+		t.Fatalf("loadTheme on an uninitialized cache: %v", err)
+	}
+	if _, err := s.loadThemeSources(DefaultTheme); err != nil {
+		t.Fatalf("loadThemeSources on an uninitialized cache: %v", err)
+	}
+
+	// The first write must not only avoid panicking but also populate the map,
+	// or every request re-parses the theme.
+	s.themeCache.Lock()
+	_, cachedTemplate := s.themeCache.themes[DefaultTheme]
+	s.themeCache.Unlock()
+	if !cachedTemplate {
+		t.Error("loadTheme did not cache the parsed template set")
+	}
+
+	s.themeSourcesCache.Lock()
+	_, cachedSources := s.themeSourcesCache.themes[DefaultTheme]
+	s.themeSourcesCache.Unlock()
+	if !cachedSources {
+		t.Error("loadThemeSources did not cache the theme sources")
 	}
 }
 
-// TestBuildPageLinks builds the windowed page-link list: first/last pages
-// always present, current ± 1, with ellipsis markers between the gaps.
-func TestBuildPageLinks(t *testing.T) {
-	urlFor := func(p int) string { return "/?page=" + strconv.Itoa(p) }
-
-	// Single page: no links at all.
-	if pages := buildPageLinks(1, 1, urlFor); len(pages) != 0 {
-		t.Errorf("single page should have no links, got %+v", pages)
+// TestRenderPageContent_FriendsBlock pins the shared friends-block rendering:
+// the fenced block becomes link cards, and every field is escaped.
+func TestRenderPageContent_FriendsBlock(t *testing.T) {
+	src := "Intro.\n\n```friends\nVexGo | https://example.com | https://example.com/a.png | A CMS\nBad | not-a-url |  | skipped\n```\n"
+	out := string(RenderPageContent(src))
+	if !strings.Contains(out, "vexgo-friends") {
+		t.Errorf("friends block not expanded:\n%s", out)
+	}
+	if !strings.Contains(out, "https://example.com") {
+		t.Errorf("friend url missing:\n%s", out)
+	}
+	if strings.Contains(out, "not-a-url") {
+		t.Errorf("invalid url should be skipped:\n%s", out)
+	}
+	if strings.Contains(out, "```friends") {
+		t.Errorf("fence should be removed:\n%s", out)
 	}
 
-	// Two pages: both linked, current marked.
-	pages := buildPageLinks(1, 2, urlFor)
-	if len(pages) != 2 || pages[0].Number != 1 || !pages[0].IsCurrent || pages[1].Number != 2 {
-		t.Errorf("two-page window wrong: %+v", pages)
-	}
-
-	// Middle of a long range: 1 ... 4 5 6 ... 10
-	pages = buildPageLinks(5, 10, urlFor)
-	want := []struct {
-		Number   int
-		Ellipsis bool
-		IsCur    bool
-	}{
-		{1, false, false},
-		{0, true, false},
-		{4, false, false},
-		{5, false, true},
-		{6, false, false},
-		{0, true, false},
-		{10, false, false},
-	}
-	if len(pages) != len(want) {
-		t.Fatalf("middle window = %d links, want %d: %+v", len(pages), len(want), pages)
-	}
-	for i, w := range want {
-		if pages[i].Number != w.Number || pages[i].Ellipsis != w.Ellipsis || pages[i].IsCurrent != w.IsCur {
-			t.Errorf("link %d = %+v, want %+v", i, pages[i], w)
-		}
-		if !pages[i].Ellipsis && pages[i].URL != urlFor(pages[i].Number) {
-			t.Errorf("link %d url = %q, want %q", i, pages[i].URL, urlFor(pages[i].Number))
-		}
-	}
-
-	// Early page: 1 2 3 ... 10 (no leading ellipsis)
-	pages = buildPageLinks(2, 10, urlFor)
-	if len(pages) != 5 || pages[0].Number != 1 || pages[2].Number != 3 ||
-		!pages[3].Ellipsis || pages[4].Number != 10 {
-		t.Errorf("early window wrong: %+v", pages)
-	}
-}
-
-// TestPageURL preserves filters while building paginated URLs.
-func TestPageURL(t *testing.T) {
-	cases := []struct {
-		base, search, category string
-		page                   int
-		want                   string
-	}{
-		{"/", "", "", 2, "/?page=2"},
-		{"/", "go", "", 3, "/?page=3&search=go"},
-		{"/user/1", "", "tech", 1, "/user/1?category=tech"},
-		{"/", "", "", 1, "/"},
-	}
-	for _, c := range cases {
-		if got := pageURL(c.base, c.page, c.search, c.category); got != c.want {
-			t.Errorf("pageURL(%q, %d, %q, %q) = %q, want %q", c.base, c.page, c.search, c.category, got, c.want)
-		}
+	xss := "```friends\n<script> | https://example.com |  | <img src=x onerror=1>\n```\n"
+	out = string(RenderPageContent(xss))
+	if strings.Contains(out, "<script>") || strings.Contains(out, "onerror=1\">") {
+		t.Errorf("friend fields must be escaped:\n%s", out)
 	}
 }
