@@ -209,7 +209,9 @@ func (h *Handler) handlePage(c *gin.Context) {
 	h.renderNotFound(c, theme, site, dict)
 }
 
-// handleFavicon serves the site favicon.
+// handleFavicon serves the configured site icon as a redirect to its asset
+// URL, then falls back to data/favicon.ico, the active theme's favicon, and the
+// bundled admin glyph.
 func (h *Handler) handleFavicon(c *gin.Context) {
 	c.Header("Cache-Control", "no-cache")
 
@@ -293,8 +295,8 @@ var uploadContentTypes = map[string]string{
 // otherwise run any <script> it carries with the site's own origin — a stored
 // XSS. It is therefore served with svgIsolationCSP, which disables scripting
 // and same-origin access inside that document. Loaded as an <img>, which is how
-// the site icon, avatars and cover images use it, an SVG is static and the
-// policy costs nothing.
+// avatars, cover images and post media use it, an SVG is static and the policy
+// costs nothing.
 const (
 	mediaSVGContentType = "image/svg+xml"
 	svgIsolationCSP     = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
@@ -312,9 +314,8 @@ func mediaContentType(name string) string {
 	return "application/octet-stream"
 }
 
-// serveMediaFile writes one stored media file with its explicit content type.
-// Both the /uploads route and the configured-site-icon path go through here, so
-// neither can be tricked into serving an upload as an executable document.
+// serveMediaFile writes one legacy /uploads media file with its explicit
+// content type, so a hostile upload cannot be served as an executable document.
 func serveMediaFile(c *gin.Context, name string, info fs.FileInfo, file io.ReadSeeker) {
 	contentType := mediaContentType(name)
 	c.Header("Content-Type", contentType)

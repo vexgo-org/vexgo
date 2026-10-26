@@ -26,7 +26,7 @@ vexgo dev --theme-dir ../vexgo-default-theme/dist/
 just theme ../vexgo-default-theme/dist/
 ```
 
-该目录被视为主题根目录：`index.html`、`post.html`、`page.html`、`user.html`、`404.html`、任意 `<slug>.html` 文件、`assets/` 和 `i18n/` 都会直接从其中读取。资源文件仍通过稳定的 `/theme-assets/` 前缀提供，且模板在每次请求时都会从磁盘重新读取，无需重启、无需重新构建、无需上传。这也是内置主题最快的迭代方式：将 `--theme-dir` 指向独立的 `vexgo-default-theme` 检出目录（或其 `dist/` 构建产物）并在其中修改即可。
+该目录被视为主题根目录：`index.html`、`post.html`、`page.html`、`user.html`、`404.html`、任意 `<slug>.html` 文件、`assets/`、`i18n/` 和根目录的 `favicon.ico` 都会直接从其中读取。资源文件仍通过稳定的 `/theme-assets/` 前缀提供，且模板在每次请求时都会从磁盘重新读取，无需重启、无需重新构建、无需上传。这也是内置主题最快的迭代方式：将 `--theme-dir` 指向独立的 `vexgo-default-theme` 检出目录（或其 `dist/` 构建产物）并在其中修改即可。
 
 ## 第 1 步：创建最小主题
 
@@ -300,6 +300,7 @@ i18n/
 
 ```text
 my-theme/
+├── favicon.ico
 └── assets/
     ├── style.css
     └── logo.svg
@@ -311,6 +312,8 @@ my-theme/
 ```
 
 `assets/` 这一段由服务端补上，所以 `assets/style.css` 的访问地址是 `/theme-assets/style.css`，**不是** `/theme-assets/assets/style.css`。正是这层间接让模板在当前主题改变后依然可用。
+
+favicon 是例外：把 `favicon.ico` 放在主题根目录，而不是 `assets/`。服务端会在已配置的站点图标和 `data/favicon.ico` 之后将它用于 `/favicon.ico`。
 
 ## 第 9 步：添加可选交互
 

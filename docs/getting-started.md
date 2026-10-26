@@ -87,7 +87,7 @@ With the super admin account you can manage the whole site. The admin panel at `
 
 - Moderate pending posts and comments, if moderation is enabled
 - Manage users and roles
-- Change site settings such as the site name, registration, and captcha
+- Change site settings such as the site name, site icon, registration, and captcha
 - Install and switch themes
 
 ## What's next?

@@ -18,6 +18,7 @@
 | `i18n/<lang>.json` | 否   | 扁平的 `键: 文本` 字典。没有它时 `{{t "key"}}` 渲染成键名本身。  |
 | `seed/<slug>.md`   | 否   | 激活时创建的默认页面；永不覆盖已存在的页面。                     |
 | `assets/<file>`    | 否   | 静态文件，通过 `/theme-assets/<file>` 提供。                     |
+| `favicon.ico`      | 否   | 站点图标回退；必须放在主题根目录，不能放在 `assets/` 下。        |
 | 其他任意文件       | 否   | 会保留在磁盘上，但渲染器不读取。                                 |
 
 \* 主题必须至少提供 `index.html`、`post.html`、`page.html`、`user.html` 或 `404.html` 之一，否则激活时报 "theme has no template files"。缺少模板的路由会直接返回 404。
@@ -60,7 +61,7 @@
 | ----------------- | ------ | ------------------------------------------- |
 | `Name`            | string | 站点名（默认 `VexGo`）。                    |
 | `Description`     | string | 站点描述。                                  |
-| `Icon`            | string | 已配置的站点图标 URL，可能为空。            |
+| `Icon`            | string | 已配置的站点图标资源 URL；未配置时为空。    |
 | `URL`             | string | 已配置的站点根 URL。                        |
 | `ItemsPerPage`    | int    | 列表页每页文章数（默认 20）。               |
 | `Language`        | string | 本次请求解析出的访客语言，例如 `en`、`zh`。 |
@@ -277,15 +278,22 @@ frontmatter 之后的内容即 Markdown 正文。slug 必须匹配 `^[a-z0-9-]{1
 
 ## 资源 URL
 
-| 磁盘路径              | URL                                        |
-| --------------------- | ------------------------------------------ |
-| `assets/style.css`    | `/theme-assets/style.css`                  |
-| `assets/images/a.png` | `/theme-assets/images/a.png`               |
-| `favicon.ico`         | `/favicon.ico`（四个来源中的第四个，见下） |
+| 磁盘路径              | URL                                  |
+| --------------------- | ------------------------------------ |
+| `assets/style.css`    | `/theme-assets/style.css`            |
+| `assets/images/a.png` | `/theme-assets/images/a.png`         |
+| `favicon.ico`         | `/favicon.ico`（回退来源之一，见下） |
 
 `/theme-assets/*` 解析到当前主题，因此模板里不包含主题 id。`assets/` 这一段由服务端补上，不能出现在 URL 中。
 
-`/favicon.ico` 是标签页图标读取的唯一 URL，由服务端按此顺序解析一次：配置的站点图标 → `data/favicon.ico` → 当前主题的 `favicon.ico` → 管理后台内置的图标。因此不带图标的主题也仍有图标，上传站点图标后公共页面与后台会同步变化。注意主题自带的 favicon 放在主题根目录，而不是 `assets/`。
+`/favicon.ico` 是浏览器标签页读取的 URL。服务端会在每次请求时按以下顺序解析：
+
+1. 已配置的站点图标：返回 `302 Found`，重定向到该资源的原始 URL（`/api/assets/<publicID>/original`）。
+2. `data/favicon.ico`。
+3. 当前主题的 `favicon.ico`。
+4. 管理后台内置的图标。
+
+所有响应都带有 `Cache-Control: no-cache`，因此替换或清除图标无需重启即可生效。因此不带图标的主题也仍有图标；上传站点图标后，公共页面与后台会同步变化。`.Site.Icon` 只包含已配置的站点图标；模板需要完整回退链时应直接使用 `/favicon.ico`。注意主题自带的 favicon 放在主题根目录，而不是 `assets/`。
 
 ## 评论组件契约
 

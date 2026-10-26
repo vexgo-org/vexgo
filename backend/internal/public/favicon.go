@@ -7,7 +7,8 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
-// SiteIconURL returns the URL of site icon.
+// SiteIconURL returns the configured site icon's asset URL, or an empty string
+// when no icon is configured or it cannot be loaded.
 func (s *Service) SiteIconURL(ctx context.Context) string {
 	if s.repo == nil {
 		return ""
@@ -21,8 +22,7 @@ func (s *Service) SiteIconURL(ctx context.Context) string {
 	return siteIconURL(&settings)
 }
 
-// siteIconURL is a helper to compose the original URL
-// of the site icon.
+// siteIconURL composes the configured icon's original asset URL.
 func siteIconURL(settings *model.GeneralSettings) string {
 	if settings == nil ||
 		settings.SiteIcon == nil {
