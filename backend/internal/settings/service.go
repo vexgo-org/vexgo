@@ -359,7 +359,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		}
 	}
 
-	return config, nil
+	return s.repo.GetGeneralSettings(ctx)
 }
 
 // AIConfigRequest carries the fields accepted when updating the AI config.
