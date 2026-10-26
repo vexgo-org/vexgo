@@ -49,6 +49,9 @@ var (
 	ErrThemeTemplatesInvalid = errors.New("theme templates are invalid")
 	ErrThemeIsActive         = errors.New("active theme cannot be deleted")
 	ErrCannotDeleteDefault   = errors.New("default theme cannot be deleted")
+
+	// General settings errors.
+	ErrInvalidSiteIcon = errors.New("invalid site icon")
 )
 
 // ThemeManager is the seam to the public domain's theme management. The
@@ -317,10 +320,14 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 	var siteIconID *uint = nil
 	if req.SiteIconPublicID != nil {
 		id, err := s.repo.FindIconIDByPublicID(ctx, *req.SiteIconPublicID)
-		// Leave site icon ID to be `nil` if there are errors in database.
-		if err == nil {
-			siteIconID = &id
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return model.GeneralSettings{}, ErrInvalidSiteIcon
+			}
+			return model.GeneralSettings{}, fmt.Errorf("find site icon by public ID: %w", err)
 		}
+
+		siteIconID = &id
 	}
 
 	config, err := s.repo.GetGeneralSettings(ctx)

@@ -242,7 +242,12 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest(req))
 	if err != nil {
 		slog.Error("failed to update general settings", "err", err)
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update general settings"})
+		switch {
+		case errors.Is(err, ErrInvalidSiteIcon):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid site icon"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update general settings"})
+		}
 		return
 	}
 
