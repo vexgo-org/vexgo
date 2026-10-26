@@ -235,7 +235,7 @@ export function GeneralSettingsPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/vnd.microsoft.icon"
+                  accept="image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon"
                   className="hidden"
                   onChange={handleIconUpload}
                 />

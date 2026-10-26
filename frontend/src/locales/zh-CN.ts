@@ -301,7 +301,7 @@ export const zhCN = {
     siteDescriptionPlaceholder: "请输入网站描述（可选）",
     siteIcon: "网站图标",
     iconUpload: "上传图标",
-    iconDesc: "推荐 64x64 或 256x256 的 PNG/ICO/SVG 格式",
+    iconDesc: "推荐 64x64 或 256x256 的 PNG/ICO 格式",
     iconInvalidType: "请选择图片文件",
     iconUploadSuccess: "图标上传成功",
     iconUploadFailed: "图标上传失败",

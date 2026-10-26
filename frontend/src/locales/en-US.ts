@@ -323,7 +323,7 @@ export const enUS = {
     siteDescriptionPlaceholder: "Enter site description (optional)",
     siteIcon: "Site Icon",
     iconUpload: "Upload Icon",
-    iconDesc: "Recommended: 64x64 or 256x256 PNG/ICO/SVG",
+    iconDesc: "Recommended: 64x64 or 256x256 PNG/ICO",
     iconInvalidType: "Please select an image file",
     iconUploadSuccess: "Icon uploaded",
     iconUploadFailed: "Icon upload failed",
