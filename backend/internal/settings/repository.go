@@ -115,9 +115,15 @@ func (r *gormRepository) SaveThemeConfig(ctx context.Context, config *model.Them
 
 func (r *gormRepository) FindIconIDByPublicID(ctx context.Context, publicID uuid.UUID) (uint, error) {
 	var asset model.Asset
+	// A site icon is a public image; anything else would make /favicon.ico
+	// redirect to a broken or non-renderable asset.
 	if err := r.db.WithContext(ctx).
-		Select("id").
-		Where("public_id = ?", publicID).
+		Model(&model.Asset{}).
+		Joins("JOIN blobs ON blobs.id = assets.blob_id").
+		Select("assets.id").
+		Where("assets.public_id = ?", publicID).
+		Where("assets.visibility = ?", model.AssetVisibilityPublic).
+		Where("blobs.type = ?", model.BlobTypeImage).
 		Take(&asset).
 		Error; err != nil {
 		return 0, err
