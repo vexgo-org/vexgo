@@ -46,6 +46,8 @@ func newTestAdminRouter(t *testing.T) (*gin.Engine, *gorm.DB, *secrets.Cipher) {
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.SMTPConfig{},
+		&model.Blob{},
+		&model.Asset{},
 		&model.GeneralSettings{},
 		&model.AIConfig{},
 		&model.ThemeConfig{},

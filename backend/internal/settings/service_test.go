@@ -28,7 +28,14 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.SMTPConfig{}, &model.GeneralSettings{}, &model.AIConfig{}, &model.ThemeConfig{}); err != nil {
+	if err := db.AutoMigrate(
+		&model.SMTPConfig{},
+		&model.Blob{},
+		&model.Asset{},
+		&model.GeneralSettings{},
+		&model.AIConfig{},
+		&model.ThemeConfig{},
+	); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
