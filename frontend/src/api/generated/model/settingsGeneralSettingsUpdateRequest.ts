@@ -12,7 +12,7 @@ export interface SettingsGeneralSettingsUpdateRequest {
   itemsPerPage?: number;
   registrationEnabled?: boolean;
   siteDescription?: string;
-  siteIcon?: string;
+  siteIconPublicID?: string;
   siteLanguage?: string;
   siteName?: string;
 }

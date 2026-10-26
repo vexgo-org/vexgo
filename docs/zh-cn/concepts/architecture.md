@@ -274,6 +274,7 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 - 上传文件默认存到本地数据目录，启用 S3 后存到任意 S3 兼容对象存储（AWS S3、MinIO、Garage 等）。
 - 两种后端都放在 `internal/storage` 下，共用一个 `Storage` 接口（`Put`/`Open`/`Delete`/`URL`），因此 `upload` 与 `asset` 不需要知道拿到的是哪个后端，测试也可以换成指向临时目录的 `LocalStorage`。具体后端由 `app.initStorage` 选择并注入。
 - 对象一律按 key 寻址，绝不使用 URL。`asset` 领域是替代性的上传路径：`Asset` 是面向用户的记录（稳定的 `public_id`、可见性），指向不可变的 `Blob`（存储 key、MIME 类型、大小）。原始内容通过 `/api/assets/{publicID}/original`（`GET`/`HEAD`）提供；只有公开资源可解析，私有资源返回 404。旧版 `/uploads/...` URL 继续可用。旧版 `MediaFile` 记录在已记录 key 时会把存储 key（供 `Delete` 使用）与浏览器 `url` 一并保存。
+- 已配置的站点图标是通用设置引用的公开图片 `Asset`。`/favicon.ico` 会重定向到其原始 URL；未配置时依次回退到 `data/favicon.ico`、当前主题的 `favicon.ico` 和管理后台内置图标。
 - key 在进入后端前先由 `cleanKey` 归一化并拦截，`LocalStorage` 还用 `os.Root` 约束每一次操作，恶意 key 无法逃出 `data/media`。
 - 元数据（用户、文章、评论、设置）存储在数据库：默认 SQLite，生产环境用 PostgreSQL/MySQL。
 
@@ -299,13 +300,15 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ### 迁移与种子数据
 
-`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，并将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录，再将旧版 `general_settings.site_icon` URL 映射到生成的 asset，随后删除该列。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
 
 媒体回填在每次启动时运行，且是幂等的：已有 blob 的存储键会被跳过，且所有已有键通过一次查询读入，因此不会逐行查询。键取自记录的 `StorageKey`，或取自其 URL 的 `/uploads/` 前缀；MIME 类型由文件头嗅探得出，而非依赖扩展名。带有 `StorageKey` 的记录通过当前配置的存储后端打开，因此 S3 部署也能迁移这些记录。旧版 `media_files` 记录本身会保留，因为尚未迁移的内容仍然指向它们。迁移后的资源均为公开可见。
 
+站点图标映射在媒体回填之后运行，因此只能复用该轮回填创建的 asset。非本地 URL 或回填时被跳过的文件会令 `site_icon_id` 为空；旧列仍会被删除，因此旧 URL 既不会保留，也不会在后续启动中复活。
+
 有三类旧版记录会被有意跳过，每条都会记录其 `id` 与对应的 key 或 URL：
 
-- 嗅探出的类型不是图片、视频或音频的文件——即旧版的 PDF、SVG、`.md`、`.csv` 与 `.txt` 上传，因为 `model.BlobType` 没有对应类型。文章与设置仍以 URL 引用这些文件。
+- 嗅探出的类型不是图片、视频或音频的文件——即旧版的 PDF、SVG、`.md`、`.csv` 与 `.txt` 上传，因为 `model.BlobType` 没有对应类型。文章仍以 URL 引用这些文件；设置不再引用，因为旧版站点图标列在映射后会被删除。
 - 空文件。
 - URL 为绝对地址且没有记录 `StorageKey` 的记录——即尚未记录 key 之前写入的上传，包括旧版 S3 上传。没有 key 就没有可打开或改写的内容。
 

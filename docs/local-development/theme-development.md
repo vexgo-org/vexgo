@@ -26,7 +26,7 @@ The `justfile` wraps this as the `theme` recipe, which takes the directory as an
 just theme ../vexgo-default-theme/dist/
 ```
 
-The directory is treated as the theme root: `index.html`, `post.html`, `page.html`, `user.html`, `404.html`, any `<slug>.html` file, `assets/` and `i18n/` are read straight from it. Assets keep working through the stable `/theme-assets/` prefix, and templates are re-read from disk on every request, so there is no restart, rebuild, or upload involved. This is also the fastest loop for the built-in theme: point `--theme-dir` at the standalone `vexgo-default-theme` checkout (or its `dist/` build) and edit there.
+The directory is treated as the theme root: `index.html`, `post.html`, `page.html`, `user.html`, `404.html`, any `<slug>.html` file, `assets/`, `i18n/` and a root-level `favicon.ico` are read straight from it. Assets keep working through the stable `/theme-assets/` prefix, and templates are re-read from disk on every request, so there is no restart, rebuild, or upload involved. This is also the fastest loop for the built-in theme: point `--theme-dir` at the standalone `vexgo-default-theme` checkout (or its `dist/` build) and edit there.
 
 ## Step 1: Create a minimal theme
 
@@ -300,6 +300,7 @@ Put CSS, JavaScript and images in `assets/` and reference them through the stabl
 
 ```text
 my-theme/
+├── favicon.ico
 └── assets/
     ├── style.css
     └── logo.svg
@@ -311,6 +312,8 @@ my-theme/
 ```
 
 The `assets/` segment is added by the server, so a file at `assets/style.css` is served at `/theme-assets/style.css`, not `/theme-assets/assets/style.css`. This indirection is what lets a template keep working when the active theme changes.
+
+A favicon is the exception: keep `favicon.ico` at the theme root, not in `assets/`. The server uses it for `/favicon.ico` after the configured site icon and `data/favicon.ico`.
 
 ## Step 9: Add optional interactions
 

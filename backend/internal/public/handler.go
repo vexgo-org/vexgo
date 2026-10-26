@@ -209,6 +209,42 @@ func (h *Handler) handlePage(c *gin.Context) {
 	h.renderNotFound(c, theme, site, dict)
 }
 
+// handleFavicon serves the configured site icon as a redirect to its asset
+// URL, then falls back to data/favicon.ico, the active theme's favicon, and the
+// bundled admin glyph.
+func (h *Handler) handleFavicon(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache")
+
+	// Query the site icon from general settings.
+	if iconURL := h.svc.SiteIconURL(c.Request.Context()); iconURL != "" {
+		c.Redirect(http.StatusFound, iconURL)
+		return
+	}
+
+	// Fallback to local `favicon.ico`
+	local := filepath.Join(h.svc.DataDir(), FaviconFile)
+	_, err := os.Stat(local)
+	if err == nil {
+		c.File(local)
+		return
+	}
+
+	// Fallback to the favicon in the theme.
+	if content, ok := h.svc.readThemeFile(h.svc.getRequestedTheme(c), FaviconFile); ok {
+		c.Data(http.StatusOK, "image/x-icon", content)
+		return
+	}
+
+	// Fallback to the internal favicon.
+	if content, err := readAsset(DefaultFaviconAsset); err == nil {
+		c.Data(http.StatusOK, "image/x-icon", content)
+		return
+	}
+
+	// Favicon is missing.
+	c.Status(http.StatusNotFound)
+}
+
 // parsePageParam reads the 1-based ?page= query parameter, defaulting to 1.
 func parsePageParam(c *gin.Context) int {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -259,8 +295,8 @@ var uploadContentTypes = map[string]string{
 // otherwise run any <script> it carries with the site's own origin — a stored
 // XSS. It is therefore served with svgIsolationCSP, which disables scripting
 // and same-origin access inside that document. Loaded as an <img>, which is how
-// the site icon, avatars and cover images use it, an SVG is static and the
-// policy costs nothing.
+// avatars, cover images and post media use it, an SVG is static and the policy
+// costs nothing.
 const (
 	mediaSVGContentType = "image/svg+xml"
 	svgIsolationCSP     = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
@@ -278,9 +314,8 @@ func mediaContentType(name string) string {
 	return "application/octet-stream"
 }
 
-// serveMediaFile writes one stored media file with its explicit content type.
-// Both the /uploads route and the configured-site-icon path go through here, so
-// neither can be tricked into serving an upload as an executable document.
+// serveMediaFile writes one legacy /uploads media file with its explicit
+// content type, so a hostile upload cannot be served as an executable document.
 func serveMediaFile(c *gin.Context, name string, info fs.FileInfo, file io.ReadSeeker) {
 	contentType := mediaContentType(name)
 	c.Header("Content-Type", contentType)
@@ -367,73 +402,6 @@ func (h *Handler) handleThemeAsset(c *gin.Context) {
 		return
 	}
 	serveAsset(c, file, content)
-}
-
-// handleFavicon serves /favicon.ico, preferring the configured site icon, then
-// ./data/favicon.ico, then the active theme's copy, and finally the bundled
-// admin glyph. A site that configured nothing still gets an icon instead of a
-// 404, and uploading a site icon switches the public pages and the console
-// together because both end up reading this same source.
-func (h *Handler) handleFavicon(c *gin.Context) {
-	if iconURL := h.svc.SiteIcon(c.Request.Context()); iconURL != "" {
-		if h.serveConfiguredIcon(c, iconURL) {
-			return
-		}
-	}
-
-	localFavicon := filepath.Join(h.svc.DataDir(), FaviconFile)
-	if _, err := os.Stat(localFavicon); err == nil {
-		c.File(localFavicon)
-		return
-	}
-
-	if content, ok := h.svc.readThemeFile(h.svc.getRequestedTheme(c), FaviconFile); ok {
-		c.Data(http.StatusOK, "image/x-icon", content)
-		return
-	}
-
-	if content, err := readAsset(DefaultFaviconAsset); err == nil {
-		c.Data(http.StatusOK, "image/x-icon", content)
-		return
-	}
-	c.Status(http.StatusNotFound)
-}
-
-// serveConfiguredIcon serves or redirects the configured site icon and reports
-// whether it answered the request. A local upload that is gone from disk
-// reports false so the caller can fall back to the other favicon sources.
-func (h *Handler) serveConfiguredIcon(c *gin.Context, iconURL string) bool {
-	if !strings.HasPrefix(iconURL, "/uploads/") {
-		// External or S3 URL: let the browser fetch it directly.
-		c.Redirect(http.StatusFound, iconURL)
-		return true
-	}
-
-	// Serve the upload through serveMediaFile rather than c.File. c.File hands
-	// the name to http.ServeFile, which sniffs the bytes when the extension is
-	// unknown, so a site icon pointing at an extensionless upload of a hostile
-	// HTML file would be served as text/html and execute on direct navigation.
-	// The media content types are explicit and never sniffed.
-	name := filepath.Base(iconURL)
-	root, err := os.OpenRoot(filepath.Join(h.svc.DataDir(), "media"))
-	if err != nil {
-		return false
-	}
-	defer func() { _ = root.Close() }()
-
-	file, err := root.Open(name)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = file.Close() }()
-
-	info, err := file.Stat()
-	if err != nil || info.IsDir() {
-		return false
-	}
-
-	serveMediaFile(c, name, info, file)
-	return true
 }
 
 // handleThemeFile serves a non-active theme's static assets for the admin theme

@@ -212,16 +212,9 @@ func (h *Handler) GetGeneralSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get general settings"})
 		return
 	}
-	c.JSON(http.StatusOK, GeneralSettingsResponse{
-		CaptchaEnabled:      config.CaptchaEnabled,
-		RegistrationEnabled: config.RegistrationEnabled,
-		AllowGuestViewPosts: config.AllowGuestViewPosts,
-		SiteName:            config.SiteName,
-		SiteDescription:     config.SiteDescription,
-		SiteIcon:            config.SiteIcon,
-		ItemsPerPage:        config.ItemsPerPage,
-		SiteLanguage:        normalizeSiteLanguage(config.SiteLanguage),
-	})
+
+	resp := toGeneralSettingResponse(&config)
+	c.JSON(http.StatusOK, resp)
 }
 
 // UpdateGeneralSettings godoc
@@ -249,13 +242,19 @@ func (h *Handler) UpdateGeneralSettings(c *gin.Context) {
 	config, err := h.svc.UpdateGeneralSettings(c.Request.Context(), GeneralSettingsRequest(req))
 	if err != nil {
 		slog.Error("failed to update general settings", "err", err)
-		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update general settings"})
+		switch {
+		case errors.Is(err, ErrInvalidSiteIcon):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid site icon"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update general settings"})
+		}
 		return
 	}
 
+	generalSettingsResp := toGeneralSettingResponse(&config)
 	c.JSON(http.StatusOK, GeneralSettingsUpdateResponse{
-		Message:         "General settings updated successfully",
-		GeneralSettings: config,
+		Message:                 "General settings updated successfully",
+		GeneralSettingsResponse: generalSettingsResp,
 	})
 }
 

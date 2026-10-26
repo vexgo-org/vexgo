@@ -274,6 +274,7 @@ The callback URLs are:
 - Uploads go to the local data directory by default, or to any S3-compatible object storage (AWS S3, MinIO, Garage, ...) when S3 is enabled.
 - Both live behind `internal/storage` as one `Storage` interface (`Put`/`Open`/`Delete`/`URL`), so `upload` and `asset` never learn which backend they got and tests can swap in `LocalStorage` over a temp directory. `app.initStorage` picks the backend and injects it.
 - Objects are addressed by key, never by URL. The `asset` domain is the replacement upload path: an `Asset` is the user-facing record (stable `public_id`, visibility) over an immutable `Blob` (storage key, MIME type, size). Original content is served at `/api/assets/{publicID}/original` (`GET`/`HEAD`); only public assets resolve, so a private asset is a 404. Legacy `/uploads/...` URLs keep working. Legacy `MediaFile` rows keep the storage key (what `Delete` takes) beside the browser `url` when a key was recorded.
+- The configured site icon is a public image `Asset` referenced from general settings. `/favicon.ico` redirects to its original URL, then falls back to `data/favicon.ico`, the active theme's `favicon.ico`, and the glyph bundled with the admin console.
 - Keys are normalized and screened by `cleanKey` before they reach a backend, and `LocalStorage` confines every operation with `os.Root`, so a hostile key cannot escape `data/media`.
 - Metadata (users, posts, comments, settings) lives in the database: SQLite by default, PostgreSQL/MySQL for production.
 
@@ -299,13 +300,15 @@ The database type is determined by the `db_type` config field or `DB_TYPE` envir
 
 ### Migrations and seeding
 
-`migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, backfills post slugs, and converts legacy `media_files` rows into `Asset` + `Blob` records. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
+`migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, backfills post slugs, converts legacy `media_files` rows into `Asset` + `Blob` records, and maps the legacy `general_settings.site_icon` URL onto the resulting asset before dropping that column. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
 
 The media backfill runs on every startup and is idempotent: a storage key that already owns a blob is skipped, and all existing keys are read in a single query, so the pass does not issue a query per row. The key comes from the row's `StorageKey`, or from the `/uploads/` prefix of its URL; the MIME type is sniffed from the file header rather than the extension. Rows with a `StorageKey` are opened through the configured storage backend, so S3-backed installs migrate their keyed rows too. The legacy `media_files` rows themselves are kept, because content that has not been migrated yet still points at them. Migrated assets are public.
 
+The site-icon mapping runs after the media backfill, so it can only reuse an asset created by that pass. A non-local URL or a file skipped by the backfill leaves `site_icon_id` empty; the legacy column is dropped anyway, so the old URL is neither kept nor resurrected.
+
 Three classes of legacy row are deliberately skipped, each logged with its `id` and the offending key or URL:
 
-- Files whose sniffed type is not an image, video or audio type — legacy PDF, SVG, `.md`, `.csv` and `.txt` uploads, because `model.BlobType` has no type for them. Posts and settings still reference these by URL.
+- Files whose sniffed type is not an image, video or audio type — legacy PDF, SVG, `.md`, `.csv` and `.txt` uploads, because `model.BlobType` has no type for them. Posts still reference these by URL; settings do not, because the legacy site-icon column is mapped and then dropped.
 - Empty files.
 - Rows whose URL is absolute and that have no recorded `StorageKey` — uploads written before keys were stored, including legacy S3 uploads. Without a key there is nothing to open or rewrite.
 

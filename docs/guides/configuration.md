@@ -335,7 +335,7 @@ The SMTP password and the AI / comment-moderation API keys are stored in the dat
 
 Some settings are managed from the admin panel and stored in the database, with no restart needed:
 
-- General settings: site name, description, registration toggle, captcha, guest viewing, items per page
+- General settings: site name, description, site icon, registration toggle, captcha, guest viewing, items per page
 - Comment moderation: manual review, keyword filter, and LLM review switches; prompt and blocked keywords
 - Active theme: switch between installed themes
 - SMTP, described above

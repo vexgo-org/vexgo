@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
@@ -47,6 +49,9 @@ var (
 	ErrThemeTemplatesInvalid = errors.New("theme templates are invalid")
 	ErrThemeIsActive         = errors.New("active theme cannot be deleted")
 	ErrCannotDeleteDefault   = errors.New("default theme cannot be deleted")
+
+	// General settings errors.
+	ErrInvalidSiteIcon = errors.New("invalid site icon")
 )
 
 // ThemeManager is the seam to the public domain's theme management. The
@@ -272,7 +277,7 @@ type GeneralSettingsRequest struct {
 	AllowGuestViewPosts bool
 	SiteName            string
 	SiteDescription     string
-	SiteIcon            string
+	SiteIconPublicID    *uuid.UUID
 	ItemsPerPage        int
 	SiteLanguage        string
 }
@@ -299,7 +304,8 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 				AllowGuestViewPosts: true,
 				SiteName:            "VexGo",
 				SiteDescription:     "",
-				SiteIcon:            "",
+				SiteIconID:          nil,
+				SiteIcon:            nil,
 				ItemsPerPage:        20,
 				SiteLanguage:        public.DefaultLanguage,
 			}, nil
@@ -311,6 +317,19 @@ func (s *Service) GetGeneralSettings(ctx context.Context) (model.GeneralSettings
 
 // UpdateGeneralSettings creates or updates the general settings.
 func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettingsRequest) (model.GeneralSettings, error) {
+	var siteIconID *uint = nil
+	if req.SiteIconPublicID != nil {
+		id, err := s.repo.FindIconIDByPublicID(ctx, *req.SiteIconPublicID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return model.GeneralSettings{}, ErrInvalidSiteIcon
+			}
+			return model.GeneralSettings{}, fmt.Errorf("find site icon by public ID: %w", err)
+		}
+
+		siteIconID = &id
+	}
+
 	config, err := s.repo.GetGeneralSettings(ctx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -321,7 +340,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 				AllowGuestViewPosts: req.AllowGuestViewPosts,
 				SiteName:            req.SiteName,
 				SiteDescription:     req.SiteDescription,
-				SiteIcon:            req.SiteIcon,
+				SiteIconID:          siteIconID,
 				ItemsPerPage:        req.ItemsPerPage,
 				SiteLanguage:        normalizeSiteLanguage(req.SiteLanguage),
 			}
@@ -338,7 +357,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		config.AllowGuestViewPosts = req.AllowGuestViewPosts
 		config.SiteName = req.SiteName
 		config.SiteDescription = req.SiteDescription
-		config.SiteIcon = req.SiteIcon
+		config.SiteIconID = siteIconID
 		config.ItemsPerPage = req.ItemsPerPage
 		config.SiteLanguage = normalizeSiteLanguage(req.SiteLanguage)
 
@@ -347,7 +366,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 		}
 	}
 
-	return config, nil
+	return s.repo.GetGeneralSettings(ctx)
 }
 
 // AIConfigRequest carries the fields accepted when updating the AI config.
@@ -880,4 +899,24 @@ func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (st
 	}
 
 	return config.ActiveTheme, nil
+}
+
+// toGeneralSettingResponse transforms `model.GeneralSettings` to `GeneralSettingsResponse`.
+func toGeneralSettingResponse(config *model.GeneralSettings) *GeneralSettingsResponse {
+	resp := &GeneralSettingsResponse{
+		CaptchaEnabled:      config.CaptchaEnabled,
+		RegistrationEnabled: config.RegistrationEnabled,
+		AllowGuestViewPosts: config.AllowGuestViewPosts,
+		SiteName:            config.SiteName,
+		SiteDescription:     config.SiteDescription,
+		ItemsPerPage:        config.ItemsPerPage,
+		SiteLanguage:        normalizeSiteLanguage(config.SiteLanguage),
+	}
+
+	if config.SiteIcon != nil {
+		resp.SiteIconPublicID = &config.SiteIcon.PublicID
+		resp.SiteIconURL = asset.OriginalURL(config.SiteIcon.PublicID)
+	}
+
+	return resp
 }

@@ -18,6 +18,7 @@ A theme directory, as extracted from an uploaded ZIP into `data/theme/<id>/`:
 | `i18n/<lang>.json` | No       | Flat `key: text` dictionaries. Without them `{{t "key"}}` renders the key.    |
 | `seed/<slug>.md`   | No       | Default pages created on activation; never overwrite existing pages.          |
 | `assets/<file>`    | No       | Static files served at `/theme-assets/<file>`.                                |
+| `favicon.ico`      | No       | Site favicon fallback; must be at the theme root, not in `assets/`.           |
 | anything else      | No       | Kept on disk but not read by the renderer.                                    |
 
 \* A theme must provide at least one of `index.html`, `post.html`, `page.html`, `user.html` or `404.html`, or activation fails with "theme has no template files". Routes whose template is missing simply return a 404.
@@ -60,7 +61,7 @@ Available as `.Site` on every page.
 | ----------------- | ------ | ------------------------------------------------------------ |
 | `Name`            | string | Site name (defaults to `VexGo`).                             |
 | `Description`     | string | Site description.                                            |
-| `Icon`            | string | Configured site icon URL, if any.                            |
+| `Icon`            | string | Configured site icon asset URL, if any; empty otherwise.     |
 | `URL`             | string | Configured site base URL.                                    |
 | `ItemsPerPage`    | int    | Posts per list page (defaults to 20).                        |
 | `Language`        | string | Resolved visitor language for this request, e.g. `en`, `zh`. |
@@ -277,15 +278,22 @@ Everything after the frontmatter is the Markdown body. Slugs must match `^[a-z0-
 
 ## Asset URLs
 
-| Disk path             | URL                                             |
-| --------------------- | ----------------------------------------------- |
-| `assets/style.css`    | `/theme-assets/style.css`                       |
-| `assets/images/a.png` | `/theme-assets/images/a.png`                    |
-| `favicon.ico`         | `/favicon.ico` (4th of four sources, see below) |
+| Disk path             | URL                                         |
+| --------------------- | ------------------------------------------- |
+| `assets/style.css`    | `/theme-assets/style.css`                   |
+| `assets/images/a.png` | `/theme-assets/images/a.png`                |
+| `favicon.ico`         | `/favicon.ico` (fallback source, see below) |
 
 `/theme-assets/*` is resolved against the active theme, so templates never contain a theme id. The `assets/` segment is added by the server and must not appear in the URL.
 
-`/favicon.ico` is a single URL the tab icon reads, resolved once by the server in this order: the configured site icon, `data/favicon.ico`, the active theme's `favicon.ico`, then the glyph bundled with the admin console. A theme that ships no icon therefore still gets one, and uploading a site icon changes the public pages and the console together. Note that a theme's favicon sits at the theme root, not in `assets/`.
+`/favicon.ico` is the URL the browser tab reads. The server resolves it on every request in this order:
+
+1. The configured site icon, if one is set: responds with `302 Found` and redirects to the asset's original URL (`/api/assets/<publicID>/original`).
+2. `data/favicon.ico`.
+3. The active theme's `favicon.ico`.
+4. The glyph bundled with the admin console.
+
+Every response carries `Cache-Control: no-cache`, so replacing or clearing the icon takes effect without a restart. A theme that ships no icon therefore still gets one, and uploading a site icon changes the public pages and the admin console together. `.Site.Icon` exposes only the configured icon; use `/favicon.ico` when a template needs the full fallback chain. Note that a theme's favicon sits at the theme root, not in `assets/`.
 
 ## Comment widget contract
 

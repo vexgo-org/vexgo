@@ -8,7 +8,7 @@ VexGo 的公开页面由服务端渲染。访客打开 `/`、`/post/my-post`、`
 
 管理面板是另一块非公开区域：它位于 `/admin/` 下，是一个 JavaScript 单页应用。除 API 路由和静态资源路由之外，其余请求要么是 SSR 公开页面，要么是 404。
 
-一个主题就是一个目录，里面是 HTML 模板、可选的 `i18n/` 字典目录、可选的 `seed/` 默认页面目录，以及存放 CSS、JavaScript 和图片的 `assets/` 目录。没有编译步骤，也没有插件接口：渲染器直接读取它。
+一个主题就是一个目录，里面是 HTML 模板、可选的 `i18n/` 字典目录、可选的 `seed/` 默认页面目录、存放 CSS、JavaScript 和图片的 `assets/` 目录，以及可选的根目录 `favicon.ico`。没有编译步骤，也没有插件接口：渲染器直接读取它。
 
 ## 主题存放位置
 
@@ -59,6 +59,8 @@ VexGo 的公开页面由服务端渲染。访客打开 `/`、`/post/my-post`、`
 ```
 
 服务端把 `/theme-assets/<file>` 解析到当前主题的 `assets/` 目录。注意 `assets/` 这一段是服务端补上的：磁盘上的文件是 `assets/style.css`，但 URL 是 `/theme-assets/style.css`。这样模板可以在主题之间原样拷贝，两个主题也可以各自拥有同名的 `style.css` 而不冲突。
+
+根目录的 `favicon.ico` 与 `assets/` 分开。`/favicon.ico` 会在已配置的站点图标和 `data/favicon.ico` 之后、后台内置图标之前使用它。
 
 由于资源和公开站点同源，主题里的 JavaScript 以站点的权限运行。这就是上传主题必须是管理员操作的原因，详见[信任边界](#信任边界)。
 

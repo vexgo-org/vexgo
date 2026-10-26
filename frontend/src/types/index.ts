@@ -38,7 +38,8 @@ export interface GeneralSettings {
   allowGuestViewPosts?: boolean;
   siteName?: string;
   siteDescription?: string;
-  siteIcon?: string;
+  siteIconURL?: string;
+  siteIconPublicID?: string;
   itemsPerPage?: number;
   siteLanguage?: string;
   createdAt?: string;

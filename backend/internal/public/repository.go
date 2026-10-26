@@ -45,7 +45,10 @@ func NewRepository(db *gorm.DB) Repository {
 
 func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error) {
 	var settings model.GeneralSettings
-	if err := r.db.WithContext(ctx).First(&settings).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Preload("SiteIcon").
+		First(&settings).
+		Error; err != nil {
 		return settings, err
 	}
 	return settings, nil

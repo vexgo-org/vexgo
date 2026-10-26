@@ -8,7 +8,7 @@ Public pages in VexGo are rendered on the server. When a visitor opens `/`, `/po
 
 The admin panel is a separate, non-public surface: it lives under `/admin/` and is a JavaScript single-page application. Everything that is not an API route or an asset route is either a public SSR page or a 404.
 
-A theme is a directory of HTML templates, an optional `i18n/` dictionary directory, an optional `seed/` directory of default pages, and an `assets/` directory for CSS, JavaScript and images. The renderer reads it directly: there is no compilation step and no plugin API.
+A theme is a directory of HTML templates, an optional `i18n/` dictionary directory, an optional `seed/` directory of default pages, an `assets/` directory for CSS, JavaScript and images, and an optional root-level `favicon.ico`. The renderer reads it directly: there is no compilation step and no plugin API.
 
 ## Where a theme lives
 
@@ -59,6 +59,8 @@ Templates never name a theme. Assets are referenced with a stable prefix:
 ```
 
 The server resolves `/theme-assets/<file>` against the **active** theme's `assets/` directory. Note that the `assets/` segment is added by the server: the file on disk is `assets/style.css`, but the URL is `/theme-assets/style.css`. A template can therefore be copied between themes unmodified, and two themes can both have a `style.css` without colliding.
+
+A root-level `favicon.ico` is separate from `assets/`. `/favicon.ico` uses it after the configured site icon and `data/favicon.ico`, and before the bundled admin glyph.
 
 Because assets are same-origin with the public site, the theme's JavaScript runs with the site's privileges. This is why uploading a theme is an admin-only operation; see [Trust boundaries](#trust-boundaries).
 
