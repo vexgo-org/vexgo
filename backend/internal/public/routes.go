@@ -42,6 +42,8 @@ func (h *Handler) RegisterRoutes(e *gin.Engine, s3Enabled bool) {
 	// stays private, so this is not a public read of arbitrary theme files.
 	e.GET("/themes/:id/*path", h.handleThemeFile)
 
+	e.GET("/favicon.ico", h.handleFavicon)
+
 	// SPA fallback: the admin SPA is the only non-public surface and lives
 	// under /admin/. Everything else that used to be an SPA route is
 	// redirected to its /admin/ equivalent so old bookmarks and emailed links

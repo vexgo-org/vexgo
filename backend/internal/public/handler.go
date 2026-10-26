@@ -209,6 +209,40 @@ func (h *Handler) handlePage(c *gin.Context) {
 	h.renderNotFound(c, theme, site, dict)
 }
 
+// handleFavicon serves the site favicon.
+func (h *Handler) handleFavicon(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache")
+
+	// Query the site icon from general settings.
+	if iconURL := h.svc.SiteIconURL(c.Request.Context()); iconURL != "" {
+		c.Redirect(http.StatusFound, iconURL)
+		return
+	}
+
+	// Fallback to local `favicon.ico`
+	local := filepath.Join(h.svc.DataDir(), FaviconFile)
+	_, err := os.Stat(local)
+	if err == nil {
+		c.File(local)
+		return
+	}
+
+	// Fallback to the favicon in the theme.
+	if content, ok := h.svc.readThemeFile(h.svc.getRequestedTheme(c), FaviconFile); ok {
+		c.Data(http.StatusOK, "image/x-icon", content)
+		return
+	}
+
+	// Fallback to the internal favicon.
+	if content, err := readAsset(DefaultFaviconAsset); err == nil {
+		c.Data(http.StatusOK, "image/x-icon", content)
+		return
+	}
+
+	// Favicon is missing.
+	c.Status(http.StatusNotFound)
+}
+
 // parsePageParam reads the 1-based ?page= query parameter, defaulting to 1.
 func parsePageParam(c *gin.Context) int {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
