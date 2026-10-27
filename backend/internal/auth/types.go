@@ -6,6 +6,7 @@ package auth
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -100,9 +101,10 @@ type CurrentUserResponse struct {
 // distinct from an empty string.
 type UpdateProfileRequestWire struct {
 	Username *string `json:"username" example:"alice"`
-	Avatar   *string `json:"avatar" example:"https://example.com/avatar.png"`
 	Birthday *string `json:"birthday" example:"2000-01-01"`
 	Bio      *string `json:"bio" example:"Hello, I'm alice."`
+
+	AvatarPublicID *uuid.UUID `json:"avatarPublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
 }
 
 // ChangePasswordRequestWire is the body of PUT /api/auth/password.
@@ -215,9 +217,10 @@ type RegisterRequest struct {
 // UpdateProfileRequest carries the optional profile fields.
 type UpdateProfileRequest struct {
 	Username *string
-	Avatar   *string
 	Birthday *string
 	Bio      *string
+
+	AvatarPublicID *uuid.UUID
 }
 
 // UpdateSettingsRequest carries the optional privacy settings.
