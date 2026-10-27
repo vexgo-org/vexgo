@@ -32,25 +32,13 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 		return nil, err
 	}
 
-	if req.Avatar != nil {
-		// The value is rendered as an <img src> by the public pages and by
-		// the theme's comment widget, which writes it straight to the DOM;
-		// anything the browser would resolve as a script is refused here
-		// (see isSafeAvatarURL) instead of being stored for those sinks.
-		if !isSafeAvatarURL(*req.Avatar) {
-			return nil, ErrInvalidAvatar
+	if req.AvatarPublicID != nil {
+		id, err := s.repo.FindAvatarIDByPublicID(ctx, userID, *req.AvatarPublicID)
+		if err != nil {
+			return nil, err
 		}
 
-		// Delete the old avatar file — but only when it maps to a media
-		// record owned by this user. The stored URL is client-controlled
-		// (set by a previous profile update), and Storage.Delete resolves it
-		// back to a storage key (for S3, any key in the bucket), so deleting
-		// on faith would let a user wipe arbitrary objects by first pointing
-		// their avatar at them.
-		if *req.Avatar != user.Avatar && user.Avatar != "" {
-			s.deleteOldAvatar(ctx, userID, user.Avatar)
-		}
-		user.Avatar = *req.Avatar
+		user.AvatarID = &id
 	}
 
 	if req.Username != nil {
@@ -65,7 +53,8 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uint, req UpdateProf
 	if err := s.repo.SaveUser(ctx, user); err != nil {
 		return nil, err
 	}
-	return user, nil
+
+	return s.repo.FindUserByID(ctx, userID)
 }
 
 // deleteOldAvatar removes the file behind a replaced avatar when — and only
