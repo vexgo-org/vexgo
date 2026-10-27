@@ -252,15 +252,13 @@ export function ProfilePage() {
     setShowCropper(false);
 
     try {
-      // Use the existing upload API
       const uploadResponse = await unwrap(
-        getVexGoAPI().postUpload({ file: croppedFile }),
+        getVexGoAPI().postAssetsUpload({ file: croppedFile }),
       );
-      if (uploadResponse.file && uploadResponse.file.url) {
-        // Update the user avatar
+      if (uploadResponse.assetPublicID) {
         const updateResponse = await unwrap(
           getVexGoAPI().putAuthProfile({
-            avatar: uploadResponse.file.url,
+            avatarPublicID: uploadResponse.assetPublicID,
           }),
         );
         updateUser(updateResponse.user as UserType);
