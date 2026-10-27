@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // LoginRequestWire is the body of POST /api/auth/login.
@@ -91,9 +90,29 @@ type RegisterResponse struct {
 	RequiresVerification bool         `json:"requires_verification" example:"true"`
 }
 
+// UserResponse is the account shape returned by the authenticated
+// user endpoints. It keeps internal token fields and database-only
+// relations out of the API while exposing the avatar's public URL.
+type UserResponse struct {
+	ID                uint      `json:"id" example:"42"`
+	Username          string    `json:"username" example:"alice"`
+	Email             string    `json:"email" example:"alice@example.com"`
+	Role              string    `json:"role" example:"author"`
+	EmailVerified     bool      `json:"email_verified" example:"true"`
+	LastLoginAt       time.Time `json:"last_login_at"`
+	Birthday          string    `json:"birthday,omitempty" example:"2000-01-01"`
+	Bio               string    `json:"bio,omitempty" example:"Hello, I'm alice."`
+	CreatedAt         time.Time `json:"createdAt"`
+	ProfileVisibility string    `json:"profile_visibility,omitempty" enums:"public,private" example:"public"`
+	HideEmail         bool      `json:"hide_email,omitempty" example:"false"`
+	HideBirthday      bool      `json:"hide_birthday,omitempty" example:"false"`
+	HideBio           bool      `json:"hide_bio,omitempty" example:"false"`
+	Avatar            string    `json:"avatar,omitempty" example:"/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original"`
+}
+
 // CurrentUserResponse is the body of GET /api/auth/me.
 type CurrentUserResponse struct {
-	User *model.User `json:"user"`
+	User *UserResponse `json:"user"`
 }
 
 // UpdateProfileRequestWire is the body of PUT /api/auth/profile.
@@ -125,8 +144,8 @@ type UpdateSettingsRequestWire struct {
 
 // UpdateSettingsResponse is the body of PUT /api/auth/settings.
 type UpdateSettingsResponse struct {
-	Message string      `json:"message" example:"Settings updated successfully"`
-	User    *model.User `json:"user"`
+	Message string        `json:"message" example:"Settings updated successfully"`
+	User    *UserResponse `json:"user"`
 }
 
 // UpdateEmailRequestWire is the body of PUT /api/auth/email.
