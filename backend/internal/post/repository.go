@@ -25,7 +25,6 @@ type ListFilter struct {
 type Repository interface {
 	// Posts
 	FindByID(ctx context.Context, id uint) (*model.Post, error)
-	FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error)
 	FindBySlug(ctx context.Context, slug string) (*model.Post, error)
 	FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error)
 	SlugExists(ctx context.Context, slug string) (bool, error)
@@ -112,14 +111,6 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *gormRepository) FindByID(ctx context.Context, id uint) (*model.Post, error) {
-	var post model.Post
-	if err := r.baseQuery(ctx).First(&post, id).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
-}
-
-func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error) {
 	var post model.Post
 	if err := r.baseQuery(ctx).First(&post, id).Error; err != nil {
 		return nil, err
