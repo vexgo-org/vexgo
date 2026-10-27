@@ -59,5 +59,10 @@ func (s *Service) MigrateDB() error {
 		return err
 	}
 
+	// Map legacy user avatar URLs onto the assets created above.
+	if err := s.backfillUserAvatar(); err != nil {
+		return err
+	}
+
 	return nil
 }
