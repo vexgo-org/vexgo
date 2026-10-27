@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/page"
@@ -152,7 +153,9 @@ func toPostCard(post model.Post) PostCardData {
 	if post.Author.ID != 0 {
 		card.AuthorID = post.Author.ID
 		card.AuthorName = post.Author.Username
-		card.AuthorAvatar = post.Author.Avatar
+		if post.Author.Avatar != nil {
+			card.AuthorAvatar = asset.OriginalURL(post.Author.Avatar.PublicID)
+		}
 	}
 	return card
 }
@@ -514,7 +517,9 @@ func (s *Service) PostView(ctx context.Context, site *SiteData, slug string) (*P
 	if post.Author.ID != 0 {
 		data.Post.AuthorName = post.Author.Username
 		data.Post.AuthorID = post.Author.ID
-		data.Post.AuthorAvatar = post.Author.Avatar
+		if post.Author.Avatar != nil {
+			data.Post.AuthorAvatar = asset.OriginalURL(post.Author.Avatar.PublicID)
+		}
 	}
 	for _, tag := range post.Tags {
 		data.Post.Tags = append(data.Post.Tags, tag.Name)
@@ -541,7 +546,9 @@ func (s *Service) UserView(ctx context.Context, site *SiteData, userID uint, q P
 	data := &UserData{Site: site, Pages: s.buildNavPages(ctx)}
 	data.User.ID = user.ID
 	data.User.Username = user.Username
-	data.User.Avatar = user.Avatar
+	if user.Avatar != nil {
+		data.User.Avatar = asset.OriginalURL(user.Avatar.PublicID)
+	}
 	if !user.HideBio {
 		data.User.Bio = user.Bio
 	}
