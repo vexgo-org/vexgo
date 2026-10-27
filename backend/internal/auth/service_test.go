@@ -12,6 +12,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -60,7 +61,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}, &model.MediaFile{}); err != nil {
+	if err := db.AutoMigrate(&model.Blob{}, &model.Asset{}, &model.User{}, &model.Captcha{}, &model.GeneralSettings{}, &model.SMTPConfig{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -107,6 +108,37 @@ func enableSMTP(t *testing.T, db *gorm.DB) {
 	}
 }
 
+// seedAsset inserts a blob and an asset owned by userID.
+func seedAsset(
+	t *testing.T,
+	db *gorm.DB,
+	userID uint,
+	visibility model.AssetVisibility,
+	blobType model.BlobType,
+) model.Asset {
+	t.Helper()
+
+	blob := model.Blob{
+		StorageKey: uuid.NewString(),
+		MimeType:   "image/png",
+		Type:       blobType,
+	}
+	if err := db.Create(&blob).Error; err != nil {
+		t.Fatalf("failed to seed blob: %v", err)
+	}
+	asset := model.Asset{
+		PublicID:     uuid.New(),
+		OriginalName: "avatar.png",
+		UserID:       userID,
+		BlobID:       blob.ID,
+		Visibility:   visibility,
+	}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatalf("failed to seed asset: %v", err)
+	}
+	return asset
+}
+
 // failingCaptchaLookupRepo forces FindCaptcha to fail with a non-not-found
 // error to exercise the internal-error path.
 type failingCaptchaLookupRepo struct {
@@ -129,16 +161,6 @@ func (f *failingRepo) FindUserByEmail(ctx context.Context, email string) (*model
 		return nil, f.findUserByEmailErr
 	}
 	return f.Repository.FindUserByEmail(ctx, email)
-}
-
-// seedMedia inserts a media_files row for the given owner and URL.
-func seedMedia(t *testing.T, db *gorm.DB, userID uint, url string) model.MediaFile {
-	t.Helper()
-	media := model.MediaFile{URL: url, UserID: userID, Type: "image/png"}
-	if err := db.Create(&media).Error; err != nil {
-		t.Fatalf("failed to seed media: %v", err)
-	}
-	return media
 }
 
 // capturedEmail holds the rendered parts of an outgoing email captured by the

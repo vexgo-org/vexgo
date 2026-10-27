@@ -18,6 +18,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -290,8 +291,8 @@ func (errRepo) GetGeneralSettings(context.Context) (model.GeneralSettings, error
 	return model.GeneralSettings{}, nil
 }
 
-func (errRepo) FindMediaByURL(context.Context, string) (*model.MediaFile, error) {
-	return nil, gorm.ErrRecordNotFound
+func (errRepo) FindAvatarIDByPublicID(context.Context, uint, uuid.UUID) (uint, error) {
+	return 0, gorm.ErrRecordNotFound
 }
 
 func (errRepo) FindCaptcha(context.Context, string, string) (*model.Captcha, error) {
@@ -426,9 +427,9 @@ func TestLogin_DebugLogsOmitEmail(t *testing.T) {
 	}
 }
 
-// A profile update carrying a scheme the browser would execute must be refused
-// at the HTTP boundary and must not reach the database.
-func TestUpdateProfileHandler_RejectsUnsafeAvatar(t *testing.T) {
+// A profile update naming an asset the caller cannot use must be refused at
+// the HTTP boundary and must not replace the stored avatar.
+func TestUpdateProfileHandler_RejectsUnavailableAvatar(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	_, _, db := newTestService(t)
@@ -437,8 +438,6 @@ func TestUpdateProfileHandler_RejectsUnsafeAvatar(t *testing.T) {
 		DB:        db,
 		JWTSecret: testJWTSecret,
 		Files:     &fakeFiles{},
-		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
 	})
 
 	r := gin.New()
@@ -449,7 +448,7 @@ func TestUpdateProfileHandler_RejectsUnsafeAvatar(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/profile",
-		strings.NewReader(`{"avatar":"javascript:document.title=\"xss\""}`))
+		strings.NewReader(`{"avatarPublicID":"`+uuid.NewString()+`"}`))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 
@@ -461,7 +460,61 @@ func TestUpdateProfileHandler_RejectsUnsafeAvatar(t *testing.T) {
 	if err := db.First(&stored, u.ID).Error; err != nil {
 		t.Fatalf("failed to reload user: %v", err)
 	}
-	if stored.Avatar != "" {
-		t.Errorf("unsafe avatar must not be stored, got %q", stored.Avatar)
+	if stored.AvatarID != nil {
+		t.Errorf("avatar must not be stored, got %d", *stored.AvatarID)
+	}
+}
+
+// The current-user response must use the public DTO: avatar URL, but no
+// database-only avatar id or account token fields.
+func TestGetCurrentUserHandler_ReturnsPublicUserShape(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	_, _, db := newTestService(t)
+	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
+	avatar := seedAsset(t, db, u.ID, model.AssetVisibilityPublic, model.BlobTypeImage)
+	if err := db.Model(&model.User{}).Where("id = ?", u.ID).
+		Update("avatar_id", avatar.ID).Error; err != nil {
+		t.Fatalf("failed to set avatar: %v", err)
+	}
+	if err := db.Model(&model.User{}).Where("id = ?", u.ID).
+		Update("verification_token", "secret-token").Error; err != nil {
+		t.Fatalf("failed to seed token: %v", err)
+	}
+
+	h := NewHandler(Deps{DB: db, JWTSecret: testJWTSecret, Files: &fakeFiles{}})
+	r := gin.New()
+	r.GET("/api/auth/me", func(c *gin.Context) {
+		c.Set(middleware.CtxUserIDKey, u.ID)
+		h.GetCurrentUser(c)
+	})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	user, ok := body["user"].(map[string]any)
+	if !ok {
+		t.Fatalf("response has no user object: %s", w.Body.String())
+	}
+	if got, want := user["avatar"], userAvatarURL(&model.User{Avatar: &avatar}); got != want {
+		t.Errorf("avatar = %v, want %q", got, want)
+	}
+	for _, field := range []string{
+		"avatarId",
+		"verification_token",
+		"token_expires_at",
+		"pending_email",
+		"password_version",
+	} {
+		if _, ok := user[field]; ok {
+			t.Errorf("internal field %q leaked in the response", field)
+		}
 	}
 }
