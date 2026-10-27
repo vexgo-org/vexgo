@@ -97,7 +97,7 @@
             "auth.CurrentUserResponse": {
                 "properties": {
                     "user": {
-                        "$ref": "#/components/schemas/model.User"
+                        "$ref": "#/components/schemas/auth.UserResponse"
                     }
                 },
                 "type": "object"
@@ -397,8 +397,8 @@
             },
             "auth.UpdateProfileRequestWire": {
                 "properties": {
-                    "avatar": {
-                        "example": "https://example.com/avatar.png",
+                    "avatarPublicID": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
                         "type": "string"
                     },
                     "bio": {
@@ -448,7 +448,70 @@
                         "type": "string"
                     },
                     "user": {
-                        "$ref": "#/components/schemas/model.User"
+                        "$ref": "#/components/schemas/auth.UserResponse"
+                    }
+                },
+                "type": "object"
+            },
+            "auth.UserResponse": {
+                "properties": {
+                    "avatar": {
+                        "example": "/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original",
+                        "type": "string"
+                    },
+                    "bio": {
+                        "example": "Hello, I'm alice.",
+                        "type": "string"
+                    },
+                    "birthday": {
+                        "example": "2000-01-01",
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "example": "alice@example.com",
+                        "type": "string"
+                    },
+                    "email_verified": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "hide_bio": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "hide_birthday": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "hide_email": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "last_login_at": {
+                        "type": "string"
+                    },
+                    "profile_visibility": {
+                        "enum": [
+                            "public",
+                            "private"
+                        ],
+                        "example": "public",
+                        "type": "string"
+                    },
+                    "role": {
+                        "example": "author",
+                        "type": "string"
+                    },
+                    "username": {
+                        "example": "alice",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1245,9 +1308,8 @@
             },
             "model.User": {
                 "properties": {
-                    "avatar": {
-                        "description": "avatar URL",
-                        "type": "string"
+                    "avatarId": {
+                        "type": "integer"
                     },
                     "bio": {
                         "description": "personal bio",

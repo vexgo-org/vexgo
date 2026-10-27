@@ -7,7 +7,7 @@
  */
 
 export interface AuthUpdateProfileRequestWire {
-  avatar?: string;
+  avatarPublicID?: string;
   bio?: string;
   birthday?: string;
   username?: string;

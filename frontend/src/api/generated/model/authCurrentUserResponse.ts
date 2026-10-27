@@ -5,8 +5,8 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelUser } from "./modelUser";
+import type { AuthUserResponse } from "./authUserResponse";
 
 export interface AuthCurrentUserResponse {
-  user?: ModelUser;
+  user?: AuthUserResponse;
 }
