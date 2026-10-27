@@ -25,7 +25,6 @@ type ListFilter struct {
 type Repository interface {
 	// Posts
 	FindByID(ctx context.Context, id uint) (*model.Post, error)
-	FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error)
 	FindBySlug(ctx context.Context, slug string) (*model.Post, error)
 	FindBySlugExcludeID(ctx context.Context, slug string, excludeID uint) (*model.Post, error)
 	SlugExists(ctx context.Context, slug string) (bool, error)
@@ -113,15 +112,7 @@ func NewRepository(db *gorm.DB) Repository {
 
 func (r *gormRepository) FindByID(ctx context.Context, id uint) (*model.Post, error) {
 	var post model.Post
-	if err := r.db.WithContext(ctx).Preload("Author").Preload("Tags").First(&post, id).Error; err != nil {
-		return nil, err
-	}
-	return &post, nil
-}
-
-func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id uint) (*model.Post, error) {
-	var post model.Post
-	if err := r.db.WithContext(ctx).Preload("Tags").First(&post, id).Error; err != nil {
+	if err := r.baseQuery(ctx).First(&post, id).Error; err != nil {
 		return nil, err
 	}
 	return &post, nil
@@ -129,9 +120,7 @@ func (r *gormRepository) FindByIDPreloadTags(ctx context.Context, id uint) (*mod
 
 func (r *gormRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
 	var post model.Post
-	if err := r.db.WithContext(ctx).
-		Preload("Author").
-		Preload("Tags").
+	if err := r.baseQuery(ctx).
 		Where("slug = ?", slug).
 		First(&post).Error; err != nil {
 		return nil, err
@@ -198,7 +187,11 @@ func (r *gormRepository) IncrementViewCount(ctx context.Context, postID uint) er
 
 // baseQuery returns the post model query with author and tags preloaded.
 func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
-	return r.db.WithContext(ctx).Model(&model.Post{}).Preload("Author").Preload("Tags")
+	return r.db.WithContext(ctx).
+		Model(&model.Post{}).
+		Preload("Author").
+		Preload("Author.Avatar").
+		Preload("Tags")
 }
 
 // listPage runs the shared count + paginate + order pattern for list queries.
@@ -549,10 +542,7 @@ func (r *gormRepository) GetGuestViewSetting(ctx context.Context) bool {
 }
 
 func (r *gormRepository) ListModeration(ctx context.Context, status model.PostStatus, offset, limit int, search string) ([]model.Post, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
-		Where("status = ?", status)
+	query := r.baseQuery(ctx).Where("status = ?", status)
 
 	if search != "" {
 		searchTerm := "%" + search + "%"

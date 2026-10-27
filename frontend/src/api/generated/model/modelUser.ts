@@ -7,8 +7,7 @@
  */
 
 export interface ModelUser {
-  /** avatar URL */
-  avatar?: string;
+  avatarId?: number;
   /** personal bio */
   bio?: string;
   /** birthday */

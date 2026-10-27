@@ -156,7 +156,7 @@ func (h *Handler) Login(c *gin.Context) {
 			Username: user.Username,
 			Email:    user.Email,
 			Role:     user.Role,
-			Avatar:   user.Avatar,
+			Avatar:   userAvatarURL(user),
 			Bio:      user.Bio,
 			Birthday: user.Birthday,
 		},
@@ -257,6 +257,29 @@ func (h *Handler) Register(c *gin.Context) {
 	})
 }
 
+// userToResponse projects a model.User into the public account DTO.
+func userToResponse(u *model.User) *UserResponse {
+	if u == nil {
+		return nil
+	}
+	return &UserResponse{
+		ID:                u.ID,
+		Username:          u.Username,
+		Email:             u.Email,
+		Role:              u.Role,
+		EmailVerified:     u.EmailVerified,
+		LastLoginAt:       u.LastLoginAt,
+		Birthday:          u.Birthday,
+		Bio:               u.Bio,
+		CreatedAt:         u.CreatedAt,
+		ProfileVisibility: u.ProfileVisibility,
+		HideEmail:         u.HideEmail,
+		HideBirthday:      u.HideBirthday,
+		HideBio:           u.HideBio,
+		Avatar:            userAvatarURL(u),
+	}
+}
+
 // userToRegisterUser projects a model.User into the slim
 // RegisterUser shape.
 func userToRegisterUser(u *model.User) RegisterUser {
@@ -268,7 +291,7 @@ func userToRegisterUser(u *model.User) RegisterUser {
 		Username:      u.Username,
 		Email:         u.Email,
 		Role:          u.Role,
-		Avatar:        u.Avatar,
+		Avatar:        userAvatarURL(u),
 		EmailVerified: u.EmailVerified,
 		CreatedAt:     u.CreatedAt,
 		Birthday:      u.Birthday,
@@ -303,7 +326,7 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get user"})
 		return
 	}
-	c.JSON(http.StatusOK, CurrentUserResponse{User: user})
+	c.JSON(http.StatusOK, CurrentUserResponse{User: userToResponse(user)})
 }
 
 // UpdateProfile godoc
@@ -347,7 +370,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, CurrentUserResponse{User: user})
+	c.JSON(http.StatusOK, CurrentUserResponse{User: userToResponse(user)})
 }
 
 // ChangePassword godoc
@@ -435,7 +458,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, UpdateSettingsResponse{
 		Message: "Settings updated successfully",
-		User:    user,
+		User:    userToResponse(user),
 	})
 }
 

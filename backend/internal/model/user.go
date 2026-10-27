@@ -36,7 +36,6 @@ type User struct {
 	Email         string `json:"email" binding:"required,email" gorm:"size:255;uniqueIndex"`
 	Password      string `json:"-"`                   // not serialized
 	Role          string `json:"role" gorm:"size:50"` // super_admin/admin/author/contributor/guest
-	Avatar        string `json:"avatar,omitempty"`    // avatar URL
 	EmailVerified bool   `json:"email_verified"`      // whether email is verified
 	// VerificationToken / TokenExpiresAt / PendingEmail hold live account
 	// tokens and must never serialize: model.User instances are rendered raw
@@ -55,6 +54,9 @@ type User struct {
 	HideEmail         bool   `json:"hide_email,omitempty" gorm:"default:false"`                    // hide email
 	HideBirthday      bool   `json:"hide_birthday,omitempty" gorm:"default:false"`                 // hide birthday
 	HideBio           bool   `json:"hide_bio,omitempty" gorm:"default:false"`                      // hide bio
+
+	AvatarID *uint  `json:"avatarId"`
+	Avatar   *Asset `gorm:"foreignKey:AvatarID" json:"-"`
 }
 
 // IsSuperAdmin reports whether the role is super admin.

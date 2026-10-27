@@ -4,11 +4,14 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Repository is the persistence interface for the auth domain.
@@ -25,14 +28,13 @@ type Repository interface {
 	UpdateUserEmailVerified(ctx context.Context, userID uint) error
 	ResetPassword(ctx context.Context, userID uint, hashedPassword string) error
 	GetGeneralSettings(ctx context.Context) (model.GeneralSettings, error)
-	// FindMediaByURL looks up the media_files row behind a stored URL so
-	// avatar cleanup can verify ownership before deleting the file.
-	FindMediaByURL(ctx context.Context, url string) (*model.MediaFile, error)
 	FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error)
 	// DeleteCaptcha removes a consumed or rejected challenge so the same
 	// (id, token, x, y) answer cannot be replayed against auth endpoints.
 	DeleteCaptcha(ctx context.Context, id, token string) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
+
+	FindAvatarIDByPublicID(ctx context.Context, userID uint, publicID uuid.UUID) (uint, error)
 }
 
 // gormRepository is the GORM-backed implementation of Repository.
@@ -46,19 +48,19 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
-		return nil, err
+	if id == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
-	return &user, nil
+
+	return r.findUser(ctx, &model.User{ID: id})
 }
 
 func (r *gormRepository) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
-		return nil, err
+	if email == "" {
+		return nil, gorm.ErrRecordNotFound
 	}
-	return &user, nil
+
+	return r.findUser(ctx, &model.User{Email: email})
 }
 
 func (r *gormRepository) FindUserByEmailExcluding(
@@ -66,8 +68,15 @@ func (r *gormRepository) FindUserByEmailExcluding(
 	email string,
 	excludeID uint,
 ) (*model.User, error) {
+	if email == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
 	var user model.User
-	if err := r.db.WithContext(ctx).Where("email = ? AND id != ?", email, excludeID).First(&user).Error; err != nil {
+	if err := r.userBaseQuery(ctx).
+		Where("email = ? AND id != ?", email, excludeID).
+		First(&user).
+		Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -81,14 +90,11 @@ func (r *gormRepository) FindUserByToken(ctx context.Context, token string) (*mo
 		// already fails to match it; this guard is the explicit contract.)
 		return nil, gorm.ErrRecordNotFound
 	}
-	var user model.User
+
 	// Tokens are stored hashed (tokenStorageForm); the presented raw token is
 	// hashed the same way before the lookup, so the plaintext never exists in
 	// the database.
-	if err := r.db.WithContext(ctx).Where("verification_token = ?", tokenStorageForm(token)).First(&user).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return r.findUser(ctx, &model.User{VerificationToken: tokenStorageForm(token)})
 }
 
 func (r *gormRepository) CreateUser(ctx context.Context, user *model.User) error {
@@ -96,7 +102,10 @@ func (r *gormRepository) CreateUser(ctx context.Context, user *model.User) error
 }
 
 func (r *gormRepository) SaveUser(ctx context.Context, user *model.User) error {
-	return r.db.WithContext(ctx).Save(user).Error
+	return r.db.WithContext(ctx).
+		Omit(clause.Associations).
+		Save(user).
+		Error
 }
 
 func (r *gormRepository) UpdateEmail(ctx context.Context, userID uint, email string) error {
@@ -153,14 +162,6 @@ func (r *gormRepository) GetGeneralSettings(ctx context.Context) (model.GeneralS
 	return settings, nil
 }
 
-func (r *gormRepository) FindMediaByURL(ctx context.Context, url string) (*model.MediaFile, error) {
-	var media model.MediaFile
-	if err := r.db.WithContext(ctx).Where("url = ?", url).First(&media).Error; err != nil {
-		return nil, err
-	}
-	return &media, nil
-}
-
 func (r *gormRepository) FindCaptcha(ctx context.Context, id, token string) (*model.Captcha, error) {
 	var captcha model.Captcha
 	if err := r.db.WithContext(ctx).Where("id = ? AND token = ?", id, token).First(&captcha).Error; err != nil {
@@ -198,4 +199,48 @@ func (r *gormRepository) UpdateEmailChangeToken(ctx context.Context, userID uint
 				"pending_email":      newEmail,
 			},
 		).Error
+}
+
+func (r *gormRepository) FindAvatarIDByPublicID(ctx context.Context, userID uint, publicID uuid.UUID) (uint, error) {
+	if userID == 0 || publicID == uuid.Nil {
+		return 0, gorm.ErrRecordNotFound
+	}
+
+	var asset model.Asset
+	err := r.db.WithContext(ctx).
+		Model(&model.Asset{}).
+		Joins("JOIN blobs ON blobs.id = assets.blob_id").
+		Select("assets.id").
+		Where("assets.user_id = ?", userID).
+		Where("assets.public_id = ?", publicID).
+		Where("assets.visibility = ?", model.AssetVisibilityPublic).
+		Where("blobs.type = ?", model.BlobTypeImage).
+		Take(&asset).
+		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, ErrInvalidAvatar
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return asset.ID, nil
+}
+
+func (r *gormRepository) userBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Preload("Avatar")
+}
+
+func (r *gormRepository) findUser(ctx context.Context, query *model.User) (*model.User, error) {
+	var user model.User
+	if err := r.userBaseQuery(ctx).
+		Where(query).
+		First(&user).
+		Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }

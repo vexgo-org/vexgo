@@ -34,6 +34,8 @@ export * from "./authUpdateProfileRequestWire";
 export * from "./authUpdateSettingsRequestWire";
 export * from "./authUpdateSettingsRequestWireProfileVisibility";
 export * from "./authUpdateSettingsResponse";
+export * from "./authUserResponse";
+export * from "./authUserResponseProfileVisibility";
 export * from "./authVerificationStatusResponse";
 export * from "./authVerifyEmailResponse";
 export * from "./captchaCaptchaGenerateResponse";

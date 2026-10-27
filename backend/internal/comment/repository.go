@@ -35,8 +35,11 @@ func NewRepository(db *gorm.DB) Repository {
 
 func (r *gormRepository) ListByPostID(ctx context.Context, postID string) ([]model.Comment, error) {
 	var comments []model.Comment
-	err := r.db.WithContext(ctx).Where("post_id = ? AND status = ?", postID, model.CommentStatusPublished).
-		Preload("User").Order("created_at ASC").Find(&comments).Error
+	err := r.baseQuery(ctx).
+		Where("post_id = ? AND status = ?", postID, model.CommentStatusPublished).
+		Order("created_at ASC").
+		Find(&comments).
+		Error
 	return comments, err
 }
 
@@ -99,8 +102,7 @@ func (r *gormRepository) ListModeration(
 	status model.CommentStatus,
 	offset, limit int,
 ) ([]model.Comment, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.Comment{}).
-		Preload("User").Preload("Post").Where("status = ?", status)
+	query := r.baseQuery(ctx).Where("status = ?", status)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -113,4 +115,12 @@ func (r *gormRepository) ListModeration(
 	}
 
 	return comments, total, nil
+}
+
+func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.Comment{}).
+		Preload("User").
+		Preload("User.Avatar").
+		Preload("Post")
 }

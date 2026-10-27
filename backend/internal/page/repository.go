@@ -33,7 +33,7 @@ func NewRepository(db *gorm.DB) Repository {
 
 func (r *gormRepository) FindByID(ctx context.Context, id string) (*model.Page, error) {
 	var page model.Page
-	if err := r.db.WithContext(ctx).Preload("Author").First(&page, id).Error; err != nil {
+	if err := r.baseQuery(ctx).First(&page, id).Error; err != nil {
 		return nil, err
 	}
 	return &page, nil
@@ -41,7 +41,7 @@ func (r *gormRepository) FindByID(ctx context.Context, id string) (*model.Page, 
 
 func (r *gormRepository) FindBySlug(ctx context.Context, slug string) (*model.Page, error) {
 	var page model.Page
-	if err := r.db.WithContext(ctx).Preload("Author").Where("slug = ?", slug).First(&page).Error; err != nil {
+	if err := r.baseQuery(ctx).Where("slug = ?", slug).First(&page).Error; err != nil {
 		return nil, err
 	}
 	return &page, nil
@@ -82,7 +82,7 @@ func (r *gormRepository) Delete(ctx context.Context, page *model.Page) error {
 }
 
 func (r *gormRepository) List(ctx context.Context, q ListQuery) ([]model.Page, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.Page{}).Preload("Author")
+	query := r.baseQuery(ctx)
 	if q.Status != "" {
 		query = query.Where("status = ?", q.Status)
 	}
@@ -121,4 +121,11 @@ func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.Page{}).
+		Preload("Author").
+		Preload("Author.Avatar")
 }

@@ -584,6 +584,37 @@ func TestBackfillAssetBlob_KeepsRowWithoutUser(t *testing.T) {
 	}
 }
 
+// TestBackfillAssetBlob_RollsBackBlobWhenAssetInsertFails pins the transaction:
+// an asset insert failure must not leave the blob behind.
+func TestBackfillAssetBlob_RollsBackBlobWhenAssetInsertFails(t *testing.T) {
+	svc, db, local := newMigrationService(t)
+
+	const key = "rollback-avatar.png"
+	putObject(t, local, key, pngPayload)
+	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: 1})
+
+	if err := db.Callback().Create().Before("gorm:create").Register(
+		"fail_asset_insert",
+		func(tx *gorm.DB) {
+			if _, ok := tx.Statement.Dest.(*model.Asset); ok {
+				_ = tx.AddError(errors.New("injected asset insert failure"))
+			}
+		},
+	); err != nil {
+		t.Fatalf("register failing asset callback: %v", err)
+	}
+
+	if err := svc.backfillAssetBlob(); err != nil {
+		t.Fatalf("backfill must skip the failed row: %v", err)
+	}
+	if count := countRows(t, db, &model.Blob{}); count != 0 {
+		t.Errorf("expected the blob insert to roll back, got %d blobs", count)
+	}
+	if count := countRows(t, db, &model.Asset{}); count != 0 {
+		t.Errorf("expected 0 assets, got %d", count)
+	}
+}
+
 // TestBackfillAssetBlob_MigratesSharedObjectOnce covers two legacy rows pointing
 // at the same file: the unique index on Blob.StorageKey means only one blob.
 func TestBackfillAssetBlob_MigratesSharedObjectOnce(t *testing.T) {
