@@ -4,8 +4,10 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -33,6 +35,8 @@ type Repository interface {
 	// (id, token, x, y) answer cannot be replayed against auth endpoints.
 	DeleteCaptcha(ctx context.Context, id, token string) error
 	UpdateEmailChangeToken(ctx context.Context, userID uint, newEmail, token string, expiresAt time.Time) error
+
+	FindAvatarIDByPublicID(ctx context.Context, userID uint, publicID uuid.UUID) (uint, error)
 }
 
 // gormRepository is the GORM-backed implementation of Repository.
@@ -202,6 +206,33 @@ func (r *gormRepository) UpdateEmailChangeToken(ctx context.Context, userID uint
 				"pending_email":      newEmail,
 			},
 		).Error
+}
+
+func (r *gormRepository) FindAvatarIDByPublicID(ctx context.Context, userID uint, publicID uuid.UUID) (uint, error) {
+	if userID == 0 || publicID == uuid.Nil {
+		return 0, gorm.ErrRecordNotFound
+	}
+
+	var asset model.Asset
+	err := r.db.WithContext(ctx).
+		Model(&model.Asset{}).
+		Joins("JOIN blobs ON blobs.id = assets.blob_id").
+		Select("assets.id").
+		Where("assets.user_id = ?", userID).
+		Where("assets.public_id = ?", publicID).
+		Where("assets.visibility = ?", model.AssetVisibilityPublic).
+		Where("blobs.type = ?", model.BlobTypeImage).
+		Take(&asset).
+		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, ErrInvalidAvatar
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return asset.ID, nil
 }
 
 func (r *gormRepository) userBaseQuery(ctx context.Context) *gorm.DB {
