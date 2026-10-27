@@ -46,19 +46,19 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
-		return nil, err
+	if id == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
-	return &user, nil
+
+	return r.findUser(ctx, &model.User{ID: id})
 }
 
 func (r *gormRepository) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
-		return nil, err
+	if email == "" {
+		return nil, gorm.ErrRecordNotFound
 	}
-	return &user, nil
+
+	return r.findUser(ctx, &model.User{Email: email})
 }
 
 func (r *gormRepository) FindUserByEmailExcluding(
@@ -66,8 +66,15 @@ func (r *gormRepository) FindUserByEmailExcluding(
 	email string,
 	excludeID uint,
 ) (*model.User, error) {
+	if email == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
 	var user model.User
-	if err := r.db.WithContext(ctx).Where("email = ? AND id != ?", email, excludeID).First(&user).Error; err != nil {
+	if err := r.userBaseQuery(ctx).
+		Where("email = ? AND id != ?", email, excludeID).
+		First(&user).
+		Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -81,14 +88,11 @@ func (r *gormRepository) FindUserByToken(ctx context.Context, token string) (*mo
 		// already fails to match it; this guard is the explicit contract.)
 		return nil, gorm.ErrRecordNotFound
 	}
-	var user model.User
+
 	// Tokens are stored hashed (tokenStorageForm); the presented raw token is
 	// hashed the same way before the lookup, so the plaintext never exists in
 	// the database.
-	if err := r.db.WithContext(ctx).Where("verification_token = ?", tokenStorageForm(token)).First(&user).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return r.findUser(ctx, &model.User{VerificationToken: tokenStorageForm(token)})
 }
 
 func (r *gormRepository) CreateUser(ctx context.Context, user *model.User) error {
@@ -198,4 +202,21 @@ func (r *gormRepository) UpdateEmailChangeToken(ctx context.Context, userID uint
 				"pending_email":      newEmail,
 			},
 		).Error
+}
+
+func (r *gormRepository) userBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Preload("Avatar")
+}
+
+func (r *gormRepository) findUser(ctx context.Context, query *model.User) (*model.User, error) {
+	var user model.User
+	if err := r.userBaseQuery(ctx).
+		Where(query).
+		First(&user).
+		Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
