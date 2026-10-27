@@ -11,6 +11,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Repository is the persistence interface for the auth domain.
@@ -104,7 +105,10 @@ func (r *gormRepository) CreateUser(ctx context.Context, user *model.User) error
 }
 
 func (r *gormRepository) SaveUser(ctx context.Context, user *model.User) error {
-	return r.db.WithContext(ctx).Save(user).Error
+	return r.db.WithContext(ctx).
+		Omit(clause.Associations).
+		Save(user).
+		Error
 }
 
 func (r *gormRepository) UpdateEmail(ctx context.Context, userID uint, email string) error {
