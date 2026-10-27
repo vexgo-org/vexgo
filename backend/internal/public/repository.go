@@ -63,9 +63,7 @@ func (r *gormRepository) GetThemeConfig(ctx context.Context) (model.ThemeConfig,
 }
 
 func (r *gormRepository) ListPublishedPosts(ctx context.Context, q PostListQuery) ([]model.Post, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
+	query := r.postBaseQuery(ctx).
 		Where("status = ?", model.PostStatusPublished)
 	if q.AuthorID != 0 {
 		query = query.Where("author_id = ?", q.AuthorID)
@@ -94,11 +92,10 @@ func (r *gormRepository) ListPublishedPosts(ctx context.Context, q PostListQuery
 
 func (r *gormRepository) FindPublishedPostBySlug(ctx context.Context, slug string) (*model.Post, error) {
 	var post model.Post
-	if err := r.db.WithContext(ctx).
-		Preload("Author").
-		Preload("Tags").
+	if err := r.postBaseQuery(ctx).
 		Where("slug = ? AND status = ?", slug, model.PostStatusPublished).
-		First(&post).Error; err != nil {
+		First(&post).
+		Error; err != nil {
 		return nil, err
 	}
 	return &post, nil
@@ -118,9 +115,7 @@ func (r *gormRepository) ListPublishedCategories(ctx context.Context) ([]string,
 
 func (r *gormRepository) ListRecentPublishedPosts(ctx context.Context, limit int) ([]model.Post, error) {
 	var posts []model.Post
-	if err := r.db.WithContext(ctx).Model(&model.Post{}).
-		Preload("Author").
-		Preload("Tags").
+	if err := r.postBaseQuery(ctx).
 		Where("status = ?", model.PostStatusPublished).
 		Order("created_at DESC").
 		Limit(limit).
@@ -201,7 +196,9 @@ func (r *gormRepository) CountCommentsByPostIDs(ctx context.Context, postIDs []u
 
 func (r *gormRepository) FindUserByID(ctx context.Context, id uint) (*model.User, error) {
 	var user model.User
-	if err := r.db.WithContext(ctx).First(&user, id).Error; err != nil {
+	if err := r.userBaseQuery(ctx).
+		First(&user, id).
+		Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -232,11 +229,25 @@ func (r *gormRepository) FindPageBySlug(ctx context.Context, slug string, publis
 
 func (r *gormRepository) FindFirstUserByRole(ctx context.Context, role string) (*model.User, error) {
 	var user model.User
-	if err := r.db.WithContext(ctx).
+	if err := r.userBaseQuery(ctx).
 		Where("role = ?", role).
 		Order("id ASC").
 		First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *gormRepository) postBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.Post{}).
+		Preload("Author").
+		Preload("Author.Avatar").
+		Preload("Tags")
+}
+
+func (r *gormRepository) userBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Preload("Avatar")
 }
