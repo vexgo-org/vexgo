@@ -300,15 +300,13 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ### 迁移与种子数据
 
-`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录，再将旧版 `general_settings.site_icon` URL 映射到生成的 asset，随后删除该列。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录，再将旧版 `general_settings.site_icon` 和 `users.avatar` URL 映射到生成的 asset，随后删除这些列。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
 
-媒体回填在每次启动时运行，且是幂等的：已有 blob 的存储键会被跳过，且所有已有键通过一次查询读入，因此不会逐行查询。键取自记录的 `StorageKey`，或取自其 URL 的 `/uploads/` 前缀；MIME 类型由文件头嗅探得出，而非依赖扩展名。带有 `StorageKey` 的记录通过当前配置的存储后端打开，因此 S3 部署也能迁移这些记录。旧版 `media_files` 记录本身会保留，因为尚未迁移的内容仍然指向它们。迁移后的资源均为公开可见。
-
-站点图标映射在媒体回填之后运行，因此只能复用该轮回填创建的 asset。非本地 URL 或回填时被跳过的文件会令 `site_icon_id` 为空；旧列仍会被删除，因此旧 URL 既不会保留，也不会在后续启动中复活。
+站点图标和用户头像映射在媒体回填之后运行，因此只能复用该轮回填创建的 asset。非本地 URL 或回填时被跳过的文件会令引用为空；旧列仍会被删除，因此旧 URL 既不会保留，也不会在后续启动中复活。用户头像映射将旧版 URL 与 `media_files.url` 匹配（覆盖本地与 S3 URL），要求媒体文件与 asset 均属于该用户，且仅关联公开的图片 asset。
 
 有三类旧版记录会被有意跳过，每条都会记录其 `id` 与对应的 key 或 URL：
 
-- 嗅探出的类型不是图片、视频或音频的文件——即旧版的 PDF、SVG、`.md`、`.csv` 与 `.txt` 上传，因为 `model.BlobType` 没有对应类型。文章仍以 URL 引用这些文件；设置不再引用，因为旧版站点图标列在映射后会被删除。
+- 嗅探出的类型不是图片、视频或音频的文件——即旧版的 PDF、SVG、`.md`、`.csv` 与 `.txt` 上传，因为 `model.BlobType` 没有对应类型。文章仍以 URL 引用这些文件；设置与用户头像不再引用，因为旧版列在映射后会被删除。
 - 空文件。
 - URL 为绝对地址且没有记录 `StorageKey` 的记录——即尚未记录 key 之前写入的上传，包括旧版 S3 上传。没有 key 就没有可打开或改写的内容。
 

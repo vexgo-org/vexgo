@@ -32,7 +32,7 @@ go run backend/cmd/vexgo/main.go server       # 不用 just 的等价写法
 
 - `backend/internal/router`：`RegisterAPIRoutes` 把各领域路由挂到 `/api` 下（group 级别应用可选 JWT 中间件），依赖聚合在 `router.Deps`。`router_test.go` 锁死了 method+path 全表：增删改路由必须同步更新该表。
 - `backend/internal/app`：装配所有领域；`backend/cmd/vexgo/main.go` 只做配置解析与调用。
-- `backend/internal/database`：仅负责连接（`Open`/`Seed`）。`backend/internal/migration`：启动迁移——`MigrateDB`（表结构、旧版审核开关、slug 与媒体回填、旧版站点图标映射）与 `MigrateSecrets`（加密仍为明文的敏感信息）。`internal/app` 在 `database.Open` 与领域装配之间调用两者；该包没有 handler 或路由。
+- `backend/internal/database`：仅负责连接（`Open`/`Seed`）。`backend/internal/migration`：启动迁移——`MigrateDB`（表结构、旧版审核开关、slug 与媒体回填、旧版站点图标与用户头像映射）与 `MigrateSecrets`（加密仍为明文的敏感信息）。`internal/app` 在 `database.Open` 与领域装配之间调用两者；该包没有 handler 或路由。
 - 不导入其他后端包的叶子包：`config`、`model`、`secrets`、`cache`。`model` 放 GORM 模型与 `Notifier`/`FileRemover` 缝隙（`model/interfaces.go`）；不得导入应用逻辑。
 - `backend/internal/public`：SSR 引擎、主题 serving、嵌入资源。它同样遵循三层结构，另有两个文件：`render.go`（主题引擎：模板、i18n、种子页）与 `routes.go`（路由表）。`backend/internal/settings`：站点设置与主题管理。
 - 跨域调用走消费方声明的接口（`notification` 实现 `model.Notifier`，`storage.Storage` 实现 `model.FileRemover`，`*public.Service` 为主题目录实现 `settings.ThemeManager`）。`mailer.Service` 是有意的例外：以具体 `*mailer.Service` 注入 `auth` 与 `settings`。
