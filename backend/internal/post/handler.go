@@ -189,14 +189,14 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Create(c.Request.Context(), userRole, userID, CreateRequest{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Tags:       req.Tags,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     model.PostStatus(req.Status),
+		Slug:               req.Slug,
+		Title:              req.Title,
+		Content:            req.Content,
+		Category:           req.Category,
+		Tags:               req.Tags,
+		Excerpt:            req.Excerpt,
+		CoverImagePublicID: req.CoverImagePublicID,
+		Status:             model.PostStatus(req.Status),
 	})
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
@@ -211,7 +211,10 @@ func (h *Handler) CreatePost(c *gin.Context) {
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 			return
 		}
-		if errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong) {
+		if errors.Is(err, model.ErrEmptySlug) ||
+			errors.Is(err, model.ErrInvalidSlug) ||
+			errors.Is(err, model.ErrSlugTooLong) ||
+			errors.Is(err, ErrInvalidCoverImage) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
@@ -257,14 +260,14 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Update(c.Request.Context(), id, userID, UpdateRequest{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Tags:       req.Tags,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     model.PostStatus(req.Status),
+		Slug:               req.Slug,
+		Title:              req.Title,
+		Content:            req.Content,
+		Category:           req.Category,
+		Tags:               req.Tags,
+		Excerpt:            req.Excerpt,
+		CoverImagePublicID: req.CoverImagePublicID,
+		Status:             model.PostStatus(req.Status),
 	})
 	if err != nil {
 		switch {
@@ -276,7 +279,10 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post status"})
 		case errors.Is(err, model.ErrSlugTaken):
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
-		case errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
+		case errors.Is(err, model.ErrEmptySlug) ||
+			errors.Is(err, model.ErrInvalidSlug) ||
+			errors.Is(err, model.ErrSlugTooLong) ||
+			errors.Is(err, ErrInvalidCoverImage):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update post"})
