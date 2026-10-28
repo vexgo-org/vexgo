@@ -281,7 +281,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		return nil, err
 	}
 
-	return &post, nil
+	return s.repo.FindByID(ctx, post.ID)
 }
 
 // Update modifies a post when the acting user is its author or an admin.
@@ -379,7 +379,8 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 		}
 		return nil, fmt.Errorf("save post: %w", err)
 	}
-	return post, nil
+
+	return s.repo.FindByID(ctx, post.ID)
 }
 
 // Delete removes a post (author or admin only), cleaning up its files,
