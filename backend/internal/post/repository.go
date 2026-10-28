@@ -197,6 +197,7 @@ func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
 		Model(&model.Post{}).
 		Preload("Author").
 		Preload("Author.Avatar").
+		Preload("CoverImage").
 		Preload("Tags")
 }
 
