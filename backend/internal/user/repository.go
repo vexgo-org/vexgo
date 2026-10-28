@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -114,8 +115,8 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 		postIDs := make([]uint, 0, len(posts))
 		for _, post := range posts {
 			postIDs = append(postIDs, post.ID)
-			if post.CoverImage != "" {
-				fileURLs = append(fileURLs, post.CoverImage)
+			if post.CoverImage != nil {
+				fileURLs = append(fileURLs, asset.OriginalURL(post.CoverImage.PublicID))
 			}
 		}
 		if len(postIDs) > 0 {

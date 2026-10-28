@@ -140,13 +140,17 @@ func toPostCard(post model.Post) PostCardData {
 		Title:         post.Title,
 		Slug:          post.Slug,
 		Excerpt:       post.Excerpt,
-		CoverImage:    post.CoverImage,
 		Category:      post.Category,
 		CreatedAt:     post.CreatedAt,
 		ViewCount:     post.ViewCount,
 		CommentsCount: int64(post.CommentsCount),
 		URL:           "/post/" + post.Slug,
 	}
+
+	if post.CoverImage != nil {
+		card.CoverImage = asset.OriginalURL(post.CoverImage.PublicID)
+	}
+
 	for _, tag := range post.Tags {
 		card.Tags = append(card.Tags, tag.Name)
 	}
@@ -505,7 +509,6 @@ func (s *Service) PostView(ctx context.Context, site *SiteData, slug string) (*P
 	data.Post.Title = post.Title
 	data.Post.Slug = post.Slug
 	data.Post.Excerpt = post.Excerpt
-	data.Post.CoverImage = post.CoverImage
 	data.Post.Category = post.Category
 	data.Post.CreatedAt = post.CreatedAt
 	data.Post.UpdatedAt = post.UpdatedAt
@@ -514,6 +517,10 @@ func (s *Service) PostView(ctx context.Context, site *SiteData, slug string) (*P
 	data.Post.LikesCount = likeCounts[post.ID]
 	data.Post.ContentHTML = RenderMarkdown(post.Content)
 	data.Post.URL = "/post/" + post.Slug
+
+	if post.CoverImage != nil {
+		data.Post.CoverImage = asset.OriginalURL(post.CoverImage.PublicID)
+	}
 	if post.Author.ID != 0 {
 		data.Post.AuthorName = post.Author.Username
 		data.Post.AuthorID = post.Author.ID
