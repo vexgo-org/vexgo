@@ -1205,77 +1205,6 @@
                     "PageStatusPublished"
                 ]
             },
-            "model.Post": {
-                "properties": {
-                    "author": {
-                        "$ref": "#/components/schemas/model.User"
-                    },
-                    "authorId": {
-                        "type": "integer"
-                    },
-                    "category": {
-                        "type": "string"
-                    },
-                    "commentsCount": {
-                        "description": "Non-database field: comment count",
-                        "type": "integer"
-                    },
-                    "content": {
-                        "type": "string"
-                    },
-                    "coverImage": {
-                        "type": "string"
-                    },
-                    "createdAt": {
-                        "type": "string"
-                    },
-                    "excerpt": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "isLiked": {
-                        "type": "boolean"
-                    },
-                    "likesCount": {
-                        "description": "Non-database field: used to include like count and whether the current user has liked in API response",
-                        "type": "integer"
-                    },
-                    "rejectionReason": {
-                        "description": "rejection reason",
-                        "type": "string"
-                    },
-                    "slug": {
-                        "type": "string"
-                    },
-                    "status": {
-                        "$ref": "#/components/schemas/model.PostStatus",
-                        "description": "draft/published/pending/rejected"
-                    },
-                    "tags": {
-                        "items": {
-                            "$ref": "#/components/schemas/model.Tag"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "title": {
-                        "type": "string"
-                    },
-                    "updatedAt": {
-                        "type": "string"
-                    },
-                    "viewCount": {
-                        "type": "integer"
-                    }
-                },
-                "required": [
-                    "content",
-                    "title"
-                ],
-                "type": "object"
-            },
             "model.PostStatus": {
                 "enum": [
                     "pending",
@@ -1607,8 +1536,8 @@
                         "example": "\u003cp\u003eHello world\u003c/p\u003e",
                         "type": "string"
                     },
-                    "coverImage": {
-                        "example": "https://example.com/cover.jpg",
+                    "coverImagePublicID": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
                         "type": "string"
                     },
                     "excerpt": {
@@ -1761,7 +1690,7 @@
                     },
                     "posts": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Post"
+                            "$ref": "#/components/schemas/post.PostResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -1773,7 +1702,7 @@
                 "properties": {
                     "posts": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Post"
+                            "$ref": "#/components/schemas/post.PostResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -1788,15 +1717,89 @@
                         "type": "string"
                     },
                     "post": {
-                        "$ref": "#/components/schemas/model.Post"
+                        "$ref": "#/components/schemas/post.PostResponse"
                     }
                 },
+                "type": "object"
+            },
+            "post.PostResponse": {
+                "properties": {
+                    "author": {
+                        "$ref": "#/components/schemas/model.User"
+                    },
+                    "authorId": {
+                        "type": "integer"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "commentsCount": {
+                        "description": "Non-database field: comment count",
+                        "type": "integer"
+                    },
+                    "content": {
+                        "type": "string"
+                    },
+                    "coverImageOriginalURL": {
+                        "type": "string"
+                    },
+                    "coverImagePublicID": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "excerpt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "isLiked": {
+                        "type": "boolean"
+                    },
+                    "likesCount": {
+                        "description": "Non-database field: used to include like count and whether the current user has liked in API response",
+                        "type": "integer"
+                    },
+                    "rejectionReason": {
+                        "description": "rejection reason",
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/model.PostStatus",
+                        "description": "draft/published/pending/rejected"
+                    },
+                    "tags": {
+                        "items": {
+                            "$ref": "#/components/schemas/model.Tag"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "viewCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "content",
+                    "title"
+                ],
                 "type": "object"
             },
             "post.PostSingleResponse": {
                 "properties": {
                     "post": {
-                        "$ref": "#/components/schemas/model.Post"
+                        "$ref": "#/components/schemas/post.PostResponse"
                     }
                 },
                 "type": "object"
@@ -1832,8 +1835,8 @@
                         "example": "\u003cp\u003eHello world\u003c/p\u003e",
                         "type": "string"
                     },
-                    "coverImage": {
-                        "example": "https://example.com/cover.jpg",
+                    "coverImagePublicID": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
                         "type": "string"
                     },
                     "excerpt": {
@@ -1867,6 +1870,10 @@
                     "title": {
                         "example": "My First Post",
                         "type": "string"
+                    },
+                    "unsetCoverImage": {
+                        "example": false,
+                        "type": "boolean"
                     }
                 },
                 "type": "object"

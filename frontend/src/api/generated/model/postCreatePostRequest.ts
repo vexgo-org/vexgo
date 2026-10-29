@@ -10,7 +10,7 @@ import type { PostCreatePostRequestStatus } from "./postCreatePostRequestStatus"
 export interface PostCreatePostRequest {
   category: string;
   content: string;
-  coverImage?: string;
+  coverImagePublicID?: string;
   excerpt?: string;
   slug: string;
   status?: PostCreatePostRequestStatus;

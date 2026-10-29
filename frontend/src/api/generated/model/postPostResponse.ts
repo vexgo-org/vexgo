@@ -9,14 +9,15 @@ import type { ModelPostStatus } from "./modelPostStatus";
 import type { ModelTag } from "./modelTag";
 import type { ModelUser } from "./modelUser";
 
-export interface ModelPost {
+export interface PostPostResponse {
   author?: ModelUser;
   authorId?: number;
   category?: string;
   /** Non-database field: comment count */
   commentsCount?: number;
   content: string;
-  coverImage?: string;
+  coverImageOriginalURL?: string;
+  coverImagePublicID?: string;
   createdAt?: string;
   excerpt?: string;
   id?: number;
