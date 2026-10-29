@@ -339,11 +339,14 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 		post.Excerpt = req.Excerpt
 	}
 
-	if req.CoverImagePublicID != nil {
+	if req.CoverImagePublicID != nil &&
+		(post.CoverImage == nil ||
+			post.CoverImage.PublicID != *req.CoverImagePublicID) {
 		coverImageID, err := s.repo.FindCoverImageIDByPublicID(ctx, userID, *req.CoverImagePublicID)
 		if err != nil {
 			return nil, err
 		}
+
 		post.CoverImageID = &coverImageID
 	}
 
