@@ -33,30 +33,7 @@ import {
   ArrowLeft,
   Trash2,
 } from "lucide-react";
-
-// Post fields from the backend may be looser than the frontend Post type (category may be numeric, tags may be an object array)
-interface LoadedPost {
-  slug?: string;
-  title: string;
-  content: string;
-  excerpt: string;
-  coverImage: string | null;
-  category?: string | number;
-  tags?:
-    | string
-    | Array<
-        | string
-        | {
-            name?: string;
-            Name?: string;
-            title?: string;
-            label?: string;
-            id?: string | number;
-          }
-      >;
-  tag_names?: string[];
-  Tags?: Array<{ name?: string; Name?: string; id?: string | number }>;
-}
+import type { PostPostResponse } from "@/api/generated/model";
 
 export function WritePostPage() {
   const { t } = useTranslation();
@@ -88,7 +65,9 @@ export function WritePostPage() {
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [coverImage, setCoverImage] = useState("");
+  const [coverImage, setCoverImage] = useState<
+    Pick<PostPostResponse, "coverImagePublicID" | "coverImageOriginalURL">
+  >({});
   const [showCropper, setShowCropper] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -140,7 +119,7 @@ export function WritePostPage() {
   const loadPost = async () => {
     try {
       const response = await unwrap(getVexGoAPI().getPostsByIdId(postId));
-      const post = response.post as LoadedPost;
+      const post = response.post!;
       console.debug("WritePostPage loaded post:", post);
       console.log("Post content:", post.content);
       console.log("Post content type:", typeof post.content);
@@ -168,44 +147,25 @@ export function WritePostPage() {
       }
       // The backend may return tags as an object array [{id,name}, ...]; the frontend needs a string array
       try {
-        let mappedTags: string[] = [];
         const rawTags = post.tags;
+        if (!rawTags) {
+          return;
+        }
 
-        if (Array.isArray(rawTags)) {
-          if (rawTags.every((x) => typeof x === "string")) {
-            // 1) The backend returns a plain string array
-            mappedTags = rawTags;
-          } else {
-            // 2) Common case: an object array [{id,name}, ...]
-            mappedTags = rawTags
-              .map((t) => {
-                if (!t) return "";
-                if (typeof t === "string") return t;
-                return (
-                  t.name ||
-                  t.Name ||
-                  t.title ||
-                  t.label ||
-                  (t.id ? String(t.id) : undefined) ||
-                  ""
-                );
-              })
-              .filter((v): v is string => Boolean(v));
-          }
-        } else if (typeof rawTags === "string") {
-          // 3) The backend returns a comma-separated string
+        let mappedTags: string[] = [];
+
+        if (rawTags.every((x) => typeof x === "string")) {
+          // 1) The backend returns a plain string array
+          mappedTags = rawTags;
+        } else {
+          // 2) Common case: an object array [{id,name}, ...]
           mappedTags = rawTags
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-        } else if (post.tag_names && Array.isArray(post.tag_names)) {
-          mappedTags = post.tag_names
-            .map((s) => String(s).trim())
-            .filter(Boolean);
-        } else if (post.Tags && Array.isArray(post.Tags)) {
-          mappedTags = post.Tags.map(
-            (t) => t.name || t.Name || (t.id ? String(t.id) : ""),
-          ).filter((v): v is string => Boolean(v));
+            .map((t) => {
+              if (!t) return "";
+              if (typeof t === "string") return t;
+              return t.name || (t.id ? String(t.id) : undefined) || "";
+            })
+            .filter((v): v is string => Boolean(v));
         }
 
         console.debug(
@@ -219,7 +179,7 @@ export function WritePostPage() {
         console.error("Failed to parse post.tags:", e, post && post.tags);
         setTags([]);
       }
-      setCoverImage(post.coverImage || "");
+      setCoverImage(post);
     } catch (error) {
       console.error("Failed to load post:", error);
       navigate("/admin/my-posts");
@@ -258,9 +218,12 @@ export function WritePostPage() {
     setUploadingImage(true);
     try {
       const response = await unwrap(
-        getVexGoAPI().postUpload({ file: croppedFile }),
+        getVexGoAPI().postAssetsUpload({ file: croppedFile }),
       );
-      setCoverImage(response.file?.url || "");
+      setCoverImage({
+        coverImagePublicID: response.assetPublicID,
+        coverImageOriginalURL: response.assetOriginalURL,
+      });
     } catch (err) {
       console.error("Failed to upload cropped image:", err);
       alert(t("writePostPage.uploadFailed"));
@@ -316,7 +279,7 @@ export function WritePostPage() {
         category,
         tags,
         excerpt: excerpt.trim(),
-        coverImage: coverImage || undefined,
+        coverImagePublicID: coverImage.coverImagePublicID || undefined,
         status: isContributor && status === "published" ? "pending" : status,
       };
 
@@ -465,10 +428,10 @@ export function WritePostPage() {
             <Label className="mb-2 block">
               {t("writePostPage.coverImage")}
             </Label>
-            {coverImage ? (
+            {coverImage.coverImageOriginalURL ? (
               <div className="relative">
                 <img
-                  src={coverImage}
+                  src={coverImage.coverImageOriginalURL}
                   alt={t("writePostPage.coverImageAlt")}
                   className="h-48 w-full rounded-md border object-cover"
                 />
@@ -476,7 +439,9 @@ export function WritePostPage() {
                   variant="destructive"
                   size="sm"
                   className="absolute top-2 right-2"
-                  onClick={() => setCoverImage("")}
+                  onClick={() =>
+                    setCoverImage({})
+                  }
                 >
                   <X className="size-4" />
                 </Button>
