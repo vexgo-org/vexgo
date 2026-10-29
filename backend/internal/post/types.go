@@ -17,29 +17,35 @@ type Pagination struct {
 	TotalPages int   `json:"totalPages" example:"5"`
 }
 
+type PostResponse struct {
+	*model.Post
+	CoverImageOriginalURL string     `json:"coverImageOriginalURL"`
+	CoverImagePublicID    *uuid.UUID `json:"coverImagePublicID"`
+}
+
 // PostListResponse is the body of any paged post list.
 type PostListResponse struct {
-	Posts      []model.Post `json:"posts"`
-	Pagination Pagination   `json:"pagination"`
+	Posts      []PostResponse `json:"posts"`
+	Pagination Pagination     `json:"pagination"`
 }
 
 // PostListResponseData is the body of a list that doesn't
 // include pagination (popular posts, latest posts).
 type PostListResponseData struct {
-	Posts []model.Post `json:"posts"`
+	Posts []PostResponse `json:"posts"`
 }
 
 // PostSingleResponse is the body of GET /api/posts/{slug}
 // and GET /api/posts/by-id/{id}.
 type PostSingleResponse struct {
-	Post *model.Post `json:"post"`
+	Post *PostResponse `json:"post"`
 }
 
 // PostMessageResponse is the body of POST/PUT/DELETE
 // /api/posts endpoints that return the updated row.
 type PostMessageResponse struct {
-	Message string      `json:"message" example:"Post created successfully"`
-	Post    *model.Post `json:"post"`
+	Message string        `json:"message" example:"Post created successfully"`
+	Post    *PostResponse `json:"post"`
 }
 
 // PostDeleteResponse is the body of DELETE /api/posts/{id}.
