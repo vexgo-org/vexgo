@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/vexgo-org/vexgo/backend/internal/asset"
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -22,7 +22,7 @@ type Repository interface {
 	// (comments, likes, media rows, posts and their post_tags join rows) in
 	// a single transaction. It returns the URLs of the referenced files so
 	// the caller can delete them after the transaction commits.
-	DeleteUserCascade(ctx context.Context, userID uint) ([]string, error)
+	DeleteUserCascade(ctx context.Context, userID uint) ([]uuid.UUID, error)
 
 	// Creator applications
 	FindPendingApplication(ctx context.Context, userID uint) (*model.CreatorApplication, error)
@@ -83,9 +83,11 @@ func (r *gormRepository) ListUsers(ctx context.Context, search string, offset, l
 // DeleteUserCascade removes the user and all dependent rows inside a single
 // transaction, including the post_tags join rows that would otherwise survive
 // as orphans. File URLs are collected (not deleted) so the caller can remove
-// the files only after the transaction commits.
-func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]string, error) {
-	var fileURLs []string
+// the files only after the transaction commits. IDs are deduplicated because a
+// user's own upload and a post cover can refer to the same asset row.
+func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]uuid.UUID, error) {
+	seen := make(map[uuid.UUID]struct{})
+	var assetPublicIDs []uuid.UUID
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Comments and likes authored by the user.
 		if err := tx.Where("user_id = ?", userID).Delete(&model.Comment{}).Error; err != nil {
@@ -95,13 +97,17 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 			return fmt.Errorf("delete user likes: %w", err)
 		}
 
-		// Media files owned by the user.
-		var mediaFiles []model.MediaFile
-		if err := tx.Where("user_id = ?", userID).Find(&mediaFiles).Error; err != nil {
-			return fmt.Errorf("query user media files: %w", err)
+		// Assets owned by the user.
+		var assets []model.Asset
+		if err := tx.Where("user_id = ?", userID).Find(&assets).Error; err != nil {
+			return fmt.Errorf("query user assets: %w", err)
 		}
-		for _, media := range mediaFiles {
-			fileURLs = append(fileURLs, media.URL)
+		for _, asset := range assets {
+			if _, ok := seen[asset.PublicID]; ok {
+				continue
+			}
+			seen[asset.PublicID] = struct{}{}
+			assetPublicIDs = append(assetPublicIDs, asset.PublicID)
 		}
 		if err := tx.Where("user_id = ?", userID).Delete(&model.MediaFile{}).Error; err != nil {
 			return fmt.Errorf("delete user media files: %w", err)
@@ -119,7 +125,11 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 		for _, post := range posts {
 			postIDs = append(postIDs, post.ID)
 			if post.CoverImage != nil {
-				fileURLs = append(fileURLs, asset.OriginalURL(post.CoverImage.PublicID))
+				if _, ok := seen[post.CoverImage.PublicID]; ok {
+					continue
+				}
+				seen[post.CoverImage.PublicID] = struct{}{}
+				assetPublicIDs = append(assetPublicIDs, post.CoverImage.PublicID)
 			}
 		}
 		if len(postIDs) > 0 {
@@ -145,7 +155,7 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 	if err != nil {
 		return nil, err
 	}
-	return fileURLs, nil
+	return assetPublicIDs, nil
 }
 
 func (r *gormRepository) FindPendingApplication(ctx context.Context, userID uint) (*model.CreatorApplication, error) {

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -408,25 +409,36 @@ func (s *Service) Delete(ctx context.Context, id, userID uint) error {
 		return ErrForbidden
 	}
 
-	// Collect and delete image files (cover + content images)
-	var imagesToDelete []string
-	if post.CoverImage != nil {
-		imagesToDelete = append(imagesToDelete, asset.OriginalURL(post.CoverImage.PublicID))
-	}
-	imagesToDelete = append(imagesToDelete, extractImageURLs(post.Content)...)
+	// Collect and delete assets.
+	var assetPublicIDs []uuid.UUID
+	seen := make(map[uuid.UUID]struct{})
 
-	uniqueImages := make(map[string]bool)
-	for _, url := range imagesToDelete {
-		uniqueImages[url] = true
-	}
-	for url := range uniqueImages {
-		if err := s.files.Delete(ctx, url); err != nil {
-			slog.Warn(
-				"failed to delete image",
-				"url", url,
-				"err", err,
-			)
+	add := func(id uuid.UUID) {
+		if id == uuid.Nil {
+			return
 		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		assetPublicIDs = append(assetPublicIDs, id)
+	}
+
+	if post.CoverImage != nil {
+		add(post.CoverImage.PublicID)
+	}
+
+	imageURLs := extractImageURLs(post.Content)
+	for _, raw := range imageURLs {
+		publicID, ok := asset.PublicIDFromURL(raw)
+		if !ok {
+			continue
+		}
+		add(publicID)
+	}
+
+	if err := s.files.DeleteAssets(ctx, assetPublicIDs); err != nil {
+		return fmt.Errorf("delete associated assets: %w", err)
 	}
 
 	// Delete comments associated with this post

@@ -164,20 +164,20 @@ func (s *Service) DeleteUser(ctx context.Context, actor model.User, targetID uin
 	// Cascade-delete inside a single transaction, then remove the referenced
 	// files only after it commits: a rollback must not leave DB rows pointing
 	// at deleted files (or files deleted for rows that were rolled back).
-	fileURLs, err := s.repo.DeleteUserCascade(ctx, user.ID)
+	assetPublicIDs, err := s.repo.DeleteUserCascade(ctx, user.ID)
 	if err != nil {
 		return err
 	}
 
-	for _, url := range fileURLs {
-		if err := s.files.Delete(ctx, url); err != nil {
-			slog.Warn(
-				"failed to delete media file",
-				"url", url,
-				"err", err,
-			)
-		}
+	if err := s.files.DeleteAssets(ctx, assetPublicIDs); err != nil {
+		slog.Warn(
+			"failed to delete user assets",
+			"user", targetID,
+			"len", len(assetPublicIDs),
+			"err", err,
+		)
 	}
+
 	return nil
 }
 
