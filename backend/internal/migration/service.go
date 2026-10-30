@@ -69,5 +69,10 @@ func (s *Service) MigrateDB() error {
 		return err
 	}
 
+	// Point post and page content at the asset URLs created above.
+	if err := s.rewriteLegacyMediaURLs(); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -10,6 +10,7 @@ import type { EditorView } from "@codemirror/view";
 
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { useIsDark } from "@/hooks/useIsDark";
+import { unwrap } from "@/lib/api";
 import { useTranslation } from "@/lib/I18nContext";
 import { cn } from "@/lib/utils";
 
@@ -52,8 +53,8 @@ export function MarkdownEditor({
   const uploadImage = useCallback(
     async (file: File) => {
       try {
-        const response = await getVexGoAPI().postUpload({ file });
-        return response.data.file?.url ?? "";
+        const response = await unwrap(getVexGoAPI().postAssetsUpload({ file }));
+        return response.assetOriginalURL ?? "";
       } catch (error) {
         console.error("Failed to upload image:", error);
         toast.error(t("editor.uploadFailed"));
