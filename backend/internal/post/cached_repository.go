@@ -11,6 +11,8 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+
+	"github.com/google/uuid"
 )
 
 // ReadCache is the consumer-declared seam for the read cache. It is satisfied
@@ -123,15 +125,62 @@ func sanitizeForCache(posts ...*model.Post) {
 	}
 }
 
+// cachedPost is the cache wire shape of a post. model.Post hides its cover
+// asset from JSON, so the cover's public ID is stored alongside and rebuilt on
+// decode; response rendering derives the URL from that ID alone.
+type cachedPost struct {
+	model.Post
+	CoverImagePublicID *uuid.UUID `json:"coverImagePublicID,omitempty"`
+}
+
+func cachePost(post *model.Post) cachedPost {
+	cached := cachedPost{Post: *post}
+	if post.CoverImage != nil {
+		publicID := post.CoverImage.PublicID
+		cached.CoverImagePublicID = &publicID
+	}
+	return cached
+}
+
+// post rebuilds the decoded row, restoring the cover asset the response layer
+// needs. Only the public ID is restored: it is the sole field URL derivation
+// reads.
+func (c cachedPost) post() model.Post {
+	post := c.Post
+	if c.CoverImagePublicID != nil {
+		post.CoverImage = &model.Asset{PublicID: *c.CoverImagePublicID}
+	}
+	return post
+}
+
+func cachePosts(posts []model.Post) []cachedPost {
+	cached := make([]cachedPost, len(posts))
+	for i := range posts {
+		cached[i] = cachePost(&posts[i])
+	}
+	return cached
+}
+
+// uncachePosts always returns a non-nil slice, so a decoded null stays an
+// empty JSON array rather than null.
+func uncachePosts(posts []cachedPost) []model.Post {
+	decoded := make([]model.Post, len(posts))
+	for i := range posts {
+		decoded[i] = posts[i].post()
+	}
+	return decoded
+}
+
 // FindBySlug serves the post by slug through the cache. The stored copy is
 // the pristine database row with guest-invisible author data stripped;
 // per-request enrichment (like and comment counts) happens in the service on
 // a freshly decoded copy. Not-found lookups are never cached.
 func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.Post, error) {
 	key := fmt.Sprintf("post:g%s:slug:%s", r.generation(ctx), slug)
-	var cached model.Post
+	var cached cachedPost
 	if r.getJSON(ctx, key, &cached) {
-		return &cached, nil
+		post := cached.post()
+		return &post, nil
 	}
 
 	post, err := r.Repository.FindBySlug(ctx, slug)
@@ -139,7 +188,7 @@ func (r *cachedRepository) FindBySlug(ctx context.Context, slug string) (*model.
 		return post, err
 	}
 	sanitizeForCache(post)
-	r.setJSON(ctx, key, post)
+	r.setJSON(ctx, key, cachePost(post))
 	return post, nil
 }
 
@@ -155,17 +204,14 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	}
 
 	type listPage struct {
-		Posts []model.Post
+		Posts []cachedPost
 		Total int64
 	}
 	key := fmt.Sprintf("post:g%s:list:%d:%d:%s", r.generation(ctx), f.Page, f.Limit, listFilterKey(f.CategoryID, f.Status))
 	var page listPage
 	if r.getJSON(ctx, key, &page) {
 		// A decoded null slice must stay an empty JSON array, not null.
-		if page.Posts == nil {
-			page.Posts = []model.Post{}
-		}
-		return page.Posts, page.Total, nil
+		return uncachePosts(page.Posts), page.Total, nil
 	}
 
 	posts, total, err := r.Repository.List(ctx, userRole, userID, f)
@@ -175,7 +221,7 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 	for i := range posts {
 		sanitizeForCache(&posts[i])
 	}
-	r.setJSON(ctx, key, listPage{Posts: posts, Total: total})
+	r.setJSON(ctx, key, listPage{Posts: cachePosts(posts), Total: total})
 	return posts, total, nil
 }
 
@@ -185,12 +231,9 @@ func (r *cachedRepository) List(ctx context.Context, userRole string, userID uin
 // stores until contentTTL. A decoded null slice comes back as an empty
 // slice, never null.
 func (r *cachedRepository) cachedPosts(ctx context.Context, key string, fetch func(context.Context) ([]model.Post, error)) ([]model.Post, error) {
-	var posts []model.Post
-	if r.getJSON(ctx, key, &posts) {
-		if posts == nil {
-			posts = []model.Post{}
-		}
-		return posts, nil
+	var cached []cachedPost
+	if r.getJSON(ctx, key, &cached) {
+		return uncachePosts(cached), nil
 	}
 
 	posts, err := fetch(ctx)
@@ -200,7 +243,7 @@ func (r *cachedRepository) cachedPosts(ctx context.Context, key string, fetch fu
 	for i := range posts {
 		sanitizeForCache(&posts[i])
 	}
-	r.setJSON(ctx, key, posts)
+	r.setJSON(ctx, key, cachePosts(posts))
 	return posts, nil
 }
 
