@@ -270,6 +270,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		Excerpt:            req.Excerpt,
 		CoverImagePublicID: req.CoverImagePublicID,
 		Status:             model.PostStatus(req.Status),
+		UnsetCoverImage:    req.UnsetCoverImage,
 	})
 	if err != nil {
 		switch {

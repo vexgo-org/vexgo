@@ -75,6 +75,7 @@ type UpdatePostRequest struct {
 	Tags               []string   `json:"tags" example:"intro,personal"`
 	Excerpt            string     `json:"excerpt" example:"A short summary"`
 	CoverImagePublicID *uuid.UUID `json:"coverImagePublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	UnsetCoverImage    bool       `json:"unsetCoverImage" example:"false"`
 	Status             string     `json:"status" enums:"draft,pending,published" example:"published"`
 }
 
@@ -158,5 +159,6 @@ type UpdateRequest struct {
 	Tags               []string
 	Excerpt            string
 	CoverImagePublicID *uuid.UUID
+	UnsetCoverImage    bool
 	Status             model.PostStatus
 }

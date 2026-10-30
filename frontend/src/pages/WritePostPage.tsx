@@ -76,6 +76,7 @@ export function WritePostPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState(false);
+  const [unsetCoverImage, setUnsetCoverImage] = useState(false);
 
   // Determine the user role
   const isContributor = user?.role === "contributor";
@@ -180,6 +181,7 @@ export function WritePostPage() {
         setTags([]);
       }
       setCoverImage(post);
+      setUnsetCoverImage(false);
     } catch (error) {
       console.error("Failed to load post:", error);
       navigate("/admin/my-posts");
@@ -216,6 +218,7 @@ export function WritePostPage() {
   const handleCropConfirm = async (croppedFile: File) => {
     setShowCropper(false);
     setUploadingImage(true);
+    setUnsetCoverImage(false);
     try {
       const response = await unwrap(
         getVexGoAPI().postAssetsUpload({ file: croppedFile }),
@@ -281,6 +284,7 @@ export function WritePostPage() {
         excerpt: excerpt.trim(),
         coverImagePublicID: coverImage.coverImagePublicID || undefined,
         status: isContributor && status === "published" ? "pending" : status,
+        unsetCoverImage: unsetCoverImage,
       };
 
       if (isEditMode) {
@@ -382,6 +386,11 @@ export function WritePostPage() {
     }
   };
 
+  const handleUnsetCoverImage = () => {
+    setCoverImage({});
+    setUnsetCoverImage(true);
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       {/* The screen has no heading of its own: its heading is the title field.
@@ -439,9 +448,7 @@ export function WritePostPage() {
                   variant="destructive"
                   size="sm"
                   className="absolute top-2 right-2"
-                  onClick={() =>
-                    setCoverImage({})
-                  }
+                  onClick={handleUnsetCoverImage}
                 >
                   <X className="size-4" />
                 </Button>
