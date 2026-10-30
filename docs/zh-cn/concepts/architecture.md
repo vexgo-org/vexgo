@@ -300,9 +300,11 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 ### 迁移与种子数据
 
-`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录，再将旧版 `general_settings.site_icon`、`users.avatar` 与 `posts.cover_image` URL 映射到生成的 asset，随后删除这些列。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
+`migration.Service.MigrateDB()` 创建或更新所有模型的表结构，映射旧版评论审核开关，回填文章 slug，将旧版 `media_files` 记录转换为 `Asset` + `Blob` 记录，再将旧版 `general_settings.site_icon`、`users.avatar` 与 `posts.cover_image` URL 映射到生成的 asset，随后删除这些列，并将文章与页面内容中的旧版媒体 URL 改写为生成的 asset URL。`database.Seed()` 在记录不存在时插入默认数据（管理员用户、SMTP/通用/AI/主题设置、默认分类）。
 
 站点图标、用户头像和文章封面映射在媒体回填之后运行，因此只能复用该轮回填创建的 asset。非本地 URL 或回填时被跳过的文件会令引用为空；旧列仍会被删除，因此旧 URL 既不会保留，也不会在后续启动中复活。用户头像映射将旧版 URL 与 `media_files.url` 匹配（覆盖本地与 S3 URL），要求媒体文件与 asset 均属于该用户，且仅关联公开的图片 asset。文章封面映射以相同方式匹配，且仅关联公开的图片 asset；它不校验归属，因为旧版列没有记录上传者，且封面可能由管理员设置为其他作者的上传。
+
+内容改写会在上述映射之后运行，且是幂等的：仅当媒体记录生成了公开 asset 时，才会将 `posts.content` 与 `pages.content` 中完全匹配的旧 URL 替换为 asset URL，因此外部链接与被跳过文件的引用保持不变。升级后编辑器上传会直接使用 asset API，新内容从一开始就使用这些 URL。
 
 有三类旧版记录会被有意跳过，每条都会记录其 `id` 与对应的 key 或 URL：
 
