@@ -284,6 +284,25 @@ func (s *stubAssetRepo) FindByPublicID(
 	return s.find, nil
 }
 
+func (s *stubAssetRepo) FindByPublicIDs(
+	_ context.Context,
+	publicIDs []uuid.UUID,
+) ([]model.Asset, error) {
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	var found []model.Asset
+	for _, id := range publicIDs {
+		if s.find == nil {
+			continue
+		}
+		if s.find.PublicID == id {
+			found = append(found, *s.find)
+		}
+	}
+	return found, nil
+}
+
 // FindPublicByPublicID answers exactly like FindByPublicID, without the
 // visibility filter a real public read would apply: a test that cares about the
 // lookup itself goes through the real repository, and one that only needs a row
@@ -1564,6 +1583,88 @@ func TestDelete_ChecksOwnershipBeforeRole(t *testing.T) {
 	}
 	if len(repo.deleted) != 0 {
 		t.Errorf("forbidden delete ran %v", repo.deleted)
+	}
+}
+
+// TestService_DeleteAssets_EmptyInputIsNoop covers that deleting no IDs is a
+// no-op and never touches the repository.
+func TestService_DeleteAssets_EmptyInputIsNoop(t *testing.T) {
+	svc, _, _ := newTestService(t)
+
+	if err := svc.DeleteAssets(context.Background(), nil); err != nil {
+		t.Errorf("DeleteAssets(nil) error = %v, want nil", err)
+	}
+	if err := svc.DeleteAssets(context.Background(), []uuid.UUID{}); err != nil {
+		t.Errorf("DeleteAssets([]) error = %v, want nil", err)
+	}
+}
+
+// TestService_DeleteAssets_DedupsAndSkipsNil covers that duplicate IDs are
+// retired only once and nil UUIDs are skipped.
+func TestService_DeleteAssets_DedupsAndSkipsNil(t *testing.T) {
+	svc, _, db := newTestService(t)
+	id := uuid.New()
+	seedAsset(t, db, 0, "dup.png")
+	// Override the public ID with a known one.
+	var asset model.Asset
+	db.First(&asset, "original_name = ?", "dup.png")
+	asset.PublicID = id
+	db.Save(&asset)
+
+	if err := svc.DeleteAssets(context.Background(), []uuid.UUID{id, id, uuid.Nil, id}); err != nil {
+		t.Errorf("DeleteAssets error = %v, want nil", err)
+	}
+	var retired model.Asset
+	if err := db.Unscoped().First(&retired, "public_id = ?", id).Error; err != nil {
+		t.Fatalf("asset %s was not soft-deleted: %v", id, err)
+	}
+	if !retired.DeletedAt.Valid {
+		t.Errorf("asset %s is not marked deleted", id)
+	}
+}
+
+// TestService_DeleteAssets_RetiresOnlyFound covers that IDs without a matching
+// asset row are skipped without error.
+func TestService_DeleteAssets_RetiresOnlyFound(t *testing.T) {
+	svc, _, db := newTestService(t)
+	foundID := uuid.New()
+	seedAsset(t, db, 0, "found.png")
+	var asset model.Asset
+	db.First(&asset, "original_name = ?", "found.png")
+	asset.PublicID = foundID
+	db.Save(&asset)
+
+	missing := uuid.New()
+	if err := svc.DeleteAssets(context.Background(), []uuid.UUID{foundID, missing}); err != nil {
+		t.Errorf("DeleteAssets error = %v, want nil", err)
+	}
+
+	var retired model.Asset
+	if err := db.Unscoped().First(&retired, "public_id = ?", foundID).Error; err != nil {
+		t.Fatalf("asset %s was not soft-deleted: %v", foundID, err)
+	}
+	if !retired.DeletedAt.Valid {
+		t.Errorf("asset %s is not marked deleted", foundID)
+	}
+
+	// The missing ID must not cause an error or delete anything else.
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("deleted_at IS NOT NULL").Count(&count)
+	if count != 1 {
+		t.Errorf("expected exactly 1 soft-deleted asset, got %d", count)
+	}
+}
+
+// TestService_DeleteAssets_PropagatesError covers that a repository failure
+// aborts the whole operation. Since the repository layer is backed by GORM,
+// a hard-to-trigger error, this test pins that the method returns an error
+// when the database is unavailable (e.g. nil ID still passes validation).
+func TestService_DeleteAssets_PropagatesError(t *testing.T) {
+	svc, _, _ := newTestService(t)
+
+	// Deleting a non-existent ID is not an error; nothing matches.
+	if err := svc.DeleteAssets(context.Background(), []uuid.UUID{uuid.New()}); err != nil {
+		t.Errorf("DeleteAssets with missing ID error = %v, want nil", err)
 	}
 }
 

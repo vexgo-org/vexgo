@@ -11,7 +11,7 @@ import (
 )
 
 func TestUpdateProfile_SetsOwnedAvatar(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 	avatar := seedAsset(t, db, u.ID, model.AssetVisibilityPublic, model.BlobTypeImage)
 
@@ -32,7 +32,7 @@ func TestUpdateProfile_SetsOwnedAvatar(t *testing.T) {
 // A profile form that omits avatarPublicID must leave the existing avatar
 // alone; the normal form never sends the field.
 func TestUpdateProfile_PreservesAvatarWhenOmitted(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 	avatar := seedAsset(t, db, u.ID, model.AssetVisibilityPublic, model.BlobTypeImage)
 	if err := db.Model(&model.User{}).Where("id = ?", u.ID).
@@ -86,7 +86,7 @@ func TestUpdateProfile_RejectsUnavailableAvatar(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			svc, _, db := newTestService(t)
+			svc, db := newTestService(t)
 			u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 			previous := seedAsset(t, db, u.ID, model.AssetVisibilityPublic, model.BlobTypeImage)
 			if err := db.Model(&model.User{}).Where("id = ?", u.ID).
@@ -114,7 +114,7 @@ func TestUpdateProfile_RejectsUnavailableAvatar(t *testing.T) {
 }
 
 func TestUpdateSettings(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 
 	hideEmail := true

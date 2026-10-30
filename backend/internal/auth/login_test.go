@@ -13,7 +13,7 @@ import (
 )
 
 func TestLogin_Success(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
 	token, user, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "password123"})
@@ -50,7 +50,7 @@ func TestLogin_Success(t *testing.T) {
 }
 
 func TestLogin_WrongCredentials(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
 	if _, _, err := svc.Login(context.Background(), LoginRequest{Email: "alice@example.com", Password: "wrong"}); !errors.Is(err, ErrInvalidCredentials) {
@@ -70,7 +70,7 @@ func TestLogin_UnknownEmailRunsDummyHashComparison(t *testing.T) {
 	if testing.Short() {
 		t.Skip("timing-sensitive")
 	}
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, true)
 
 	sample := func(email, password string) time.Duration {
@@ -100,7 +100,7 @@ func TestLogin_UnknownEmailRunsDummyHashComparison(t *testing.T) {
 }
 
 func TestLogin_EmailUnverified(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	seedUser(t, db, "alice@example.com", "password123", model.RoleAuthor, false)
 
@@ -110,7 +110,7 @@ func TestLogin_EmailUnverified(t *testing.T) {
 }
 
 func TestLogin_WithCaptcha(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	settings := model.GeneralSettings{CaptchaEnabled: true}
 	if err := db.Create(&settings).Error; err != nil {
 		t.Fatalf("failed to enable captcha: %v", err)
@@ -182,7 +182,7 @@ func TestLogin_WithCaptcha(t *testing.T) {
 // lookup failure surfaces as ErrCaptchaFailed instead of masquerading as a
 // missing challenge.
 func TestLogin_CaptchaLookupFailureFailsClosed(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	if err := db.Create(&model.GeneralSettings{CaptchaEnabled: true}).Error; err != nil {
 		t.Fatalf("failed to enable captcha: %v", err)
 	}

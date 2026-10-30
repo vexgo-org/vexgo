@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -838,11 +839,13 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	ctx := context.Background()
 	author := seedUser(t, db, "author", model.RoleAuthor)
 	cover := seedCoverAsset(t, db, author.ID)
+	inline1 := seedCoverAsset(t, db, author.ID)
+	inline2 := seedCoverAsset(t, db, author.ID)
 
 	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
 		Slug:               "delete-test",
 		Title:              "A",
-		Content:            "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
+		Content:            "![img](" + asset.OriginalURL(inline1.PublicID) + ") and <img src=\"" + asset.OriginalURL(inline2.PublicID) + "\">",
 		Category:           "1",
 		CoverImagePublicID: &cover.PublicID,
 		Status:             model.PostStatusPublished,
@@ -883,6 +886,150 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	other := seedUser(t, db, "other", model.RoleGuest)
 	if err := svc.Delete(ctx, post2.ID, other.ID); !errors.Is(err, ErrForbidden) {
 		t.Errorf("expected ErrForbidden, got %v", err)
+	}
+}
+
+// TestDelete_SoftDeletesContentImageAssets covers inline images in the post
+// body: each URL that parses to an asset public ID is retired through the
+// asset service.
+func TestDelete_SoftDeletesContentImageAssets(t *testing.T) {
+	svc, _, remover, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	inline := seedCoverAsset(t, db, author.ID)
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:     "body-delete",
+		Title:    "t",
+		Content:  "before ![shot](" + asset.OriginalURL(inline.PublicID) + ") after",
+		Category: "1",
+		Status:   model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if len(remover.deleted) != 1 || remover.deleted[0] != inline.PublicID {
+		t.Errorf("expected inline asset %s to be retired, got %v", inline.PublicID, remover.deleted)
+	}
+
+	var count int64
+	db.Model(&model.Post{}).Count(&count)
+	if count != 0 {
+		t.Errorf("post not deleted")
+	}
+}
+
+// TestDelete_LeavesUnmanagedContentURLsAlone guards the blast radius: a post
+// body can reference external URLs or legacy /uploads/ URLs that never became
+// assets. Those are left alone and do not fail the delete.
+func TestDelete_LeavesUnmanagedContentURLsAlone(t *testing.T) {
+	svc, _, remover, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	bystander := seedCoverAsset(t, db, author.ID)
+
+	for _, body := range []string{
+		"![shot](https://cdn.example.com/shot.png)",
+		"![shot](/uploads/long-gone.png)",
+		"<img src=\"https://track.example.com/pixel\">",
+	} {
+		t.Run("body", func(t *testing.T) {
+			post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+				Slug:     "external-delete",
+				Title:    "t",
+				Content:  body,
+				Category: "1",
+				Status:   model.PostStatusPublished,
+			})
+			if err != nil {
+				t.Fatalf("Create error: %v", err)
+			}
+
+			if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+				t.Fatalf("Delete error: %v", err)
+			}
+
+			if len(remover.deleted) != 0 {
+				t.Errorf("unmanaged URLs bypassed the asset service: %v", remover.deleted)
+			}
+			var found model.Asset
+			if err := db.Model(&model.Asset{}).Where("id = ?", bystander.ID).First(&found).Error; err != nil {
+				t.Errorf("bystander asset %d was touched by a post that never referenced it", bystander.ID)
+			}
+		})
+	}
+}
+
+// TestDelete_ToleratesCoverReusedAsContentImage pins the dedup boundary: the
+// same upload used as both cover and inline image is one asset, so the second
+// retirement must find it already gone and be ignored rather than treated as a
+// failure.
+func TestDelete_ToleratesCoverReusedAsContentImage(t *testing.T) {
+	svc, _, remover, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	shared := seedCoverAsset(t, db, author.ID)
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:               "shared-delete",
+		Title:              "t",
+		Content:            "![again](" + asset.OriginalURL(shared.PublicID) + ")",
+		Category:           "1",
+		CoverImagePublicID: &shared.PublicID,
+		Status:             model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, author.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if len(remover.deleted) != 1 || remover.deleted[0] != shared.PublicID {
+		t.Errorf("expected shared asset %s retired once, got %v", shared.PublicID, remover.deleted)
+	}
+}
+
+// TestDelete_AdminRetiresAnotherAuthorsCoverAsset pins the authorization
+// boundary: an admin deleting another author's post still retires the cover
+// asset because the asset service allows administrators.
+func TestDelete_AdminRetiresAnotherAuthorsCoverAsset(t *testing.T) {
+	svc, _, remover, db := newTestService(t)
+	ctx := context.Background()
+	author := seedUser(t, db, "author", model.RoleAuthor)
+	admin := seedUser(t, db, "admin", model.RoleAdmin)
+	cover := seedCoverAsset(t, db, author.ID)
+
+	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
+		Slug:               "admin-delete",
+		Title:              "t",
+		Content:            "c",
+		Category:           "1",
+		CoverImagePublicID: &cover.PublicID,
+		Status:             model.PostStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	if err := svc.Delete(ctx, post.ID, admin.ID); err != nil {
+		t.Fatalf("Delete error: %v", err)
+	}
+
+	if len(remover.deleted) != 1 || remover.deleted[0] != cover.PublicID {
+		t.Errorf("expected cover asset %s retired by admin, got %v", cover.PublicID, remover.deleted)
+	}
+
+	var count int64
+	db.Model(&model.Post{}).Count(&count)
+	if count != 0 {
+		t.Errorf("post not deleted by admin")
 	}
 }
 

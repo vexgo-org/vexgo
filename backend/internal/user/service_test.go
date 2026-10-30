@@ -25,13 +25,13 @@ func (f *fakeNotifier) CreateNotification(_ context.Context, input model.Notific
 	return nil
 }
 
-// fakeFiles records deleted URLs.
+// fakeFiles records deleted asset IDs.
 type fakeFiles struct {
-	deleted []string
+	deleted []uuid.UUID
 }
 
-func (f *fakeFiles) Delete(_ context.Context, url string) error {
-	f.deleted = append(f.deleted, url)
+func (f *fakeFiles) DeleteAssets(_ context.Context, publicIDs []uuid.UUID) error {
+	f.deleted = append(f.deleted, publicIDs...)
 	return nil
 }
 
@@ -236,8 +236,94 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 	if count != 0 {
 		t.Errorf("expected media files deleted")
 	}
-	if len(files.deleted) != 2 {
-		t.Errorf("expected cover + media file deletion, got %v", files.deleted)
+	if len(files.deleted) != 1 {
+		t.Errorf("expected cover asset deletion only, got %v", files.deleted)
+	}
+}
+
+// TestDeleteUser_RetiresOwnedAssets pins the user half of the TODO: a deleted
+// user's uploads go through the asset service, which retires the asset rows
+// instead of hard-deleting media_files rows.
+func TestDeleteUser_RetiresOwnedAssets(t *testing.T) {
+	ctx := context.Background()
+	svc, _, files, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+
+	asset := seedCoverAsset(t, db, target.ID)
+	if err := db.Create(&model.Post{Title: "p", Content: "c", Category: "1", AuthorID: target.ID, Status: model.PostStatusPublished, CoverImageID: &asset.ID}).Error; err != nil {
+		t.Fatalf("failed to seed post: %v", err)
+	}
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	if len(files.deleted) != 1 || files.deleted[0] != asset.PublicID {
+		t.Errorf("expected target's asset %s retired, got %v", asset.PublicID, files.deleted)
+	}
+
+	var count int64
+	if err := db.Model(&model.User{}).Where("id = ?", target.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected user deleted")
+	}
+}
+
+// TestDeleteUser_LeavesOtherUsersAssetsAlone is the permission boundary: a
+// cascade must not sweep assets it does not own.
+func TestDeleteUser_LeavesOtherUsersAssetsAlone(t *testing.T) {
+	ctx := context.Background()
+	svc, _, files, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+	innocent := seedUser(t, db, "innocent", model.RoleAuthor)
+
+	mine := seedCoverAsset(t, db, target.ID)
+	theirs := seedCoverAsset(t, db, innocent.ID)
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	if len(files.deleted) != 1 || files.deleted[0] != mine.PublicID {
+		t.Errorf("expected only target's asset %s retired, got %v", mine.PublicID, files.deleted)
+	}
+
+	if err := db.Model(&model.Asset{}).Where("id = ?", theirs.ID).First(&model.Asset{}).Error; err != nil {
+		t.Errorf("innocent user's asset %d was deleted: %v", theirs.ID, err)
+	}
+}
+
+// TestDeleteUser_ToleratesAlreadyRetiredAssets pins that the cascade tolerates
+// a row already marked deleted before the account goes.
+func TestDeleteUser_ToleratesAlreadyRetiredAssets(t *testing.T) {
+	ctx := context.Background()
+	svc, _, files, db := newTestService(t)
+	super := seedUser(t, db, "super", model.RoleSuperAdmin)
+	target := seedUser(t, db, "target", model.RoleAuthor)
+
+	asset := seedCoverAsset(t, db, target.ID)
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("retire asset up front: %v", err)
+	}
+
+	if err := svc.DeleteUser(ctx, super, target.ID); err != nil {
+		t.Fatalf("DeleteUser error: %v", err)
+	}
+
+	if len(files.deleted) != 0 {
+		t.Errorf("already-retired asset should not be passed again, got %v", files.deleted)
+	}
+
+	var count int64
+	if err := db.Model(&model.User{}).Where("id = ?", target.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected user deleted")
 	}
 }
 

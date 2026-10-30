@@ -11,7 +11,7 @@ import (
 )
 
 func TestRegister_WithCaptcha(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	settings := model.GeneralSettings{CaptchaEnabled: true, RegistrationEnabled: true}
 	if err := db.Create(&settings).Error; err != nil {
 		t.Fatalf("failed to enable captcha: %v", err)
@@ -62,7 +62,7 @@ func TestRegister_WithCaptcha(t *testing.T) {
 }
 
 func TestRegister_Success(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 
 	result, err := svc.Register(context.Background(), RegisterRequest{Email: "new@example.com", Password: "password123", Username: "newbie", Protocol: "http", Host: "localhost:8080"})
 	if err != nil {
@@ -84,7 +84,7 @@ func TestRegister_Success(t *testing.T) {
 }
 
 func TestRegister_DuplicateEmail(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	seedUser(t, db, "dup@example.com", "password123", model.RoleGuest, true)
 
 	if _, err := svc.Register(context.Background(), RegisterRequest{Email: "dup@example.com", Password: "password123", Username: "other", Protocol: "http", Host: "localhost"}); !errors.Is(err, ErrUserExists) {
@@ -96,7 +96,7 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 // instead of being treated as "user does not exist" and proceeding to create
 // the account.
 func TestRegister_DbErrorOnUserLookup(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	svc.repo = &failingRepo{Repository: svc.repo, findUserByEmailErr: errors.New("database is unavailable")}
 
 	_, err := svc.Register(context.Background(), RegisterRequest{
@@ -109,7 +109,7 @@ func TestRegister_DbErrorOnUserLookup(t *testing.T) {
 }
 
 func TestRegister_Disabled(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	// Seed settings with registration disabled. The RegistrationEnabled field
 	// used to carry gorm:"default:true", which made GORM omit the zero value
 	// on Create and silently store true — that bug is now fixed.
@@ -123,7 +123,7 @@ func TestRegister_Disabled(t *testing.T) {
 }
 
 func TestRegister_SendsVerificationEmail(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	captureEmails(t)
 
@@ -176,7 +176,7 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 // live must not send another email: the live token is the per-account resend
 // cooldown that keeps the endpoint from being used as a mail bomb.
 func TestRegister_UnverifiedDuplicateNoSecondEmailInCooldown(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	captureEmails(t)
 
@@ -212,7 +212,7 @@ func TestRegister_UnverifiedDuplicateNoSecondEmailInCooldown(t *testing.T) {
 // semantics (immediately usable, requires_verification=false) instead of
 // telling the user to wait for an email nobody can send.
 func TestRegister_DuplicateUnverifiedSMTPDisabled(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	captureEmails(t)
 
 	first, err := svc.Register(context.Background(), RegisterRequest{
@@ -240,7 +240,7 @@ func TestRegister_DuplicateUnverifiedSMTPDisabled(t *testing.T) {
 }
 
 func TestRegister_NoEmailWhenSMTPDisabled(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	captureEmails(t)
 
 	result, err := svc.Register(context.Background(), RegisterRequest{

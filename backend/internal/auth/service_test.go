@@ -57,18 +57,16 @@ func newTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func newTestService(t *testing.T) (*Service, *fakeFiles, *gorm.DB) {
+func newTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
-	files := &fakeFiles{}
 	db := newTestDB(t)
 	svc := NewService(Deps{
 		DB:        db,
 		JWTSecret: testJWTSecret,
-		Files:     files,
 		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
 		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
 	})
-	return svc, files, db
+	return svc, db
 }
 
 func seedUser(t *testing.T, db *gorm.DB, email, password, role string, verified bool) model.User {

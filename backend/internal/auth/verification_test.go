@@ -12,7 +12,7 @@ import (
 // Once the previous verification token has expired, a resend goes through
 // again.
 func TestResendVerification_AfterExpirySendsAgain(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	captureEmails(t)
 
@@ -56,7 +56,7 @@ func TestResendVerification_AfterExpirySendsAgain(t *testing.T) {
 // A live password-reset (or email-change) token sharing the column must not
 // block a verification resend.
 func TestResendVerification_NonVerifyTokensDoNotCoolDown(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	captureEmails(t)
 
@@ -84,7 +84,7 @@ func TestResendVerification_NonVerifyTokensDoNotCoolDown(t *testing.T) {
 }
 
 func TestResendVerification_SilentForUnknownAndVerified(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	captureEmails(t)
 
 	// Unknown address: silent success, no email sent.
@@ -108,7 +108,7 @@ func TestResendVerification_SilentForUnknownAndVerified(t *testing.T) {
 }
 
 func TestResendVerification_DbErrorOnLookup(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	svc.repo = &failingRepo{Repository: svc.repo, findUserByEmailErr: errors.New("database is unavailable")}
 
 	if err := svc.ResendVerification(context.Background(), ResendVerificationRequest{Email: "x@example.com"}); !errors.Is(err, ErrQueryFailed) {
@@ -119,7 +119,7 @@ func TestResendVerification_DbErrorOnLookup(t *testing.T) {
 // SMTP is enabled but points at an unreachable host; delivery must surface as
 // the coarse ErrSendEmail sentinel instead of a raw transport error.
 func TestResendVerification_DeliveryFailureReturnsSentinel(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	seedUser(t, db, "bob@example.com", "password123", model.RoleGuest, false)
 

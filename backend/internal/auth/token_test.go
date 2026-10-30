@@ -15,7 +15,7 @@ import (
 // the former predictable "userID-nanotime" format, and keep their prefixes so
 // token kinds stay distinguishable.
 func TestGenerateTokens_CryptoRandomAndPrefixed(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	ctx := context.Background()
 
 	cases := []struct {
@@ -53,7 +53,7 @@ func TestGenerateTokens_CryptoRandomAndPrefixed(t *testing.T) {
 // expose live one-time tokens, and the raw value must still resolve through
 // the hashed lookup.
 func TestTokens_OnlyHashesAreStored(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 
 	raw, err := svc.GenerateVerificationToken(context.Background(), u.ID)
