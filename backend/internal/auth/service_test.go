@@ -40,16 +40,6 @@ func captchaGone(t *testing.T, db *gorm.DB, id string) bool {
 // capturedEmails records emails captured by the mailer test seam.
 var capturedEmails []capturedEmail
 
-// fakeFiles records deleted URLs.
-type fakeFiles struct {
-	deleted []string
-}
-
-func (f *fakeFiles) Delete(_ context.Context, url string) error {
-	f.deleted = append(f.deleted, url)
-	return nil
-}
-
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
