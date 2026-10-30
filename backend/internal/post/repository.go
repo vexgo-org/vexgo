@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -98,6 +99,8 @@ type Repository interface {
 	BatchCountLikesByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error)
 	BatchCountCommentsByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error)
 	BatchFindLikedPostIDs(ctx context.Context, postIDs []uint, userID uint) (map[uint]bool, error)
+
+	FindCoverImageIDByPublicID(ctx context.Context, userID uint, publicID uuid.UUID) (uint, error)
 }
 
 // gormRepository is the GORM-backed implementation of Repository.
@@ -173,7 +176,10 @@ func (r *gormRepository) Create(ctx context.Context, post *model.Post) error {
 }
 
 func (r *gormRepository) Save(ctx context.Context, post *model.Post) error {
-	return r.db.WithContext(ctx).Save(post).Error
+	return r.db.WithContext(ctx).
+		Omit(clause.Associations).
+		Save(post).
+		Error
 }
 
 func (r *gormRepository) Delete(ctx context.Context, post *model.Post) error {
@@ -191,6 +197,7 @@ func (r *gormRepository) baseQuery(ctx context.Context) *gorm.DB {
 		Model(&model.Post{}).
 		Preload("Author").
 		Preload("Author.Avatar").
+		Preload("CoverImage").
 		Preload("Tags")
 }
 
@@ -630,4 +637,35 @@ func (r *gormRepository) BatchFindLikedPostIDs(ctx context.Context, postIDs []ui
 		liked[id] = true
 	}
 	return liked, nil
+}
+
+func (r *gormRepository) FindCoverImageIDByPublicID(
+	ctx context.Context,
+	userID uint,
+	publicID uuid.UUID,
+) (uint, error) {
+	if userID == 0 || publicID == uuid.Nil {
+		return 0, gorm.ErrRecordNotFound
+	}
+
+	var asset model.Asset
+	err := r.db.WithContext(ctx).
+		Model(&model.Asset{}).
+		Joins("JOIN blobs ON blobs.id = assets.blob_id").
+		Select("assets.id").
+		Where("assets.user_id = ?", userID).
+		Where("assets.public_id = ?", publicID).
+		Where("assets.visibility = ?", model.AssetVisibilityPublic).
+		Where("blobs.type = ?", model.BlobTypeImage).
+		Take(&asset).
+		Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, ErrInvalidCoverImage
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return asset.ID, nil
 }

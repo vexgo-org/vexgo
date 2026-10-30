@@ -8,8 +8,10 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
@@ -71,7 +73,7 @@ func (h *Handler) GetPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: posts,
+		Posts: toPostResponses(posts),
 		Pagination: Pagination{
 			Total:      total,
 			Page:       page,
@@ -115,7 +117,7 @@ func (h *Handler) GetPostByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostSingleResponse{Post: post})
+	c.JSON(http.StatusOK, PostSingleResponse{Post: toPostResponse(post)})
 }
 
 // GetPost godoc
@@ -148,7 +150,7 @@ func (h *Handler) GetPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostSingleResponse{Post: post})
+	c.JSON(http.StatusOK, PostSingleResponse{Post: toPostResponse(post)})
 }
 
 // CreatePost godoc
@@ -189,14 +191,14 @@ func (h *Handler) CreatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Create(c.Request.Context(), userRole, userID, CreateRequest{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Tags:       req.Tags,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     model.PostStatus(req.Status),
+		Slug:               req.Slug,
+		Title:              req.Title,
+		Content:            req.Content,
+		Category:           req.Category,
+		Tags:               req.Tags,
+		Excerpt:            req.Excerpt,
+		CoverImagePublicID: req.CoverImagePublicID,
+		Status:             model.PostStatus(req.Status),
 	})
 	if err != nil {
 		if errors.Is(err, ErrForbidden) {
@@ -211,7 +213,10 @@ func (h *Handler) CreatePost(c *gin.Context) {
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
 			return
 		}
-		if errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong) {
+		if errors.Is(err, model.ErrEmptySlug) ||
+			errors.Is(err, model.ErrInvalidSlug) ||
+			errors.Is(err, model.ErrSlugTooLong) ||
+			errors.Is(err, ErrInvalidCoverImage) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 			return
 		}
@@ -219,7 +224,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, PostMessageResponse{Message: "Post created successfully", Post: post})
+	c.JSON(http.StatusCreated, PostMessageResponse{Message: "Post created successfully", Post: toPostResponse(post)})
 }
 
 // UpdatePost godoc
@@ -257,14 +262,15 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	}
 
 	post, err := h.svc.Update(c.Request.Context(), id, userID, UpdateRequest{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Tags:       req.Tags,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     model.PostStatus(req.Status),
+		Slug:               req.Slug,
+		Title:              req.Title,
+		Content:            req.Content,
+		Category:           req.Category,
+		Tags:               req.Tags,
+		Excerpt:            req.Excerpt,
+		CoverImagePublicID: req.CoverImagePublicID,
+		Status:             model.PostStatus(req.Status),
+		UnsetCoverImage:    req.UnsetCoverImage,
 	})
 	if err != nil {
 		switch {
@@ -276,7 +282,10 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid post status"})
 		case errors.Is(err, model.ErrSlugTaken):
 			c.JSON(http.StatusConflict, api.CodeErrorResponse{Error: "Slug is already taken by another post", Code: "slug_taken"})
-		case errors.Is(err, model.ErrEmptySlug) || errors.Is(err, model.ErrInvalidSlug) || errors.Is(err, model.ErrSlugTooLong):
+		case errors.Is(err, model.ErrEmptySlug) ||
+			errors.Is(err, model.ErrInvalidSlug) ||
+			errors.Is(err, model.ErrSlugTooLong) ||
+			errors.Is(err, ErrInvalidCoverImage):
 			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update post"})
@@ -284,7 +293,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post updated successfully", Post: post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post updated successfully", Post: toPostResponse(post)})
 }
 
 // DeletePost godoc
@@ -366,7 +375,7 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: posts,
+		Posts: toPostResponses(posts),
 		Pagination: Pagination{
 			Total:      total,
 			Page:       page,
@@ -411,7 +420,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: posts,
+		Posts: toPostResponses(posts),
 		Pagination: Pagination{
 			Total:      total,
 			Page:       page,
@@ -473,7 +482,7 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: posts,
+		Posts: toPostResponses(posts),
 		Pagination: Pagination{
 			Total:      total,
 			Page:       page,
@@ -509,7 +518,7 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostListResponseData{Posts: posts})
+	c.JSON(http.StatusOK, PostListResponseData{Posts: toPostResponses(posts)})
 }
 
 // GetLatestPosts godoc
@@ -534,7 +543,7 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostListResponseData{Posts: posts})
+	c.JSON(http.StatusOK, PostListResponseData{Posts: toPostResponses(posts)})
 }
 
 // GetCategories godoc
@@ -848,7 +857,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: posts,
+		Posts: toPostResponses(posts),
 		Pagination: Pagination{
 			Total:      total,
 			Page:       page,
@@ -889,7 +898,7 @@ func (h *Handler) ApprovePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post approved", Post: post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post approved", Post: toPostResponse(post)})
 }
 
 // RejectPost godoc
@@ -933,7 +942,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post has been rejected", Post: post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post has been rejected", Post: toPostResponse(post)})
 }
 
 // ResubmitPost godoc
@@ -973,7 +982,7 @@ func (h *Handler) ResubmitPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post resubmitted for moderation", Post: post})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post resubmitted for moderation", Post: toPostResponse(post)})
 }
 
 // ToggleLike godoc
@@ -1041,4 +1050,27 @@ func (h *Handler) GetLikeStatus(c *gin.Context) {
 		IsLiked:    isLiked,
 		LikesCount: count,
 	})
+}
+
+func toPostResponse(post *model.Post) *PostResponse {
+	originalURL := ""
+	var publicID *uuid.UUID = nil
+	if post.CoverImage != nil {
+		publicID = &post.CoverImage.PublicID
+		originalURL = asset.OriginalURL(post.CoverImage.PublicID)
+	}
+
+	return &PostResponse{
+		Post:                  post,
+		CoverImageOriginalURL: originalURL,
+		CoverImagePublicID:    publicID,
+	}
+}
+
+func toPostResponses(posts []model.Post) []PostResponse {
+	resps := make([]PostResponse, len(posts))
+	for i, post := range posts {
+		resps[i] = *toPostResponse(&post)
+	}
+	return resps
 }

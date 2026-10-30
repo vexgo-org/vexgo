@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
@@ -248,14 +249,21 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 	}
 
 	post := model.Post{
-		Slug:       req.Slug,
-		Title:      req.Title,
-		Content:    req.Content,
-		Category:   req.Category,
-		Excerpt:    req.Excerpt,
-		CoverImage: req.CoverImage,
-		Status:     initialStatus,
-		AuthorID:   userID,
+		Slug:     req.Slug,
+		Title:    req.Title,
+		Content:  req.Content,
+		Category: req.Category,
+		Excerpt:  req.Excerpt,
+		Status:   initialStatus,
+		AuthorID: userID,
+	}
+
+	if req.CoverImagePublicID != nil {
+		coverImageID, err := s.repo.FindCoverImageIDByPublicID(ctx, userID, *req.CoverImagePublicID)
+		if err != nil {
+			return nil, err
+		}
+		post.CoverImageID = &coverImageID
 	}
 
 	if len(req.Tags) > 0 {
@@ -273,7 +281,7 @@ func (s *Service) Create(ctx context.Context, userRole string, userID uint, req 
 		return nil, err
 	}
 
-	return &post, nil
+	return s.repo.FindByID(ctx, post.ID)
 }
 
 // Update modifies a post when the acting user is its author or an admin.
@@ -330,9 +338,20 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 	if req.Excerpt != "" {
 		post.Excerpt = req.Excerpt
 	}
-	if req.CoverImage != "" {
-		post.CoverImage = req.CoverImage
+
+	if req.UnsetCoverImage {
+		post.CoverImageID = nil
+	} else if req.CoverImagePublicID != nil &&
+		(post.CoverImage == nil ||
+			post.CoverImage.PublicID != *req.CoverImagePublicID) {
+		coverImageID, err := s.repo.FindCoverImageIDByPublicID(ctx, userID, *req.CoverImagePublicID)
+		if err != nil {
+			return nil, err
+		}
+
+		post.CoverImageID = &coverImageID
 	}
+
 	if req.Status != "" {
 		if err := validateAuthorStatus(user.Role, req.Status); err != nil {
 			return nil, err
@@ -365,7 +384,8 @@ func (s *Service) Update(ctx context.Context, id, userID uint, req UpdateRequest
 		}
 		return nil, fmt.Errorf("save post: %w", err)
 	}
-	return post, nil
+
+	return s.repo.FindByID(ctx, post.ID)
 }
 
 // Delete removes a post (author or admin only), cleaning up its files,
@@ -390,8 +410,8 @@ func (s *Service) Delete(ctx context.Context, id, userID uint) error {
 
 	// Collect and delete image files (cover + content images)
 	var imagesToDelete []string
-	if post.CoverImage != "" {
-		imagesToDelete = append(imagesToDelete, post.CoverImage)
+	if post.CoverImage != nil {
+		imagesToDelete = append(imagesToDelete, asset.OriginalURL(post.CoverImage.PublicID))
 	}
 	imagesToDelete = append(imagesToDelete, extractImageURLs(post.Content)...)
 

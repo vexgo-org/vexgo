@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/vexgo-org/vexgo/backend/internal/asset"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -108,14 +109,17 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 
 		// Posts authored by the user, with all dependents and join rows.
 		var posts []model.Post
-		if err := tx.Where("author_id = ?", userID).Find(&posts).Error; err != nil {
+		if err := tx.Preload("CoverImage").
+			Where("author_id = ?", userID).
+			Find(&posts).
+			Error; err != nil {
 			return fmt.Errorf("query user posts: %w", err)
 		}
 		postIDs := make([]uint, 0, len(posts))
 		for _, post := range posts {
 			postIDs = append(postIDs, post.ID)
-			if post.CoverImage != "" {
-				fileURLs = append(fileURLs, post.CoverImage)
+			if post.CoverImage != nil {
+				fileURLs = append(fileURLs, asset.OriginalURL(post.CoverImage.PublicID))
 			}
 		}
 		if len(postIDs) > 0 {

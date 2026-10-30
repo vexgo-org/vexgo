@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+
+	"github.com/google/uuid"
 )
 
 // fakeRepo is a Repository fake recording calls to the cached methods.
@@ -290,6 +292,52 @@ func TestCachedRepository_CachedAuthorIsGuestFiltered(t *testing.T) {
 	}
 	if hit.Author.Email != "" || hit.Author.Username != "alice" {
 		t.Fatalf("cache hit lost or leaked author data: %+v", hit.Author)
+	}
+}
+
+// TestCachedRepository_CoverImageSurvivesCache pins the cover image into the
+// cache payload: model.Post hides its asset from JSON, so caching the bare row
+// dropped the cover URL on every hit.
+func TestCachedRepository_CoverImageSurvivesCache(t *testing.T) {
+	ctx := context.Background()
+	r, repo, cache := newCachedFakeRepo()
+	publicID := uuid.New()
+	repo.post.CoverImage = &model.Asset{PublicID: publicID}
+
+	assertCover := func(t *testing.T, posts ...model.Post) {
+		t.Helper()
+		for i := range posts {
+			if posts[i].CoverImage == nil || posts[i].CoverImage.PublicID != publicID {
+				t.Fatalf("cover image lost through the cache: %+v", posts[i].CoverImage)
+			}
+		}
+	}
+
+	// First reads populate the cache; second reads decode the cached copies.
+	for range 2 {
+		post, err := r.FindBySlug(ctx, "hello")
+		if err != nil {
+			t.Fatalf("FindBySlug: %v", err)
+		}
+		assertCover(t, *post)
+
+		posts, _, err := r.List(ctx, "", 0, ListFilter{Page: 1, Limit: 10})
+		if err != nil {
+			t.Fatalf("List: %v", err)
+		}
+		assertCover(t, posts...)
+
+		popular, err := r.Popular(ctx)
+		if err != nil {
+			t.Fatalf("Popular: %v", err)
+		}
+		assertCover(t, popular...)
+	}
+
+	for key, value := range cache.values {
+		if key != generationKey && !strings.Contains(value, publicID.String()) {
+			t.Fatalf("cached payload %q dropped the cover public ID", key)
+		}
 	}
 }
 

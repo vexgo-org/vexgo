@@ -10,10 +10,11 @@ import type { PostUpdatePostRequestStatus } from "./postUpdatePostRequestStatus"
 export interface PostUpdatePostRequest {
   category?: string;
   content?: string;
-  coverImage?: string;
+  coverImagePublicID?: string;
   excerpt?: string;
   slug?: string;
   status?: PostUpdatePostRequestStatus;
   tags?: string[];
   title?: string;
+  unsetCoverImage?: boolean;
 }

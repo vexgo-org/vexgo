@@ -9,6 +9,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -43,7 +44,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.Post{}, &model.User{}, &model.Tag{}, &model.Like{}, &model.Comment{}, &model.Category{}, &model.GeneralSettings{}); err != nil {
+	if err := db.AutoMigrate(&model.Post{}, &model.User{}, &model.Tag{}, &model.Like{}, &model.Comment{}, &model.Category{}, &model.GeneralSettings{}, &model.Blob{}, &model.Asset{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -65,6 +66,32 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 		t.Fatalf("failed to seed user: %v", err)
 	}
 	return u
+}
+
+// seedCoverAsset creates the image blob and asset rows a real upload leaves
+// behind, owned by userID.
+func seedCoverAsset(t *testing.T, db *gorm.DB, userID uint) model.Asset {
+	t.Helper()
+	blob := model.Blob{
+		StorageKey: uuid.NewString(),
+		MimeType:   "image/png",
+		Type:       model.BlobTypeImage,
+		Size:       1,
+	}
+	if err := db.Create(&blob).Error; err != nil {
+		t.Fatalf("failed to seed blob: %v", err)
+	}
+	asset := model.Asset{
+		OriginalName: "cover.png",
+		UserID:       userID,
+		BlobID:       blob.ID,
+		PublicID:     uuid.New(),
+		Visibility:   model.AssetVisibilityPublic,
+	}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatalf("failed to seed asset: %v", err)
+	}
+	return asset
 }
 
 // reloadPostStatus re-reads a post's status from the database so a test can

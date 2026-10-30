@@ -4,6 +4,7 @@
 package post
 
 import (
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -16,29 +17,35 @@ type Pagination struct {
 	TotalPages int   `json:"totalPages" example:"5"`
 }
 
+type PostResponse struct {
+	*model.Post
+	CoverImageOriginalURL string     `json:"coverImageOriginalURL"`
+	CoverImagePublicID    *uuid.UUID `json:"coverImagePublicID"`
+}
+
 // PostListResponse is the body of any paged post list.
 type PostListResponse struct {
-	Posts      []model.Post `json:"posts"`
-	Pagination Pagination   `json:"pagination"`
+	Posts      []PostResponse `json:"posts"`
+	Pagination Pagination     `json:"pagination"`
 }
 
 // PostListResponseData is the body of a list that doesn't
 // include pagination (popular posts, latest posts).
 type PostListResponseData struct {
-	Posts []model.Post `json:"posts"`
+	Posts []PostResponse `json:"posts"`
 }
 
 // PostSingleResponse is the body of GET /api/posts/{slug}
 // and GET /api/posts/by-id/{id}.
 type PostSingleResponse struct {
-	Post *model.Post `json:"post"`
+	Post *PostResponse `json:"post"`
 }
 
 // PostMessageResponse is the body of POST/PUT/DELETE
 // /api/posts endpoints that return the updated row.
 type PostMessageResponse struct {
-	Message string      `json:"message" example:"Post created successfully"`
-	Post    *model.Post `json:"post"`
+	Message string        `json:"message" example:"Post created successfully"`
+	Post    *PostResponse `json:"post"`
 }
 
 // PostDeleteResponse is the body of DELETE /api/posts/{id}.
@@ -48,27 +55,28 @@ type PostDeleteResponse struct {
 
 // CreatePostRequest is the body of POST /api/posts.
 type CreatePostRequest struct {
-	Slug       string   `json:"slug" binding:"required" example:"my-first-post"`
-	Title      string   `json:"title" binding:"required" example:"My First Post"`
-	Content    string   `json:"content" binding:"required" example:"<p>Hello world</p>"`
-	Category   string   `json:"category" binding:"required" example:"1"`
-	Tags       []string `json:"tags" example:"intro,personal"`
-	Excerpt    string   `json:"excerpt" example:"A short summary"`
-	CoverImage string   `json:"coverImage" example:"https://example.com/cover.jpg"`
-	Status     string   `json:"status" enums:"draft,pending,published" example:"published"`
+	Slug               string     `json:"slug" binding:"required" example:"my-first-post"`
+	Title              string     `json:"title" binding:"required" example:"My First Post"`
+	Content            string     `json:"content" binding:"required" example:"<p>Hello world</p>"`
+	Category           string     `json:"category" binding:"required" example:"1"`
+	Tags               []string   `json:"tags" example:"intro,personal"`
+	Excerpt            string     `json:"excerpt" example:"A short summary"`
+	CoverImagePublicID *uuid.UUID `json:"coverImagePublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	Status             string     `json:"status" enums:"draft,pending,published" example:"published"`
 }
 
 // UpdatePostRequest is the body of PUT /api/posts/{id}. All
 // fields are optional; only the supplied ones are updated.
 type UpdatePostRequest struct {
-	Slug       string   `json:"slug" example:"my-first-post"`
-	Title      string   `json:"title" example:"My First Post"`
-	Content    string   `json:"content" example:"<p>Hello world</p>"`
-	Category   string   `json:"category" example:"1"`
-	Tags       []string `json:"tags" example:"intro,personal"`
-	Excerpt    string   `json:"excerpt" example:"A short summary"`
-	CoverImage string   `json:"coverImage" example:"https://example.com/cover.jpg"`
-	Status     string   `json:"status" enums:"draft,pending,published" example:"published"`
+	Slug               string     `json:"slug" example:"my-first-post"`
+	Title              string     `json:"title" example:"My First Post"`
+	Content            string     `json:"content" example:"<p>Hello world</p>"`
+	Category           string     `json:"category" example:"1"`
+	Tags               []string   `json:"tags" example:"intro,personal"`
+	Excerpt            string     `json:"excerpt" example:"A short summary"`
+	CoverImagePublicID *uuid.UUID `json:"coverImagePublicID" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	UnsetCoverImage    bool       `json:"unsetCoverImage" example:"false"`
+	Status             string     `json:"status" enums:"draft,pending,published" example:"published"`
 }
 
 // CategoriesListResponse is the body of GET /api/categories.
@@ -132,24 +140,25 @@ type LikeStatusResponse struct {
 
 // CreateRequest carries the fields accepted when creating a post.
 type CreateRequest struct {
-	Slug       string
-	Title      string
-	Content    string
-	Category   string
-	Tags       []string
-	Excerpt    string
-	CoverImage string
-	Status     model.PostStatus
+	Slug               string
+	Title              string
+	Content            string
+	Category           string
+	Tags               []string
+	Excerpt            string
+	CoverImagePublicID *uuid.UUID
+	Status             model.PostStatus
 }
 
 // UpdateRequest carries the fields accepted when updating a post.
 type UpdateRequest struct {
-	Slug       string
-	Title      string
-	Content    string
-	Category   string
-	Tags       []string
-	Excerpt    string
-	CoverImage string
-	Status     model.PostStatus
+	Slug               string
+	Title              string
+	Content            string
+	Category           string
+	Tags               []string
+	Excerpt            string
+	CoverImagePublicID *uuid.UUID
+	UnsetCoverImage    bool
+	Status             model.PostStatus
 }

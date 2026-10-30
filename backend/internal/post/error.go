@@ -27,6 +27,9 @@ var (
 	ErrCategoryNotFound = errors.New("category not found")
 	// ErrTagNotFound means the tag does not exist.
 	ErrTagNotFound = errors.New("tag not found")
+	// ErrInvalidCoverImage means the cover image is broken or doesn't belong
+	// to the author.
+	ErrInvalidCoverImage = errors.New("invalid cover image")
 )
 
 // InUseError means a category or tag is still referenced by posts; Count

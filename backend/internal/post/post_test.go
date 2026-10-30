@@ -319,16 +319,17 @@ func TestCreate_SavesFieldsAsAuthor(t *testing.T) {
 	svc, _, _, db := newTestService(t)
 	ctx := context.Background()
 	user := seedUser(t, db, "tester", model.RoleAuthor)
+	cover := seedCoverAsset(t, db, user.ID)
 
 	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
-		Slug:       "hello-world",
-		Title:      "Hello",
-		Content:    "world",
-		Category:   "1",
-		Tags:       []string{"go", "gin"},
-		Excerpt:    "ex",
-		CoverImage: "/img.png",
-		Status:     model.PostStatusPublished,
+		Slug:               "hello-world",
+		Title:              "Hello",
+		Content:            "world",
+		Category:           "1",
+		Tags:               []string{"go", "gin"},
+		Excerpt:            "ex",
+		CoverImagePublicID: &cover.PublicID,
+		Status:             model.PostStatusPublished,
 	})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
@@ -338,8 +339,11 @@ func TestCreate_SavesFieldsAsAuthor(t *testing.T) {
 	}
 
 	var stored model.Post
-	if err := db.Preload("Tags").First(&stored, post.ID).Error; err != nil {
+	if err := db.Preload("Tags").Preload("CoverImage").First(&stored, post.ID).Error; err != nil {
 		t.Fatalf("post not saved: %v", err)
+	}
+	if stored.CoverImageID == nil || *stored.CoverImageID != cover.ID {
+		t.Errorf("expected cover image %d, got %v", cover.ID, stored.CoverImageID)
 	}
 	if stored.Status != model.PostStatusPublished {
 		t.Errorf("status expected published, got %s", stored.Status)
@@ -602,6 +606,63 @@ func TestUpdate_ModifiesFields(t *testing.T) {
 	}
 }
 
+// TestUpdate_CoverImage covers the cover lifecycle on the update path: an
+// omitted cover field keeps the current reference, a new owned public ID
+// replaces it, another user's asset is rejected without touching the stored
+// reference, and unsetCoverImage clears it.
+func TestUpdate_CoverImage(t *testing.T) {
+	svc, _, _, db := newTestService(t)
+	ctx := context.Background()
+	user := seedUser(t, db, "tester", model.RoleAuthor)
+	first := seedCoverAsset(t, db, user.ID)
+	second := seedCoverAsset(t, db, user.ID)
+	other := seedUser(t, db, "other", model.RoleAuthor)
+	foreign := seedCoverAsset(t, db, other.ID)
+
+	post, err := svc.Create(ctx, user.Role, user.ID, CreateRequest{
+		Slug: "cover", Title: "A", Content: "B", Category: "1",
+		CoverImagePublicID: &first.PublicID,
+	})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	updated, err := svc.Update(ctx, post.ID, user.ID, UpdateRequest{Title: "New"})
+	if err != nil {
+		t.Fatalf("Update title: %v", err)
+	}
+	if updated.CoverImageID == nil || *updated.CoverImageID != first.ID {
+		t.Fatalf("omitted cover field changed the cover: %v", updated.CoverImageID)
+	}
+
+	updated, err = svc.Update(ctx, post.ID, user.ID, UpdateRequest{CoverImagePublicID: &second.PublicID})
+	if err != nil {
+		t.Fatalf("Update cover: %v", err)
+	}
+	if updated.CoverImageID == nil || *updated.CoverImageID != second.ID {
+		t.Fatalf("cover not replaced: %v", updated.CoverImageID)
+	}
+
+	if _, err := svc.Update(ctx, post.ID, user.ID, UpdateRequest{CoverImagePublicID: &foreign.PublicID}); !errors.Is(err, ErrInvalidCoverImage) {
+		t.Fatalf("foreign asset error = %v, want ErrInvalidCoverImage", err)
+	}
+	stored, err := svc.repo.FindByID(ctx, post.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if stored.CoverImageID == nil || *stored.CoverImageID != second.ID {
+		t.Fatalf("rejected update changed the cover: %v", stored.CoverImageID)
+	}
+
+	updated, err = svc.Update(ctx, post.ID, user.ID, UpdateRequest{UnsetCoverImage: true})
+	if err != nil {
+		t.Fatalf("Update unset cover: %v", err)
+	}
+	if updated.CoverImageID != nil {
+		t.Fatalf("cover not cleared: %v", updated.CoverImageID)
+	}
+}
+
 // TestUpdate_PublishRequiresAuthorRole verifies the update path enforces the
 // same boundary as create: a contributor cannot move their own post into the
 // published state, while an admin may publish any post and an author may
@@ -776,14 +837,15 @@ func TestDelete_RemovesFilesAndAssociations(t *testing.T) {
 	svc, _, remover, db := newTestService(t)
 	ctx := context.Background()
 	author := seedUser(t, db, "author", model.RoleAuthor)
+	cover := seedCoverAsset(t, db, author.ID)
 
 	post, err := svc.Create(ctx, author.Role, author.ID, CreateRequest{
-		Slug:       "delete-test",
-		Title:      "A",
-		Content:    "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
-		Category:   "1",
-		CoverImage: "/uploads/cover.jpg",
-		Status:     model.PostStatusPublished,
+		Slug:               "delete-test",
+		Title:              "A",
+		Content:            "![img](/uploads/a.jpg) and <img src=\"/uploads/b.jpg\">",
+		Category:           "1",
+		CoverImagePublicID: &cover.PublicID,
+		Status:             model.PostStatusPublished,
 	})
 	if err != nil {
 		t.Fatalf("Create error: %v", err)
