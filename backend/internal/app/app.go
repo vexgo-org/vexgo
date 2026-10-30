@@ -145,6 +145,7 @@ func New(cfg *config.Config) (*App, error) {
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 	mailerSvc := mailer.NewService(mailer.Deps{DB: db, Cipher: cipher})
 	captchaSvc := captcha.NewService(captcha.Deps{DB: db, JWTSecret: cfg.JWTSecret})
+	assetSvc := asset.NewService(asset.Deps{DB: db, JWTSecret: cfg.JWTSecret, Storage: storage})
 
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
@@ -164,7 +165,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
-			Files:     storage,
+			Files:     assetSvc,
 			Cache:     contentCache,
 		},
 		Page: page.Deps{
@@ -180,7 +181,7 @@ func New(cfg *config.Config) (*App, error) {
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
 			Notifier:  notificationSvc,
-			Files:     storage,
+			Files:     assetSvc,
 		},
 		Captcha: captcha.Deps{
 			DB:                 db,
@@ -191,7 +192,6 @@ func New(cfg *config.Config) (*App, error) {
 		Auth: auth.Deps{
 			DB:                 db,
 			JWTSecret:          cfg.JWTSecret,
-			Files:              storage,
 			Mailer:             mailerSvc,
 			Captcha:            captchaSvc,
 			BaseURL:            cfg.BaseURL,

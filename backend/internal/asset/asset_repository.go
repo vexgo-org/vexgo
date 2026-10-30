@@ -12,6 +12,7 @@ type AssetRepository interface {
 	Create(ctx context.Context, asset *model.Asset) error
 	FindByID(ctx context.Context, id uint) (*model.Asset, error)
 	FindByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
+	FindByPublicIDs(ctx context.Context, publicIDs []uuid.UUID) ([]model.Asset, error)
 	FindPublicByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
 	SoftDelete(ctx context.Context, asset *model.Asset) error
 }
@@ -47,6 +48,17 @@ func (r *assetRepository) FindByPublicID(ctx context.Context, publicID uuid.UUID
 	return r.find(ctx, &model.Asset{PublicID: publicID})
 }
 
+func (r *assetRepository) FindByPublicIDs(ctx context.Context, publicIDs []uuid.UUID) ([]model.Asset, error) {
+	var assets []model.Asset
+	if err := r.baseQuery(ctx).
+		Where("public_id IN ?", publicIDs).
+		Find(&assets).
+		Error; err != nil {
+		return nil, err
+	}
+	return assets, nil
+}
+
 func (r *assetRepository) FindPublicByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error) {
 	if publicID == uuid.Nil {
 		return nil, gorm.ErrRecordNotFound
@@ -71,14 +83,18 @@ func (r *assetRepository) SoftDelete(ctx context.Context, asset *model.Asset) er
 
 func (r *assetRepository) find(ctx context.Context, query *model.Asset) (*model.Asset, error) {
 	var asset model.Asset
-	if err := r.db.
-		WithContext(ctx).
-		Model(&model.Asset{}).
-		Preload("Blob").
+	if err := r.baseQuery(ctx).
 		Where(query).
 		First(&asset).
 		Error; err != nil {
 		return nil, err
 	}
 	return &asset, nil
+}
+
+func (r *assetRepository) baseQuery(ctx context.Context) *gorm.DB {
+	return r.db.
+		WithContext(ctx).
+		Model(&model.Asset{}).
+		Preload("Blob")
 }

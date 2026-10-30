@@ -5,7 +5,6 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/mailer"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
-	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"gorm.io/gorm"
 )
@@ -14,7 +13,6 @@ import (
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
-	Files     FileRemover
 	Mailer    *mailer.Service
 	Captcha   CaptchaChecker
 
@@ -34,9 +32,6 @@ type Deps struct {
 	RateLimit middleware.RateLimitStore
 }
 
-// FileRemover is an alias for model.FileRemover kept for backward compatibility.
-type FileRemover = model.FileRemover
-
 // CaptchaChecker is the seam for checking whether captcha verification is
 // enabled; implemented by the verification domain and injected so it can be
 // faked in tests.
@@ -48,7 +43,6 @@ type CaptchaChecker interface {
 type Service struct {
 	repo      Repository
 	jwtSecret []byte
-	files     FileRemover
 	mailer    *mailer.Service
 	captcha   CaptchaChecker
 }
@@ -58,7 +52,6 @@ func NewService(deps Deps) *Service {
 	return &Service{
 		repo:      NewRepository(deps.DB),
 		jwtSecret: deps.JWTSecret,
-		files:     deps.Files,
 		mailer:    deps.Mailer,
 		captcha:   deps.Captcha,
 	}

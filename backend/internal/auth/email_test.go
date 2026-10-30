@@ -11,7 +11,7 @@ import (
 )
 
 func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 	captureEmails(t)
@@ -67,14 +67,14 @@ func TestUpdateEmail_SendsChangeEmail(t *testing.T) {
 }
 
 func TestVerifyEmail_InvalidToken(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	if _, _, err := svc.VerifyEmail(context.Background(), "no-such-token"); err == nil {
 		t.Errorf("expected error for unknown token")
 	}
 }
 
 func TestVerifyEmail_Success(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	expiresAt := time.Now().Add(5 * time.Minute)
 	u := model.User{
 		Username:          "alice",
@@ -104,14 +104,14 @@ func TestVerifyEmail_Success(t *testing.T) {
 }
 
 func TestVerifyEmail_EmailChangeUnknownToken(t *testing.T) {
-	svc, _, _ := newTestService(t)
+	svc, _ := newTestService(t)
 	if _, _, err := svc.VerifyEmail(context.Background(), "email-change-nope"); err == nil {
 		t.Errorf("expected error for unknown email-change token")
 	}
 }
 
 func TestVerifyEmail_EmailChangeReturnsNewEmail(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	expiresAt := time.Now().Add(5 * time.Minute)
 	u := model.User{
 		Username:          "alice",
@@ -149,7 +149,7 @@ func TestVerifyEmail_EmailChangeReturnsNewEmail(t *testing.T) {
 }
 
 func TestVerifyEmail_RejectsResetToken(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	expiresAt := time.Now().Add(5 * time.Minute)
 	u := model.User{
 		Username:          "alice",
@@ -176,7 +176,7 @@ func TestVerifyEmail_RejectsResetToken(t *testing.T) {
 }
 
 func TestVerificationStatus(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	u := model.User{Username: "alice", Email: "alice@example.com", EmailVerified: true}
 	if err := db.Create(&u).Error; err != nil {
 		t.Fatalf("failed to seed user: %v", err)

@@ -30,13 +30,13 @@ func TestResendVerification_UniformResponse(t *testing.T) {
 
 	setup := func(t *testing.T, breakLookup bool) gin.HandlerFunc {
 		t.Helper()
-		_, _, db := newTestService(t)
+		_, db := newTestService(t)
 		h := NewHandler(Deps{
 			DB:        db,
 			JWTSecret: testJWTSecret,
-			Files:     &fakeFiles{},
-			Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-			Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+
+			Mailer:  mailer.NewService(mailer.Deps{DB: db}),
+			Captcha: captcha.NewService(captcha.Deps{DB: db}),
 		})
 		if breakLookup {
 			h.svc.repo = &failingRepo{Repository: h.svc.repo, findUserByEmailErr: errors.New("database is unavailable")}
@@ -76,9 +76,9 @@ func registerAndGetEmailedLink(t *testing.T, db *gorm.DB, baseURL string, behind
 	captureEmails(t)
 
 	h := NewHandler(Deps{
-		DB:                 db,
-		JWTSecret:          testJWTSecret,
-		Files:              &fakeFiles{},
+		DB:        db,
+		JWTSecret: testJWTSecret,
+
 		Mailer:             mailer.NewService(mailer.Deps{DB: db}),
 		Captcha:            captcha.NewService(captcha.Deps{DB: db}),
 		BaseURL:            baseURL,
@@ -146,7 +146,7 @@ func TestEmailLinkOrigin_NotPoisonedByRequestHeaders(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, db := newTestService(t)
+			_, db := newTestService(t)
 			body := registerAndGetEmailedLink(t, db, tt.baseURL, tt.behindProxy)
 
 			wantPrefix := tt.wantScheme + "://" + tt.wantHost + "/admin/verify-email?token="
@@ -183,7 +183,7 @@ func TestParseLinkOrigin(t *testing.T) {
 func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	_, _, db := newTestService(t)
+	_, db := newTestService(t)
 	u := model.User{
 		Username:      "alice",
 		Email:         "alice@example.com",
@@ -197,9 +197,9 @@ func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 	h := NewHandler(Deps{
 		DB:        db,
 		JWTSecret: testJWTSecret,
-		Files:     &fakeFiles{},
-		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+
+		Mailer:  mailer.NewService(mailer.Deps{DB: db}),
+		Captcha: captcha.NewService(captcha.Deps{DB: db}),
 	})
 
 	r := gin.New()
@@ -231,13 +231,13 @@ func TestGetVerificationStatus_UserContextUint(t *testing.T) {
 func TestGetVerificationStatus_UserNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	_, _, db := newTestService(t)
+	_, db := newTestService(t)
 	h := NewHandler(Deps{
 		DB:        db,
 		JWTSecret: testJWTSecret,
-		Files:     &fakeFiles{},
-		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+
+		Mailer:  mailer.NewService(mailer.Deps{DB: db}),
+		Captcha: captcha.NewService(captcha.Deps{DB: db}),
 	})
 
 	r := gin.New()
@@ -317,8 +317,8 @@ func TestVerifyEmail_HandlerDoesNotLeakInternalErrors(t *testing.T) {
 	h := NewHandler(Deps{
 		DB:        newTestDB(t),
 		JWTSecret: testJWTSecret,
-		Files:     &fakeFiles{},
-		Mailer:    svc.mailer,
+
+		Mailer: svc.mailer,
 	})
 	// Inject the erroring repository so the handler exercises the
 	// internal-error path without a real data store.
@@ -363,13 +363,13 @@ func TestLogin_BadPayloadLoggedOnce(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logs := captureLogs(t)
 
-	_, _, db := newTestService(t)
+	_, db := newTestService(t)
 	h := NewHandler(Deps{
 		DB:        db,
 		JWTSecret: testJWTSecret,
-		Files:     &fakeFiles{},
-		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+
+		Mailer:  mailer.NewService(mailer.Deps{DB: db}),
+		Captcha: captcha.NewService(captcha.Deps{DB: db}),
 	})
 
 	r := gin.New()
@@ -399,13 +399,13 @@ func TestLogin_DebugLogsOmitEmail(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logs := captureLogs(t)
 
-	_, _, db := newTestService(t)
+	_, db := newTestService(t)
 	h := NewHandler(Deps{
 		DB:        db,
 		JWTSecret: testJWTSecret,
-		Files:     &fakeFiles{},
-		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
-		Captcha:   captcha.NewService(captcha.Deps{DB: db}),
+
+		Mailer:  mailer.NewService(mailer.Deps{DB: db}),
+		Captcha: captcha.NewService(captcha.Deps{DB: db}),
 	})
 
 	r := gin.New()
@@ -432,12 +432,11 @@ func TestLogin_DebugLogsOmitEmail(t *testing.T) {
 func TestUpdateProfileHandler_RejectsUnavailableAvatar(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	_, _, db := newTestService(t)
+	_, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 	h := NewHandler(Deps{
 		DB:        db,
 		JWTSecret: testJWTSecret,
-		Files:     &fakeFiles{},
 	})
 
 	r := gin.New()
@@ -470,7 +469,7 @@ func TestUpdateProfileHandler_RejectsUnavailableAvatar(t *testing.T) {
 func TestGetCurrentUserHandler_ReturnsPublicUserShape(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	_, _, db := newTestService(t)
+	_, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 	avatar := seedAsset(t, db, u.ID, model.AssetVisibilityPublic, model.BlobTypeImage)
 	if err := db.Model(&model.User{}).Where("id = ?", u.ID).
@@ -482,7 +481,7 @@ func TestGetCurrentUserHandler_ReturnsPublicUserShape(t *testing.T) {
 		t.Fatalf("failed to seed token: %v", err)
 	}
 
-	h := NewHandler(Deps{DB: db, JWTSecret: testJWTSecret, Files: &fakeFiles{}})
+	h := NewHandler(Deps{DB: db, JWTSecret: testJWTSecret})
 	r := gin.New()
 	r.GET("/api/auth/me", func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, u.ID)

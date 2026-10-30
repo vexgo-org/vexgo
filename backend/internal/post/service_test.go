@@ -23,11 +23,11 @@ func (f *fakeNotifier) CreateNotification(_ context.Context, input model.Notific
 }
 
 type fakeRemover struct {
-	deleted []string
+	deleted []uuid.UUID
 }
 
-func (f *fakeRemover) Delete(_ context.Context, url string) error {
-	f.deleted = append(f.deleted, url)
+func (f *fakeRemover) DeleteAssets(_ context.Context, publicIDs []uuid.UUID) error {
+	f.deleted = append(f.deleted, publicIDs...)
 	return nil
 }
 

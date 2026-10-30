@@ -1243,6 +1243,14 @@ func (r *recordingAssetRepo) FindByPublicID(
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (r *recordingAssetRepo) FindByPublicIDs(
+	_ context.Context,
+	publicIDs []uuid.UUID,
+) ([]model.Asset, error) {
+	r.publicLookups = append(r.publicLookups, publicIDs...)
+	return nil, nil
+}
+
 func (r *recordingAssetRepo) FindPublicByPublicID(
 	context.Context,
 	uuid.UUID,

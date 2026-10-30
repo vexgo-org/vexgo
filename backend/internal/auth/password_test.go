@@ -12,7 +12,7 @@ import (
 )
 
 func TestChangePassword(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	u := seedUser(t, db, "alice@example.com", "oldpass", model.RoleGuest, true)
 
 	// wrong old password
@@ -40,7 +40,7 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestResetPassword(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	expiresAt := time.Now().Add(5 * time.Minute)
 	u := model.User{
 		Username:          "alice",
@@ -103,7 +103,7 @@ func TestResetPassword(t *testing.T) {
 }
 
 func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	// Email verification token (valid, unexpired) must NOT reset a password.
@@ -148,7 +148,7 @@ func TestResetPassword_RejectsNonResetTokens(t *testing.T) {
 }
 
 func TestRequestPasswordReset_SendsResetEmail(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	u := seedUser(t, db, "alice@example.com", "password123", model.RoleGuest, true)
 	captureEmails(t)
@@ -191,7 +191,7 @@ func TestRequestPasswordReset_SendsResetEmail(t *testing.T) {
 }
 
 func TestRequestPasswordReset_NoEmailForUnknownUser(t *testing.T) {
-	svc, _, db := newTestService(t)
+	svc, db := newTestService(t)
 	enableSMTP(t, db)
 	captureEmails(t)
 
