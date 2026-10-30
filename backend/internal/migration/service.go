@@ -64,5 +64,10 @@ func (s *Service) MigrateDB() error {
 		return err
 	}
 
+	// Map legacy post cover image URLs onto the assets created above.
+	if err := s.backfillPostCoverImage(); err != nil {
+		return err
+	}
+
 	return nil
 }
