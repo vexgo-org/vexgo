@@ -1,6 +1,10 @@
 package model
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 // NotificationInput is the content of a notification to create. It groups
 // the values that were previously passed as positional arguments.
@@ -23,5 +27,5 @@ type Notifier interface {
 // FileRemover deletes a stored file by its public URL; implemented by
 // upload.Storage and injected so it can be faked in tests.
 type FileRemover interface {
-	Delete(ctx context.Context, url string) error
+	DeleteAssets(ctx context.Context, publicIDs []uuid.UUID) error
 }
