@@ -197,6 +197,33 @@ func (s *Service) ResolveOriginal(ctx context.Context, publicID uuid.UUID) (*Ori
 	}, nil
 }
 
+// DeleteAssets deletes a group of assets.
+// This is an internal method used by other modules.
+// Never provide an API for this.
+func (s *Service) DeleteAssets(ctx context.Context, publicIDs []uuid.UUID) error {
+	uniqueIDs := uniquePublicIDs(publicIDs)
+	if len(uniqueIDs) == 0 {
+		return nil
+	}
+
+	return s.txManager.WithTransaction(ctx, func(repos Repositories) error {
+		assetRepo := repos.Assets()
+
+		assets, err := assetRepo.FindByPublicIDs(ctx, uniqueIDs)
+		if err != nil {
+			return err
+		}
+
+		for _, asset := range assets {
+			if err := assetRepo.SoftDelete(ctx, &asset); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 // rollbackUpload removes file from storage when uploading error occurs.
 func (s *Service) rollbackUpload(ctx context.Context, key string) {
 	if err := s.storage.Delete(ctx, key); err != nil {
@@ -207,4 +234,23 @@ func (s *Service) rollbackUpload(ctx context.Context, key string) {
 			"err", err,
 		)
 	}
+}
+
+func uniquePublicIDs(publicIDs []uuid.UUID) []uuid.UUID {
+	seen := make(map[uuid.UUID]struct{}, len(publicIDs))
+	result := make([]uuid.UUID, 0, len(publicIDs))
+
+	for _, publicID := range publicIDs {
+		if publicID == uuid.Nil {
+			continue
+		}
+
+		if _, exist := seen[publicID]; exist {
+			continue
+		}
+		seen[publicID] = struct{}{}
+		result = append(result, publicID)
+	}
+
+	return result
 }
