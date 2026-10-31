@@ -36,7 +36,6 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { Edit, Eye, FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeTagsArray } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
@@ -79,12 +78,7 @@ export function AllPostsPage() {
           category: category === "all" ? undefined : category,
         }),
       );
-      setPosts(
-        (response.posts || []).map((p) => ({
-          ...p,
-          tags: normalizeTagsArray(p.tags),
-        })) as Post[],
-      );
+      setPosts(response.posts || []);
       setPagination({
         total: response.pagination?.total ?? 0,
         page: response.pagination?.page ?? 1,

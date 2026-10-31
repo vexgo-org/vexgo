@@ -40,7 +40,6 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Edit, Eye, PenLine, Plus, Trash2 } from "lucide-react";
-import { normalizeTagsArray } from "@/lib/utils";
 
 export function MyPostsPage() {
   const { t } = useTranslation();
@@ -72,12 +71,7 @@ export function MyPostsPage() {
           limit: 10,
         }),
       );
-      setPosts(
-        (response.posts || []).map((p) => ({
-          ...p,
-          tags: normalizeTagsArray(p.tags),
-        })) as Post[],
-      );
+      setPosts(response.posts || []);
       setPagination({
         total: response.pagination?.total ?? 0,
         page: response.pagination?.page ?? 1,
@@ -194,7 +188,10 @@ export function MyPostsPage() {
                     </TableCell>
                     <TableCell className="max-w-0 text-muted-foreground">
                       <span className="block truncate">
-                        {(post.tags ?? []).slice(0, 3).join(", ")}
+                        {(post.tags ?? [])
+                          .slice(0, 3)
+                          .map((t) => t.name)
+                          .join(", ")}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">
