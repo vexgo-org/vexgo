@@ -7,7 +7,7 @@ import { unwrap } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/lib/I18nContext";
 import type { Category } from "@/types";
-import { normalizeTagsArray } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -142,40 +142,17 @@ export function WritePostPage() {
       } else {
         setCategory("");
       }
-      // The backend may return tags as an object array [{id,name}, ...]; the frontend needs a string array
-      try {
-        const rawTags = post.tags;
-        if (!rawTags) {
-          return;
-        }
-
-        let mappedTags: string[] = [];
-
-        if (rawTags.every((x) => typeof x === "string")) {
-          // 1) The backend returns a plain string array
-          mappedTags = rawTags;
-        } else {
-          // 2) Common case: an object array [{id,name}, ...]
-          mappedTags = rawTags
-            .map((t) => {
-              if (!t) return "";
-              if (typeof t === "string") return t;
-              return t.name || (t.id ? String(t.id) : undefined) || "";
-            })
-            .filter((v): v is string => Boolean(v));
-        }
-
-        console.debug(
-          "WritePostPage loaded post.tags raw:",
-          post.tags,
-          "mapped:",
-          mappedTags,
-        );
-        setTags(normalizeTagsArray(mappedTags));
-      } catch (e) {
-        console.error("Failed to parse post.tags:", e, post && post.tags);
-        setTags([]);
-      }
+      // The backend returns tags as PostTagResponse[]; extract names
+      const mappedTags = (post.tags ?? [])
+        .map((t) => t.name)
+        .filter((n): n is string => Boolean(n));
+      console.debug(
+        "WritePostPage loaded post.tags raw:",
+        post.tags,
+        "mapped:",
+        mappedTags,
+      );
+      setTags(mappedTags);
       setCoverImage(post);
       setUnsetCoverImage(false);
     } catch (error) {
@@ -185,8 +162,9 @@ export function WritePostPage() {
   };
 
   const handleAddTag = () => {
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags((prev) => normalizeTagsArray([...prev, tagInput.trim()]));
+    const trimmed = tagInput.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags((prev) => [...prev, trimmed]);
       setTagInput("");
     }
   };
