@@ -52,19 +52,9 @@ func (h *Handler) GetUserList(c *gin.Context) {
 		return
 	}
 
-	totalPages := int((total + int64(limit) - 1) / int64(limit))
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, UserListResponse{
-		Users: users,
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: int64(totalPages),
-		},
+		Users:      users,
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 
@@ -286,19 +276,9 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 		return
 	}
 
-	totalPages := int((total + int64(limit) - 1) / int64(limit))
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, CreatorApplicationListResponse{
 		Applications: applications,
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: int64(totalPages),
-		},
+		Pagination:   api.ToPagination(total, page, limit),
 	})
 }
 

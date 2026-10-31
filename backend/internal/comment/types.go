@@ -4,6 +4,7 @@
 package comment
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -73,7 +74,7 @@ type TestModerationResponse struct {
 // /api/moderation/comments/{pending,approved,rejected}.
 type CommentModerationListResponse struct {
 	Comments   []model.Comment `json:"comments"`
-	Pagination Pagination      `json:"pagination"`
+	Pagination api.Pagination  `json:"pagination"`
 }
 
 // CommentMessageResponse is the body of PUT
@@ -82,13 +83,4 @@ type CommentModerationListResponse struct {
 type CommentMessageResponse struct {
 	Message string         `json:"message" example:"Comment approved"`
 	Comment *model.Comment `json:"comment"`
-}
-
-// Pagination describes a paged result. It is the same shape
-// used by the rest of the REST surface.
-type Pagination struct {
-	Total      int64 `json:"total" example:"42"`
-	Page       int   `json:"page" example:"1"`
-	Limit      int   `json:"limit" example:"10"`
-	TotalPages int   `json:"totalPages" example:"5"`
 }

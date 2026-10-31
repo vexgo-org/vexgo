@@ -5,17 +5,9 @@ package post
 
 import (
 	"github.com/google/uuid"
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
-
-// Pagination describes a paged result. It is the same shape
-// used by the rest of the REST surface.
-type Pagination struct {
-	Total      int64 `json:"total" example:"42"`
-	Page       int   `json:"page" example:"1"`
-	Limit      int   `json:"limit" example:"10"`
-	TotalPages int   `json:"totalPages" example:"5"`
-}
 
 type PostResponse struct {
 	*model.Post
@@ -26,7 +18,7 @@ type PostResponse struct {
 // PostListResponse is the body of any paged post list.
 type PostListResponse struct {
 	Posts      []PostResponse `json:"posts"`
-	Pagination Pagination     `json:"pagination"`
+	Pagination api.Pagination `json:"pagination"`
 }
 
 // PostListResponseData is the body of a list that doesn't

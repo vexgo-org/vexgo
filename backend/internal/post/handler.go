@@ -67,19 +67,9 @@ func (h *Handler) GetPosts(c *gin.Context) {
 		return
 	}
 
-	totalPages := (int(total) + limit - 1) / limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: toPostResponses(posts),
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: totalPages,
-		},
+		Posts:      toPostResponses(posts),
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 
@@ -369,19 +359,9 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 		return
 	}
 
-	totalPages := (int(total) + limit - 1) / limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: toPostResponses(posts),
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: totalPages,
-		},
+		Posts:      toPostResponses(posts),
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 
@@ -414,19 +394,9 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 		return
 	}
 
-	totalPages := (int(total) + limit - 1) / limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: toPostResponses(posts),
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: totalPages,
-		},
+		Posts:      toPostResponses(posts),
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 
@@ -476,19 +446,9 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 		return
 	}
 
-	totalPages := (int(total) + limit - 1) / limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: toPostResponses(posts),
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: totalPages,
-		},
+		Posts:      toPostResponses(posts),
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 
@@ -851,19 +811,9 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 		return
 	}
 
-	totalPages := (int(total) + limit - 1) / limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts: toPostResponses(posts),
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: totalPages,
-		},
+		Posts:      toPostResponses(posts),
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 

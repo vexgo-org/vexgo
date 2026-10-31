@@ -341,19 +341,9 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 		return
 	}
 
-	totalPages := (int(total) + limitNum - 1) / limitNum
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	c.JSON(http.StatusOK, CommentModerationListResponse{
-		Comments: comments,
-		Pagination: Pagination{
-			Total:      total,
-			Page:       pageNum,
-			Limit:      limitNum,
-			TotalPages: totalPages,
-		},
+		Comments:   comments,
+		Pagination: api.ToPagination(total, pageNum, limitNum),
 	})
 }
 

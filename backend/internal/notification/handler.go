@@ -58,12 +58,7 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 
 	c.JSON(http.StatusOK, NotificationListResponse{
 		Notifications: notifications,
-		Pagination: Pagination{
-			Total:      total,
-			Page:       page,
-			Limit:      limit,
-			TotalPages: (total + int64(limit) - 1) / int64(limit),
-		},
+		Pagination:    api.ToPagination(total, page, limit),
 	})
 }
 
