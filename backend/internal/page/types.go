@@ -1,21 +1,14 @@
 package page
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
-// Pagination describes a paged result.
-type Pagination struct {
-	Total      int64 `json:"total" example:"42"`
-	Page       int   `json:"page" example:"1"`
-	Limit      int   `json:"limit" example:"10"`
-	TotalPages int   `json:"totalPages" example:"5"`
-}
-
 // PageListResponse is the body of any paged page list.
 type PageListResponse struct {
-	Pages      []model.Page `json:"pages"`
-	Pagination Pagination   `json:"pagination"`
+	Pages      []model.Page   `json:"pages"`
+	Pagination api.Pagination `json:"pagination"`
 }
 
 // PageSingleResponse is the body of GET /api/pages/{slug}.

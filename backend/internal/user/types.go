@@ -4,13 +4,14 @@
 package user
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
 // UserListResponse is the body of GET /api/users (admin only).
 type UserListResponse struct {
-	Users      []model.User `json:"users"`
-	Pagination Pagination   `json:"pagination"`
+	Users      []model.User   `json:"users"`
+	Pagination api.Pagination `json:"pagination"`
 }
 
 // UserMessageResponse is the uniform `{ "message", "user" }`
@@ -18,11 +19,6 @@ type UserListResponse struct {
 type UserMessageResponse struct {
 	Message string      `json:"message" example:"User role updated successfully"`
 	User    *model.User `json:"user"`
-}
-
-// MessageResponse is a uniform `{ "message": "..." }` body.
-type MessageResponse struct {
-	Message string `json:"message" example:"User deleted successfully"`
 }
 
 // ApplyForCreatorRequest is the body of POST
@@ -45,7 +41,7 @@ type ApplyForCreatorResponse struct {
 // shape is the same as everywhere else.
 type CreatorApplicationListResponse struct {
 	Applications []model.CreatorApplication `json:"applications"`
-	Pagination   Pagination                 `json:"pagination"`
+	Pagination   api.Pagination             `json:"pagination"`
 }
 
 // ReviewCreatorApplicationBody is the body of PUT
@@ -59,15 +55,4 @@ type ReviewCreatorApplicationBody struct {
 	// Reason is a human-readable explanation shown to the
 	// applicant in the notification. Optional.
 	Reason string `json:"reason" example:"Your writing samples look good"`
-}
-
-// Pagination describes a paged result. It is the same shape
-// used by the rest of the REST surface; declaring it here
-// (rather than pulling it out into a shared api package)
-// keeps each domain self-contained for swag.
-type Pagination struct {
-	Total      int64 `json:"total" example:"42"`
-	Page       int   `json:"page" example:"1"`
-	Limit      int   `json:"limit" example:"10"`
-	TotalPages int64 `json:"totalPages" example:"5"`
 }

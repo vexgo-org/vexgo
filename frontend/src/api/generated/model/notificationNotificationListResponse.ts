@@ -5,10 +5,10 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
+import type { ApiPagination } from "./apiPagination";
 import type { ModelNotification } from "./modelNotification";
-import type { NotificationPagination } from "./notificationPagination";
 
 export interface NotificationNotificationListResponse {
   notifications?: ModelNotification[];
-  pagination?: NotificationPagination;
+  pagination?: ApiPagination;
 }

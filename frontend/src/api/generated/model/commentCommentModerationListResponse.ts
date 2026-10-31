@@ -5,10 +5,10 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { CommentPagination } from "./commentPagination";
+import type { ApiPagination } from "./apiPagination";
 import type { ModelComment } from "./modelComment";
 
 export interface CommentCommentModerationListResponse {
   comments?: ModelComment[];
-  pagination?: CommentPagination;
+  pagination?: ApiPagination;
 }

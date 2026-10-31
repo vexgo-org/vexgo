@@ -127,7 +127,7 @@ func (h *Handler) Upload(c *gin.Context) {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			publicID	path		string	true	"asset public id"
-//	@Success		200			{object}	MessageResponse
+//	@Success		200			{object}	api.MessageResponse
 //	@Failure		400			{object}	api.ErrorResponse
 //	@Failure		401			{object}	api.ErrorResponse
 //	@Failure		403			{object}	api.ErrorResponse	"not the owner"
@@ -168,7 +168,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "File deleted"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "File deleted"})
 }
 
 // Original godoc

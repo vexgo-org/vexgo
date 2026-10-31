@@ -38,3 +38,9 @@ type NotFoundWithSlugResponse struct {
 	Error string `json:"error" example:"Post does not exist"`
 	Slug  string `json:"slug" example:"my-post"`
 }
+
+// MessageResponse is a uniform `{ "message": "..." }` body
+// for endpoints that don't return data.
+type MessageResponse struct {
+	Message string `json:"message" example:"This is a message"`
+}

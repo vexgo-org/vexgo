@@ -72,15 +72,10 @@ func (h *Handler) GetPages(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to fetch pages"})
 		return
 	}
-	totalPages := (int(total) + limit - 1) / limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
+
 	c.JSON(http.StatusOK, PageListResponse{
-		Pages: pages,
-		Pagination: Pagination{
-			Total: total, Page: page, Limit: limit, TotalPages: totalPages,
-		},
+		Pages:      pages,
+		Pagination: api.ToPagination(total, page, limit),
 	})
 }
 

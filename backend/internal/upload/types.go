@@ -28,9 +28,3 @@ type MultiUploadResponse struct {
 type FilesListResponse struct {
 	Files []model.MediaFile `json:"files"`
 }
-
-// MessageResponse is a uniform `{ "message": "..." }` body
-// for endpoints that don't return data.
-type MessageResponse struct {
-	Message string `json:"message" example:"File deleted"`
-}

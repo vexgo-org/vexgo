@@ -228,7 +228,7 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			id	path		string	true	"file id (UUID filename without extension)"
-//	@Success		200	{object}	MessageResponse
+//	@Success		200	{object}	api.MessageResponse
 //	@Failure		403	{object}	api.ErrorResponse	"not authorized"
 //	@Failure		404	{object}	api.ErrorResponse	"file not found"
 //	@Failure		500	{object}	api.ErrorResponse
@@ -251,5 +251,5 @@ func (h *Handler) DeleteFile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "File deleted"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "File deleted"})
 }

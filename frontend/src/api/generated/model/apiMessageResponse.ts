@@ -6,9 +6,6 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface CommentPagination {
-  limit?: number;
-  page?: number;
-  total?: number;
-  totalPages?: number;
+export interface ApiMessageResponse {
+  message?: string;
 }

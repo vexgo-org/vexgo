@@ -4,6 +4,7 @@
 package notification
 
 import (
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -13,24 +14,7 @@ import (
 // contains model.Notification rows.
 type NotificationListResponse struct {
 	Notifications []model.Notification `json:"notifications"`
-	Pagination    Pagination           `json:"pagination"`
-}
-
-// Pagination describes a paged result. It is the same shape
-// used by the rest of the REST surface; declaring it here
-// (rather than pulling it out into a shared api package)
-// keeps each domain self-contained for swag.
-type Pagination struct {
-	Total      int64 `json:"total" example:"42"`
-	Page       int   `json:"page" example:"1"`
-	Limit      int   `json:"limit" example:"10"`
-	TotalPages int64 `json:"totalPages" example:"5"`
-}
-
-// MessageResponse is a uniform `{ "message": "..." }` body
-// for endpoints that don't return data.
-type MessageResponse struct {
-	Message string `json:"message" example:"Notification marked as read"`
+	Pagination    api.Pagination       `json:"pagination"`
 }
 
 // UnreadCountResponse is the body of GET
