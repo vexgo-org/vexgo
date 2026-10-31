@@ -4,21 +4,46 @@
 package user
 
 import (
+	"time"
+
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
+// AdminUserResponse is the user shape the admin console sees. It is the only
+// user type that carries an email besides the authenticated user's own
+// response, and every endpoint returning it is admin-only.
+type AdminUserResponse struct {
+	ID        uint      `json:"id" example:"42"`
+	Username  string    `json:"username" example:"alice"`
+	Email     string    `json:"email" example:"alice@example.com"`
+	Role      string    `json:"role" example:"author"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// CreatorApplicationResponse is one application in the admin review queue.
+type CreatorApplicationResponse struct {
+	ID           uint                           `json:"id" example:"5"`
+	User         AdminUserResponse              `json:"user"`
+	Status       model.CreatorApplicationStatus `json:"status" example:"pending"`
+	Reason       string                         `json:"reason"`
+	ReviewerID   *uint                          `json:"reviewerId,omitempty"`
+	ReviewReason string                         `json:"reviewReason"`
+	CreatedAt    time.Time                      `json:"createdAt"`
+	UpdatedAt    time.Time                      `json:"updatedAt"`
+}
+
 // UserListResponse is the body of GET /api/users (admin only).
 type UserListResponse struct {
-	Users      []model.User   `json:"users"`
-	Pagination api.Pagination `json:"pagination"`
+	Users      []AdminUserResponse `json:"users"`
+	Pagination api.Pagination      `json:"pagination"`
 }
 
 // UserMessageResponse is the uniform `{ "message", "user" }`
 // body used by PUT /api/users/{id}/role.
 type UserMessageResponse struct {
-	Message string      `json:"message" example:"User role updated successfully"`
-	User    *model.User `json:"user"`
+	Message string             `json:"message" example:"User role updated successfully"`
+	User    *AdminUserResponse `json:"user"`
 }
 
 // ApplyForCreatorRequest is the body of POST
@@ -40,8 +65,8 @@ type ApplyForCreatorResponse struct {
 // the CreatorApplication struct from model; the pagination
 // shape is the same as everywhere else.
 type CreatorApplicationListResponse struct {
-	Applications []model.CreatorApplication `json:"applications"`
-	Pagination   api.Pagination             `json:"pagination"`
+	Applications []CreatorApplicationResponse `json:"applications"`
+	Pagination   api.Pagination               `json:"pagination"`
 }
 
 // ReviewCreatorApplicationBody is the body of PUT

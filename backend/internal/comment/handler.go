@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/vexgo-org/vexgo/backend/internal/api"
+	"github.com/vexgo-org/vexgo/backend/internal/auth"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
@@ -59,7 +60,7 @@ func (h *Handler) GetComments(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, CommentListResponse{Comments: comments})
+	c.JSON(http.StatusOK, CommentListResponse{Comments: toCommentResponses(comments)})
 }
 
 // CreateComment godoc
@@ -122,7 +123,7 @@ func (h *Handler) CreateComment(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, CreateCommentResponse{
 		Message:            "Comment created successfully",
-		Comment:            comment,
+		Comment:            toCommentResponse(comment),
 		CommentsCount:      count,
 		RequiresModeration: comment.Status == model.CommentStatusPending,
 	})
@@ -187,7 +188,7 @@ func (h *Handler) GetCommentModerationConfig(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, config)
+	c.JSON(http.StatusOK, toModerationConfigResponse(&config))
 }
 
 // UpdateCommentModerationConfig godoc
@@ -227,7 +228,7 @@ func (h *Handler) UpdateCommentModerationConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, UpdateModerationConfigResponse{
 		Message: "Comment moderation configuration updated successfully",
-		Config:  config,
+		Config:  toModerationConfigResponse(&config),
 	})
 }
 
@@ -342,7 +343,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.CommentStatus) {
 	}
 
 	c.JSON(http.StatusOK, CommentModerationListResponse{
-		Comments:   comments,
+		Comments:   toModerationCommentResponses(comments),
 		Pagination: api.ToPagination(total, pageNum, limitNum),
 	})
 }
@@ -395,6 +396,62 @@ func (h *Handler) setStatus(c *gin.Context, status model.CommentStatus, successM
 
 	c.JSON(http.StatusOK, CommentMessageResponse{
 		Message: successMsg,
-		Comment: comment,
+		Comment: toModerationCommentResponse(comment),
 	})
+}
+
+func toCommentResponse(comment *model.Comment) *CommentResponse {
+	return &CommentResponse{
+		ID:       comment.ID,
+		PostID:   comment.PostID,
+		UserID:   comment.UserID,
+		ParentID: comment.ParentID,
+		Content:  comment.Content,
+		Status:   comment.Status,
+		Author: api.UserSummary{
+			ID:       comment.User.ID,
+			Username: comment.User.Username,
+			Avatar:   auth.UserAvatarURL(&comment.User),
+		},
+		CreatedAt: comment.CreatedAt,
+		UpdatedAt: comment.UpdatedAt,
+	}
+}
+
+func toCommentResponses(comments []model.Comment) []CommentResponse {
+	resps := make([]CommentResponse, len(comments))
+	for i := range comments {
+		resps[i] = *toCommentResponse(&comments[i])
+	}
+	return resps
+}
+
+// Moderation endpoints are the only place the moderation reason is serialized.
+func toModerationCommentResponse(comment *model.Comment) *CommentResponse {
+	resp := toCommentResponse(comment)
+	if comment.ModerationReason != "" {
+		resp.ModerationReason = &comment.ModerationReason
+	}
+	return resp
+}
+
+func toModerationCommentResponses(comments []model.Comment) []CommentResponse {
+	resps := make([]CommentResponse, len(comments))
+	for i := range comments {
+		resps[i] = *toModerationCommentResponse(&comments[i])
+	}
+	return resps
+}
+
+func toModerationConfigResponse(config *model.CommentModerationConfig) CommentModerationConfigResponse {
+	return CommentModerationConfigResponse{
+		ManualReviewEnabled:  config.ManualReviewEnabled,
+		KeywordFilterEnabled: config.KeywordFilterEnabled,
+		LLMReviewEnabled:     config.LLMReviewEnabled,
+		ModelProvider:        config.ModelProvider,
+		ApiEndpoint:          config.ApiEndpoint,
+		ModelName:            config.ModelName,
+		ModerationPrompt:     config.ModerationPrompt,
+		BlockKeywords:        config.BlockKeywords,
+	}
 }

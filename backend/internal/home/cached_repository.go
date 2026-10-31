@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
@@ -102,6 +103,65 @@ func (r *cachedRepository) CountTags(ctx context.Context) (int64, error) {
 	return r.counter(ctx, "tags", r.Repository.CountTags), nil
 }
 
+// cachedSettings is the cache wire shape of the settings row: an explicit
+// snapshot, never model.GeneralSettings. The cache may be a shared Valkey, so
+// the attached site-icon asset (and its blob storage key) stays out of it.
+type cachedSettings struct {
+	ID                  uint       `json:"id"`
+	CaptchaEnabled      bool       `json:"captchaEnabled"`
+	RegistrationEnabled bool       `json:"registrationEnabled"`
+	AllowGuestViewPosts bool       `json:"allowGuestViewPosts"`
+	SiteName            string     `json:"siteName"`
+	SiteDescription     string     `json:"siteDescription"`
+	ItemsPerPage        int        `json:"itemsPerPage"`
+	SiteLanguage        string     `json:"siteLanguage"`
+	CreatedAt           time.Time  `json:"createdAt"`
+	UpdatedAt           time.Time  `json:"updatedAt"`
+	SiteIconID          *uint      `json:"siteIconId,omitempty"`
+	SiteIconPublicID    *uuid.UUID `json:"siteIconPublicID,omitempty"`
+}
+
+func cacheSettings(config model.GeneralSettings) cachedSettings {
+	cached := cachedSettings{
+		ID:                  config.ID,
+		CaptchaEnabled:      config.CaptchaEnabled,
+		RegistrationEnabled: config.RegistrationEnabled,
+		AllowGuestViewPosts: config.AllowGuestViewPosts,
+		SiteName:            config.SiteName,
+		SiteDescription:     config.SiteDescription,
+		ItemsPerPage:        config.ItemsPerPage,
+		SiteLanguage:        config.SiteLanguage,
+		CreatedAt:           config.CreatedAt,
+		UpdatedAt:           config.UpdatedAt,
+		SiteIconID:          config.SiteIconID,
+	}
+	if config.SiteIcon != nil {
+		publicID := config.SiteIcon.PublicID
+		cached.SiteIconPublicID = &publicID
+	}
+	return cached
+}
+
+func (c cachedSettings) settings() model.GeneralSettings {
+	config := model.GeneralSettings{
+		ID:                  c.ID,
+		CaptchaEnabled:      c.CaptchaEnabled,
+		RegistrationEnabled: c.RegistrationEnabled,
+		AllowGuestViewPosts: c.AllowGuestViewPosts,
+		SiteName:            c.SiteName,
+		SiteDescription:     c.SiteDescription,
+		ItemsPerPage:        c.ItemsPerPage,
+		SiteLanguage:        c.SiteLanguage,
+		CreatedAt:           c.CreatedAt,
+		UpdatedAt:           c.UpdatedAt,
+		SiteIconID:          c.SiteIconID,
+	}
+	if c.SiteIconPublicID != nil {
+		config.SiteIcon = &model.Asset{PublicID: *c.SiteIconPublicID}
+	}
+	return config
+}
+
 // getSettings loads and decodes the cached settings row, reporting whether
 // usable data was found. Decode failures are logged here and read as a miss;
 // the fall-through re-reads the database and overwrites the bad value.
@@ -110,12 +170,12 @@ func (r *cachedRepository) getSettings(ctx context.Context, key string) (model.G
 	if err != nil || !ok {
 		return model.GeneralSettings{}, false
 	}
-	var config model.GeneralSettings
-	if jsonErr := json.Unmarshal([]byte(value), &config); jsonErr != nil {
+	var cached cachedSettings
+	if jsonErr := json.Unmarshal([]byte(value), &cached); jsonErr != nil {
 		slog.Warn("home cache decode failed", "key", key, "err", jsonErr)
 		return model.GeneralSettings{}, false
 	}
-	return config, true
+	return cached.settings(), true
 }
 
 // GetGeneralSettings serves the general settings row through the cache; it
@@ -130,7 +190,7 @@ func (r *cachedRepository) GetGeneralSettings(ctx context.Context) (model.Genera
 	if err != nil {
 		return config, err
 	}
-	if data, jsonErr := json.Marshal(config); jsonErr == nil {
+	if data, jsonErr := json.Marshal(cacheSettings(config)); jsonErr == nil {
 		if setErr := r.cache.Set(ctx, key, string(data), statsTTL); setErr != nil {
 			slog.Warn("home cache write failed", "key", key, "err", setErr)
 		}

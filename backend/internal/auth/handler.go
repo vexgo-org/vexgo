@@ -156,7 +156,7 @@ func (h *Handler) Login(c *gin.Context) {
 			Username: user.Username,
 			Email:    user.Email,
 			Role:     user.Role,
-			Avatar:   userAvatarURL(user),
+			Avatar:   UserAvatarURL(user),
 			Bio:      user.Bio,
 			Birthday: user.Birthday,
 		},
@@ -276,7 +276,7 @@ func userToResponse(u *model.User) *UserResponse {
 		HideEmail:         u.HideEmail,
 		HideBirthday:      u.HideBirthday,
 		HideBio:           u.HideBio,
-		Avatar:            userAvatarURL(u),
+		Avatar:            UserAvatarURL(u),
 	}
 }
 
@@ -291,7 +291,7 @@ func userToRegisterUser(u *model.User) RegisterUser {
 		Username:      u.Username,
 		Email:         u.Email,
 		Role:          u.Role,
-		Avatar:        userAvatarURL(u),
+		Avatar:        UserAvatarURL(u),
 		EmailVerified: u.EmailVerified,
 		CreatedAt:     u.CreatedAt,
 		Birthday:      u.Birthday,

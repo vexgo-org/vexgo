@@ -5,7 +5,6 @@ package settings
 
 import (
 	"github.com/google/uuid"
-	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 )
 
@@ -97,8 +96,8 @@ type AIConfigUpdateRequestBody struct {
 // AIConfigUpdateResponse is the body of PUT /api/config/ai
 // on success.
 type AIConfigUpdateResponse struct {
-	Message  string         `json:"message" example:"AI config updated successfully"`
-	AIConfig model.AIConfig `json:"aiConfig"`
+	Message  string           `json:"message" example:"AI config updated successfully"`
+	AIConfig AIConfigResponse `json:"aiConfig"`
 }
 
 // AITestResponse is the body of POST /api/config/ai/test.

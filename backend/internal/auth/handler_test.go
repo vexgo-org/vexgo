@@ -502,7 +502,7 @@ func TestGetCurrentUserHandler_ReturnsPublicUserShape(t *testing.T) {
 	if !ok {
 		t.Fatalf("response has no user object: %s", w.Body.String())
 	}
-	if got, want := user["avatar"], userAvatarURL(&model.User{Avatar: &avatar}); got != want {
+	if got, want := user["avatar"], UserAvatarURL(&model.User{Avatar: &avatar}); got != want {
 		t.Errorf("avatar = %v, want %q", got, want)
 	}
 	for _, field := range []string{

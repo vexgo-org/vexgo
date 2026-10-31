@@ -136,7 +136,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, UploadResponse{
 		Message: "File uploaded successfully",
-		File:    media,
+		File:    toMediaFileResponse(&media),
 	})
 }
 
@@ -193,7 +193,7 @@ func (h *Handler) UploadFiles(c *gin.Context) {
 
 	c.JSON(http.StatusOK, MultiUploadResponse{
 		Message: "File upload completed",
-		Files:   uploadedFiles,
+		Files:   toMediaFileResponses(uploadedFiles),
 	})
 }
 
@@ -216,7 +216,7 @@ func (h *Handler) GetMyFiles(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, FilesListResponse{Files: files})
+	c.JSON(http.StatusOK, FilesListResponse{Files: toMediaFileResponses(files)})
 }
 
 // DeleteFile godoc
@@ -252,4 +252,22 @@ func (h *Handler) DeleteFile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, api.MessageResponse{Message: "File deleted"})
+}
+
+func toMediaFileResponse(file *model.MediaFile) MediaFileResponse {
+	return MediaFileResponse{
+		ID:        file.ID,
+		URL:       file.URL,
+		Size:      file.Size,
+		Type:      file.Type,
+		CreatedAt: file.CreatedAt,
+	}
+}
+
+func toMediaFileResponses(files []model.MediaFile) []MediaFileResponse {
+	resps := make([]MediaFileResponse, len(files))
+	for i := range files {
+		resps[i] = toMediaFileResponse(&files[i])
+	}
+	return resps
 }

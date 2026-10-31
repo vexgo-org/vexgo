@@ -16,6 +16,7 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
+	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 )
 
@@ -276,12 +277,7 @@ func (h *Handler) GetAIConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get AI config"})
 		return
 	}
-	c.JSON(http.StatusOK, AIConfigResponse{
-		Enabled:     config.Enabled,
-		Provider:    config.Provider,
-		ApiEndpoint: config.ApiEndpoint,
-		ModelName:   config.ModelName,
-	})
+	c.JSON(http.StatusOK, toAIConfigResponse(config))
 }
 
 // UpdateAIConfig godoc
@@ -317,7 +313,7 @@ func (h *Handler) UpdateAIConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, AIConfigUpdateResponse{
 		Message:  "AI config updated successfully",
-		AIConfig: config,
+		AIConfig: toAIConfigResponse(config),
 	})
 }
 
@@ -911,4 +907,13 @@ func toStringSlice(v any) []string {
 		return s
 	}
 	return nil
+}
+
+func toAIConfigResponse(config model.AIConfig) AIConfigResponse {
+	return AIConfigResponse{
+		Enabled:     config.Enabled,
+		Provider:    config.Provider,
+		ApiEndpoint: config.ApiEndpoint,
+		ModelName:   config.ModelName,
+	}
 }

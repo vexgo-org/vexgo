@@ -53,7 +53,7 @@ func (h *Handler) GetUserList(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, UserListResponse{
-		Users:      users,
+		Users:      toAdminUserResponses(users),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -123,7 +123,7 @@ func (h *Handler) UpdateUserRole(c *gin.Context) {
 
 	c.JSON(http.StatusOK, UserMessageResponse{
 		Message: "User role updated successfully",
-		User:    user,
+		User:    toAdminUserResponse(user),
 	})
 }
 
@@ -277,7 +277,7 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, CreatorApplicationListResponse{
-		Applications: applications,
+		Applications: toCreatorApplicationResponses(applications),
 		Pagination:   api.ToPagination(total, page, limit),
 	})
 }
@@ -345,4 +345,43 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, api.MessageResponse{Message: "Application reviewed successfully"})
+}
+
+func toAdminUserResponse(user *model.User) *AdminUserResponse {
+	return &AdminUserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+	}
+}
+
+func toAdminUserResponses(users []model.User) []AdminUserResponse {
+	resps := make([]AdminUserResponse, len(users))
+	for i := range users {
+		resps[i] = *toAdminUserResponse(&users[i])
+	}
+	return resps
+}
+
+func toCreatorApplicationResponse(application *model.CreatorApplication) *CreatorApplicationResponse {
+	return &CreatorApplicationResponse{
+		ID:           application.ID,
+		User:         *toAdminUserResponse(&application.User),
+		Status:       application.Status,
+		Reason:       application.Reason,
+		ReviewerID:   application.ReviewerID,
+		ReviewReason: application.ReviewReason,
+		CreatedAt:    application.CreatedAt,
+		UpdatedAt:    application.UpdatedAt,
+	}
+}
+
+func toCreatorApplicationResponses(applications []model.CreatorApplication) []CreatorApplicationResponse {
+	resps := make([]CreatorApplicationResponse, len(applications))
+	for i := range applications {
+		resps[i] = *toCreatorApplicationResponse(&applications[i])
+	}
+	return resps
 }

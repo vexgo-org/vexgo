@@ -125,16 +125,55 @@ func sanitizeForCache(posts ...*model.Post) {
 	}
 }
 
-// cachedPost is the cache wire shape of a post. model.Post hides its cover
-// asset from JSON, so the cover's public ID is stored alongside and rebuilt on
-// decode; response rendering derives the URL from that ID alone.
+// cachedPost is the cache wire shape of a post: an explicit snapshot, never
+// model.Post. The cache may be a shared Valkey, so the database row must not
+// decide what reaches it. Only guest-visible fields are stored; the author is
+// reduced to the attribution a public page shows.
 type cachedPost struct {
-	model.Post
-	CoverImagePublicID *uuid.UUID `json:"coverImagePublicID,omitempty"`
+	ID                 uint             `json:"id"`
+	Slug               string           `json:"slug"`
+	Title              string           `json:"title"`
+	Content            string           `json:"content"`
+	Excerpt            string           `json:"excerpt"`
+	ViewCount          int              `json:"viewCount"`
+	AuthorID           uint             `json:"authorId"`
+	Author             cachedAuthor     `json:"author"`
+	Category           string           `json:"category"`
+	Tags               []cachedTag      `json:"tags"`
+	Status             model.PostStatus `json:"status"`
+	CreatedAt          time.Time        `json:"createdAt"`
+	UpdatedAt          time.Time        `json:"updatedAt"`
+	CoverImagePublicID *uuid.UUID       `json:"coverImagePublicID,omitempty"`
+}
+
+type cachedAuthor struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+}
+
+type cachedTag struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
 }
 
 func cachePost(post *model.Post) cachedPost {
-	cached := cachedPost{Post: *post}
+	cached := cachedPost{
+		ID:        post.ID,
+		Slug:      post.Slug,
+		Title:     post.Title,
+		Content:   post.Content,
+		Excerpt:   post.Excerpt,
+		ViewCount: post.ViewCount,
+		AuthorID:  post.AuthorID,
+		Author:    cachedAuthor{ID: post.Author.ID, Username: post.Author.Username},
+		Category:  post.Category,
+		Status:    post.Status,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+	}
+	for _, tag := range post.Tags {
+		cached.Tags = append(cached.Tags, cachedTag{ID: tag.ID, Name: tag.Name})
+	}
 	if post.CoverImage != nil {
 		publicID := post.CoverImage.PublicID
 		cached.CoverImagePublicID = &publicID
@@ -146,7 +185,23 @@ func cachePost(post *model.Post) cachedPost {
 // needs. Only the public ID is restored: it is the sole field URL derivation
 // reads.
 func (c cachedPost) post() model.Post {
-	post := c.Post
+	post := model.Post{
+		ID:        c.ID,
+		Slug:      c.Slug,
+		Title:     c.Title,
+		Content:   c.Content,
+		Excerpt:   c.Excerpt,
+		ViewCount: c.ViewCount,
+		AuthorID:  c.AuthorID,
+		Author:    model.User{ID: c.Author.ID, Username: c.Author.Username},
+		Category:  c.Category,
+		Status:    c.Status,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
+	for _, tag := range c.Tags {
+		post.Tags = append(post.Tags, model.Tag{ID: tag.ID, Name: tag.Name})
+	}
 	if c.CoverImagePublicID != nil {
 		post.CoverImage = &model.Asset{PublicID: *c.CoverImagePublicID}
 	}
