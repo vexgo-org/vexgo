@@ -8,24 +8,15 @@
 import type { ModelNotificationRelatedType } from "./modelNotificationRelatedType";
 import type { ModelNotificationType } from "./modelNotificationType";
 
-export interface ModelNotification {
-  /** Notification content */
+export interface NotificationNotificationResponse {
   content?: string;
   created_at?: string;
   id?: number;
-  /** Whether it has been read */
   is_read?: boolean;
-  /** Related resource ID */
   related_id?: number;
-  /** Owning post ID for reply/comment notifications */
   related_post_id?: number;
-  /** Related resource type */
   related_type?: ModelNotificationRelatedType;
-  /** Notification title */
   title?: string;
-  /** Notification type: comment, like, reply, review, role */
   type?: ModelNotificationType;
   updated_at?: string;
-  /** Receiving user ID */
-  user_id?: number;
 }

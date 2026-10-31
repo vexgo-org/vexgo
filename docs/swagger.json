@@ -80,6 +80,23 @@
                 },
                 "type": "object"
             },
+            "api.UserSummary": {
+                "properties": {
+                    "avatar": {
+                        "example": "/api/assets/01a15240-3847-71a4-b8bb-f8448ef3a952/original",
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "username": {
+                        "example": "alice",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "asset.UploadResponse": {
                 "properties": {
                     "assetOriginalURL": {
@@ -664,7 +681,7 @@
                 "properties": {
                     "comments": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Comment"
+                            "$ref": "#/components/schemas/comment.CommentResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -675,10 +692,46 @@
             "comment.CommentMessageResponse": {
                 "properties": {
                     "comment": {
-                        "$ref": "#/components/schemas/model.Comment"
+                        "$ref": "#/components/schemas/comment.CommentResponse"
                     },
                     "message": {
                         "example": "Comment approved",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "comment.CommentModerationConfigResponse": {
+                "properties": {
+                    "apiEndpoint": {
+                        "example": "https://api.openai.com/v1",
+                        "type": "string"
+                    },
+                    "blockKeywords": {
+                        "example": "spam,badword",
+                        "type": "string"
+                    },
+                    "keywordFilterEnabled": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "llmReviewEnabled": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "manualReviewEnabled": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "modelName": {
+                        "example": "gpt-4o-mini",
+                        "type": "string"
+                    },
+                    "modelProvider": {
+                        "example": "openai",
+                        "type": "string"
+                    },
+                    "moderationPrompt": {
                         "type": "string"
                     }
                 },
@@ -688,13 +741,54 @@
                 "properties": {
                     "comments": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Comment"
+                            "$ref": "#/components/schemas/comment.CommentResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api.Pagination"
+                    }
+                },
+                "type": "object"
+            },
+            "comment.CommentResponse": {
+                "properties": {
+                    "author": {
+                        "$ref": "#/components/schemas/api.UserSummary"
+                    },
+                    "content": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 9,
+                        "type": "integer"
+                    },
+                    "moderationReason": {
+                        "description": "ModerationReason is only present on moderation endpoints.",
+                        "type": "string"
+                    },
+                    "parentId": {
+                        "example": 8,
+                        "type": "integer"
+                    },
+                    "postId": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/model.CommentStatus",
+                        "example": "published"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "userId": {
+                        "example": 7,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -724,7 +818,7 @@
             "comment.CreateCommentResponse": {
                 "properties": {
                     "comment": {
-                        "$ref": "#/components/schemas/model.Comment"
+                        "$ref": "#/components/schemas/comment.CommentResponse"
                     },
                     "commentsCount": {
                         "example": 3,
@@ -808,7 +902,7 @@
             "comment.UpdateModerationConfigResponse": {
                 "properties": {
                     "config": {
-                        "$ref": "#/components/schemas/model.CommentModerationConfig"
+                        "$ref": "#/components/schemas/comment.CommentModerationConfigResponse"
                     },
                     "message": {
                         "example": "Comment moderation configuration updated successfully",
@@ -850,139 +944,9 @@
                 },
                 "type": "object"
             },
-            "model.AIConfig": {
-                "properties": {
-                    "apiEndpoint": {
-                        "description": "API endpoint URL",
-                        "type": "string"
-                    },
-                    "apiKey": {
-                        "description": "API key (encrypted at rest)",
-                        "type": "string"
-                    },
-                    "created_at": {
-                        "description": "Creation time",
-                        "type": "string"
-                    },
-                    "enabled": {
-                        "description": "Whether AI model is enabled",
-                        "type": "boolean"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "modelName": {
-                        "description": "Model name",
-                        "type": "string"
-                    },
-                    "provider": {
-                        "description": "Provider (openai, azure, etc.)",
-                        "type": "string"
-                    },
-                    "updated_at": {
-                        "description": "Update time",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "model.Category": {
-                "properties": {
-                    "description": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "postCount": {
-                        "description": "Non-database field: number of posts referencing the category by name",
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "model.Comment": {
-                "properties": {
-                    "author": {
-                        "$ref": "#/components/schemas/model.User"
-                    },
-                    "content": {
-                        "type": "string"
-                    },
-                    "createdAt": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "moderationReason": {
-                        "description": "ModerationReason records why the comment was rejected or held for\nmanual review (keyword hit, LLM verdict, or LLM failure).",
-                        "type": "string"
-                    },
-                    "parentId": {
-                        "type": "integer"
-                    },
-                    "postId": {
-                        "type": "integer"
-                    },
-                    "status": {
-                        "$ref": "#/components/schemas/model.CommentStatus",
-                        "description": "published, pending, rejected"
-                    },
-                    "updatedAt": {
-                        "type": "string"
-                    },
-                    "userId": {
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
             "model.CommentModerationConfig": {
                 "properties": {
-                    "apiEndpoint": {
-                        "description": "API endpoint",
-                        "type": "string"
-                    },
-                    "apiKey": {
-                        "description": "API key (encrypted at rest)",
-                        "type": "string"
-                    },
-                    "blockKeywords": {
-                        "description": "Blocked keywords, comma-separated",
-                        "type": "string"
-                    },
                     "createdAt": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "keywordFilterEnabled": {
-                        "description": "Reject on blocked keyword hits",
-                        "type": "boolean"
-                    },
-                    "llmReviewEnabled": {
-                        "description": "Reject comments flagged by the LLM",
-                        "type": "boolean"
-                    },
-                    "manualReviewEnabled": {
-                        "description": "Hold comments for manual approval",
-                        "type": "boolean"
-                    },
-                    "modelName": {
-                        "description": "Model name",
-                        "type": "string"
-                    },
-                    "modelProvider": {
-                        "description": "AI provider (openai, azure, etc.)",
-                        "type": "string"
-                    },
-                    "moderationPrompt": {
-                        "description": "Moderation prompt",
                         "type": "string"
                     },
                     "updatedAt": {
@@ -1004,41 +968,6 @@
                     "CommentStatusRejected"
                 ]
             },
-            "model.CreatorApplication": {
-                "properties": {
-                    "created_at": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "reason": {
-                        "type": "string"
-                    },
-                    "review_reason": {
-                        "type": "string"
-                    },
-                    "reviewer": {
-                        "$ref": "#/components/schemas/model.User"
-                    },
-                    "reviewer_id": {
-                        "type": "integer"
-                    },
-                    "status": {
-                        "$ref": "#/components/schemas/model.CreatorApplicationStatus"
-                    },
-                    "updated_at": {
-                        "type": "string"
-                    },
-                    "user": {
-                        "$ref": "#/components/schemas/model.User"
-                    },
-                    "user_id": {
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
             "model.CreatorApplicationStatus": {
                 "enum": [
                     "pending",
@@ -1051,76 +980,6 @@
                     "CreatorApplicationStatusApproved",
                     "CreatorApplicationStatusRejected"
                 ]
-            },
-            "model.MediaFile": {
-                "properties": {
-                    "createdAt": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "size": {
-                        "type": "integer"
-                    },
-                    "type": {
-                        "description": "image/video etc.",
-                        "type": "string"
-                    },
-                    "url": {
-                        "type": "string"
-                    },
-                    "userId": {
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "model.Notification": {
-                "properties": {
-                    "content": {
-                        "description": "Notification content",
-                        "type": "string"
-                    },
-                    "created_at": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "is_read": {
-                        "description": "Whether it has been read",
-                        "type": "boolean"
-                    },
-                    "related_id": {
-                        "description": "Related resource ID",
-                        "type": "integer"
-                    },
-                    "related_post_id": {
-                        "description": "Owning post ID for reply/comment notifications",
-                        "type": "integer"
-                    },
-                    "related_type": {
-                        "$ref": "#/components/schemas/model.NotificationRelatedType",
-                        "description": "Related resource type"
-                    },
-                    "title": {
-                        "description": "Notification title",
-                        "type": "string"
-                    },
-                    "type": {
-                        "$ref": "#/components/schemas/model.NotificationType",
-                        "description": "Notification type: comment, like, reply, review, role"
-                    },
-                    "updated_at": {
-                        "type": "string"
-                    },
-                    "user_id": {
-                        "description": "Receiving user ID",
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
             },
             "model.NotificationRelatedType": {
                 "enum": [
@@ -1152,48 +1011,6 @@
                     "NotificationTypeReview"
                 ]
             },
-            "model.Page": {
-                "properties": {
-                    "author": {
-                        "$ref": "#/components/schemas/model.User"
-                    },
-                    "authorId": {
-                        "type": "integer"
-                    },
-                    "content": {
-                        "type": "string"
-                    },
-                    "createdAt": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "showInNav": {
-                        "type": "boolean"
-                    },
-                    "slug": {
-                        "type": "string"
-                    },
-                    "sortOrder": {
-                        "type": "integer"
-                    },
-                    "status": {
-                        "$ref": "#/components/schemas/model.PageStatus"
-                    },
-                    "title": {
-                        "type": "string"
-                    },
-                    "updatedAt": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "content",
-                    "title"
-                ],
-                "type": "object"
-            },
             "model.PageStatus": {
                 "enum": [
                     "draft",
@@ -1220,93 +1037,59 @@
                     "PostStatusRejected"
                 ]
             },
-            "model.Tag": {
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "postCount": {
-                        "description": "Non-database field: number of posts referencing the tag",
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "model.User": {
-                "properties": {
-                    "avatarId": {
-                        "type": "integer"
-                    },
-                    "bio": {
-                        "description": "personal bio",
-                        "type": "string"
-                    },
-                    "birthday": {
-                        "description": "birthday",
-                        "type": "string"
-                    },
-                    "createdAt": {
-                        "description": "registration time",
-                        "type": "string"
-                    },
-                    "email": {
-                        "type": "string"
-                    },
-                    "email_verified": {
-                        "description": "whether email is verified",
-                        "type": "boolean"
-                    },
-                    "hide_bio": {
-                        "description": "hide bio",
-                        "type": "boolean"
-                    },
-                    "hide_birthday": {
-                        "description": "hide birthday",
-                        "type": "boolean"
-                    },
-                    "hide_email": {
-                        "description": "hide email",
-                        "type": "boolean"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "last_login_at": {
-                        "description": "last login time to invalidate old tokens",
-                        "type": "string"
-                    },
-                    "profile_visibility": {
-                        "description": "Privacy settings",
-                        "type": "string"
-                    },
-                    "role": {
-                        "description": "super_admin/admin/author/contributor/guest",
-                        "type": "string"
-                    },
-                    "username": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "email",
-                    "username"
-                ],
-                "type": "object"
-            },
             "notification.NotificationListResponse": {
                 "properties": {
                     "notifications": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Notification"
+                            "$ref": "#/components/schemas/notification.NotificationResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api.Pagination"
+                    }
+                },
+                "type": "object"
+            },
+            "notification.NotificationResponse": {
+                "properties": {
+                    "content": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 11,
+                        "type": "integer"
+                    },
+                    "is_read": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "related_id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "related_post_id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "related_type": {
+                        "$ref": "#/components/schemas/model.NotificationRelatedType",
+                        "example": "post"
+                    },
+                    "title": {
+                        "example": "New comment",
+                        "type": "string"
+                    },
+                    "type": {
+                        "$ref": "#/components/schemas/model.NotificationType",
+                        "example": "comment"
+                    },
+                    "updated_at": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1371,7 +1154,7 @@
                 "properties": {
                     "pages": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Page"
+                            "$ref": "#/components/schemas/page.PageResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -1389,7 +1172,49 @@
                         "type": "string"
                     },
                     "page": {
-                        "$ref": "#/components/schemas/model.Page"
+                        "$ref": "#/components/schemas/page.PageResponse"
+                    }
+                },
+                "type": "object"
+            },
+            "page.PageResponse": {
+                "properties": {
+                    "authorId": {
+                        "example": 7,
+                        "type": "integer"
+                    },
+                    "content": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "showInNav": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "slug": {
+                        "example": "about",
+                        "type": "string"
+                    },
+                    "sortOrder": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/model.PageStatus",
+                        "example": "published"
+                    },
+                    "title": {
+                        "example": "About",
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1397,7 +1222,7 @@
             "page.PageSingleResponse": {
                 "properties": {
                     "page": {
-                        "$ref": "#/components/schemas/model.Page"
+                        "$ref": "#/components/schemas/page.PageResponse"
                     }
                 },
                 "type": "object"
@@ -1437,10 +1262,30 @@
                 "properties": {
                     "categories": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Category"
+                            "$ref": "#/components/schemas/post.CategoryResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "post.CategoryResponse": {
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "name": {
+                        "example": "Tutorials",
+                        "type": "string"
+                    },
+                    "postCount": {
+                        "example": 5,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -1466,7 +1311,7 @@
             "post.CreateCategoryResponse": {
                 "properties": {
                     "category": {
-                        "$ref": "#/components/schemas/model.Category"
+                        "$ref": "#/components/schemas/post.CategoryResponse"
                     },
                     "message": {
                         "example": "Category created successfully",
@@ -1550,7 +1395,7 @@
                         "type": "string"
                     },
                     "tag": {
-                        "$ref": "#/components/schemas/model.Tag"
+                        "$ref": "#/components/schemas/post.TagResponse"
                     }
                 },
                 "type": "object"
@@ -1653,16 +1498,18 @@
             "post.PostResponse": {
                 "properties": {
                     "author": {
-                        "$ref": "#/components/schemas/model.User"
+                        "$ref": "#/components/schemas/api.UserSummary"
                     },
                     "authorId": {
+                        "example": 7,
                         "type": "integer"
                     },
                     "category": {
+                        "example": "engineering",
                         "type": "string"
                     },
                     "commentsCount": {
-                        "description": "Non-database field: comment count",
+                        "example": 5,
                         "type": "integer"
                     },
                     "content": {
@@ -1672,6 +1519,7 @@
                         "type": "string"
                     },
                     "coverImagePublicID": {
+                        "example": "01a15240-3847-71a4-b8bb-f8448ef3a952",
                         "type": "string"
                     },
                     "createdAt": {
@@ -1681,47 +1529,49 @@
                         "type": "string"
                     },
                     "id": {
+                        "example": 42,
                         "type": "integer"
                     },
                     "isLiked": {
+                        "example": false,
                         "type": "boolean"
                     },
                     "likesCount": {
-                        "description": "Non-database field: used to include like count and whether the current user has liked in API response",
+                        "example": 3,
                         "type": "integer"
                     },
                     "rejectionReason": {
-                        "description": "rejection reason",
+                        "description": "RejectionReason is only filled for the post's author and for admins.",
+                        "example": "Off-topic",
                         "type": "string"
                     },
                     "slug": {
+                        "example": "hello-world",
                         "type": "string"
                     },
                     "status": {
                         "$ref": "#/components/schemas/model.PostStatus",
-                        "description": "draft/published/pending/rejected"
+                        "example": "published"
                     },
                     "tags": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Tag"
+                            "$ref": "#/components/schemas/post.TagResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
                     },
                     "title": {
+                        "example": "Hello world",
                         "type": "string"
                     },
                     "updatedAt": {
                         "type": "string"
                     },
                     "viewCount": {
+                        "example": 128,
                         "type": "integer"
                     }
                 },
-                "required": [
-                    "content",
-                    "title"
-                ],
                 "type": "object"
             },
             "post.PostSingleResponse": {
@@ -1741,11 +1591,28 @@
                 },
                 "type": "object"
             },
+            "post.TagResponse": {
+                "properties": {
+                    "id": {
+                        "example": 3,
+                        "type": "integer"
+                    },
+                    "name": {
+                        "example": "golang",
+                        "type": "string"
+                    },
+                    "postCount": {
+                        "example": 12,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "post.TagsListResponse": {
                 "properties": {
                     "tags": {
                         "items": {
-                            "$ref": "#/components/schemas/model.Tag"
+                            "$ref": "#/components/schemas/post.TagResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -1881,7 +1748,7 @@
             "settings.AIConfigUpdateResponse": {
                 "properties": {
                     "aiConfig": {
-                        "$ref": "#/components/schemas/model.AIConfig"
+                        "$ref": "#/components/schemas/settings.AIConfigResponse"
                     },
                     "message": {
                         "example": "AI config updated successfully",
@@ -2222,10 +2089,34 @@
                 "properties": {
                     "files": {
                         "items": {
-                            "$ref": "#/components/schemas/model.MediaFile"
+                            "$ref": "#/components/schemas/upload.MediaFileResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "upload.MediaFileResponse": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 17,
+                        "type": "integer"
+                    },
+                    "size": {
+                        "example": 20480,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "example": "image/png",
+                        "type": "string"
+                    },
+                    "url": {
+                        "example": "/uploads/01a15240.png",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2234,7 +2125,7 @@
                 "properties": {
                     "files": {
                         "items": {
-                            "$ref": "#/components/schemas/model.MediaFile"
+                            "$ref": "#/components/schemas/upload.MediaFileResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -2249,10 +2140,34 @@
             "upload.UploadResponse": {
                 "properties": {
                     "file": {
-                        "$ref": "#/components/schemas/model.MediaFile"
+                        "$ref": "#/components/schemas/upload.MediaFileResponse"
                     },
                     "message": {
                         "example": "File uploaded successfully",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "user.AdminUserResponse": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "example": "alice@example.com",
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "role": {
+                        "example": "author",
+                        "type": "string"
+                    },
+                    "username": {
+                        "example": "alice",
                         "type": "string"
                     }
                 },
@@ -2284,13 +2199,44 @@
                 "properties": {
                     "applications": {
                         "items": {
-                            "$ref": "#/components/schemas/model.CreatorApplication"
+                            "$ref": "#/components/schemas/user.CreatorApplicationResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
                     },
                     "pagination": {
                         "$ref": "#/components/schemas/api.Pagination"
+                    }
+                },
+                "type": "object"
+            },
+            "user.CreatorApplicationResponse": {
+                "properties": {
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": 5,
+                        "type": "integer"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "reviewReason": {
+                        "type": "string"
+                    },
+                    "reviewerId": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/model.CreatorApplicationStatus",
+                        "example": "pending"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/user.AdminUserResponse"
                     }
                 },
                 "type": "object"
@@ -2343,7 +2289,7 @@
                     },
                     "users": {
                         "items": {
-                            "$ref": "#/components/schemas/model.User"
+                            "$ref": "#/components/schemas/user.AdminUserResponse"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -2358,7 +2304,7 @@
                         "type": "string"
                     },
                     "user": {
-                        "$ref": "#/components/schemas/model.User"
+                        "$ref": "#/components/schemas/user.AdminUserResponse"
                     }
                 },
                 "type": "object"

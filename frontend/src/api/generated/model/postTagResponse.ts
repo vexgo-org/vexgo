@@ -6,12 +6,8 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface ModelMediaFile {
-  createdAt?: string;
+export interface PostTagResponse {
   id?: number;
-  size?: number;
-  /** image/video etc. */
-  type?: string;
-  url?: string;
-  userId?: number;
+  name?: string;
+  postCount?: number;
 }

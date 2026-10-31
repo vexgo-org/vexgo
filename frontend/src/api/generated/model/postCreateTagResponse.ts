@@ -5,9 +5,9 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelTag } from "./modelTag";
+import type { PostTagResponse } from "./postTagResponse";
 
 export interface PostCreateTagResponse {
   message?: string;
-  tag?: ModelTag;
+  tag?: PostTagResponse;
 }

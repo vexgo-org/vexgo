@@ -7,25 +7,6 @@
  */
 
 export interface ModelCommentModerationConfig {
-  /** API endpoint */
-  apiEndpoint?: string;
-  /** API key (encrypted at rest) */
-  apiKey?: string;
-  /** Blocked keywords, comma-separated */
-  blockKeywords?: string;
   createdAt?: string;
-  id?: number;
-  /** Reject on blocked keyword hits */
-  keywordFilterEnabled?: boolean;
-  /** Reject comments flagged by the LLM */
-  llmReviewEnabled?: boolean;
-  /** Hold comments for manual approval */
-  manualReviewEnabled?: boolean;
-  /** Model name */
-  modelName?: string;
-  /** AI provider (openai, azure, etc.) */
-  modelProvider?: string;
-  /** Moderation prompt */
-  moderationPrompt?: string;
   updatedAt?: string;
 }

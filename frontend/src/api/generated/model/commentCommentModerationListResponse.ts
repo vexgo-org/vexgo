@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ApiPagination } from "./apiPagination";
-import type { ModelComment } from "./modelComment";
+import type { CommentCommentResponse } from "./commentCommentResponse";
 
 export interface CommentCommentModerationListResponse {
-  comments?: ModelComment[];
+  comments?: CommentCommentResponse[];
   pagination?: ApiPagination;
 }

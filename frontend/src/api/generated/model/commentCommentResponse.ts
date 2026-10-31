@@ -5,22 +5,18 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
+import type { ApiUserSummary } from "./apiUserSummary";
 import type { ModelCommentStatus } from "./modelCommentStatus";
-import type { ModelUser } from "./modelUser";
 
-export interface ModelComment {
-  author?: ModelUser;
+export interface CommentCommentResponse {
+  author?: ApiUserSummary;
   content?: string;
   createdAt?: string;
   id?: number;
-  /**
-   * ModerationReason records why the comment was rejected or held for
-   * manual review (keyword hit, LLM verdict, or LLM failure).
-   */
+  /** ModerationReason is only present on moderation endpoints. */
   moderationReason?: string;
   parentId?: number;
   postId?: number;
-  /** published, pending, rejected */
   status?: ModelCommentStatus;
   updatedAt?: string;
   userId?: number;

@@ -6,18 +6,16 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ModelPageStatus } from "./modelPageStatus";
-import type { ModelUser } from "./modelUser";
 
-export interface ModelPage {
-  author?: ModelUser;
+export interface PagePageResponse {
   authorId?: number;
-  content: string;
+  content?: string;
   createdAt?: string;
   id?: number;
   showInNav?: boolean;
   slug?: string;
   sortOrder?: number;
   status?: ModelPageStatus;
-  title: string;
+  title?: string;
   updatedAt?: string;
 }

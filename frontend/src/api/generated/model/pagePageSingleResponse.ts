@@ -5,8 +5,8 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelPage } from "./modelPage";
+import type { PagePageResponse } from "./pagePageResponse";
 
 export interface PagePageSingleResponse {
-  page?: ModelPage;
+  page?: PagePageResponse;
 }

@@ -5,9 +5,9 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelAIConfig } from "./modelAIConfig";
+import type { SettingsAIConfigResponse } from "./settingsAIConfigResponse";
 
 export interface SettingsAIConfigUpdateResponse {
-  aiConfig?: ModelAIConfig;
+  aiConfig?: SettingsAIConfigResponse;
   message?: string;
 }
