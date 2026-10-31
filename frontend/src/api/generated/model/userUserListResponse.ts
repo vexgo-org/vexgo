@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ApiPagination } from "./apiPagination";
-import type { ModelUser } from "./modelUser";
+import type { UserAdminUserResponse } from "./userAdminUserResponse";
 
 export interface UserUserListResponse {
   pagination?: ApiPagination;
-  users?: ModelUser[];
+  users?: UserAdminUserResponse[];
 }

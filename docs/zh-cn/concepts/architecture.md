@@ -34,7 +34,7 @@ backend/
     notification/            # 站内通知
     middleware/              # JWT 认证、角色权限、请求日志
     migration/               # 启动迁移：表结构、数据回填、敏感信息加密
-    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）
+    model/                   # GORM 数据模型 + 共享接口（Notifier、FileRemover）；无 JSON 标签
     page/                    # 自定义页面（/:slug）
     post/                    # 文章 CRUD、分类、标签、点赞
     public/                  # 嵌入的前端、主题、SSR 服务与处理器、静态路由
@@ -55,11 +55,17 @@ backend/
 handler.go    → HTTP 请求解析、响应渲染（调用 service）
 service.go    → 业务逻辑、跨领域编排（调用 repository）
 repository.go → 持久化接口 + GORM 实现（调用数据库）
+types.go      → API 传输类型（请求/响应 DTO），带 JSON 标签供 swag/orval 使用
 ```
 
 - Handler 不直接操作 GORM，而是委托给 Service。
 - Service 在 `Repository` 接口之后与数据库无关，因此无需真实数据库即可测试。各领域的测试用内存 SQLite 运行，接缝则用 fake。
 - Repository 封装所有 SQL/GORM 查询，包括避免 N+1 的批量操作。
+- **Handler 绑定 `types.go` 中的请求类型并直接传给 Service**；Service 返回数据库模型，Handler 再通过显式的 `toXxxResponse` 函数将其转为响应 DTO。
+
+### 模型/DTO 分离
+
+`internal/model/` 中的数据库模型**不带 JSON 标签** —— 测试 `TestModelsHaveNoJSONTags` 强制要求这一点。每个 HTTP 响应都使用领域 `types.go`（或 `internal/api/` 中的共享形状如 `api.UserSummary`）中声明的专用 DTO。这防止凭证、令牌、存储键泄露到响应或 OpenAPI schema 中，也阻止 Handler 意外嵌入裸模型。缓存读路径（`post/cached_repository.go`、`home/cached_repository.go`）更进一步：它们存储显式的线格式（`cachedPost`、`cachedAuthor`、`cachedSettings`），只保存访客可见的数据，因此共享 Valkey 缓存永远不会积累敏感字段。
 
 ### 共享接缝（`model/interfaces.go`）
 

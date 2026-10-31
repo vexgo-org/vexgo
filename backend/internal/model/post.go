@@ -31,55 +31,55 @@ func ValidPostStatus(status PostStatus) bool {
 
 // Post is a blog article with its author, category, tags and moderation state.
 type Post struct {
-	ID              uint       `json:"id" gorm:"primaryKey"`
-	Slug            string     `json:"slug" gorm:"size:255;uniqueIndex"`
-	Title           string     `json:"title" binding:"required" gorm:"size:255"`
-	Content         string     `json:"content" binding:"required" gorm:"type:text"`
-	Excerpt         string     `json:"excerpt" gorm:"type:text"`
-	ViewCount       int        `json:"viewCount" gorm:"default:0"`
-	AuthorID        uint       `json:"authorId"`
-	Author          User       `json:"author" gorm:"foreignKey:AuthorID"`
-	Category        string     `json:"category" gorm:"size:100"`
-	Tags            []Tag      `json:"tags" gorm:"many2many:post_tags;"`
-	Status          PostStatus `json:"status" gorm:"size:50"`            // draft/published/pending/rejected
-	RejectionReason string     `json:"rejectionReason" gorm:"type:text"` // rejection reason
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	ID              uint   `gorm:"primaryKey"`
+	Slug            string `gorm:"size:255;uniqueIndex"`
+	Title           string `binding:"required" gorm:"size:255"`
+	Content         string `binding:"required" gorm:"type:text"`
+	Excerpt         string `gorm:"type:text"`
+	ViewCount       int    `gorm:"default:0"`
+	AuthorID        uint
+	Author          User       `gorm:"foreignKey:AuthorID"`
+	Category        string     `gorm:"size:100"`
+	Tags            []Tag      `gorm:"many2many:post_tags;"`
+	Status          PostStatus `gorm:"size:50"`   // draft/published/pending/rejected
+	RejectionReason string     `gorm:"type:text"` // rejection reason
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 	// Non-database field: used to include like count and whether the current user has liked in API response
-	LikesCount int  `json:"likesCount" gorm:"-"`
-	IsLiked    bool `json:"isLiked" gorm:"-"`
+	LikesCount int  `gorm:"-"`
+	IsLiked    bool `gorm:"-"`
 	// Non-database field: comment count
-	CommentsCount int `json:"commentsCount" gorm:"-"`
+	CommentsCount int `gorm:"-"`
 
-	CoverImageID *uint  `json:"-"`
-	CoverImage   *Asset `gorm:"foreignKey:CoverImageID" json:"-"`
+	CoverImageID *uint
+	CoverImage   *Asset `gorm:"foreignKey:CoverImageID"`
 }
 
 // Like model
 // Each record represents a user's like for a post
 
 type Like struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	PostID    uint      `json:"postId" gorm:"uniqueIndex:idx_likes_post_user"`
-	Post      Post      `json:"-" gorm:"foreignKey:PostID"`
-	UserID    uint      `json:"userId" gorm:"uniqueIndex:idx_likes_post_user"`
-	User      User      `json:"-" gorm:"foreignKey:UserID"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        uint `gorm:"primaryKey"`
+	PostID    uint `gorm:"uniqueIndex:idx_likes_post_user"`
+	Post      Post `gorm:"foreignKey:PostID"`
+	UserID    uint `gorm:"uniqueIndex:idx_likes_post_user"`
+	User      User `gorm:"foreignKey:UserID"`
+	CreatedAt time.Time
 }
 
 // Tag is a label attached to posts via a many-to-many association.
 type Tag struct {
-	ID   uint   `json:"id" gorm:"primaryKey"`
-	Name string `json:"name" gorm:"size:100;uniqueIndex"`
+	ID   uint   `gorm:"primaryKey"`
+	Name string `gorm:"size:100;uniqueIndex"`
 	// Non-database field: number of posts referencing the tag
-	PostCount int64 `json:"postCount" gorm:"-"`
+	PostCount int64 `gorm:"-"`
 }
 
 // Category groups posts under a named, optionally described bucket.
 type Category struct {
-	ID          uint   `json:"id" gorm:"primaryKey"`
-	Name        string `json:"name" gorm:"size:100;uniqueIndex"`
-	Description string `json:"description"`
+	ID          uint   `gorm:"primaryKey"`
+	Name        string `gorm:"size:100;uniqueIndex"`
+	Description string
 	// Non-database field: number of posts referencing the category by name
-	PostCount int64 `json:"postCount" gorm:"-"`
+	PostCount int64 `gorm:"-"`
 }

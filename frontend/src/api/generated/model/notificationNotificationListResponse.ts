@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ApiPagination } from "./apiPagination";
-import type { ModelNotification } from "./modelNotification";
+import type { NotificationNotificationResponse } from "./notificationNotificationResponse";
 
 export interface NotificationNotificationListResponse {
-  notifications?: ModelNotification[];
+  notifications?: NotificationNotificationResponse[];
   pagination?: ApiPagination;
 }

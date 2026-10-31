@@ -6,10 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface ModelCategory {
+export interface PostCategoryResponse {
   description?: string;
   id?: number;
   name?: string;
-  /** Non-database field: number of posts referencing the category by name */
   postCount?: number;
 }

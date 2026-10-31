@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
-
-import type { SMTPConfig } from "@/types";
 import {
   Card,
   CardContent,
@@ -19,6 +17,10 @@ import { Save, TestTube } from "lucide-react";
 import { SkeletonForm } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
+import type { SettingsSMTPConfigResponse } from "@/api/generated/model";
+
+// The password is write-only: the API never returns it, so it is form state.
+type SMTPConfig = SettingsSMTPConfigResponse & { password: string };
 
 export function SMTPSettingsPage() {
   const { t } = useTranslation();
@@ -26,7 +28,6 @@ export function SMTPSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [config, setConfig] = useState<SMTPConfig>({
-    id: "",
     enabled: false,
     host: "",
     port: 587,
@@ -35,14 +36,12 @@ export function SMTPSettingsPage() {
     fromEmail: "",
     fromName: t("common.siteName") || "VexGo",
     testEmail: "",
-    createdAt: "",
-    updatedAt: "",
   });
 
   const loadConfig = useCallback(async () => {
     try {
       const response = await unwrap(getVexGoAPI().getConfigSmtp());
-      setConfig(response);
+      setConfig({ ...response, password: "" });
     } catch (error: unknown) {
       console.error("Failed to load SMTP config:", error);
       toast.error(t("commentConfig.loadFailed"));

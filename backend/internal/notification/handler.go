@@ -57,9 +57,32 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, NotificationListResponse{
-		Notifications: notifications,
+		Notifications: toNotificationResponses(notifications),
 		Pagination:    api.ToPagination(total, page, limit),
 	})
+}
+
+func toNotificationResponse(notification *model.Notification) *NotificationResponse {
+	return &NotificationResponse{
+		ID:            notification.ID,
+		Type:          notification.Type,
+		Title:         notification.Title,
+		Content:       notification.Content,
+		RelatedID:     notification.RelatedID,
+		RelatedType:   notification.RelatedType,
+		RelatedPostID: notification.RelatedPostID,
+		IsRead:        notification.IsRead,
+		CreatedAt:     notification.CreatedAt,
+		UpdatedAt:     notification.UpdatedAt,
+	}
+}
+
+func toNotificationResponses(notifications []model.Notification) []NotificationResponse {
+	resps := make([]NotificationResponse, len(notifications))
+	for i := range notifications {
+		resps[i] = *toNotificationResponse(&notifications[i])
+	}
+	return resps
 }
 
 // MarkAsRead godoc

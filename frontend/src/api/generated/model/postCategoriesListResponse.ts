@@ -5,8 +5,8 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelCategory } from "./modelCategory";
+import type { PostCategoryResponse } from "./postCategoryResponse";
 
 export interface PostCategoriesListResponse {
-  categories?: ModelCategory[];
+  categories?: PostCategoryResponse[];
 }

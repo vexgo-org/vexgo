@@ -1039,92 +1039,63 @@ func TestGetUserPosts_UnknownAuthorIsNotFound(t *testing.T) {
 	}
 }
 
-// The author block on the public list endpoints is filtered for the viewer:
-// an anonymous caller receives no email, a signed-in reader receives one only
-// while the author left the address public, and neither receives account
-// state (role, verification, last login, privacy switches).
-func TestPublicAuthorBlocksAreRedacted(t *testing.T) {
-	cases := []struct {
-		name        string
-		viewer      string // "" means no token at all
-		hideEmail   bool
-		wantEmail   string
-		wantNoState bool
-	}{
-		{name: "anonymous", wantEmail: "", wantNoState: true},
-		{name: "signed-in reader", viewer: model.RoleAuthor, wantEmail: "author@example.com", wantNoState: true},
-		{name: "signed-in reader, address hidden", viewer: model.RoleAuthor, hideEmail: true, wantEmail: "", wantNoState: true},
+// The author block on the public list endpoints is the attribution summary
+// only: id and username, for every viewer. Email and account state never
+// leave the server, whatever the reader's role or the author's privacy
+// switches.
+func TestPublicAuthorBlocksAreSlim(t *testing.T) {
+	r, db := newTestRouter(t)
+	author := seedRoleUser(t, db, model.RoleAuthor)
+	author.Email = "author@example.com"
+	author.EmailVerified = true
+	author.ProfileVisibility = model.ProfileVisibilityPublic
+	author.LastLoginAt = time.Now()
+	if err := db.Save(&author).Error; err != nil {
+		t.Fatalf("save author: %v", err)
+	}
+	post := model.Post{Slug: "public", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished, AuthorID: author.ID}
+	if err := db.Create(&post).Error; err != nil {
+		t.Fatalf("seed post: %v", err)
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			r, db := newTestRouter(t)
-			author := seedRoleUser(t, db, model.RoleAuthor)
-			author.Email = "author@example.com"
-			author.EmailVerified = true
-			author.HideEmail = tc.hideEmail
-			author.ProfileVisibility = model.ProfileVisibilityPublic
-			author.LastLoginAt = time.Now()
-			if err := db.Save(&author).Error; err != nil {
-				t.Fatalf("save author: %v", err)
-			}
-			post := model.Post{Slug: "public", Title: "t", Content: "c", Category: "1", Status: model.PostStatusPublished, AuthorID: author.ID}
-			if err := db.Create(&post).Error; err != nil {
-				t.Fatalf("seed post: %v", err)
-			}
+	viewer := model.User{Username: "reader", Email: "reader@example.com", Role: model.RoleAuthor, PasswordVersion: 1}
+	if err := db.Create(&viewer).Error; err != nil {
+		t.Fatalf("seed reader: %v", err)
+	}
+	token := mintToken(t, viewer.ID, viewer.Role)
 
-			token := ""
-			if tc.viewer != "" {
-				viewer := model.User{Username: "reader", Email: "reader@example.com", Role: tc.viewer, PasswordVersion: 1}
-				if err := db.Create(&viewer).Error; err != nil {
-					t.Fatalf("seed reader: %v", err)
-				}
-				token = mintToken(t, viewer.ID, tc.viewer)
+	for _, path := range []string{"/api/posts?page=1&limit=5", "/api/stats/latest-posts", "/api/stats/popular-posts"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d (body=%s)", path, w.Code, w.Body.String())
+		}
+
+		var body struct {
+			Posts []struct {
+				Author map[string]any `json:"author"`
+			} `json:"posts"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("%s: decode body: %v", path, err)
+		}
+		if len(body.Posts) != 1 {
+			t.Fatalf("%s: expected 1 post, got %d", path, len(body.Posts))
+		}
+
+		authorBlock := body.Posts[0].Author
+		if got := authorBlock["username"]; got != author.Username {
+			t.Errorf("%s: author username = %v, want %q", path, got, author.Username)
+		}
+		if got := authorBlock["id"]; got != float64(author.ID) {
+			t.Errorf("%s: author id = %v, want %d", path, got, author.ID)
+		}
+		for _, field := range []string{"email", "role", "email_verified", "last_login_at", "profile_visibility", "password"} {
+			if _, ok := authorBlock[field]; ok {
+				t.Errorf("%s: author block exposes %q: %+v", path, field, authorBlock)
 			}
-
-			for _, path := range []string{"/api/posts?page=1&limit=5", "/api/stats/latest-posts", "/api/stats/popular-posts"} {
-				req := httptest.NewRequest(http.MethodGet, path, nil)
-				if token != "" {
-					req.Header.Set("Authorization", "Bearer "+token)
-				}
-				w := httptest.NewRecorder()
-				r.ServeHTTP(w, req)
-				if w.Code != http.StatusOK {
-					t.Fatalf("%s: expected 200, got %d (body=%s)", path, w.Code, w.Body.String())
-				}
-
-				var body struct {
-					Posts []struct {
-						Author struct {
-							Username          string    `json:"username"`
-							Email             string    `json:"email"`
-							Role              string    `json:"role"`
-							EmailVerified     bool      `json:"email_verified"`
-							LastLoginAt       time.Time `json:"last_login_at"`
-							ProfileVisibility string    `json:"profile_visibility"`
-						} `json:"author"`
-					} `json:"posts"`
-				}
-				if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-					t.Fatalf("%s: decode body: %v", path, err)
-				}
-				if len(body.Posts) != 1 {
-					t.Fatalf("%s: expected 1 post, got %d", path, len(body.Posts))
-				}
-
-				author := body.Posts[0].Author
-				if author.Username != "u_"+model.RoleAuthor {
-					t.Errorf("%s: test setup lost the author, got %+v", path, author)
-				}
-				if author.Email != tc.wantEmail {
-					t.Errorf("%s: expected email %q, got %q", path, tc.wantEmail, author.Email)
-				}
-				if tc.wantNoState {
-					if author.Role != "" || author.EmailVerified || !author.LastLoginAt.IsZero() || author.ProfileVisibility != "" {
-						t.Errorf("%s: account state leaked in the author block: %+v", path, author)
-					}
-				}
-			}
-		})
+		}
 	}
 }

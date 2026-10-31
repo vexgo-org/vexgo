@@ -99,15 +99,11 @@ export function WritePostPage() {
         throw Error("no default category");
       }
 
-      // Ensure category ids are strings so they match the Select options (the backend may return numeric ids)
-      const normalized = (response.categories || []).map((c) => ({
-        ...c,
-        id: String(c.id),
-      }));
-      setCategories(normalized);
+      const categories = response.categories || [];
+      setCategories(categories);
 
       if (!isEditMode) {
-        const def = normalized.find((c) => c.name?.toLowerCase() === "default");
+        const def = categories.find((c) => c.name?.toLowerCase() === "default");
         if (def) {
           setCategory(def.name || "");
         }
@@ -126,7 +122,7 @@ export function WritePostPage() {
       console.log("Post content type:", typeof post.content);
       console.log("Post content length:", post.content?.length);
       setSlug(post.slug || "");
-      setTitle(post.title);
+      setTitle(post.title || "");
       setContent(post.content || "");
       setExcerpt(post.excerpt || "");
       // The backend category may be numeric or a string; resolve it to the matching category name
@@ -327,9 +323,8 @@ export function WritePostPage() {
         getVexGoAPI().postCategories({ name, description: "" }),
       );
       const created = res.category!;
-      const normalized = { ...created, id: String(created.id) };
-      setCategories((prev) => [...prev, normalized]);
-      setCategory(normalized.name || "");
+      setCategories((prev) => [...prev, created]);
+      setCategory(created.name || "");
       setNewCategoryName("");
     } catch (err) {
       if (isAxiosError<{ error?: string; code?: string }>(err)) {

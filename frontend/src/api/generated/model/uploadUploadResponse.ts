@@ -5,9 +5,9 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelMediaFile } from "./modelMediaFile";
+import type { UploadMediaFileResponse } from "./uploadMediaFileResponse";
 
 export interface UploadUploadResponse {
-  file?: ModelMediaFile;
+  file?: UploadMediaFileResponse;
   message?: string;
 }

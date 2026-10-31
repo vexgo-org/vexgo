@@ -5,9 +5,9 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
-import type { ModelComment } from "./modelComment";
+import type { CommentCommentResponse } from "./commentCommentResponse";
 
 export interface CommentCommentMessageResponse {
-  comment?: ModelComment;
+  comment?: CommentCommentResponse;
   message?: string;
 }

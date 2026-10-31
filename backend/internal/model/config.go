@@ -6,35 +6,35 @@ import (
 
 // SMTPConfig stores SMTP mail server configuration
 type SMTPConfig struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	Enabled   bool      `json:"enabled" gorm:"default:false"` // Whether SMTP is enabled
-	Host      string    `json:"host" gorm:"size:255"`         // SMTP server address
-	Port      int       `json:"port"`                         // SMTP port
-	Username  string    `json:"username" gorm:"size:255"`     // Email account
-	Password  string    `json:"password" gorm:"size:512"`     // Email password or authorization code (encrypted at rest)
-	FromEmail string    `json:"fromEmail" gorm:"size:255"`    // Sender email
-	FromName  string    `json:"fromName" gorm:"size:100"`     // Sender name
-	TestEmail string    `json:"testEmail" gorm:"size:255"`    // Test email recipient
-	CreatedAt time.Time `json:"created_at"`                   // Creation time
-	UpdatedAt time.Time `json:"updated_at"`                   // Update time
+	ID        uint      `gorm:"primaryKey"`
+	Enabled   bool      `gorm:"default:false"` // Whether SMTP is enabled
+	Host      string    `gorm:"size:255"`      // SMTP server address
+	Port      int       // SMTP port
+	Username  string    `gorm:"size:255"` // Email account
+	Password  string    `gorm:"size:512"` // Email password or authorization code (encrypted at rest)
+	FromEmail string    `gorm:"size:255"` // Sender email
+	FromName  string    `gorm:"size:100"` // Sender name
+	TestEmail string    `gorm:"size:255"` // Test email recipient
+	CreatedAt time.Time // Creation time
+	UpdatedAt time.Time // Update time
 }
 
 // GeneralSettings stores general system settings
 type GeneralSettings struct {
-	ID                  uint      `json:"id" gorm:"primaryKey"`
-	CaptchaEnabled      bool      `json:"captchaEnabled" gorm:"default:false"`    // Whether captcha verification is enabled
-	RegistrationEnabled bool      `json:"registrationEnabled"`                    // Whether registration is allowed
-	AllowGuestViewPosts bool      `json:"allowGuestViewPosts"`                    // Whether guests can view posts
-	SiteName            string    `json:"siteName" gorm:"size:100;default:VexGo"` // Site name
-	SiteDescription     string    `json:"siteDescription" gorm:"type:text"`       // Site description
-	ItemsPerPage        int       `json:"itemsPerPage" gorm:"default:20"`         // Items per page
-	SiteLanguage        string    `json:"siteLanguage" gorm:"size:10;default:en"` // Default public theme language (e.g. en, zh)
-	CreatedAt           time.Time `json:"created_at"`                             // Creation time
-	UpdatedAt           time.Time `json:"updated_at"`                             // Update time
+	ID                  uint      `gorm:"primaryKey"`
+	CaptchaEnabled      bool      `gorm:"default:false"` // Whether captcha verification is enabled
+	RegistrationEnabled bool      // Whether registration is allowed
+	AllowGuestViewPosts bool      // Whether guests can view posts
+	SiteName            string    `gorm:"size:100;default:VexGo"` // Site name
+	SiteDescription     string    `gorm:"type:text"`              // Site description
+	ItemsPerPage        int       `gorm:"default:20"`             // Items per page
+	SiteLanguage        string    `gorm:"size:10;default:en"`     // Default public theme language (e.g. en, zh)
+	CreatedAt           time.Time // Creation time
+	UpdatedAt           time.Time // Update time
 
 	// Site icon.
-	SiteIconID *uint  `json:"siteIconId"`
-	SiteIcon   *Asset `gorm:"foreignKey:SiteIconID" json:"-"`
+	SiteIconID *uint
+	SiteIcon   *Asset `gorm:"foreignKey:SiteIconID"`
 }
 
 // Captcha stores sliding puzzle captcha information. Only the validation
@@ -42,15 +42,15 @@ type GeneralSettings struct {
 // directly and never stored, so anonymous challenge requests cannot grow the
 // table.
 type Captcha struct {
-	ID        string    `json:"id" gorm:"primaryKey;size:255"` // Captcha ID
-	Token     string    `json:"token" gorm:"size:255"`         // Verification token
-	X         int       `json:"x"`                             // Puzzle correct position X coordinate
-	Y         int       `json:"y"`                             // Puzzle correct position Y coordinate
-	Width     int       `json:"width"`                         // Puzzle width
-	Height    int       `json:"height"`                        // Puzzle height
-	ExpiresAt time.Time `json:"expires_at"`                    // Expiration time
-	Used      bool      `json:"used" gorm:"default:false"`     // Whether already used
-	CreatedAt time.Time `json:"created_at"`                    // Creation time
+	ID        string    `gorm:"primaryKey;size:255"` // Captcha ID
+	Token     string    `gorm:"size:255"`            // Verification token
+	X         int       // Puzzle correct position X coordinate
+	Y         int       // Puzzle correct position Y coordinate
+	Width     int       // Puzzle width
+	Height    int       // Puzzle height
+	ExpiresAt time.Time // Expiration time
+	Used      bool      `gorm:"default:false"` // Whether already used
+	CreatedAt time.Time // Creation time
 }
 
 // CommentModerationConfig stores comment moderation configuration. The three
@@ -58,36 +58,36 @@ type Captcha struct {
 // content, while manual review holds every comment that is not published or
 // rejected. All default to false, which publishes new comments immediately.
 type CommentModerationConfig struct {
-	ID                   uint      `json:"id" gorm:"primaryKey"`
-	ManualReviewEnabled  bool      `json:"manualReviewEnabled" gorm:"default:false"`  // Hold comments for manual approval
-	KeywordFilterEnabled bool      `json:"keywordFilterEnabled" gorm:"default:false"` // Reject on blocked keyword hits
-	LLMReviewEnabled     bool      `json:"llmReviewEnabled" gorm:"default:false"`     // Reject comments flagged by the LLM
-	ModelProvider        string    `json:"modelProvider" gorm:"default:''"`           // AI provider (openai, azure, etc.)
-	ApiKey               string    `json:"apiKey" gorm:"size:512;default:''"`         // API key (encrypted at rest)
-	ApiEndpoint          string    `json:"apiEndpoint" gorm:"default:''"`             // API endpoint
-	ModelName            string    `json:"modelName" gorm:"default:'gpt-3.5-turbo'"`  // Model name
-	ModerationPrompt     string    `json:"moderationPrompt" gorm:"default:''"`        // Moderation prompt
-	BlockKeywords        string    `json:"blockKeywords" gorm:"size:500;default:''"`  // Blocked keywords, comma-separated
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
+	ID                   uint   `gorm:"primaryKey"`
+	ManualReviewEnabled  bool   `gorm:"default:false"`           // Hold comments for manual approval
+	KeywordFilterEnabled bool   `gorm:"default:false"`           // Reject on blocked keyword hits
+	LLMReviewEnabled     bool   `gorm:"default:false"`           // Reject comments flagged by the LLM
+	ModelProvider        string `gorm:"default:''"`              // AI provider (openai, azure, etc.)
+	ApiKey               string `gorm:"size:512;default:''"`     // API key (encrypted at rest)
+	ApiEndpoint          string `gorm:"default:''"`              // API endpoint
+	ModelName            string `gorm:"default:'gpt-3.5-turbo'"` // Model name
+	ModerationPrompt     string `gorm:"default:''"`              // Moderation prompt
+	BlockKeywords        string `gorm:"size:500;default:''"`     // Blocked keywords, comma-separated
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // AIConfig stores AI model API configuration
 type AIConfig struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	Enabled     bool      `json:"enabled" gorm:"default:false"`                      // Whether AI model is enabled
-	Provider    string    `json:"provider" gorm:"size:50;default:'openai'"`          // Provider (openai, azure, etc.)
-	ApiEndpoint string    `json:"apiEndpoint" gorm:"size:500;default:''"`            // API endpoint URL
-	ApiKey      string    `json:"apiKey" gorm:"size:512;default:''"`                 // API key (encrypted at rest)
-	ModelName   string    `json:"modelName" gorm:"size:100;default:'gpt-3.5-turbo'"` // Model name
-	CreatedAt   time.Time `json:"created_at"`                                        // Creation time
-	UpdatedAt   time.Time `json:"updated_at"`                                        // Update time
+	ID          uint      `gorm:"primaryKey"`
+	Enabled     bool      `gorm:"default:false"`                    // Whether AI model is enabled
+	Provider    string    `gorm:"size:50;default:'openai'"`         // Provider (openai, azure, etc.)
+	ApiEndpoint string    `gorm:"size:500;default:''"`              // API endpoint URL
+	ApiKey      string    `gorm:"size:512;default:''"`              // API key (encrypted at rest)
+	ModelName   string    `gorm:"size:100;default:'gpt-3.5-turbo'"` // Model name
+	CreatedAt   time.Time // Creation time
+	UpdatedAt   time.Time // Update time
 }
 
 // ThemeConfig stores the active theme selection for the entire site
 type ThemeConfig struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	ActiveTheme string    `json:"activeTheme" gorm:"size:100;default:'default'"` // Active theme ID
-	CreatedAt   time.Time `json:"created_at"`                                    // Creation time
-	UpdatedAt   time.Time `json:"updated_at"`                                    // Update time
+	ID          uint      `gorm:"primaryKey"`
+	ActiveTheme string    `gorm:"size:100;default:'default'"` // Active theme ID
+	CreatedAt   time.Time // Creation time
+	UpdatedAt   time.Time // Update time
 }

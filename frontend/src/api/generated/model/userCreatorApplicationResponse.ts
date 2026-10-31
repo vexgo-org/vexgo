@@ -6,17 +6,15 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ModelCreatorApplicationStatus } from "./modelCreatorApplicationStatus";
-import type { ModelUser } from "./modelUser";
+import type { UserAdminUserResponse } from "./userAdminUserResponse";
 
-export interface ModelCreatorApplication {
-  created_at?: string;
+export interface UserCreatorApplicationResponse {
+  createdAt?: string;
   id?: number;
   reason?: string;
-  review_reason?: string;
-  reviewer?: ModelUser;
-  reviewer_id?: number;
+  reviewReason?: string;
+  reviewerId?: number;
   status?: ModelCreatorApplicationStatus;
-  updated_at?: string;
-  user?: ModelUser;
-  user_id?: number;
+  updatedAt?: string;
+  user?: UserAdminUserResponse;
 }

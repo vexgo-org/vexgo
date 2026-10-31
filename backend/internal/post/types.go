@@ -4,15 +4,51 @@
 package post
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
+// PostResponse is the body of every post endpoint. It never embeds model.Post:
+// the wire shape is decided here, not by the database schema.
 type PostResponse struct {
-	*model.Post
-	CoverImageOriginalURL string     `json:"coverImageOriginalURL"`
-	CoverImagePublicID    *uuid.UUID `json:"coverImagePublicID"`
+	ID                    uint             `json:"id" example:"42"`
+	Slug                  string           `json:"slug" example:"hello-world"`
+	Title                 string           `json:"title" example:"Hello world"`
+	Content               string           `json:"content"`
+	Excerpt               string           `json:"excerpt"`
+	Category              string           `json:"category" example:"engineering"`
+	Tags                  []TagResponse    `json:"tags"`
+	Status                model.PostStatus `json:"status" example:"published"`
+	AuthorID              uint             `json:"authorId" example:"7"`
+	Author                api.UserSummary  `json:"author"`
+	CoverImagePublicID    *uuid.UUID       `json:"coverImagePublicID,omitempty" example:"01a15240-3847-71a4-b8bb-f8448ef3a952"`
+	CoverImageOriginalURL string           `json:"coverImageOriginalURL,omitempty"`
+	ViewCount             int              `json:"viewCount" example:"128"`
+	LikesCount            int              `json:"likesCount" example:"3"`
+	IsLiked               bool             `json:"isLiked" example:"false"`
+	CommentsCount         int              `json:"commentsCount" example:"5"`
+	// RejectionReason is only filled for the post's author and for admins.
+	RejectionReason *string   `json:"rejectionReason,omitempty" example:"Off-topic"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+}
+
+// TagResponse is a tag on a post, in a tag list, or in a create/update reply.
+type TagResponse struct {
+	ID        uint   `json:"id" example:"3"`
+	Name      string `json:"name" example:"golang"`
+	PostCount int64  `json:"postCount,omitempty" example:"12"`
+}
+
+// CategoryResponse is a category in the post list and the category endpoints.
+type CategoryResponse struct {
+	ID          uint   `json:"id" example:"1"`
+	Name        string `json:"name" example:"Tutorials"`
+	Description string `json:"description"`
+	PostCount   int64  `json:"postCount" example:"5"`
 }
 
 // PostListResponse is the body of any paged post list.
@@ -73,7 +109,7 @@ type UpdatePostRequest struct {
 
 // CategoriesListResponse is the body of GET /api/categories.
 type CategoriesListResponse struct {
-	Categories []model.Category `json:"categories"`
+	Categories []CategoryResponse `json:"categories"`
 }
 
 // CreateCategoryRequest is the body of POST /api/categories.
@@ -84,13 +120,13 @@ type CreateCategoryRequest struct {
 
 // CreateCategoryResponse is the body of POST /api/categories.
 type CreateCategoryResponse struct {
-	Message  string          `json:"message" example:"Category created successfully"`
-	Category *model.Category `json:"category"`
+	Message  string            `json:"message" example:"Category created successfully"`
+	Category *CategoryResponse `json:"category"`
 }
 
 // TagsListResponse is the body of GET /api/tags.
 type TagsListResponse struct {
-	Tags []model.Tag `json:"tags"`
+	Tags []TagResponse `json:"tags"`
 }
 
 // CreateTagRequest is the body of POST /api/tags.
@@ -100,8 +136,8 @@ type CreateTagRequest struct {
 
 // CreateTagResponse is the body of POST /api/tags.
 type CreateTagResponse struct {
-	Message string     `json:"message" example:"Tag created successfully"`
-	Tag     *model.Tag `json:"tag"`
+	Message string       `json:"message" example:"Tag created successfully"`
+	Tag     *TagResponse `json:"tag"`
 }
 
 // DeleteMessageResponse is the body of DELETE on

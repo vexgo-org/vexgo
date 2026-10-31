@@ -342,7 +342,7 @@ export function AdminPage() {
                             {t("myPostsPage.cancel")}
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDeletePost(post.id)}
+                            onClick={() => handleDeletePost(post.id!)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
                             {t("myPostsPage.delete")}
@@ -514,7 +514,7 @@ export function AdminPage() {
                                 : t("adminData.deleteCategory")
                             }
                             aria-label={t("adminData.deleteCategory")}
-                            onClick={() => handleDeleteCategory(category.id)}
+                            onClick={() => handleDeleteCategory(category.id!)}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -571,7 +571,7 @@ export function AdminPage() {
                                 : t("adminData.deleteTag")
                             }
                             aria-label={t("adminData.deleteTag")}
-                            onClick={() => handleDeleteTag(tag.id)}
+                            onClick={() => handleDeleteTag(tag.id!)}
                           >
                             <Trash2 className="size-4" />
                           </Button>

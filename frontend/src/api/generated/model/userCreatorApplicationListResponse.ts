@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ApiPagination } from "./apiPagination";
-import type { ModelCreatorApplication } from "./modelCreatorApplication";
+import type { UserCreatorApplicationResponse } from "./userCreatorApplicationResponse";
 
 export interface UserCreatorApplicationListResponse {
-  applications?: ModelCreatorApplication[];
+  applications?: UserCreatorApplicationResponse[];
   pagination?: ApiPagination;
 }

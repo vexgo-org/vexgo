@@ -6,9 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface ModelTag {
+export interface UploadMediaFileResponse {
+  createdAt?: string;
   id?: number;
-  name?: string;
-  /** Non-database field: number of posts referencing the tag */
-  postCount?: number;
+  size?: number;
+  type?: string;
+  url?: string;
 }

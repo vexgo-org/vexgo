@@ -24,24 +24,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { CheckCircle, XCircle } from "lucide-react";
-
-interface CreatorApplication {
-  id?: number;
-  username?: string;
-  email?: string;
-  currentRole?: string;
-  createdAt?: string;
-  reason?: string;
-  status?: string;
-}
+import type { UserCreatorApplicationResponse } from "@/api/generated/model";
 
 export function CreatorApplicationReviewPage() {
   const { user: currentUser, isLoading: isAuthLoading } = useAuth();
   const { t } = useTranslation();
-  const [applications, setApplications] = useState<CreatorApplication[]>([]);
+  const [applications, setApplications] = useState<
+    UserCreatorApplicationResponse[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [selectedApplication, setSelectedApplication] =
-    useState<CreatorApplication | null>(null);
+    useState<UserCreatorApplicationResponse | null>(null);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -143,12 +136,12 @@ export function CreatorApplicationReviewPage() {
     }
   };
 
-  const openApproveDialog = (application: CreatorApplication) => {
+  const openApproveDialog = (application: UserCreatorApplicationResponse) => {
     setSelectedApplication(application);
     setIsApproveDialogOpen(true);
   };
 
-  const openRejectDialog = (application: CreatorApplication) => {
+  const openRejectDialog = (application: UserCreatorApplicationResponse) => {
     setSelectedApplication(application);
     setIsRejectDialogOpen(true);
   };
@@ -234,18 +227,18 @@ export function CreatorApplicationReviewPage() {
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <h3 className="display text-subtitle">
-                      {application.username || "-"}
+                      {application.user?.username || "-"}
                     </h3>
                     {getStatusBadge(application.status || "")}
                   </div>
                   <MetaList>
                     <MetaRow label={t("creatorApplication.emailLabel")}>
                       <span className="block truncate">
-                        {application.email || "-"}
+                        {application.user?.email || "-"}
                       </span>
                     </MetaRow>
                     <MetaRow label={t("creatorApplication.currentRole")}>
-                      {t(`roles.${application.currentRole || "guest"}`)}
+                      {t(`roles.${application.user?.role || "guest"}`)}
                     </MetaRow>
                     <MetaRow label={t("creatorApplication.appliedAt")}>
                       <span className="tabular-nums">
@@ -303,7 +296,7 @@ export function CreatorApplicationReviewPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t("creatorApplication.approveConfirmDescription", {
-                username: selectedApplication?.username || "",
+                username: selectedApplication?.user?.username || "",
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -333,7 +326,7 @@ export function CreatorApplicationReviewPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t("creatorApplication.rejectConfirmDescription", {
-                username: selectedApplication?.username || "",
+                username: selectedApplication?.user?.username || "",
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>

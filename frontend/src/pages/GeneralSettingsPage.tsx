@@ -3,7 +3,7 @@ import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
 
-import type { GeneralSettings } from "@/types";
+import type { SettingsGeneralSettingsResponse } from "@/api/generated/model";
 import {
   Card,
   CardContent,
@@ -31,8 +31,7 @@ export function GeneralSettingsPage() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [config, setConfig] = useState<GeneralSettings>({
-    id: "",
+  const [config, setConfig] = useState<SettingsGeneralSettingsResponse>({
     captchaEnabled: false,
     registrationEnabled: true,
     allowGuestViewPosts: true,
@@ -42,8 +41,6 @@ export function GeneralSettingsPage() {
     siteIconURL: undefined,
     itemsPerPage: 20,
     siteLanguage: "en",
-    createdAt: "",
-    updatedAt: "",
   });
   const [themeLanguages, setThemeLanguages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);

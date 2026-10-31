@@ -6,7 +6,7 @@ import (
 )
 
 // userAvatarURL returns the original public URL of user's avatar.
-func userAvatarURL(user *model.User) string {
+func UserAvatarURL(user *model.User) string {
 	if user == nil ||
 		user.Avatar == nil {
 		return ""

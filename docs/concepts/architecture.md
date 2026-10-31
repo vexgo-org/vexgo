@@ -34,7 +34,7 @@ backend/
     notification/            # in-app notifications
     middleware/              # JWT auth, role-based permissions, request logging
     migration/               # startup migrations: schema, backfills, secret encryption
-    model/                   # GORM data models + shared seams (Notifier, FileRemover)
+    model/                   # GORM data models + shared seams (Notifier, FileRemover); no JSON tags
     page/                    # custom pages served at /:slug
     post/                    # post CRUD, categories, tags, likes
     public/                  # embedded frontend, themes, SSR service + handler, static routes
@@ -55,11 +55,17 @@ Each domain package follows a three-layer pattern:
 handler.go    → HTTP request parsing, response rendering (calls service)
 service.go    → business logic, cross-domain orchestration (calls repository)
 repository.go → persistence interface + GORM implementation (calls database)
+types.go      → API wire types (request/response DTOs) with JSON tags for swag/orval
 ```
 
 - Handlers never touch GORM directly; they delegate to the service.
 - Services are database-agnostic behind a `Repository` interface, so they can be tested without a live database. The domain tests run them against in-memory SQLite, and the seams are faked.
 - Repositories encapsulate all SQL/GORM queries, including batch operations that prevent N+1.
+- **Handlers bind request types from `types.go` and can hand them straight to the service**; the service layer returns database models, and the handler converts them to response DTOs via explicit `toXxxResponse` functions.
+
+### Model/DTO separation
+
+Database models in `internal/model/` carry **no JSON tags** — a test (`TestModelsHaveNoJSONTags`) enforces this. Every HTTP response uses a dedicated DTO declared in the domain's `types.go` (or in `internal/api/` for shared shapes like `api.UserSummary`). This prevents credentials, tokens, and storage keys from leaking into responses or the OpenAPI schema, and stops handlers from accidentally embedding a raw model. The cached read paths (`post/cached_repository.go`, `home/cached_repository.go`) go further: they store explicit wire shapes (`cachedPost`, `cachedAuthor`, `cachedSettings`) that only ever hold guest-visible data, so a shared Valkey cache cannot accumulate sensitive fields.
 
 ### Shared seams (`model/interfaces.go`)
 

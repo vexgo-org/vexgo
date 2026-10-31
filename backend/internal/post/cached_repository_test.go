@@ -268,6 +268,12 @@ func TestCachedRepository_CachedAuthorIsGuestFiltered(t *testing.T) {
 		HideEmail:         true,
 		HideBio:           true,
 		VerificationToken: "tok",
+		Password:          "bcrypt-hash",
+		PasswordVersion:   7,
+	}
+	repo.post.CoverImage = &model.Asset{
+		PublicID: uuid.New(),
+		Blob:     model.Blob{StorageKey: "cover/secret-key"},
 	}
 
 	got, err := r.FindBySlug(ctx, "hello")
@@ -281,8 +287,10 @@ func TestCachedRepository_CachedAuthorIsGuestFiltered(t *testing.T) {
 		if strings.Contains(value, "alice@example.com") || strings.Contains(value, "secret bio") {
 			t.Fatalf("cached payload %q leaks hidden author data", key)
 		}
-		if strings.Contains(value, "tok") {
-			t.Fatalf("cached payload %q leaked the verification token", key)
+		for _, secret := range []string{"tok", "bcrypt-hash", "cover/secret-key", "PasswordVersion"} {
+			if strings.Contains(value, secret) {
+				t.Fatalf("cached payload %q leaked %q: %s", key, secret, value)
+			}
 		}
 	}
 	// A cache hit decodes the already-filtered copy.

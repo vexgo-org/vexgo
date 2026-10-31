@@ -519,7 +519,7 @@ export function ProfilePage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t("profilePage.changeEmailDescription", {
-                smtpEnabled: user?.emailVerified
+                smtpEnabled: user?.email_verified
                   ? t("profilePage.smtpEnabled")
                   : t("profilePage.smtpDisabled"),
               })}

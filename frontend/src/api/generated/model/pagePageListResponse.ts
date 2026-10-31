@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { ApiPagination } from "./apiPagination";
-import type { ModelPage } from "./modelPage";
+import type { PagePageResponse } from "./pagePageResponse";
 
 export interface PagePageListResponse {
-  pages?: ModelPage[];
+  pages?: PagePageResponse[];
   pagination?: ApiPagination;
 }

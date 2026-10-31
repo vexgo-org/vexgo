@@ -74,7 +74,7 @@ func (h *Handler) GetPages(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PageListResponse{
-		Pages:      pages,
+		Pages:      toPageResponses(pages),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -97,7 +97,7 @@ func (h *Handler) GetPage(c *gin.Context) {
 		c.JSON(http.StatusNotFound, api.ErrorResponse{Error: "Page does not exist"})
 		return
 	}
-	c.JSON(http.StatusOK, PageSingleResponse{Page: page})
+	c.JSON(http.StatusOK, PageSingleResponse{Page: toPageResponse(page)})
 }
 
 // CreatePage godoc
@@ -142,7 +142,7 @@ func (h *Handler) CreatePage(c *gin.Context) {
 		}
 		return
 	}
-	c.JSON(http.StatusCreated, PageMessageResponse{Message: "Page created successfully", Page: page})
+	c.JSON(http.StatusCreated, PageMessageResponse{Message: "Page created successfully", Page: toPageResponse(page)})
 }
 
 // UpdatePage godoc
@@ -191,7 +191,7 @@ func (h *Handler) UpdatePage(c *gin.Context) {
 		}
 		return
 	}
-	c.JSON(http.StatusOK, PageMessageResponse{Message: "Page updated successfully", Page: page})
+	c.JSON(http.StatusOK, PageMessageResponse{Message: "Page updated successfully", Page: toPageResponse(page)})
 }
 
 // DeletePage godoc
@@ -229,4 +229,27 @@ func (h *Handler) DeletePage(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, PageDeleteResponse{Message: "Page deleted successfully"})
+}
+
+func toPageResponse(page *model.Page) *PageResponse {
+	return &PageResponse{
+		ID:        page.ID,
+		Slug:      page.Slug,
+		Title:     page.Title,
+		Content:   page.Content,
+		ShowInNav: page.ShowInNav,
+		SortOrder: page.SortOrder,
+		Status:    page.Status,
+		AuthorID:  page.AuthorID,
+		CreatedAt: page.CreatedAt,
+		UpdatedAt: page.UpdatedAt,
+	}
+}
+
+func toPageResponses(pages []model.Page) []PageResponse {
+	resps := make([]PageResponse, len(pages))
+	for i := range pages {
+		resps[i] = *toPageResponse(&pages[i])
+	}
+	return resps
 }

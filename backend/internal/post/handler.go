@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/asset"
@@ -68,7 +67,7 @@ func (h *Handler) GetPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts:      toPostResponses(posts),
+		Posts:      toPostResponses(posts, u),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -107,7 +106,7 @@ func (h *Handler) GetPostByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostSingleResponse{Post: toPostResponse(post)})
+	c.JSON(http.StatusOK, PostSingleResponse{Post: toPostResponse(post, u)})
 }
 
 // GetPost godoc
@@ -140,7 +139,7 @@ func (h *Handler) GetPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostSingleResponse{Post: toPostResponse(post)})
+	c.JSON(http.StatusOK, PostSingleResponse{Post: toPostResponse(post, u)})
 }
 
 // CreatePost godoc
@@ -214,7 +213,7 @@ func (h *Handler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, PostMessageResponse{Message: "Post created successfully", Post: toPostResponse(post)})
+	c.JSON(http.StatusCreated, PostMessageResponse{Message: "Post created successfully", Post: toPostResponse(post, u)})
 }
 
 // UpdatePost godoc
@@ -243,6 +242,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 	}
 
 	userID := middleware.CurrentUserID(c)
+	u, _ := middleware.CurrentUser(c)
 
 	var req UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -283,7 +283,7 @@ func (h *Handler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post updated successfully", Post: toPostResponse(post)})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post updated successfully", Post: toPostResponse(post, u)})
 }
 
 // DeletePost godoc
@@ -344,6 +344,7 @@ func (h *Handler) DeletePost(c *gin.Context) {
 //	@Router			/posts/user/my-posts [get]
 func (h *Handler) GetMyPosts(c *gin.Context) {
 	userID := middleware.CurrentUserID(c)
+	u, _ := middleware.CurrentUser(c)
 
 	page, limit := middleware.ParsePagination(c, 10)
 	status := c.DefaultQuery("status", "")
@@ -360,7 +361,7 @@ func (h *Handler) GetMyPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts:      toPostResponses(posts),
+		Posts:      toPostResponses(posts, u),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -395,7 +396,7 @@ func (h *Handler) GetDraftPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts:      toPostResponses(posts),
+		Posts:      toPostResponses(posts, u),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -447,7 +448,7 @@ func (h *Handler) GetUserPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts:      toPostResponses(posts),
+		Posts:      toPostResponses(posts, u),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -478,7 +479,7 @@ func (h *Handler) GetPopularPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostListResponseData{Posts: toPostResponses(posts)})
+	c.JSON(http.StatusOK, PostListResponseData{Posts: toPostResponses(posts, u)})
 }
 
 // GetLatestPosts godoc
@@ -503,7 +504,7 @@ func (h *Handler) GetLatestPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostListResponseData{Posts: toPostResponses(posts)})
+	c.JSON(http.StatusOK, PostListResponseData{Posts: toPostResponses(posts, u)})
 }
 
 // GetCategories godoc
@@ -524,7 +525,7 @@ func (h *Handler) GetCategories(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, CategoriesListResponse{Categories: categories})
+	c.JSON(http.StatusOK, CategoriesListResponse{Categories: toCategoryResponses(categories)})
 }
 
 // CreateCategory godoc
@@ -568,7 +569,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, CreateCategoryResponse{
 		Message:  "Category created successfully",
-		Category: category,
+		Category: toCategoryResponse(category),
 	})
 }
 
@@ -590,7 +591,7 @@ func (h *Handler) GetTags(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, TagsListResponse{Tags: tags})
+	c.JSON(http.StatusOK, TagsListResponse{Tags: toTagResponses(tags)})
 }
 
 // DeleteCategory godoc
@@ -738,7 +739,7 @@ func (h *Handler) CreateTag(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, CreateTagResponse{Message: "Tag created successfully", Tag: tag})
+	c.JSON(http.StatusCreated, CreateTagResponse{Message: "Tag created successfully", Tag: toTagResponse(tag)})
 }
 
 // GetPendingPosts godoc
@@ -797,6 +798,7 @@ func (h *Handler) GetRejectedPosts(c *gin.Context) {
 
 // listModeration renders the moderation queue for a given post status.
 func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
+	u, _ := middleware.CurrentUser(c)
 	page, limit := middleware.ParsePagination(c, 10)
 	search := c.DefaultQuery("search", "")
 
@@ -812,7 +814,7 @@ func (h *Handler) listModeration(c *gin.Context, status model.PostStatus) {
 	}
 
 	c.JSON(http.StatusOK, PostListResponse{
-		Posts:      toPostResponses(posts),
+		Posts:      toPostResponses(posts, u),
 		Pagination: api.ToPagination(total, page, limit),
 	})
 }
@@ -838,6 +840,7 @@ func (h *Handler) ApprovePost(c *gin.Context) {
 		return
 	}
 
+	u, _ := middleware.CurrentUser(c)
 	post, err := h.svc.Approve(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
@@ -848,7 +851,7 @@ func (h *Handler) ApprovePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post approved", Post: toPostResponse(post)})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post approved", Post: toPostResponse(post, u)})
 }
 
 // RejectPost godoc
@@ -882,6 +885,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 		return
 	}
 
+	u, _ := middleware.CurrentUser(c)
 	post, err := h.svc.Reject(c.Request.Context(), id, req.RejectionReason)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
@@ -892,7 +896,7 @@ func (h *Handler) RejectPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post has been rejected", Post: toPostResponse(post)})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post has been rejected", Post: toPostResponse(post, u)})
 }
 
 // ResubmitPost godoc
@@ -919,6 +923,7 @@ func (h *Handler) ResubmitPost(c *gin.Context) {
 		return
 	}
 
+	u, _ := middleware.CurrentUser(c)
 	post, err := h.svc.Resubmit(c.Request.Context(), id)
 	if err != nil {
 		switch {
@@ -932,7 +937,7 @@ func (h *Handler) ResubmitPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post resubmitted for moderation", Post: toPostResponse(post)})
+	c.JSON(http.StatusOK, PostMessageResponse{Message: "Post resubmitted for moderation", Post: toPostResponse(post, u)})
 }
 
 // ToggleLike godoc
@@ -1002,25 +1007,69 @@ func (h *Handler) GetLikeStatus(c *gin.Context) {
 	})
 }
 
-func toPostResponse(post *model.Post) *PostResponse {
-	originalURL := ""
-	var publicID *uuid.UUID = nil
-	if post.CoverImage != nil {
-		publicID = &post.CoverImage.PublicID
-		originalURL = asset.OriginalURL(post.CoverImage.PublicID)
+func toPostResponse(post *model.Post, viewer model.User) *PostResponse {
+	resp := &PostResponse{
+		ID:            post.ID,
+		Slug:          post.Slug,
+		Title:         post.Title,
+		Content:       post.Content,
+		Excerpt:       post.Excerpt,
+		Category:      post.Category,
+		Tags:          toTagResponses(post.Tags),
+		Status:        post.Status,
+		AuthorID:      post.AuthorID,
+		Author:        api.UserSummary{ID: post.Author.ID, Username: post.Author.Username},
+		ViewCount:     post.ViewCount,
+		LikesCount:    post.LikesCount,
+		IsLiked:       post.IsLiked,
+		CommentsCount: post.CommentsCount,
+		CreatedAt:     post.CreatedAt,
+		UpdatedAt:     post.UpdatedAt,
 	}
+	if post.CoverImage != nil {
+		publicID := post.CoverImage.PublicID
+		resp.CoverImagePublicID = &publicID
+		resp.CoverImageOriginalURL = asset.OriginalURL(publicID)
+	}
+	if post.RejectionReason != "" && (viewer.ID == post.AuthorID || model.IsAdmin(viewer.Role)) {
+		resp.RejectionReason = &post.RejectionReason
+	}
+	return resp
+}
 
-	return &PostResponse{
-		Post:                  post,
-		CoverImageOriginalURL: originalURL,
-		CoverImagePublicID:    publicID,
+func toPostResponses(posts []model.Post, viewer model.User) []PostResponse {
+	resps := make([]PostResponse, len(posts))
+	for i := range posts {
+		resps[i] = *toPostResponse(&posts[i], viewer)
+	}
+	return resps
+}
+
+func toCategoryResponse(category *model.Category) *CategoryResponse {
+	return &CategoryResponse{
+		ID:          category.ID,
+		Name:        category.Name,
+		Description: category.Description,
+		PostCount:   category.PostCount,
 	}
 }
 
-func toPostResponses(posts []model.Post) []PostResponse {
-	resps := make([]PostResponse, len(posts))
-	for i, post := range posts {
-		resps[i] = *toPostResponse(&post)
+func toCategoryResponses(categories []model.Category) []CategoryResponse {
+	resps := make([]CategoryResponse, len(categories))
+	for i := range categories {
+		resps[i] = *toCategoryResponse(&categories[i])
+	}
+	return resps
+}
+
+func toTagResponse(tag *model.Tag) *TagResponse {
+	return &TagResponse{ID: tag.ID, Name: tag.Name, PostCount: tag.PostCount}
+}
+
+func toTagResponses(tags []model.Tag) []TagResponse {
+	resps := make([]TagResponse, len(tags))
+	for i := range tags {
+		resps[i] = *toTagResponse(&tags[i])
 	}
 	return resps
 }

@@ -31,32 +31,32 @@ const (
 
 // User is an account with a role, authentication fields and privacy settings.
 type User struct {
-	ID            uint   `json:"id" gorm:"primaryKey"`
-	Username      string `json:"username" binding:"required" gorm:"size:100;uniqueIndex"`
-	Email         string `json:"email" binding:"required,email" gorm:"size:255;uniqueIndex"`
-	Password      string `json:"-"`                   // not serialized
-	Role          string `json:"role" gorm:"size:50"` // super_admin/admin/author/contributor/guest
-	EmailVerified bool   `json:"email_verified"`      // whether email is verified
+	ID            uint   `gorm:"primaryKey"`
+	Username      string `binding:"required" gorm:"size:100;uniqueIndex"`
+	Email         string `binding:"required,email" gorm:"size:255;uniqueIndex"`
+	Password      string // not serialized
+	Role          string `gorm:"size:50"` // super_admin/admin/author/contributor/guest
+	EmailVerified bool   // whether email is verified
 	// VerificationToken / TokenExpiresAt / PendingEmail hold live account
 	// tokens and must never serialize: model.User instances are rendered raw
 	// by several endpoints, and a leaked emailed-link token allows account
 	// takeover. Clients get the pending email via the VerifyEmail response.
-	VerificationToken string     `json:"-" gorm:"size:255"`  // verification token (emailed link token)
-	TokenExpiresAt    *time.Time `json:"-"`                  // expiry of the verification/reset/email-change token
-	PendingEmail      string     `json:"-" gorm:"size:255"`  // new email pending confirmation (for email change)
-	PasswordVersion   int        `json:"-" gorm:"default:1"` // password version, used to invalidate old tokens after password modification
-	LastLoginAt       time.Time  `json:"last_login_at"`      // last login time to invalidate old tokens
-	Birthday          string     `json:"birthday,omitempty"` // birthday
-	Bio               string     `json:"bio,omitempty"`      // personal bio
-	CreatedAt         time.Time  `json:"createdAt"`          // registration time
+	VerificationToken string     `gorm:"size:255"` // verification token (emailed link token)
+	TokenExpiresAt    *time.Time // expiry of the verification/reset/email-change token
+	PendingEmail      string     `gorm:"size:255"`  // new email pending confirmation (for email change)
+	PasswordVersion   int        `gorm:"default:1"` // password version, used to invalidate old tokens after password modification
+	LastLoginAt       time.Time  // last login time to invalidate old tokens
+	Birthday          string     // birthday
+	Bio               string     // personal bio
+	CreatedAt         time.Time  // registration time
 	// Privacy settings
-	ProfileVisibility string `json:"profile_visibility,omitempty" gorm:"size:20;default:'public'"` // public/private
-	HideEmail         bool   `json:"hide_email,omitempty" gorm:"default:false"`                    // hide email
-	HideBirthday      bool   `json:"hide_birthday,omitempty" gorm:"default:false"`                 // hide birthday
-	HideBio           bool   `json:"hide_bio,omitempty" gorm:"default:false"`                      // hide bio
+	ProfileVisibility string `gorm:"size:20;default:'public'"` // public/private
+	HideEmail         bool   `gorm:"default:false"`            // hide email
+	HideBirthday      bool   `gorm:"default:false"`            // hide birthday
+	HideBio           bool   `gorm:"default:false"`            // hide bio
 
-	AvatarID *uint  `json:"avatarId"`
-	Avatar   *Asset `gorm:"foreignKey:AvatarID" json:"-"`
+	AvatarID *uint
+	Avatar   *Asset `gorm:"foreignKey:AvatarID"`
 }
 
 // IsSuperAdmin reports whether the role is super admin.

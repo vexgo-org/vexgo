@@ -21,12 +21,16 @@ go run backend/cmd/vexgo/main.go server       # 不用 just 的等价写法
 
 `backend/internal/<domain>/` 下每个领域都是同样的三层：
 
-| 文件            | 职责                          | 约束                                                                   |
-| --------------- | ----------------------------- | ---------------------------------------------------------------------- |
-| `handler.go`    | HTTP 解析与响应渲染           | 不得直接碰 GORM；绑定 `types.go` 中的请求类型                          |
-| `service.go`    | 业务逻辑                      | 只依赖本领域的 `Repository` 接口                                       |
-| `repository.go` | `Repository` 接口 + GORM 实现 | 所有查询都在这里，包括防止 N+1 的批量查询                              |
-| `types.go`      | API 线上类型，带 JSON tag     | 只声明一次，供 `swag` + `orval` 消费；handler 可把请求直接交给 service |
+| 文件            | 职责                          | 约束                                                                                |
+| --------------- | ----------------------------- | ----------------------------------------------------------------------------------- |
+| `handler.go`    | HTTP 解析与响应渲染           | 不得直接碰 GORM；绑定 `types.go` 请求类型，将 Service 返回的模型转为响应 DTO        |
+| `service.go`    | 业务逻辑                      | 只依赖本领域的 `Repository` 接口；返回数据库模型                                    |
+| `repository.go` | `Repository` 接口 + GORM 实现 | 所有查询都在这里，包括防止 N+1 的批量查询                                           |
+| `types.go`      | API 线上类型，带 JSON tag     | 只声明一次，供 `swag` + `orval` 消费；请求类型传给 service，响应类型在 handler 组装 |
+
+`internal/api/` 包存放跨领域共享的线格式（如 `api.UserSummary`，用于文章、评论、页面响应中的最小用户归属信息）。
+
+**模型/DTO 分离**：`internal/model/` 中的数据库模型不带 JSON 标签（由 `TestModelsHaveNoJSONTags` 强制）。每个 HTTP 响应都使用领域 `types.go` 或 `internal/api/` 中声明的专用 DTO。这防止凭证、令牌、存储键泄露到响应或 OpenAPI schema。缓存读路径存储显式线格式（`cachedPost`、`cachedAuthor`、`cachedSettings`），只保存访客可见数据，因此共享 Valkey 缓存永远不会积累敏感字段。
 
 配套结构：
 

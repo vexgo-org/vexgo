@@ -5,32 +5,29 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
+import type { ApiUserSummary } from "./apiUserSummary";
 import type { ModelPostStatus } from "./modelPostStatus";
-import type { ModelTag } from "./modelTag";
-import type { ModelUser } from "./modelUser";
+import type { PostTagResponse } from "./postTagResponse";
 
 export interface PostPostResponse {
-  author?: ModelUser;
+  author?: ApiUserSummary;
   authorId?: number;
   category?: string;
-  /** Non-database field: comment count */
   commentsCount?: number;
-  content: string;
+  content?: string;
   coverImageOriginalURL?: string;
   coverImagePublicID?: string;
   createdAt?: string;
   excerpt?: string;
   id?: number;
   isLiked?: boolean;
-  /** Non-database field: used to include like count and whether the current user has liked in API response */
   likesCount?: number;
-  /** rejection reason */
+  /** RejectionReason is only filled for the post's author and for admins. */
   rejectionReason?: string;
   slug?: string;
-  /** draft/published/pending/rejected */
   status?: ModelPostStatus;
-  tags?: ModelTag[];
-  title: string;
+  tags?: PostTagResponse[];
+  title?: string;
   updatedAt?: string;
   viewCount?: number;
 }

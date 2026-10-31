@@ -4,13 +4,44 @@
 package comment
 
 import (
+	"time"
+
 	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 )
 
+// CommentResponse is the wire shape of a comment. The author is the public
+// summary, never model.User.
+type CommentResponse struct {
+	ID       uint                `json:"id" example:"9"`
+	PostID   uint                `json:"postId" example:"42"`
+	UserID   uint                `json:"userId" example:"7"`
+	ParentID *uint               `json:"parentId,omitempty" swaggertype:"primitive,integer" example:"8"`
+	Content  string              `json:"content"`
+	Status   model.CommentStatus `json:"status" example:"published"`
+	Author   api.UserSummary     `json:"author"`
+	// ModerationReason is only present on moderation endpoints.
+	ModerationReason *string   `json:"moderationReason,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+// CommentModerationConfigResponse is the body of GET and the `config` field of
+// PUT /api/moderation/comments/config. The API key is never echoed back.
+type CommentModerationConfigResponse struct {
+	ManualReviewEnabled  bool   `json:"manualReviewEnabled" example:"true"`
+	KeywordFilterEnabled bool   `json:"keywordFilterEnabled" example:"true"`
+	LLMReviewEnabled     bool   `json:"llmReviewEnabled" example:"false"`
+	ModelProvider        string `json:"modelProvider" example:"openai"`
+	ApiEndpoint          string `json:"apiEndpoint" example:"https://api.openai.com/v1"`
+	ModelName            string `json:"modelName" example:"gpt-4o-mini"`
+	ModerationPrompt     string `json:"moderationPrompt"`
+	BlockKeywords        string `json:"blockKeywords" example:"spam,badword"`
+}
+
 // CommentListResponse is the body of GET /api/comments/post/{id}.
 type CommentListResponse struct {
-	Comments []model.Comment `json:"comments"`
+	Comments []CommentResponse `json:"comments"`
 }
 
 // CreateCommentRequest is the body of POST /api/comments.
@@ -25,10 +56,10 @@ type CreateCommentRequest struct {
 // held in the pending queue (manual review or keyword/LLM
 // filter triggered).
 type CreateCommentResponse struct {
-	Message            string         `json:"message" example:"Comment created successfully"`
-	Comment            *model.Comment `json:"comment"`
-	CommentsCount      int64          `json:"commentsCount" example:"3"`
-	RequiresModeration bool           `json:"requiresModeration" example:"false"`
+	Message            string           `json:"message" example:"Comment created successfully"`
+	Comment            *CommentResponse `json:"comment"`
+	CommentsCount      int64            `json:"commentsCount" example:"3"`
+	RequiresModeration bool             `json:"requiresModeration" example:"false"`
 }
 
 // DeleteCommentResponse is the body of DELETE /api/comments/{id}.
@@ -58,8 +89,8 @@ type UpdateModerationConfigBody struct {
 // field is the same shape as the GET response; the apiKey
 // is masked in the response.
 type UpdateModerationConfigResponse struct {
-	Message string                        `json:"message" example:"Comment moderation configuration updated successfully"`
-	Config  model.CommentModerationConfig `json:"config"`
+	Message string                          `json:"message" example:"Comment moderation configuration updated successfully"`
+	Config  CommentModerationConfigResponse `json:"config"`
 }
 
 // TestModerationResponse is the body of POST
@@ -73,14 +104,14 @@ type TestModerationResponse struct {
 // CommentModerationListResponse is the body of GET
 // /api/moderation/comments/{pending,approved,rejected}.
 type CommentModerationListResponse struct {
-	Comments   []model.Comment `json:"comments"`
-	Pagination api.Pagination  `json:"pagination"`
+	Comments   []CommentResponse `json:"comments"`
+	Pagination api.Pagination    `json:"pagination"`
 }
 
 // CommentMessageResponse is the body of PUT
 // /api/moderation/comments/{id}/(approve|reject). The
 // `comment` field is the updated row.
 type CommentMessageResponse struct {
-	Message string         `json:"message" example:"Comment approved"`
-	Comment *model.Comment `json:"comment"`
+	Message string           `json:"message" example:"Comment approved"`
+	Comment *CommentResponse `json:"comment"`
 }
