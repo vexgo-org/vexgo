@@ -153,7 +153,7 @@ type UpdateUserRoleBody struct {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			id	path		int	true	"target user id"
-//	@Success		200	{object}	MessageResponse
+//	@Success		200	{object}	api.MessageResponse
 //	@Failure		400	{object}	api.ErrorResponse	"self-deletion or invalid id"
 //	@Failure		401	{object}	api.ErrorResponse
 //	@Failure		403	{object}	api.ErrorResponse	"admin delete restricted or no permission"
@@ -191,7 +191,7 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "User deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "User deleted successfully"})
 }
 
 // ApplyForCreator godoc
@@ -314,7 +314,7 @@ func (h *Handler) GetCreatorApplications(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			id		path		int								true	"application id"
 //	@Param			request	body		ReviewCreatorApplicationBody	true	"approve or reject"
-//	@Success		200		{object}	MessageResponse
+//	@Success		200		{object}	api.MessageResponse
 //	@Failure		400		{object}	api.ErrorResponse	"invalid id, payload, or already processed"
 //	@Failure		401		{object}	api.ErrorResponse
 //	@Failure		403		{object}	api.ErrorResponse	"no permission to review"
@@ -364,5 +364,5 @@ func (h *Handler) ReviewCreatorApplication(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "Application reviewed successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Application reviewed successfully"})
 }

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vexgo-org/vexgo/backend/internal/api"
 	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -348,9 +349,9 @@ func decodeUploadResponse(t *testing.T, recorder *httptest.ResponseRecorder) Upl
 }
 
 // decodeMessageResponse decodes a success body as MessageResponse.
-func decodeMessageResponse(t *testing.T, recorder *httptest.ResponseRecorder) MessageResponse {
+func decodeMessageResponse(t *testing.T, recorder *httptest.ResponseRecorder) api.MessageResponse {
 	t.Helper()
-	var response MessageResponse
+	var response api.MessageResponse
 	decodeInto(t, recorder, &response)
 	return response
 }

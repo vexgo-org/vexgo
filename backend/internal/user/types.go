@@ -20,11 +20,6 @@ type UserMessageResponse struct {
 	User    *model.User `json:"user"`
 }
 
-// MessageResponse is a uniform `{ "message": "..." }` body.
-type MessageResponse struct {
-	Message string `json:"message" example:"User deleted successfully"`
-}
-
 // ApplyForCreatorRequest is the body of POST
 // /api/users/apply-creator. The reason is optional but
 // encouraged so admins have context for the decision.

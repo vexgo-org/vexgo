@@ -74,7 +74,7 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 //	@Produce	json
 //	@Security	BearerAuth
 //	@Param		id	path		int	true	"notification id"
-//	@Success	200	{object}	MessageResponse
+//	@Success	200	{object}	api.MessageResponse
 //	@Failure	400	{object}	api.ErrorResponse	"invalid id"
 //	@Failure	401	{object}	api.ErrorResponse
 //	@Failure	404	{object}	api.ErrorResponse	"notification not found or not updated"
@@ -100,7 +100,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "Notification marked as read"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Notification marked as read"})
 }
 
 // MarkAllAsRead godoc
@@ -109,7 +109,7 @@ func (h *Handler) MarkAsRead(c *gin.Context) {
 //	@Tags		notifications
 //	@Produce	json
 //	@Security	BearerAuth
-//	@Success	200	{object}	MessageResponse
+//	@Success	200	{object}	api.MessageResponse
 //	@Failure	401	{object}	api.ErrorResponse
 //	@Failure	500	{object}	api.ErrorResponse
 //	@Router		/notifications/read-all [put]
@@ -121,7 +121,7 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "All notifications marked as read"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "All notifications marked as read"})
 }
 
 // DeleteNotification godoc
@@ -131,7 +131,7 @@ func (h *Handler) MarkAllAsRead(c *gin.Context) {
 //	@Produce	json
 //	@Security	BearerAuth
 //	@Param		id	path		int	true	"notification id"
-//	@Success	200	{object}	MessageResponse
+//	@Success	200	{object}	api.MessageResponse
 //	@Failure	400	{object}	api.ErrorResponse	"invalid id"
 //	@Failure	401	{object}	api.ErrorResponse
 //	@Failure	404	{object}	api.ErrorResponse	"notification not found"
@@ -157,7 +157,7 @@ func (h *Handler) DeleteNotification(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, MessageResponse{Message: "Notification deleted"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Notification deleted"})
 }
 
 // GetUnreadCount godoc

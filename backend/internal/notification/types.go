@@ -27,12 +27,6 @@ type Pagination struct {
 	TotalPages int64 `json:"totalPages" example:"5"`
 }
 
-// MessageResponse is a uniform `{ "message": "..." }` body
-// for endpoints that don't return data.
-type MessageResponse struct {
-	Message string `json:"message" example:"Notification marked as read"`
-}
-
 // UnreadCountResponse is the body of GET
 // /api/notifications/unread-count. The number is the count
 // of unread notifications for the authenticated user.
