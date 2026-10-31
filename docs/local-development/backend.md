@@ -21,12 +21,16 @@ Configuration layers, highest first: CLI flags > config file (`vexgo server -c`,
 
 Each domain under `backend/internal/<domain>/` follows the same three layers:
 
-| File            | Role                                         | Rules                                                                                      |
-| --------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `handler.go`    | HTTP parsing and response rendering          | Never touches GORM; binds request types from `types.go`                                    |
-| `service.go`    | Business logic                               | Depends only on the domain `Repository` interface                                          |
-| `repository.go` | `Repository` interface + GORM implementation | Every query lives here, including batch queries that prevent N+1                           |
-| `types.go`      | API wire types with JSON tags                | Declared once for `swag` + `orval`; the handler can hand a request straight to the service |
+| File            | Role                                         | Rules                                                                                                |
+| --------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `handler.go`    | HTTP parsing and response rendering          | Never touches GORM; binds request types from `types.go`, converts service models to response DTOs    |
+| `service.go`    | Business logic                               | Depends only on the domain `Repository` interface; returns database models                           |
+| `repository.go` | `Repository` interface + GORM implementation | Every query lives here, including batch queries that prevent N+1                                     |
+| `types.go`      | API wire types with JSON tags                | Declared once for `swag` + `orval`; request types passed to service, response types built in handler |
+
+The `internal/api/` package holds shared wire types used across domains (e.g. `api.UserSummary` for minimal user attribution in post, comment, and page responses).
+
+**Model/DTO separation**: Database models in `internal/model/` carry no JSON tags (enforced by `TestModelsHaveNoJSONTags`). Every HTTP response uses a dedicated DTO from the domain's `types.go` or `internal/api/`. This prevents credentials, tokens, and storage keys from leaking into responses or the OpenAPI schema. Cached read paths store explicit wire shapes (`cachedPost`, `cachedAuthor`, `cachedSettings`) that only hold guest-visible data, so a shared Valkey cache cannot accumulate sensitive fields.
 
 Supporting pieces:
 
