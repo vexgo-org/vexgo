@@ -5,10 +5,10 @@
  * Self-hosted blog CMS HTTP API.
  * OpenAPI spec version: 1.0.0
  */
+import type { ApiPagination } from "./apiPagination";
 import type { ModelPage } from "./modelPage";
-import type { PagePagination } from "./pagePagination";
 
 export interface PagePageListResponse {
   pages?: ModelPage[];
-  pagination?: PagePagination;
+  pagination?: ApiPagination;
 }

@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type {
-  AssetMessageResponse,
+  ApiMessageResponse,
   AssetUploadResponse,
   AuthChangePasswordRequestWire,
   AuthCurrentUserResponse,
@@ -59,7 +59,6 @@ import type {
   GetUsersParams,
   HomeStatsResponse,
   ModelCommentModerationConfig,
-  NotificationMessageResponse,
   NotificationNotificationListResponse,
   NotificationUnreadCountResponse,
   PageCreatePageRequest,
@@ -110,13 +109,11 @@ import type {
   SettingsThemesListResponse,
   SsoSSOProvidersResponse,
   UploadFilesListResponse,
-  UploadMessageResponse,
   UploadMultiUploadResponse,
   UploadUploadResponse,
   UserApplyForCreatorRequest,
   UserApplyForCreatorResponse,
   UserCreatorApplicationListResponse,
-  UserMessageResponse,
   UserReviewCreatorApplicationBody,
   UserUpdateUserRoleBody,
   UserUserListResponse,
@@ -133,7 +130,7 @@ export const getVexGoAPI = () => {
    * @summary Delete an asset
    */
   const postAssetsDeletePublicID = (publicID: string) => {
-    return customInstance<AssetMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/assets/delete/${publicID}`,
       method: "POST",
     });
@@ -931,7 +928,7 @@ export const getVexGoAPI = () => {
    * @summary Mark all notifications as read
    */
   const putNotificationsReadAll = () => {
-    return customInstance<NotificationMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/notifications/read-all`,
       method: "PUT",
     });
@@ -954,7 +951,7 @@ export const getVexGoAPI = () => {
    * @summary Delete a notification
    */
   const deleteNotificationsId = (id: number) => {
-    return customInstance<NotificationMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/notifications/${id}`,
       method: "DELETE",
     });
@@ -964,7 +961,7 @@ export const getVexGoAPI = () => {
    * @summary Mark a single notification as read
    */
   const putNotificationsIdRead = (id: number) => {
-    return customInstance<NotificationMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/notifications/${id}/read`,
       method: "PUT",
     });
@@ -1336,7 +1333,7 @@ export const getVexGoAPI = () => {
    * @summary Delete an uploaded file
    */
   const deleteUploadId = (id: string) => {
-    return customInstance<UploadMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/upload/${id}`,
       method: "DELETE",
     });
@@ -1398,7 +1395,7 @@ export const getVexGoAPI = () => {
     id: number,
     userReviewCreatorApplicationBody: UserReviewCreatorApplicationBody,
   ) => {
-    return customInstance<UserMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/users/creator-applications/${id}/review`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -1414,7 +1411,7 @@ export const getVexGoAPI = () => {
    * @summary Delete a user
    */
   const deleteUsersId = (id: number) => {
-    return customInstance<UserMessageResponse>({
+    return customInstance<ApiMessageResponse>({
       url: `/users/${id}`,
       method: "DELETE",
     });

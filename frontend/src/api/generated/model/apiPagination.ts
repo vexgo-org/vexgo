@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export interface PagePagination {
+export interface ApiPagination {
   limit?: number;
   page?: number;
   total?: number;

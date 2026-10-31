@@ -24,6 +24,15 @@
                 },
                 "type": "object"
             },
+            "api.MessageResponse": {
+                "properties": {
+                    "message": {
+                        "example": "This is a message",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "api.NotFoundWithIDResponse": {
                 "properties": {
                     "error": {
@@ -50,11 +59,23 @@
                 },
                 "type": "object"
             },
-            "asset.MessageResponse": {
+            "api.Pagination": {
                 "properties": {
-                    "message": {
-                        "example": "File deleted",
-                        "type": "string"
+                    "limit": {
+                        "example": 10,
+                        "type": "integer"
+                    },
+                    "page": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "total": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "totalPages": {
+                        "example": 5,
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -673,7 +694,7 @@
                         "uniqueItems": false
                     },
                     "pagination": {
-                        "$ref": "#/components/schemas/comment.Pagination"
+                        "$ref": "#/components/schemas/api.Pagination"
                     }
                 },
                 "type": "object"
@@ -729,27 +750,6 @@
                     "message": {
                         "example": "Comment deleted",
                         "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "comment.Pagination": {
-                "properties": {
-                    "limit": {
-                        "example": 10,
-                        "type": "integer"
-                    },
-                    "page": {
-                        "example": 1,
-                        "type": "integer"
-                    },
-                    "total": {
-                        "example": 42,
-                        "type": "integer"
-                    },
-                    "totalPages": {
-                        "example": 5,
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -1296,15 +1296,6 @@
                 ],
                 "type": "object"
             },
-            "notification.MessageResponse": {
-                "properties": {
-                    "message": {
-                        "example": "Notification marked as read",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "notification.NotificationListResponse": {
                 "properties": {
                     "notifications": {
@@ -1315,28 +1306,7 @@
                         "uniqueItems": false
                     },
                     "pagination": {
-                        "$ref": "#/components/schemas/notification.Pagination"
-                    }
-                },
-                "type": "object"
-            },
-            "notification.Pagination": {
-                "properties": {
-                    "limit": {
-                        "example": 10,
-                        "type": "integer"
-                    },
-                    "page": {
-                        "example": 1,
-                        "type": "integer"
-                    },
-                    "total": {
-                        "example": 42,
-                        "type": "integer"
-                    },
-                    "totalPages": {
-                        "example": 5,
-                        "type": "integer"
+                        "$ref": "#/components/schemas/api.Pagination"
                     }
                 },
                 "type": "object"
@@ -1407,7 +1377,7 @@
                         "uniqueItems": false
                     },
                     "pagination": {
-                        "$ref": "#/components/schemas/page.Pagination"
+                        "$ref": "#/components/schemas/api.Pagination"
                     }
                 },
                 "type": "object"
@@ -1428,27 +1398,6 @@
                 "properties": {
                     "page": {
                         "$ref": "#/components/schemas/model.Page"
-                    }
-                },
-                "type": "object"
-            },
-            "page.Pagination": {
-                "properties": {
-                    "limit": {
-                        "example": 10,
-                        "type": "integer"
-                    },
-                    "page": {
-                        "example": 1,
-                        "type": "integer"
-                    },
-                    "total": {
-                        "example": 42,
-                        "type": "integer"
-                    },
-                    "totalPages": {
-                        "example": 5,
-                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -1653,27 +1602,6 @@
                 },
                 "type": "object"
             },
-            "post.Pagination": {
-                "properties": {
-                    "limit": {
-                        "example": 10,
-                        "type": "integer"
-                    },
-                    "page": {
-                        "example": 1,
-                        "type": "integer"
-                    },
-                    "total": {
-                        "example": 42,
-                        "type": "integer"
-                    },
-                    "totalPages": {
-                        "example": 5,
-                        "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
             "post.PostDeleteResponse": {
                 "properties": {
                     "message": {
@@ -1686,7 +1614,7 @@
             "post.PostListResponse": {
                 "properties": {
                     "pagination": {
-                        "$ref": "#/components/schemas/post.Pagination"
+                        "$ref": "#/components/schemas/api.Pagination"
                     },
                     "posts": {
                         "items": {
@@ -2302,15 +2230,6 @@
                 },
                 "type": "object"
             },
-            "upload.MessageResponse": {
-                "properties": {
-                    "message": {
-                        "example": "File deleted",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "upload.MultiUploadResponse": {
                 "properties": {
                     "files": {
@@ -2371,37 +2290,7 @@
                         "uniqueItems": false
                     },
                     "pagination": {
-                        "$ref": "#/components/schemas/user.Pagination"
-                    }
-                },
-                "type": "object"
-            },
-            "user.MessageResponse": {
-                "properties": {
-                    "message": {
-                        "example": "User deleted successfully",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "user.Pagination": {
-                "properties": {
-                    "limit": {
-                        "example": 10,
-                        "type": "integer"
-                    },
-                    "page": {
-                        "example": 1,
-                        "type": "integer"
-                    },
-                    "total": {
-                        "example": 42,
-                        "type": "integer"
-                    },
-                    "totalPages": {
-                        "example": 5,
-                        "type": "integer"
+                        "$ref": "#/components/schemas/api.Pagination"
                     }
                 },
                 "type": "object"
@@ -2450,7 +2339,7 @@
             "user.UserListResponse": {
                 "properties": {
                     "pagination": {
-                        "$ref": "#/components/schemas/user.Pagination"
+                        "$ref": "#/components/schemas/api.Pagination"
                     },
                     "users": {
                         "items": {
@@ -2522,7 +2411,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/asset.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
@@ -6181,7 +6070,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/notification.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
@@ -6283,7 +6172,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/notification.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
@@ -6359,7 +6248,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/notification.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
@@ -8077,7 +7966,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/upload.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
@@ -8400,7 +8289,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/user.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
@@ -8487,7 +8376,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/user.MessageResponse"
+                                    "$ref": "#/components/schemas/api.MessageResponse"
                                 }
                             }
                         },
