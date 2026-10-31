@@ -25,15 +25,18 @@ import { Bot, Save } from "lucide-react";
 import { toast } from "sonner";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
+import type { CommentCommentModerationConfigResponse } from "@/api/generated/model";
 
-import type { CommentModerationConfig } from "@/types";
+// The API key is write-only: the API never returns it, so it is form state.
+type CommentModerationConfig = CommentCommentModerationConfigResponse & {
+  apiKey: string;
+};
 
 export function CommentConfigPage() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<CommentModerationConfig>({
-    id: "",
     manualReviewEnabled: false,
     keywordFilterEnabled: false,
     llmReviewEnabled: false,
@@ -43,8 +46,6 @@ export function CommentConfigPage() {
     modelName: "gpt-3.5-turbo",
     moderationPrompt: t("commentConfig.moderationPromptPlaceholder"),
     blockKeywords: "",
-    createdAt: "",
-    updatedAt: "",
   });
 
   const loadConfig = useCallback(async () => {
@@ -52,7 +53,7 @@ export function CommentConfigPage() {
       const response = await unwrap(
         getVexGoAPI().getModerationCommentsConfig(),
       );
-      setConfig(response);
+      setConfig({ ...response, apiKey: "" });
     } catch (error: unknown) {
       console.error("Failed to load comment moderation config:", error);
       toast.error(t("commentConfig.loadFailed"));

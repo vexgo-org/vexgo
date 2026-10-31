@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/I18nContext";
 import { getVexGoAPI } from "@/api/generated/endpoints";
 import { unwrap } from "@/lib/api";
-
-import type { AIConfig, AIModel } from "@/types";
 import type { AxiosError } from "axios";
 import {
   Card,
@@ -27,6 +25,10 @@ import { Save, TestTube, RefreshCw } from "lucide-react";
 import { SkeletonForm } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
+import type { SettingsAIConfigResponse } from "@/api/generated/model";
+
+// The API key is write-only: the API never returns it, so it is form state.
+type AIConfig = SettingsAIConfigResponse & { apiKey: string };
 
 interface ApiErrorResponse {
   error?: string;
@@ -39,21 +41,18 @@ export function AISettingsPage() {
   const [testing, setTesting] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [config, setConfig] = useState<AIConfig>({
-    id: "",
     enabled: false,
     provider: "openai",
     apiEndpoint: "",
     apiKey: "",
     modelName: "gpt-3.5-turbo",
-    createdAt: "",
-    updatedAt: "",
   });
-  const [models, setModels] = useState<AIModel[]>([]);
+  const [models, setModels] = useState<string[]>([]);
 
   const loadConfig = useCallback(async () => {
     try {
       const response = await unwrap(getVexGoAPI().getConfigAi());
-      setConfig(response);
+      setConfig({ ...response, apiKey: "" });
     } catch (error: unknown) {
       console.error("Failed to load AI config:", error);
       toast.error(t("aiSettings.loadFailed"));
@@ -75,14 +74,7 @@ export function AISettingsPage() {
     setFetchingModels(true);
     try {
       const response = await unwrap(getVexGoAPI().getConfigAiModels());
-      setModels(
-        (response.models || []).map((m) => ({
-          id: m,
-          object: "model" as const,
-          created: 0,
-          owned_by: "",
-        })),
-      );
+      setModels(response.models || []);
       toast.success(t("aiSettings.testSuccess"));
     } catch (error: unknown) {
       console.error("Failed to fetch the model list:", error);
@@ -164,7 +156,7 @@ export function AISettingsPage() {
   }
 
   // Get the currently selected model info
-  const selectedModel = models.find((m) => m.id === config.modelName);
+  const selectedModel = models.find((m) => m === config.modelName);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -293,32 +285,12 @@ export function AISettingsPage() {
                 disabled={saving}
               >
                 <SelectTrigger>
-                  {/* `Select.Value` renders its children as a render function,
-                    not as nodes — a `ReactNode` child here would be ignored. */}
-                  <SelectValue placeholder={t("aiSettings.selectModel")}>
-                    {(value: string) => {
-                      const model = models.find((item) => item.id === value);
-                      if (!model) return value;
-                      return (
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="truncate">{model.id}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            ({model.owned_by})
-                          </span>
-                        </span>
-                      );
-                    }}
-                  </SelectValue>
+                  <SelectValue placeholder={t("aiSettings.selectModel")} />
                 </SelectTrigger>
                 <SelectContent>
                   {models.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex flex-col">
-                        <span>{model.id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {t("aiSettings.provider")}: {model.owned_by}
-                        </span>
-                      </div>
+                    <SelectItem key={model} value={model}>
+                      {model}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -343,7 +315,7 @@ export function AISettingsPage() {
               </span>
               {selectedModel && (
                 <span className="text-success">
-                  {t("aiSettings.selectedModel", { model: selectedModel.id })}
+                  {t("aiSettings.selectedModel", { model: selectedModel })}
                 </span>
               )}
             </div>

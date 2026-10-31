@@ -239,7 +239,11 @@ export function ModerationPage() {
   );
 
   const editButton = (post: Post) => (
-    <Button variant="outline" size="sm" onClick={() => handleEditPost(post.id)}>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => handleEditPost(post.id!)}
+    >
       <Edit />
       {t("moderation.edit")}
     </Button>
@@ -333,7 +337,7 @@ export function ModerationPage() {
                       {editButton(post)}
                       <Button
                         size="sm"
-                        onClick={() => handleApprovePost(post.id)}
+                        onClick={() => handleApprovePost(post.id!)}
                       >
                         <CheckCircle />
                         {t("moderation.approve")}
@@ -341,7 +345,7 @@ export function ModerationPage() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleRejectPost(post.id)}
+                        onClick={() => handleRejectPost(post.id!)}
                       >
                         <XCircle />
                         {t("moderation.reject")}
@@ -398,7 +402,7 @@ export function ModerationPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleResubmitPost(post.id)}
+                        onClick={() => handleResubmitPost(post.id!)}
                       >
                         <Send />
                         {t("moderation.resubmit")}

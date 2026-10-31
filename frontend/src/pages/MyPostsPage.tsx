@@ -244,7 +244,7 @@ export function MyPostsPage() {
                                 {t("myPostsPage.cancel")}
                               </AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => handleDeletePost(post.id)}
+                                onClick={() => handleDeletePost(post.id!)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
                                 {t("myPostsPage.delete")}

@@ -175,7 +175,7 @@ export function UserManagementPage() {
     if (currentUser?.role === "super_admin") return true; // super admins can delete any user
     if (currentUser?.role === "admin") {
       // Admins can only delete authors, contributors, and guests
-      return ["author", "contributor", "guest"].includes(user.role);
+      return ["author", "contributor", "guest"].includes(user.role ?? "");
     }
     return false;
   };
@@ -248,23 +248,25 @@ export function UserManagementPage() {
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-2xs font-medium text-muted-foreground">
-                      {user.username.charAt(0).toUpperCase()}
+                      {(user.username || "").charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
-                        {user.username}
+                        {user.username || "-"}
                       </span>
                       <span className="block truncate text-2xs text-muted-foreground">
-                        {user.email}
+                        {user.email || "-"}
                       </span>
                     </span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <Badge
-                    variant={roleDisplayMap[user.role]?.variant || "outline"}
+                    variant={
+                      roleDisplayMap[user.role ?? ""]?.variant || "outline"
+                    }
                   >
-                    {roleDisplayMap[user.role]?.label || user.role}
+                    {roleDisplayMap[user.role ?? ""]?.label || user.role}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground tabular-nums">
