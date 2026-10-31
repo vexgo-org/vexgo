@@ -14,15 +14,15 @@ const (
 
 // Page is a standalone custom page rendered at /:slug.
 type Page struct {
-	ID        uint       `json:"id" gorm:"primaryKey"`
-	Slug      string     `json:"slug" gorm:"size:100;uniqueIndex"`
-	Title     string     `json:"title" binding:"required" gorm:"size:255"`
-	Content   string     `json:"content" binding:"required" gorm:"type:text"`
-	ShowInNav bool       `json:"showInNav" gorm:"default:false"`
-	SortOrder int        `json:"sortOrder" gorm:"default:0"`
-	Status    PageStatus `json:"status" gorm:"size:20;default:draft"`
-	AuthorID  uint       `json:"authorId"`
-	Author    User       `json:"author" gorm:"foreignKey:AuthorID"`
-	CreatedAt time.Time  `json:"createdAt"`
-	UpdatedAt time.Time  `json:"updatedAt"`
+	ID        uint       `gorm:"primaryKey"`
+	Slug      string     `gorm:"size:100;uniqueIndex"`
+	Title     string     `binding:"required" gorm:"size:255"`
+	Content   string     `binding:"required" gorm:"type:text"`
+	ShowInNav bool       `gorm:"default:false"`
+	SortOrder int        `gorm:"default:0"`
+	Status    PageStatus `gorm:"size:20;default:draft"`
+	AuthorID  uint
+	Author    User `gorm:"foreignKey:AuthorID"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
