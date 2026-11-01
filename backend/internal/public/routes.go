@@ -3,7 +3,6 @@ package public
 import (
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -12,13 +11,6 @@ import (
 // RegisterRoutes registers all static file routes, theme support and the
 // server-side-rendered public pages.
 func (h *Handler) RegisterRoutes(e *gin.Engine, s3Enabled bool) {
-	// Serve local uploads if S3 is not enabled
-	if !s3Enabled {
-		serveUpload := h.uploadHandler(filepath.Join(h.svc.DataDir(), "media"))
-		e.GET("/uploads/*filepath", serveUpload)
-		e.HEAD("/uploads/*filepath", serveUpload)
-	}
-
 	// Admin SPA assets. The SPA is built with base /admin/, so its HTML
 	// references /admin/assets/... and everything non-public lives under
 	// /admin/.

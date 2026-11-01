@@ -2,7 +2,6 @@ package public
 
 import (
 	"embed"
-	"io"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -252,121 +251,6 @@ func parsePageParam(c *gin.Context) int {
 		return 1
 	}
 	return page
-}
-
-// uploadContentTypes maps stored-media extensions to the content type served
-// for them. It never maps to a type a browser executes as a script
-// (html/xhtml/xml/js are absent), and any unlisted extension falls back to
-// application/octet-stream. Because the type is set explicitly before
-// http.ServeContent runs, the file server never sniffs the bytes, so an
-// uploaded file cannot be rendered as a document on this origin. The upload
-// domain keeps its own filename allowlist; an extension it allows but this map
-// omits is simply served as an opaque byte stream.
-//
-// SVG is the deliberate exception: it is a document, so it is served as
-// image/svg+xml only together with the isolation policy in serveMediaFile.
-var uploadContentTypes = map[string]string{
-	".jpg":  "image/jpeg",
-	".jpeg": "image/jpeg",
-	".png":  "image/png",
-	".gif":  "image/gif",
-	".webp": "image/webp",
-	".avif": "image/avif",
-	".bmp":  "image/bmp",
-	".ico":  "image/x-icon",
-	".tif":  "image/tiff",
-	".tiff": "image/tiff",
-	".svg":  "image/svg+xml",
-	".mp4":  "video/mp4",
-	".webm": "video/webm",
-	".mov":  "video/quicktime",
-	".mp3":  "audio/mpeg",
-	".wav":  "audio/wav",
-	".ogg":  "audio/ogg",
-	".m4a":  "audio/mp4",
-	".pdf":  "application/pdf",
-	".txt":  "text/plain; charset=utf-8",
-	".csv":  "text/csv; charset=utf-8",
-	".md":   "text/plain; charset=utf-8",
-}
-
-// Media response hardening. mediaSVGContentType is the one media type a browser
-// renders as a document, so navigating straight to an uploaded SVG would
-// otherwise run any <script> it carries with the site's own origin — a stored
-// XSS. It is therefore served with svgIsolationCSP, which disables scripting
-// and same-origin access inside that document. Loaded as an <img>, which is how
-// avatars, cover images and post media use it, an SVG is static and the policy
-// costs nothing.
-const (
-	mediaSVGContentType = "image/svg+xml"
-	svgIsolationCSP     = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-)
-
-// mediaContentType returns the content type served for a stored media file. It
-// is derived from the stored name only — never from sniffing the bytes — so a
-// hostile upload cannot talk the browser into rendering it as a document.
-// Unlisted extensions, including a name whose extension was stripped at upload
-// time, are opaque byte streams.
-func mediaContentType(name string) string {
-	if contentType, ok := uploadContentTypes[strings.ToLower(path.Ext(name))]; ok {
-		return contentType
-	}
-	return "application/octet-stream"
-}
-
-// serveMediaFile writes one legacy /uploads media file with its explicit
-// content type, so a hostile upload cannot be served as an executable document.
-func serveMediaFile(c *gin.Context, name string, info fs.FileInfo, file io.ReadSeeker) {
-	contentType := mediaContentType(name)
-	c.Header("Content-Type", contentType)
-	if contentType == mediaSVGContentType {
-		// Append to the baseline policy the security-headers middleware already
-		// set, so base-uri, object-src and frame-ancestors keep applying to the
-		// SVG document alongside the sandbox.
-		policy := c.Writer.Header().Get("Content-Security-Policy")
-		if policy == "" {
-			policy = svgIsolationCSP
-		} else {
-			policy += "; " + svgIsolationCSP
-		}
-		c.Header("Content-Security-Policy", policy)
-	}
-	http.ServeContent(c.Writer, c.Request, name, info.ModTime(), file)
-}
-
-// uploadHandler serves one local media file. The path is confined to mediaDir
-// with os.Root, and the content type comes from uploadContentTypes (never from
-// sniffing), so a hostile upload can never be served as an executable document.
-func (h *Handler) uploadHandler(mediaDir string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		clean := path.Clean(strings.TrimPrefix(c.Param("filepath"), "/"))
-		if clean == "." || !fs.ValidPath(clean) {
-			c.Status(http.StatusNotFound)
-			return
-		}
-
-		root, err := os.OpenRoot(mediaDir)
-		if err != nil {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		defer func() { _ = root.Close() }()
-
-		file, err := root.Open(clean)
-		if err != nil {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		defer func() { _ = file.Close() }()
-
-		info, err := file.Stat()
-		if err != nil || info.IsDir() {
-			c.Status(http.StatusNotFound)
-			return
-		}
-
-		serveMediaFile(c, clean, info, file)
-	}
 }
 
 // serveAsset writes an asset with a content type derived from its extension,
