@@ -13,7 +13,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
-	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
 
 	"github.com/gin-gonic/gin"
@@ -28,7 +27,6 @@ type Deps struct {
 	Comment      comment.Deps
 	Post         post.Deps
 	Page         page.Deps
-	Upload       upload.Deps
 	User         user.Deps
 	Captcha      captcha.Deps
 	Auth         auth.Deps
@@ -47,7 +45,6 @@ func RegisterAPIRoutes(r *gin.Engine, deps Deps) {
 	comment.NewHandler(deps.Comment).RegisterRoutes(api)
 	post.NewHandler(deps.Post).RegisterRoutes(api)
 	page.NewHandler(deps.Page).RegisterRoutes(api)
-	upload.NewHandler(deps.Upload).RegisterRoutes(api)
 	user.NewHandler(deps.User).RegisterRoutes(api)
 	captcha.NewHandler(deps.Captcha).RegisterRoutes(api)
 	auth.NewHandler(deps.Auth).RegisterRoutes(api)

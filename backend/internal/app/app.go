@@ -30,7 +30,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
-	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
 
 	"github.com/gin-gonic/gin"
@@ -171,11 +170,6 @@ func New(cfg *config.Config) (*App, error) {
 		Page: page.Deps{
 			DB:        db,
 			JWTSecret: cfg.JWTSecret,
-		},
-		Upload: upload.Deps{
-			DB:        db,
-			JWTSecret: cfg.JWTSecret,
-			Storage:   storage,
 		},
 		User: user.Deps{
 			DB:        db,
