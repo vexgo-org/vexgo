@@ -26,7 +26,7 @@ func TestMigrateDB_RewritesLegacyMediaURLs(t *testing.T) {
 	const key = "content-local.png"
 	const legacyURL = "/uploads/" + key
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: legacyURL})
+	seedMediaFile(t, db, mediaFile{URL: legacyURL})
 
 	post := model.Post{
 		Slug:    "content-post",
@@ -79,7 +79,7 @@ func TestMigrateDB_RewritesS3MediaURLs(t *testing.T) {
 	const key = "content-s3.png"
 	const legacyURL = "https://cdn.example.com/blog/" + key
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: legacyURL, StorageKey: key})
+	seedMediaFile(t, db, mediaFile{URL: legacyURL, StorageKey: key})
 
 	post := model.Post{Slug: "s3-post", Title: "S3 post", Content: "![image](" + legacyURL + ")"}
 	if err := db.Omit("Author").Create(&post).Error; err != nil {
@@ -108,7 +108,7 @@ func TestMigrateDB_LeavesUnmappedMediaURLs(t *testing.T) {
 	const documentKey = "document.pdf"
 	const documentURL = "/uploads/" + documentKey
 	putObject(t, local, documentKey, textPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: documentURL})
+	seedMediaFile(t, db, mediaFile{URL: documentURL})
 
 	content := "![missing](" + missingURL + ")\n[document](" + documentURL + ")"
 	post := model.Post{Slug: "unmapped-post", Title: "Unmapped post", Content: content}

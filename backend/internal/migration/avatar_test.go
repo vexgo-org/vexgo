@@ -55,7 +55,7 @@ func TestMigrateDB_BackfillsUserAvatarFromLegacyUpload(t *testing.T) {
 	putObject(t, local, key, pngPayload)
 
 	userID := seedLegacyAvatarUser(t, db, "local", "local@example.com", "/uploads/"+key)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: userID})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: userID})
 
 	if err := s.MigrateDB(); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -81,7 +81,7 @@ func TestMigrateDB_BackfillsUserAvatarFromS3URL(t *testing.T) {
 	putObject(t, local, key, pngPayload)
 
 	userID := seedLegacyAvatarUser(t, db, "s3", "s3@example.com", url)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:        url,
 		StorageKey: key,
 		UserID:     userID,
@@ -127,7 +127,7 @@ func TestMigrateDB_SkipsUserAvatarOwnedByAnotherUser(t *testing.T) {
 
 	ownerID := seedLegacyAvatarUser(t, db, "owner", "owner@example.com", "")
 	otherID := seedLegacyAvatarUser(t, db, "other", "other@example.com", "/uploads/"+key)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:    "/uploads/" + key,
 		UserID: ownerID,
 	})
@@ -154,7 +154,7 @@ func TestMigrateDB_DoesNotResurrectClearedUserAvatar(t *testing.T) {
 	putObject(t, local, key, pngPayload)
 
 	userID := seedLegacyAvatarUser(t, db, "cleared", "cleared@example.com", "/uploads/"+key)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: userID})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: userID})
 
 	if err := s.MigrateDB(); err != nil {
 		t.Fatalf("first migrate: %v", err)

@@ -49,7 +49,12 @@ func (s *Service) rewriteLegacyMediaURLs() error {
 // blob, or without a public asset are left out: their content keeps using the
 // legacy route.
 func (s *Service) legacyMediaURLReplacements() (map[string]string, error) {
-	var mediaFiles []model.MediaFile
+	// If the legacy table doesn't exist, there's nothing to rewrite.
+	if !s.db.Migrator().HasTable(&mediaFile{}) {
+		return nil, nil
+	}
+
+	var mediaFiles []mediaFile
 	if err := s.db.Find(&mediaFiles).Error; err != nil {
 		return nil, fmt.Errorf("list legacy media files: %w", err)
 	}
