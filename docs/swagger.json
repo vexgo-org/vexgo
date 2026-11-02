@@ -8202,10 +8202,6 @@
             "name": "notifications"
         },
         {
-            "description": "File uploads",
-            "name": "uploads"
-        },
-        {
             "description": "Home-page statistics",
             "name": "stats"
         },

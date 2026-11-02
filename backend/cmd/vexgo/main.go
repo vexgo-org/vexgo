@@ -52,8 +52,6 @@ var Version = "dev"
 // @tag.description	Post tags
 // @tag.name			notifications
 // @tag.description	User notifications
-// @tag.name			uploads
-// @tag.description	File uploads
 // @tag.name			stats
 // @tag.description	Home-page statistics
 // @tag.name			captcha
