@@ -19,7 +19,7 @@ type Repository interface {
 	ListUsers(ctx context.Context, search string, offset, limit int) ([]model.User, int64, error)
 
 	// DeleteUserCascade deletes the user and everything referencing them
-	// (comments, likes, media rows, posts and their post_tags join rows) in
+	// (comments, likes, posts and their post_tags join rows) in
 	// a single transaction. It returns the URLs of the referenced files so
 	// the caller can delete them after the transaction commits.
 	DeleteUserCascade(ctx context.Context, userID uint) ([]uuid.UUID, error)
@@ -108,9 +108,6 @@ func (r *gormRepository) DeleteUserCascade(ctx context.Context, userID uint) ([]
 			}
 			seen[asset.PublicID] = struct{}{}
 			assetPublicIDs = append(assetPublicIDs, asset.PublicID)
-		}
-		if err := tx.Where("user_id = ?", userID).Delete(&model.MediaFile{}).Error; err != nil {
-			return fmt.Errorf("delete user media files: %w", err)
 		}
 
 		// Posts authored by the user, with all dependents and join rows.

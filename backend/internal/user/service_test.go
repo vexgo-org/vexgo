@@ -46,7 +46,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to get sql.DB: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Tag{}, &model.Comment{}, &model.Like{}, &model.MediaFile{}, &model.CreatorApplication{}, &model.Blob{}, &model.Asset{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Post{}, &model.Tag{}, &model.Comment{}, &model.Like{}, &model.CreatorApplication{}, &model.Blob{}, &model.Asset{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -191,9 +191,6 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 	if err := db.Create(&model.Like{PostID: post.ID, UserID: target.ID}).Error; err != nil {
 		t.Fatalf("failed to seed like: %v", err)
 	}
-	if err := db.Create(&model.MediaFile{UserID: target.ID, URL: "/uploads/media.jpg"}).Error; err != nil {
-		t.Fatalf("failed to seed media file: %v", err)
-	}
 
 	if err := svc.DeleteUser(ctx, admin, otherAdmin.ID); !errors.Is(err, ErrAdminDeleteRestricted) {
 		t.Errorf("expected ErrAdminDeleteRestricted, got %v", err)
@@ -231,10 +228,6 @@ func TestDeleteUser_CascadeAndPermissions(t *testing.T) {
 	db.Model(&model.Like{}).Where("user_id = ?", target.ID).Count(&count)
 	if count != 0 {
 		t.Errorf("expected likes deleted")
-	}
-	db.Model(&model.MediaFile{}).Where("user_id = ?", target.ID).Count(&count)
-	if count != 0 {
-		t.Errorf("expected media files deleted")
 	}
 	if len(files.deleted) != 1 {
 		t.Errorf("expected cover asset deletion only, got %v", files.deleted)

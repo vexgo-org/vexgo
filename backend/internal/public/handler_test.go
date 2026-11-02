@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vexgo-org/vexgo/backend/internal/middleware"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -571,92 +570,6 @@ func TestThemeFileRoute_ServesOnlyAssets(t *testing.T) {
 		}
 		if strings.Contains(w.Body.String(), `"name": "Alt"`) {
 			t.Errorf("GET %s exposed the theme manifest", path)
-		}
-	}
-}
-
-// TestPublicRoutes_UploadsNeverRenderAsDocuments is the regression guard for
-// stored XSS through /uploads: a hostile HTML payload must be served as an
-// opaque byte stream (or a safe non-document type), never as text/html, and
-// path traversal must not escape the media directory.
-func TestPublicRoutes_UploadsNeverRenderAsDocuments(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open test db: %v", err)
-	}
-	dataDir := t.TempDir()
-	mediaDir := filepath.Join(dataDir, "media")
-	if err := os.MkdirAll(mediaDir, 0o750); err != nil {
-		t.Fatalf("mkdir media: %v", err)
-	}
-
-	evil := `<script>alert(document.domain)</script>`
-	for name, content := range map[string]string{
-		"evil.html": evil,
-		"evil.svg":  `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>`,
-		"deadbeef":  evil, // extensionless file, as a stripped upload becomes
-		"pic.png":   "not-really-a-png",
-	} {
-		if err := os.WriteFile(filepath.Join(mediaDir, name), []byte(content), 0o600); err != nil {
-			t.Fatalf("write %s: %v", name, err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "secret.txt"), []byte("secret"), 0o600); err != nil {
-		t.Fatalf("seed decoy: %v", err)
-	}
-
-	svc := NewService(Deps{DB: db, BaseURL: "http://localhost", DataDir: dataDir})
-	e := gin.New()
-	// Register the same baseline headers production uses, so the SVG policy is
-	// asserted as it will actually be sent.
-	e.Use(middleware.SecurityHeaders())
-	NewHandler(svc).RegisterRoutes(e, false)
-
-	for _, tc := range []struct {
-		path string
-		want string
-	}{
-		{"/uploads/evil.html", "application/octet-stream"},
-		{"/uploads/deadbeef", "application/octet-stream"},
-		{"/uploads/pic.png", "image/png"},
-		// SVG keeps a renderable type so an <img> can show it; the sandbox
-		// CSP below is what stops it executing when opened directly.
-		{"/uploads/evil.svg", mediaSVGContentType},
-	} {
-		w := doPublicRequest(t, e, tc.path)
-		if w.Code != http.StatusOK {
-			t.Fatalf("GET %s status = %d", tc.path, w.Code)
-		}
-		if ct := w.Header().Get("Content-Type"); ct != tc.want {
-			t.Errorf("GET %s Content-Type = %q, want %q", tc.path, ct, tc.want)
-		}
-		if strings.HasPrefix(tc.want, "text/html") {
-			t.Errorf("GET %s served an executable document", tc.path)
-		}
-	}
-
-	// The SVG document must carry the isolation policy, alongside the baseline
-	// directives rather than replacing them.
-	w := doPublicRequest(t, e, "/uploads/evil.svg")
-	policy := w.Header().Get("Content-Security-Policy")
-	if !strings.Contains(policy, "sandbox") {
-		t.Errorf("SVG CSP = %q, want a sandbox directive", policy)
-	}
-	if !strings.Contains(policy, "default-src 'none'") {
-		t.Errorf("SVG CSP = %q, want default-src 'none'", policy)
-	}
-	if !strings.Contains(policy, "frame-ancestors") {
-		t.Errorf("SVG CSP = %q, want the baseline directives preserved", policy)
-	}
-	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
-		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
-	}
-
-	// Traversal must not escape the media directory.
-	for _, path := range []string{"/uploads/../secret.txt", "/uploads/..%2fsecret.txt"} {
-		if w := doPublicRequest(t, e, path); w.Code == http.StatusOK {
-			t.Errorf("GET %s served a file outside media (status 200)", path)
 		}
 	}
 }

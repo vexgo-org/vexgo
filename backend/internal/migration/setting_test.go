@@ -42,7 +42,7 @@ func TestMigrateDB_BackfillsSiteIconFromLegacyUpload(t *testing.T) {
 
 	const key = "a1b2c3d4.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 	settingsID := seedSiteIconSetting(t, db, "/uploads/"+key)
 
 	if err := s.MigrateDB(); err != nil {
@@ -86,7 +86,7 @@ func TestMigrateDB_DoesNotResurrectClearedSiteIcon(t *testing.T) {
 
 	const key = "a1b2c3d4.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 	settingsID := seedSiteIconSetting(t, db, "/uploads/"+key)
 
 	if err := s.MigrateDB(); err != nil {

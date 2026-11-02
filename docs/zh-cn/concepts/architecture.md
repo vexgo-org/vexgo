@@ -43,7 +43,6 @@ backend/
     settings/                # 管理员配置（SMTP、AI、通用、主题）
     sso/                     # GitHub / Google / OIDC 登录
     storage/                 # Storage 接缝后的文件后端（本地磁盘或 S3）
-    upload/                  # 旧版上传接口与媒体文件记录，正由 asset/ 取代
     user/                    # 用户管理、角色、创作者申请
 ```
 
@@ -149,7 +148,7 @@ cmd/vexgo/main.go
                      secrets.SecretCipher 接缝，由 settings、comment、mailer 消费
     cache/         ← 内存 + Valkey 后端；各领域通过自己的窄接缝
                      （CounterStore、StateStore、ReadCache）消费
-    storage/       ← 本地磁盘与 S3 文件后端（仅导入 config）；由 upload
+    storage/       ← 本地磁盘与 S3 文件后端（仅导入 config）；由 asset
                      上传媒体、migration 的媒体回填，以及
                      model.FileRemover 清理路径消费
 
@@ -160,7 +159,7 @@ cmd/vexgo/main.go
     auth/          ← 被 comment、post、sso 使用（隐私过滤）
     notification/  ← 实现 model.Notifier，被 comment、post、user 作为通知接缝使用
     storage/       ← storage.Storage 实现 model.FileRemover，被 user、auth、post
-                     用于文件清理；upload 与 asset 领域通过它存储媒体，
+                     用于文件清理；asset 领域通过它存储媒体，
                      migration 的媒体回填也会读取它
     captcha/       ← 实现 auth 声明的验证码检查接缝 auth.CaptchaChecker
     public/        ← 主题目录与预览链接，实现 settings.ThemeManager 接缝
@@ -278,8 +277,8 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 ## 存储
 
 - 上传文件默认存到本地数据目录，启用 S3 后存到任意 S3 兼容对象存储（AWS S3、MinIO、Garage 等）。
-- 两种后端都放在 `internal/storage` 下，共用一个 `Storage` 接口（`Put`/`Open`/`Delete`/`URL`），因此 `upload` 与 `asset` 不需要知道拿到的是哪个后端，测试也可以换成指向临时目录的 `LocalStorage`。具体后端由 `app.initStorage` 选择并注入。
-- 对象一律按 key 寻址，绝不使用 URL。`asset` 领域是替代性的上传路径：`Asset` 是面向用户的记录（稳定的 `public_id`、可见性），指向不可变的 `Blob`（存储 key、MIME 类型、大小）。原始内容通过 `/api/assets/{publicID}/original`（`GET`/`HEAD`）提供；只有公开资源可解析，私有资源返回 404。旧版 `/uploads/...` URL 继续可用。旧版 `MediaFile` 记录在已记录 key 时会把存储 key（供 `Delete` 使用）与浏览器 `url` 一并保存。
+- 两种后端都放在 `internal/storage` 下，共用一个 `Storage` 接口（`Put`/`Open`/`Delete`/`URL`），因此 `asset` 不需要知道拿到的是哪个后端，测试也可以换成指向临时目录的 `LocalStorage`。具体后端由 `app.initStorage` 选择并注入。
+- 对象一律按 key 寻址，绝不使用 URL。`asset` 领域是替代性的上传路径：`Asset` 是面向用户的记录（稳定的 `public_id`、可见性），指向不可变的 `Blob`（存储 key、MIME 类型、大小）。原始内容通过 `/api/assets/{publicID}/original`（`GET`/`HEAD`）提供；只有公开资源可解析，私有资源返回 404。旧版 `/uploads/...` URL 在迁移后不再可用；旧版 `media_files` 表在内容改写完成后被删除。
 - 已配置的站点图标是通用设置引用的公开图片 `Asset`。`/favicon.ico` 会重定向到其原始 URL；未配置时依次回退到 `data/favicon.ico`、当前主题的 `favicon.ico` 和管理后台内置图标。
 - key 在进入后端前先由 `cleanKey` 归一化并拦截，`LocalStorage` 还用 `os.Root` 约束每一次操作，恶意 key 无法逃出 `data/media`。
 - 元数据（用户、文章、评论、设置）存储在数据库：默认 SQLite，生产环境用 PostgreSQL/MySQL。
@@ -310,7 +309,7 @@ SSO 流程使用授权码模式 + 弹窗；结果写入 `localStorage` 的 `sso_
 
 站点图标、用户头像和文章封面映射在媒体回填之后运行，因此只能复用该轮回填创建的 asset。非本地 URL 或回填时被跳过的文件会令引用为空；旧列仍会被删除，因此旧 URL 既不会保留，也不会在后续启动中复活。用户头像映射将旧版 URL 与 `media_files.url` 匹配（覆盖本地与 S3 URL），要求媒体文件与 asset 均属于该用户，且仅关联公开的图片 asset。文章封面映射以相同方式匹配，且仅关联公开的图片 asset；它不校验归属，因为旧版列没有记录上传者，且封面可能由管理员设置为其他作者的上传。
 
-内容改写会在上述映射之后运行，且是幂等的：仅当媒体记录生成了公开 asset 时，才会将 `posts.content` 与 `pages.content` 中完全匹配的旧 URL 替换为 asset URL，因此外部链接与被跳过文件的引用保持不变。升级后编辑器上传会直接使用 asset API，新内容从一开始就使用这些 URL。
+内容改写会在上述映射之后运行，且是幂等的：仅当媒体记录生成了公开 asset 时，才会将 `posts.content` 与 `pages.content` 中完全匹配的旧 URL 替换为 asset URL，因此外部链接与被跳过文件的引用保持不变。内容改写完成后，旧版 `media_files` 表会被删除。升级后编辑器上传会直接使用 asset API，新内容从一开始就使用这些 URL。
 
 有三类旧版记录会被有意跳过，每条都会记录其 `id` 与对应的 key 或 URL：
 

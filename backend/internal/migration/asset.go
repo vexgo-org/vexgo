@@ -15,13 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// backfillAssetBlob fills asset and blob record from legacy `model.MediaFile`.
+// backfillAssetBlob fills asset and blob record from legacy `mediaFile`.
 func (s *Service) backfillAssetBlob() error {
-	if !s.db.Migrator().HasTable(&model.MediaFile{}) {
+	if !s.db.Migrator().HasTable(&mediaFile{}) {
 		return nil
 	}
 
-	var mediaFiles []model.MediaFile
+	var mediaFiles []mediaFile
 	publicIDGenerator := idgen.NewUUIDv7Generator()
 
 	// Query all media file records.

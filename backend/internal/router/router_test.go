@@ -15,7 +15,6 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
-	"github.com/vexgo-org/vexgo/backend/internal/upload"
 	"github.com/vexgo-org/vexgo/backend/internal/user"
 
 	"github.com/gin-gonic/gin"
@@ -53,7 +52,6 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		Comment:      comment.Deps{DB: db, JWTSecret: secret},
 		Post:         post.Deps{DB: db, JWTSecret: secret},
 		Page:         page.Deps{DB: db, JWTSecret: secret},
-		Upload:       upload.Deps{DB: db, JWTSecret: secret},
 		User:         user.Deps{DB: db, JWTSecret: secret},
 		Captcha: captcha.Deps{
 			DB:        db,
@@ -159,11 +157,6 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"GET /api/sso/providers",
 		"GET /api/sso/:provider/login",
 		"GET /api/sso/:provider/callback",
-		// upload
-		"POST /api/upload",
-		"POST /api/upload/multiple",
-		"GET /api/upload/my",
-		"DELETE /api/upload/:id",
 		// asset
 		"POST /api/assets/upload",
 		"POST /api/assets/delete/:publicID",

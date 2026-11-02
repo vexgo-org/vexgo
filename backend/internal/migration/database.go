@@ -29,7 +29,6 @@ func autoMigrate(db *gorm.DB) error {
 		&model.Category{},
 		&model.Comment{},
 		&model.Like{},
-		&model.MediaFile{},
 		&model.SMTPConfig{},
 		&model.Captcha{},
 		&model.GeneralSettings{},
@@ -66,4 +65,13 @@ func dropLegacyColumn(db *gorm.DB, value any, column string) error {
 		query = fmt.Sprintf(`ALTER TABLE "%s" DROP COLUMN "%s"`, stmt.Schema.Table, column)
 	}
 	return db.Exec(query).Error
+}
+
+// dropMediaFileTable removes the legacy media_files table after all migrations
+// have completed. It is safe to call repeatedly because of the HasTable guard.
+func dropMediaFileTable(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&mediaFile{}) {
+		return nil
+	}
+	return db.Migrator().DropTable(&mediaFile{})
 }

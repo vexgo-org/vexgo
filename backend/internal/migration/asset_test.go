@@ -32,7 +32,7 @@ const (
 func newMigrationService(t *testing.T) (*Service, *gorm.DB, storage.Storage) {
 	t.Helper()
 
-	db := newAutoMigratedDB(t)
+	db := newAutoMigratedDBWithMediaFile(t)
 	local := storage.NewLocalStorage(t.TempDir())
 
 	return NewService(Deps{DB: db, Storage: local}), db, local
@@ -50,7 +50,7 @@ func putObject(t *testing.T, s storage.Storage, key, content string) {
 
 // seedMediaFile inserts a legacy media_files row. Passing an empty storageKey
 // reproduces a row written before keys were recorded.
-func seedMediaFile(t *testing.T, db *gorm.DB, mediaFile model.MediaFile) model.MediaFile {
+func seedMediaFile(t *testing.T, db *gorm.DB, mediaFile mediaFile) mediaFile {
 	t.Helper()
 
 	if err := db.Create(&mediaFile).Error; err != nil {
@@ -116,8 +116,8 @@ func TestBackfillAssetBlob_NilStoragePanics(t *testing.T) {
 		}
 	}()
 
-	db := newAutoMigratedDB(t)
-	seedMediaFile(t, db, model.MediaFile{
+	db := newAutoMigratedDBWithMediaFile(t)
+	seedMediaFile(t, db, mediaFile{
 		URL:  "/uploads/504e504e-6f6e-4172-8373-f80912233455.png",
 		Size: 1,
 	})
@@ -149,7 +149,7 @@ func TestBackfillAssetBlob_MigratesLegacyRowFromURL(t *testing.T) {
 
 	const key = "0ae2915d-88c2-4e2e-be99-40282e922bf2.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:    "/uploads/" + key,
 		Size:   int64(len(pngPayload)),
 		Type:   "unknown",
@@ -208,7 +208,7 @@ func TestBackfillAssetBlob_PrefersStorageKeyOverURL(t *testing.T) {
 
 	const key = "0ee4c663-dbc8-4f11-99cc-8d66c0bcd088.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:        "https://example.invalid/other/file.png",
 		StorageKey: key,
 		Size:       int64(len(pngPayload)),
@@ -237,7 +237,7 @@ func TestBackfillAssetBlob_MintsDistinctPublicIDs(t *testing.T) {
 	}
 	for _, key := range keys {
 		putObject(t, local, key, pngPayload)
-		seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+		seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 	}
 
 	if err := svc.backfillAssetBlob(); err != nil {
@@ -284,7 +284,7 @@ func TestBackfillAssetBlob_MigratesEveryRow(t *testing.T) {
 	}
 	for _, key := range keys {
 		putObject(t, local, key, pngPayload)
-		seedMediaFile(t, db, model.MediaFile{
+		seedMediaFile(t, db, mediaFile{
 			URL:    "/uploads/" + key,
 			Size:   int64(len(pngPayload)),
 			UserID: 3,
@@ -316,7 +316,7 @@ func TestBackfillAssetBlob_SizeComesFromTheFile(t *testing.T) {
 
 	const key = "31f7759d-c21e-4eaa-9005-40d887b0cd04.jpg"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:    "/uploads/" + key,
 		Size:   999_999, // wrong on purpose
 		UserID: 1,
@@ -342,7 +342,7 @@ func TestBackfillAssetBlob_MigratesRowWithUnrecordedSize(t *testing.T) {
 
 	const key = "3d7437fb-06eb-4246-ae21-bfc2ae2e0bf8.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: 0})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: 0})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
@@ -364,7 +364,7 @@ func TestBackfillAssetBlob_TypeComesFromContentNotExtension(t *testing.T) {
 
 	const key = "4844ea1d-060e-4957-ad31-e11fac2f9806.mp4"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
@@ -390,7 +390,7 @@ func TestBackfillAssetBlob_SkipsUnsupportedMIMEType(t *testing.T) {
 
 	const key = "d41d8cd98f00b204e9800998ecf8427e.txt"
 	putObject(t, local, key, textPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: int64(len(textPayload))})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: int64(len(textPayload))})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("an unsupported MIME type must not fail the migration: %v", err)
@@ -410,7 +410,7 @@ func TestBackfillAssetBlob_ExtensionlessKey(t *testing.T) {
 
 	const key = "9f8e7d6c-5b4a-3210-fedc-ba9876543210"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
@@ -431,7 +431,7 @@ func TestBackfillAssetBlob_SkipsMissingObject(t *testing.T) {
 	svc, db, _ := newMigrationService(t)
 
 	const key = "37f01d7d-2d9a-4b31-9c3e-0d7e0a1b2c3d.png"
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: 1024})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: 1024})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("a missing object must not fail the migration: %v", err)
@@ -451,7 +451,7 @@ func TestBackfillAssetBlob_SkipsEmptyFile(t *testing.T) {
 
 	const key = "c0ffee00-dead-beef-cafe-000000000000.png"
 	putObject(t, local, key, "")
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: 0})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: 0})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("an empty file must not fail the migration: %v", err)
@@ -466,9 +466,9 @@ func TestBackfillAssetBlob_SkipsEmptyFile(t *testing.T) {
 func TestBackfillAssetBlob_SkipsUnusableURL(t *testing.T) {
 	svc, db, _ := newMigrationService(t)
 
-	seedMediaFile(t, db, model.MediaFile{URL: "", Size: 10})
-	seedMediaFile(t, db, model.MediaFile{URL: "/", Size: 10})
-	seedMediaFile(t, db, model.MediaFile{URL: "not-a-url", Size: 10})
+	seedMediaFile(t, db, mediaFile{URL: "", Size: 10})
+	seedMediaFile(t, db, mediaFile{URL: "/", Size: 10})
+	seedMediaFile(t, db, mediaFile{URL: "not-a-url", Size: 10})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("an unusable URL must not fail the migration: %v", err)
@@ -484,7 +484,7 @@ func TestBackfillAssetBlob_SkipsUnusableURL(t *testing.T) {
 func TestBackfillAssetBlob_SkipsAbsoluteURL(t *testing.T) {
 	svc, db, _ := newMigrationService(t)
 
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:  "https://bucket.s3.eu-central-1.amazonaws.com/media/1ab74e4a-74d4-4be4-8dc0-8f8630906c39.png",
 		Size: 2048,
 	})
@@ -505,7 +505,7 @@ func TestBackfillAssetBlob_DoesNotClaimLocalFileForAbsoluteURL(t *testing.T) {
 
 	const key = "5d41402abc4b2a76b9719d911017c592.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:  "https://bucket.s3.eu-central-1.amazonaws.com/media/" + key,
 		Size: 2048,
 	})
@@ -527,7 +527,7 @@ func TestBackfillAssetBlob_SkipsTraversingURL(t *testing.T) {
 	svc, db, local := newMigrationService(t)
 
 	putObject(t, local, "secret.txt", textPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/../../secret.txt", Size: 5})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/../../secret.txt", Size: 5})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
@@ -544,15 +544,15 @@ func TestBackfillAssetBlob_KeepsMediaFileTable(t *testing.T) {
 
 	const key = "7c9e6679-7425-40de-944b-e07fc1f90ae7.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
 	}
-	if !db.Migrator().HasTable(&model.MediaFile{}) {
+	if !db.Migrator().HasTable(&mediaFile{}) {
 		t.Error("media_files must not be dropped by this migration")
 	}
-	if count := countRows(t, db, &model.MediaFile{}); count != 1 {
+	if count := countRows(t, db, &mediaFile{}); count != 1 {
 		t.Errorf("expected the legacy row to remain, got %d rows", count)
 	}
 }
@@ -565,7 +565,7 @@ func TestBackfillAssetBlob_KeepsRowWithoutUser(t *testing.T) {
 
 	const key = "a3f1c2d4-5b6e-4f70-8192-a3b4c5d6e7f8.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{
+	seedMediaFile(t, db, mediaFile{
 		URL:    "/uploads/" + key,
 		Size:   int64(len(pngPayload)),
 		UserID: 4242, // no such user
@@ -591,7 +591,7 @@ func TestBackfillAssetBlob_RollsBackBlobWhenAssetInsertFails(t *testing.T) {
 
 	const key = "rollback-avatar.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: 1})
 
 	if err := db.Callback().Create().Before("gorm:create").Register(
 		"fail_asset_insert",
@@ -622,8 +622,8 @@ func TestBackfillAssetBlob_MigratesSharedObjectOnce(t *testing.T) {
 
 	const key = "b4f2d3e5-6c7f-4081-9203-b4c5d6e7f809.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: 1})
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: 2})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: 2})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
@@ -651,7 +651,7 @@ func TestBackfillAssetBlob_SkipsAlreadyMigratedKey(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed blob: %v", err)
 	}
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill: %v", err)
@@ -684,7 +684,7 @@ func TestBackfillAssetBlob_DoesNotResurrectSoftDeletedBlob(t *testing.T) {
 	if err := db.Delete(&blob).Error; err != nil {
 		t.Fatalf("soft delete blob: %v", err)
 	}
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, Size: int64(len(pngPayload))})
 
 	if err := svc.backfillAssetBlob(); err != nil {
 		t.Fatalf("a soft-deleted blob must not fail the migration: %v", err)
@@ -712,7 +712,7 @@ func TestBackfillAssetBlob_SurvivesRepeatedRuns(t *testing.T) {
 
 	const key = "e7a5f6b8-9fa2-4b3c-9526-e7f809122334.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: 5, Size: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: 5, Size: 1})
 
 	for run := range 3 {
 		if err := svc.backfillAssetBlob(); err != nil {
@@ -736,7 +736,7 @@ func TestMigrateDB_RepeatedStartsMigrateMediaOnce(t *testing.T) {
 
 	const key = "f8b6a7c9-0ab3-4c4d-a637-f80912233445.png"
 	putObject(t, local, key, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key, UserID: 5, Size: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key, UserID: 5, Size: 1})
 
 	for run := range 3 {
 		if err := svc.MigrateDB(); err != nil {
@@ -771,10 +771,10 @@ func TestMigrateDB_RepeatedStartsSurviveUnmigratableRows(t *testing.T) {
 	const good = "2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901.png"
 	putObject(t, local, empty, "")
 	putObject(t, local, good, pngPayload)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + missing, UserID: 1})
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + empty, UserID: 1})
-	seedMediaFile(t, db, model.MediaFile{URL: "", UserID: 1})
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + good, UserID: 1, Size: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + missing, UserID: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + empty, UserID: 1})
+	seedMediaFile(t, db, mediaFile{URL: "", UserID: 1})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + good, UserID: 1, Size: 1})
 
 	for run := range 3 {
 		if err := svc.MigrateDB(); err != nil {
@@ -807,7 +807,7 @@ func TestMigrateDB_MigratesMediaOfAnExistingInstallation(t *testing.T) {
 		putObject(t, local, key, pngPayload)
 	}
 	for i, key := range keys {
-		seedMediaFile(t, db, model.MediaFile{
+		seedMediaFile(t, db, mediaFile{
 			URL:        "/uploads/" + key,
 			Size:       int64(len(pngPayload)),
 			Type:       "unknown",
@@ -885,6 +885,10 @@ func TestBackfillAssetBlob_ReadsBlobKeysInOneQuery(t *testing.T) {
 	if err := autoMigrate(db); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
+	// Also create the legacy media_files table for this test.
+	if err := db.AutoMigrate(&mediaFile{}); err != nil {
+		t.Fatalf("auto migrate mediaFile: %v", err)
+	}
 
 	local := storage.NewLocalStorage(t.TempDir())
 	svc := NewService(Deps{DB: db, Storage: local})
@@ -892,7 +896,7 @@ func TestBackfillAssetBlob_ReadsBlobKeysInOneQuery(t *testing.T) {
 	for i := range rowCount {
 		key := fmt.Sprintf("query-count-%02d.png", i)
 		putObject(t, local, key, pngPayload)
-		seedMediaFile(t, db, model.MediaFile{
+		seedMediaFile(t, db, mediaFile{
 			URL:  "/uploads/" + key,
 			Size: int64(len(pngPayload)),
 		})

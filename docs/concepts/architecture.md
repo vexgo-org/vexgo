@@ -43,7 +43,6 @@ backend/
     settings/                # admin configuration (SMTP, AI, general, theme)
     sso/                     # GitHub / Google / OIDC login
     storage/                 # file backends behind the Storage seam (local disk or S3)
-    upload/                  # legacy upload endpoints and the media-file records, being replaced by asset/
     user/                    # user management, roles, creator applications
 ```
 
@@ -150,7 +149,7 @@ Leaf packages (no internal imports):
     cache/         ← memory + Valkey backends; domains consume it through their
                      own narrow seams (CounterStore, StateStore, ReadCache)
     storage/       ← local disk and S3 file backends (imports config only); consumed
-                     by upload, by the media backfill in migration, and by the
+                     by asset, by the media backfill in migration, and by the
                      model.FileRemover cleanup paths
 
 Shared layer:
@@ -160,7 +159,7 @@ Cross-domain edges:
     auth/          ← used by comment, post, sso (for privacy filtering)
     notification/  ← implements model.Notifier, used by comment, post, user as notification seam
     storage/       ← storage.Storage implements model.FileRemover, used by user, auth,
-                     post for file cleanup; the upload and asset domains store media
+                     post for file cleanup; the asset domain stores media
                      through it, and migration reads it for the media backfill
     captcha/       ← implements auth.CaptchaChecker, the captcha-check seam auth declares
     public/        ← implements the settings.ThemeManager seam (theme catalog, preview links)
@@ -278,8 +277,8 @@ The callback URLs are:
 ## Storage
 
 - Uploads go to the local data directory by default, or to any S3-compatible object storage (AWS S3, MinIO, Garage, ...) when S3 is enabled.
-- Both live behind `internal/storage` as one `Storage` interface (`Put`/`Open`/`Delete`/`URL`), so `upload` and `asset` never learn which backend they got and tests can swap in `LocalStorage` over a temp directory. `app.initStorage` picks the backend and injects it.
-- Objects are addressed by key, never by URL. The `asset` domain is the replacement upload path: an `Asset` is the user-facing record (stable `public_id`, visibility) over an immutable `Blob` (storage key, MIME type, size). Original content is served at `/api/assets/{publicID}/original` (`GET`/`HEAD`); only public assets resolve, so a private asset is a 404. Legacy `/uploads/...` URLs keep working. Legacy `MediaFile` rows keep the storage key (what `Delete` takes) beside the browser `url` when a key was recorded.
+- Both live behind `internal/storage` as one `Storage` interface (`Put`/`Open`/`Delete`/`URL`), so `asset` never learns which backend it got and tests can swap in `LocalStorage` over a temp directory. `app.initStorage` picks the backend and injects it.
+- Objects are addressed by key, never by URL. The `asset` domain manages uploads: an `Asset` is the user-facing record (stable `public_id`, visibility) over an immutable `Blob` (storage key, MIME type, size). Original content is served at `/api/assets/{publicID}/original` (`GET`/`HEAD`); only public assets resolve, so a private asset is a 404. Legacy `/uploads/...` URLs and the `media_files` table are removed after the startup migration completes.
 - The configured site icon is a public image `Asset` referenced from general settings. `/favicon.ico` redirects to its original URL, then falls back to `data/favicon.ico`, the active theme's `favicon.ico`, and the glyph bundled with the admin console.
 - Keys are normalized and screened by `cleanKey` before they reach a backend, and `LocalStorage` confines every operation with `os.Root`, so a hostile key cannot escape `data/media`.
 - Metadata (users, posts, comments, settings) lives in the database: SQLite by default, PostgreSQL/MySQL for production.
@@ -308,7 +307,7 @@ The database type is determined by the `db_type` config field or `DB_TYPE` envir
 
 `migration.Service.MigrateDB()` creates or updates the schema for all models, maps the legacy comment-moderation switches, backfills post slugs, converts legacy `media_files` rows into `Asset` + `Blob` records, maps the legacy `general_settings.site_icon`, `users.avatar` and `posts.cover_image` URLs onto the resulting assets before dropping those columns, and rewrites legacy media URLs in post and page content to the resulting asset URLs. `database.Seed()` inserts default records (admin user, SMTP/general/AI/theme settings, default category) if they do not already exist.
 
-The media backfill runs on every startup and is idempotent: a storage key that already owns a blob is skipped, and all existing keys are read in a single query, so the pass does not issue a query per row. The key comes from the row's `StorageKey`, or from the `/uploads/` prefix of its URL; the MIME type is sniffed from the file header rather than the extension. Rows with a `StorageKey` are opened through the configured storage backend, so S3-backed installs migrate their keyed rows too. The legacy `media_files` rows themselves are kept for references the content rewrite cannot map (skipped files, missing assets), and the `/uploads/` route keeps serving them. Migrated assets are public.
+The media backfill runs on every startup and is idempotent: a storage key that already owns a blob is skipped, and all existing keys are read in a single query, so the pass does not issue a query per row. The key comes from the row's `StorageKey`, or from the `/uploads/` prefix of its URL; the MIME type is sniffed from the file header rather than the extension. Rows with a `StorageKey` are opened through the configured storage backend, so S3-backed installs migrate their keyed rows too. After all content has been rewritten, the legacy `media_files` table is dropped. Migrated assets are public.
 
 The site-icon, user-avatar and post-cover mappings run after the media backfill, so they can only reuse assets created by that pass. A non-local URL or a file skipped by the backfill leaves the reference empty; the legacy column is dropped anyway, so the old URL is neither kept nor resurrected. The user-avatar mapping matches the legacy URL against `media_files.url` (covering local and S3 URLs), requires the media file and asset to belong to that user, and only attaches a public image asset. The post-cover mapping matches the same way and only attaches a public image asset; it does not check ownership, because the legacy column records no uploader and an admin may have set another author's cover.
 

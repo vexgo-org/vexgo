@@ -37,7 +37,7 @@ func (s *Service) backfillUserAvatar() error {
 
 	migrated := 0
 	for _, row := range rows {
-		var media model.MediaFile
+		var media mediaFile
 		if err := s.db.
 			Where("url = ? AND user_id = ?", row.Avatar, row.ID).
 			First(&media).

@@ -48,7 +48,7 @@ func TestMigrateDB_BackfillsPostCoverFromLegacyUpload(t *testing.T) {
 	putObject(t, local, key, pngPayload)
 
 	postID := seedLegacyPostCover(t, db, "cover-local", "/uploads/"+key)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 
 	if err := s.MigrateDB(); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -74,7 +74,7 @@ func TestMigrateDB_BackfillsPostCoverFromS3URL(t *testing.T) {
 	putObject(t, local, key, pngPayload)
 
 	postID := seedLegacyPostCover(t, db, "cover-s3", url)
-	seedMediaFile(t, db, model.MediaFile{URL: url, StorageKey: key})
+	seedMediaFile(t, db, mediaFile{URL: url, StorageKey: key})
 
 	if err := s.MigrateDB(); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -100,8 +100,8 @@ func TestMigrateDB_KeepsExistingPostCover(t *testing.T) {
 	putObject(t, local, currentKey, pngPayload)
 
 	postID := seedLegacyPostCover(t, db, "cover-existing", "/uploads/"+legacyKey)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + legacyKey})
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + currentKey})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + legacyKey})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + currentKey})
 
 	if err := s.backfillAssetBlob(); err != nil {
 		t.Fatalf("backfill assets: %v", err)
@@ -133,7 +133,7 @@ func TestMigrateDB_SkipsNonImagePostCover(t *testing.T) {
 	putObject(t, local, key, mp4Payload)
 
 	postID := seedLegacyPostCover(t, db, "cover-video", "/uploads/"+key)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 
 	if err := s.MigrateDB(); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -174,7 +174,7 @@ func TestMigrateDB_DoesNotResurrectClearedPostCover(t *testing.T) {
 	putObject(t, local, key, pngPayload)
 
 	postID := seedLegacyPostCover(t, db, "cover-cleared", "/uploads/"+key)
-	seedMediaFile(t, db, model.MediaFile{URL: "/uploads/" + key})
+	seedMediaFile(t, db, mediaFile{URL: "/uploads/" + key})
 
 	if err := s.MigrateDB(); err != nil {
 		t.Fatalf("first migrate: %v", err)

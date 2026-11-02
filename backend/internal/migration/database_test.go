@@ -29,6 +29,30 @@ func newAutoMigratedDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+// newAutoMigratedDBWithMediaFile opens an in-memory SQLite database with the
+// production schema plus the legacy media_files table. Used by tests that need
+// to seed legacy media file rows.
+func newAutoMigratedDBWithMediaFile(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	if err := autoMigrate(db); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	// Also create the legacy media_files table for migration tests.
+	if err := db.AutoMigrate(&mediaFile{}); err != nil {
+		t.Fatalf("auto migrate mediaFile: %v", err)
+	}
+	return db
+}
+
 func TestAutoMigrate_DeduplicatesExistingLikes(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -82,7 +106,6 @@ func TestAutoMigrate_CreatesAllTables(t *testing.T) {
 		&model.Category{},
 		&model.Comment{},
 		&model.Like{},
-		&model.MediaFile{},
 		&model.SMTPConfig{},
 		&model.Captcha{},
 		&model.GeneralSettings{},

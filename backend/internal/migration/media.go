@@ -1,10 +1,14 @@
-package model
+package migration
 
-import "time"
+import (
+	"time"
 
-// Media file model, used to record user uploaded resources
+	"github.com/vexgo-org/vexgo/backend/internal/model"
+)
 
-type MediaFile struct {
+// mediaFile is a deprecated model used before.
+// It is now a private model only used in `migration` package.
+type mediaFile struct {
 	ID   uint   `gorm:"primaryKey"`
 	URL  string `gorm:"size:500"`
 	Size int64
@@ -14,6 +18,6 @@ type MediaFile struct {
 	// Internal plumbing, so it stays out of the API surface like User.
 	StorageKey string
 	UserID     uint
-	User       User `gorm:"foreignKey:UserID"`
+	User       model.User `gorm:"foreignKey:UserID"`
 	CreatedAt  time.Time
 }

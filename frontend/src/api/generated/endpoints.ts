@@ -86,8 +86,6 @@ import type {
   PostRejectPostRequest,
   PostTagsListResponse,
   PostUpdatePostRequest,
-  PostUploadBody,
-  PostUploadMultipleBody,
   SettingsAIConfigResponse,
   SettingsAIConfigUpdateRequestBody,
   SettingsAIConfigUpdateResponse,
@@ -108,9 +106,6 @@ import type {
   SettingsThemeUploadResponse,
   SettingsThemesListResponse,
   SsoSSOProvidersResponse,
-  UploadFilesListResponse,
-  UploadMultiUploadResponse,
-  UploadUploadResponse,
   UserApplyForCreatorRequest,
   UserApplyForCreatorResponse,
   UserCreatorApplicationListResponse,
@@ -1277,69 +1272,6 @@ export const getVexGoAPI = () => {
   };
 
   /**
-   * Accepts a multipart/form-data body with a single 'file'
-   * part. The stored filename is a freshly generated UUID
-   * plus the sanitized extension from the original filename;
-   * any untrusted characters are stripped before persistence.
-   * Requires authentication.
-   * @summary Upload a single file
-   */
-  const postUpload = (postUploadBody: PostUploadBody) => {
-    const formData = new FormData();
-    formData.append(`file`, postUploadBody.file);
-
-    return customInstance<UploadUploadResponse>({
-      url: `/upload`,
-      method: "POST",
-      headers: { "Content-Type": "multipart/form-data" },
-      data: formData,
-    });
-  };
-
-  /**
-   * Accepts a multipart/form-data body with one or more
-   * 'files' parts. Per-file failures are silently dropped;
-   * the response only includes the rows that persisted.
-   * Requires authentication.
-   * @summary Upload multiple files
-   */
-  const postUploadMultiple = (
-    postUploadMultipleBody: PostUploadMultipleBody,
-  ) => {
-    const formData = new FormData();
-    formData.append(`files`, postUploadMultipleBody.files);
-
-    return customInstance<UploadMultiUploadResponse>({
-      url: `/upload/multiple`,
-      method: "POST",
-      headers: { "Content-Type": "multipart/form-data" },
-      data: formData,
-    });
-  };
-
-  /**
-   * @summary List the authenticated user's uploads
-   */
-  const getUploadMy = () => {
-    return customInstance<UploadFilesListResponse>({
-      url: `/upload/my`,
-      method: "GET",
-    });
-  };
-
-  /**
-   * Only the original uploader or an admin may delete a file.
-   * The id is the MediaFile.ID from the upload response.
-   * @summary Delete an uploaded file
-   */
-  const deleteUploadId = (id: string) => {
-    return customInstance<ApiMessageResponse>({
-      url: `/upload/${id}`,
-      method: "DELETE",
-    });
-  };
-
-  /**
    * Paginated list of users with optional free-text search
    * over username and email.
    * @summary List users (admin only)
@@ -1520,10 +1452,6 @@ export const getVexGoAPI = () => {
     getTags,
     postTags,
     deleteTagsId,
-    postUpload,
-    postUploadMultiple,
-    getUploadMy,
-    deleteUploadId,
     getUsers,
     postUsersApplyCreator,
     getUsersCreatorApplications,
@@ -1819,18 +1747,6 @@ export type PostTagsResult = NonNullable<
 >;
 export type DeleteTagsIdResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["deleteTagsId"]>>
->;
-export type PostUploadResult = NonNullable<
-  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postUpload"]>>
->;
-export type PostUploadMultipleResult = NonNullable<
-  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postUploadMultiple"]>>
->;
-export type GetUploadMyResult = NonNullable<
-  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getUploadMy"]>>
->;
-export type DeleteUploadIdResult = NonNullable<
-  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["deleteUploadId"]>>
 >;
 export type GetUsersResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getUsers"]>>
