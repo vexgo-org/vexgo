@@ -74,5 +74,11 @@ func (s *Service) MigrateDB() error {
 		return err
 	}
 
+	// Drop the legacy media_files table now that all migrations depending
+	// on it (backfill, site icon, avatar, cover, content rewrite) are done.
+	if err := dropMediaFileTable(s.db); err != nil {
+		return err
+	}
+
 	return nil
 }
