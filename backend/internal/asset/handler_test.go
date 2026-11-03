@@ -1263,6 +1263,10 @@ func (r *recordingAssetRepo) SoftDelete(context.Context, *model.Asset) error {
 	return nil
 }
 
+func (r *recordingAssetRepo) PermanentlyDeleteByIDs(context.Context, []uint) error {
+	return nil
+}
+
 // TestHandlerDelete_NilPublicIDIsNotFound is the lookup edge: the nil UUID
 // parses cleanly but identifies nothing, so it must not select the first asset
 // in the table.
