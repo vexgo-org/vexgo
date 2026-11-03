@@ -15,6 +15,8 @@ type AssetRepository interface {
 	FindByPublicIDs(ctx context.Context, publicIDs []uuid.UUID) ([]model.Asset, error)
 	FindPublicByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
 	SoftDelete(ctx context.Context, asset *model.Asset) error
+
+	PermanentlyDeleteByIDs(ctx context.Context, assetIDs []uint) error
 }
 
 type assetRepository struct {
@@ -78,6 +80,18 @@ func (r *assetRepository) SoftDelete(ctx context.Context, asset *model.Asset) er
 	return r.db.
 		WithContext(ctx).
 		Delete(asset).
+		Error
+}
+
+func (r *assetRepository) PermanentlyDeleteByIDs(ctx context.Context, assetIDs []uint) error {
+	if len(assetIDs) == 0 {
+		return nil
+	}
+
+	return r.db.WithContext(ctx).
+		Unscoped().
+		Where("id IN ?", assetIDs).
+		Delete(&model.Asset{}).
 		Error
 }
 
