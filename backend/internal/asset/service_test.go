@@ -330,6 +330,10 @@ func (s *stubAssetRepo) SoftDelete(_ context.Context, asset *model.Asset) error 
 	return nil
 }
 
+func (s *stubAssetRepo) PermanentlyDeleteByIDs(_ context.Context, assetIDs []uint) error {
+	return nil
+}
+
 type stubBlobRepo struct {
 	createErr error
 
@@ -344,6 +348,18 @@ func (s *stubBlobRepo) Create(_ context.Context, blob *model.Blob) error {
 		blob.ID = uint(len(s.created) + 1)
 	}
 	s.created = append(s.created, blob)
+	return nil
+}
+
+func (s *stubBlobRepo) FindUnreferencedByIDForUpdate(_ context.Context, blobIDs []uint) ([]model.Blob, error) {
+	return nil, nil
+}
+
+func (s *stubBlobRepo) MarkPendingDelete(_ context.Context, blobIDs []uint) error {
+	return nil
+}
+
+func (s *stubBlobRepo) DeletePendingIfUnreferenced(_ context.Context, blobID uint) error {
 	return nil
 }
 
