@@ -5,10 +5,12 @@ import (
 
 	"github.com/vexgo-org/vexgo/backend/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type BlobRepository interface {
 	Create(ctx context.Context, blob *model.Blob) error
+	FindUnreferencedByIDForUpdate(ctx context.Context, blobIDs []uint) ([]model.Blob, error)
 }
 
 type blobRepository struct {
@@ -24,4 +26,31 @@ func (r *blobRepository) Create(ctx context.Context, blob *model.Blob) error {
 		WithContext(ctx).
 		Create(blob).
 		Error
+}
+
+func (r *blobRepository) FindUnreferencedByIDForUpdate(ctx context.Context, blobIDs []uint) ([]model.Blob, error) {
+	if len(blobIDs) == 0 {
+		return []model.Blob{}, nil
+	}
+
+	var blobs []model.Blob
+	err := r.db.WithContext(ctx).
+		Model(&model.Blob{}).
+		Where("blobs.id IN ?", blobIDs).
+		Where("blobs.status = ?", model.BlobStatusActive).
+		Where(`
+		NOT EXISTS (
+			SELECT 1 FROM assets WHERE assets.blob_id = blobs.id
+		)
+		`).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+		}).
+		Find(&blobs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return blobs, nil
 }
