@@ -11,6 +11,7 @@ import (
 type BlobRepository interface {
 	Create(ctx context.Context, blob *model.Blob) error
 	FindUnreferencedByIDForUpdate(ctx context.Context, blobIDs []uint) ([]model.Blob, error)
+	MarkPendingDelete(ctx context.Context, blobIDs []uint) error
 }
 
 type blobRepository struct {
@@ -53,4 +54,17 @@ func (r *blobRepository) FindUnreferencedByIDForUpdate(ctx context.Context, blob
 	}
 
 	return blobs, nil
+}
+
+func (r *blobRepository) MarkPendingDelete(ctx context.Context, blobIDs []uint) error {
+	if len(blobIDs) == 0 {
+		return nil
+	}
+
+	return r.db.WithContext(ctx).
+		Model(&model.Blob{}).
+		Where("id IN ?", blobIDs).
+		Where("status = ?", model.BlobStatusActive).
+		Update("status", model.BlobStatusPendingDelete).
+		Error
 }
