@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -222,6 +223,24 @@ func (s *Service) DeleteAssets(ctx context.Context, publicIDs []uuid.UUID) error
 
 		return nil
 	})
+}
+
+// PruneManually only allows the super admin to prune deleted assets before a certain time.
+func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Time) error {
+	if !model.IsSuperAdmin(actor.Role) {
+		return ErrForbidden
+	}
+
+	assets, err := s.assets.FindDeletedBefore(ctx, before)
+	if err != nil {
+		return fmt.Errorf("find deleted assets: %w", err)
+	}
+
+	if err := s.prune(ctx, assets); err != nil {
+		return fmt.Errorf("manually prune assets: %w", err)
+	}
+
+	return nil
 }
 
 // prune is a helper function used to remove a group of asset records
