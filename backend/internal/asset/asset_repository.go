@@ -2,6 +2,7 @@ package asset
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
@@ -14,7 +15,10 @@ type AssetRepository interface {
 	FindByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
 	FindByPublicIDs(ctx context.Context, publicIDs []uuid.UUID) ([]model.Asset, error)
 	FindPublicByPublicID(ctx context.Context, publicID uuid.UUID) (*model.Asset, error)
+	FindDeletedBefore(ctx context.Context, before time.Time) ([]model.Asset, error)
 	SoftDelete(ctx context.Context, asset *model.Asset) error
+
+	PermanentlyDeleteByIDs(ctx context.Context, assetIDs []uint) error
 }
 
 type assetRepository struct {
@@ -70,6 +74,18 @@ func (r *assetRepository) FindPublicByPublicID(ctx context.Context, publicID uui
 	})
 }
 
+func (r *assetRepository) FindDeletedBefore(ctx context.Context, before time.Time) ([]model.Asset, error) {
+	var assets []model.Asset
+	if err := r.db.WithContext(ctx).
+		Unscoped().
+		Where("deleted_at < ?", before).
+		Find(&assets).
+		Error; err != nil {
+		return nil, err
+	}
+	return assets, nil
+}
+
 func (r *assetRepository) SoftDelete(ctx context.Context, asset *model.Asset) error {
 	if asset.ID == 0 {
 		return gorm.ErrRecordNotFound
@@ -78,6 +94,18 @@ func (r *assetRepository) SoftDelete(ctx context.Context, asset *model.Asset) er
 	return r.db.
 		WithContext(ctx).
 		Delete(asset).
+		Error
+}
+
+func (r *assetRepository) PermanentlyDeleteByIDs(ctx context.Context, assetIDs []uint) error {
+	if len(assetIDs) == 0 {
+		return nil
+	}
+
+	return r.db.WithContext(ctx).
+		Unscoped().
+		Where("id IN ?", assetIDs).
+		Delete(&model.Asset{}).
 		Error
 }
 

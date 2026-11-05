@@ -247,6 +247,9 @@ type stubAssetRepo struct {
 
 	created []*model.Asset
 	deleted []uint
+
+	// For PruneManually tests.
+	deletedAssets []model.Asset
 }
 
 func (s *stubAssetRepo) Create(_ context.Context, asset *model.Asset) error {
@@ -330,6 +333,17 @@ func (s *stubAssetRepo) SoftDelete(_ context.Context, asset *model.Asset) error 
 	return nil
 }
 
+func (s *stubAssetRepo) PermanentlyDeleteByIDs(_ context.Context, assetIDs []uint) error {
+	return nil
+}
+
+func (s *stubAssetRepo) FindDeletedBefore(ctx context.Context, before time.Time) ([]model.Asset, error) {
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	return s.deletedAssets, nil
+}
+
 type stubBlobRepo struct {
 	createErr error
 
@@ -344,6 +358,18 @@ func (s *stubBlobRepo) Create(_ context.Context, blob *model.Blob) error {
 		blob.ID = uint(len(s.created) + 1)
 	}
 	s.created = append(s.created, blob)
+	return nil
+}
+
+func (s *stubBlobRepo) FindUnreferencedByIDForUpdate(_ context.Context, blobIDs []uint) ([]model.Blob, error) {
+	return nil, nil
+}
+
+func (s *stubBlobRepo) MarkPendingDelete(_ context.Context, blobIDs []uint) error {
+	return nil
+}
+
+func (s *stubBlobRepo) DeletePendingIfUnreferenced(_ context.Context, blobID uint) error {
 	return nil
 }
 
@@ -1854,5 +1880,405 @@ func TestAssetRepository_FindByPublicIDHidesSoftDeletedAsset(t *testing.T) {
 		asset.PublicID,
 	); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Errorf("FindByPublicID after soft delete = %v, want gorm.ErrRecordNotFound", err)
+	}
+}
+
+// --- prune -------------------------------------------------------------
+
+func TestService_Prune_RemovesAssetsAndDeletesOrphanBlobs(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	key := writeObject(t, db, dataDir, asset.BlobID, "stored-bytes")
+
+	if err := svc.prune(context.Background(), []model.Asset{asset}); err != nil {
+		t.Fatalf("prune error: %v", err)
+	}
+
+	// Asset permanently removed.
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("asset %d still exists after prune", asset.ID)
+	}
+
+	// Orphan blob deleted from storage and DB.
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); !os.IsNotExist(err) {
+		t.Errorf("blob file %q was not removed", key)
+	}
+
+	var blobCount int64
+	db.Model(&model.Blob{}).Unscoped().Where("id = ?", asset.BlobID).Count(&blobCount)
+	if blobCount != 0 {
+		t.Errorf("blob %d still exists after prune", asset.BlobID)
+	}
+}
+
+func TestService_Prune_NoAssetsIsNoop(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	if err := svc.prune(context.Background(), nil); err != nil {
+		t.Errorf("prune(nil) error = %v, want nil", err)
+	}
+	if err := svc.prune(context.Background(), []model.Asset{}); err != nil {
+		t.Errorf("prune([]) error = %v, want nil", err)
+	}
+}
+
+func TestService_Prune_KeepsReferencedBlobs(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	first := seedAsset(t, db, owner.ID, "first.png")
+	second := seedAsset(t, db, owner.ID, "second.png")
+	// Make both assets share the same blob by overriding second's BlobID.
+	if err := db.Model(&model.Asset{}).Where("id = ?", second.ID).Update("blob_id", first.BlobID).Error; err != nil {
+		t.Fatalf("failed to link second asset to first blob: %v", err)
+	}
+
+	key := writeObject(t, db, dataDir, first.BlobID, "shared-bytes")
+
+	if err := svc.prune(context.Background(), []model.Asset{first}); err != nil {
+		t.Fatalf("prune error: %v", err)
+	}
+
+	// The shared blob should survive because second asset still references it.
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); err != nil {
+		t.Errorf("shared blob file %q was wrongly removed: %v", key, err)
+	}
+
+	var blobCount int64
+	db.Model(&model.Blob{}).Where("id = ?", first.BlobID).Count(&blobCount)
+	if blobCount != 1 {
+		t.Errorf("shared blob count = %d, want 1", blobCount)
+	}
+}
+
+func TestService_Prune_DedupsBlobIDs(t *testing.T) {
+	svc, _, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+
+	if err := svc.prune(context.Background(), []model.Asset{asset, asset}); err != nil {
+		t.Fatalf("prune with duplicate assets error: %v", err)
+	}
+
+	var count int64
+	db.Model(&model.Blob{}).Unscoped().Where("id = ?", asset.BlobID).Count(&count)
+	if count != 0 {
+		t.Errorf("blob %d should be deleted once", asset.BlobID)
+	}
+}
+
+func TestService_Prune_PropagatesTransactionError(t *testing.T) {
+	store := &fakeStorage{}
+	svc := newFailingStoreService(&fakeTxManager{err: errDB}, store)
+
+	err := svc.prune(context.Background(), []model.Asset{{ID: 1, BlobID: 1}})
+	if !errors.Is(err, errDB) {
+		t.Errorf("prune transaction error = %v, want %v", err, errDB)
+	}
+}
+
+func TestService_Prune_PropagatesDeletePendingBlobError(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	writeObject(t, db, dataDir, asset.BlobID, "bytes")
+
+	store := &fakeStorage{deleteErr: errDB}
+	svc.storage = store
+
+	err := svc.prune(context.Background(), []model.Asset{asset})
+	if err == nil {
+		t.Fatal("expected error from failed pending blob delete, got nil")
+	}
+	if !errors.Is(err, errDB) {
+		t.Errorf("prune error = %v, want it to wrap %v", err, errDB)
+	}
+}
+
+// --- PruneManually ------------------------------------------------------
+
+func TestService_PruneManually_SuperAdminCanPrune(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	key := writeObject(t, db, dataDir, asset.BlobID, "stored-bytes")
+
+	// Soft-delete the asset first so it's eligible for pruning.
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+
+	// Super admin can prune.
+	actor := Actor{ID: 99, Role: model.RoleSuperAdmin}
+	// Use a time far in the future to ensure the deleted_at is before it.
+	before := time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if err := svc.PruneManually(context.Background(), actor, before); err != nil {
+		t.Fatalf("PruneManually error: %v", err)
+	}
+
+	// Asset permanently removed.
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("asset %d still exists after prune", asset.ID)
+	}
+
+	// Orphan blob deleted from storage and DB.
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); !os.IsNotExist(err) {
+		t.Errorf("blob file %q was not removed", key)
+	}
+
+	var blobCount int64
+	db.Model(&model.Blob{}).Unscoped().Where("id = ?", asset.BlobID).Count(&blobCount)
+	if blobCount != 0 {
+		t.Errorf("blob %d still exists after prune", asset.BlobID)
+	}
+}
+
+func TestService_PruneManually_ForbiddenForNonSuperAdmin(t *testing.T) {
+	for _, role := range []string{
+		model.RoleGuest,
+		model.RoleContributor,
+		model.RoleAuthor,
+		model.RoleAdmin,
+		"", // unknown role
+	} {
+		t.Run("role="+role, func(t *testing.T) {
+			svc, _, _ := newTestService(t)
+			actor := Actor{ID: 1, Role: role}
+
+			err := svc.PruneManually(context.Background(), actor, time.Now())
+			if !errors.Is(err, ErrForbidden) {
+				t.Fatalf("PruneManually error = %v, want ErrForbidden for role %q", err, role)
+			}
+		})
+	}
+}
+
+func TestService_PruneManually_NoAssetsIsNoop(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+
+	if err := svc.PruneManually(context.Background(), actor, time.Now()); err != nil {
+		t.Errorf("PruneManually with no assets error = %v, want nil", err)
+	}
+}
+
+func TestService_PruneManually_PropagatesFindError(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	repo := &stubAssetRepo{findErr: errDB}
+	svc.assets = repo
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+
+	err := svc.PruneManually(context.Background(), actor, time.Now())
+	if !errors.Is(err, errDB) {
+		t.Fatalf("PruneManually error = %v, want it to wrap the lookup failure", err)
+	}
+}
+
+func TestService_PruneManually_PropagatesPruneError(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	writeObject(t, db, dataDir, asset.BlobID, "bytes")
+
+	// Soft-delete the asset.
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+
+	// Make prune fail by injecting a failing storage.
+	store := &fakeStorage{deleteErr: errDB}
+	svc.storage = store
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+	before := time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	err := svc.PruneManually(context.Background(), actor, before)
+	if err == nil {
+		t.Fatal("expected error from failed prune, got nil")
+	}
+	if !errors.Is(err, errDB) {
+		t.Errorf("PruneManually error = %v, want it to wrap %v", err, errDB)
+	}
+}
+
+// --- deletePendingBlob -------------------------------------------------
+
+func TestService_DeletePendingBlob_RemovesPhysicalAndRecord(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	key := writeObject(t, db, dataDir, asset.BlobID, "bytes")
+
+	blob := model.Blob{StorageKey: key, Status: model.BlobStatusPendingDelete}
+	if err := db.First(&blob, asset.BlobID).Error; err != nil {
+		t.Fatalf("failed to load blob: %v", err)
+	}
+	blob.Status = model.BlobStatusPendingDelete
+	db.Save(&blob)
+
+	// Remove the referencing asset so the blob is truly unreferenced.
+	if err := db.Unscoped().Delete(&model.Asset{ID: asset.ID}).Error; err != nil {
+		t.Fatalf("failed to hard-delete referencing asset: %v", err)
+	}
+
+	if err := svc.deletePendingBlob(context.Background(), &blob); err != nil {
+		t.Fatalf("deletePendingBlob error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); !os.IsNotExist(err) {
+		t.Errorf("blob file %q was not removed", key)
+	}
+
+	var count int64
+	db.Model(&model.Blob{}).Unscoped().Where("id = ? AND status = ?", asset.BlobID, model.BlobStatusPendingDelete).Count(&count)
+	if count != 0 {
+		t.Errorf("pending blob record should be deleted")
+	}
+}
+
+func TestService_DeletePendingBlob_RequiresStorageKey(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	err := svc.deletePendingBlob(context.Background(), &model.Blob{StorageKey: ""})
+	if err == nil {
+		t.Fatal("expected error for empty storage key, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty") {
+		t.Errorf("error message = %q, want it to mention empty key", err.Error())
+	}
+}
+
+// --- repository methods --------------------------------------------------
+
+func TestAssetRepository_PermanentlyDeleteByIDs(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	repo := NewAssetRepository(db)
+
+	if err := repo.PermanentlyDeleteByIDs(context.Background(), []uint{asset.ID}); err != nil {
+		t.Fatalf("PermanentlyDeleteByIDs error: %v", err)
+	}
+
+	var count int64
+	db.Unscoped().Model(&model.Asset{}).Where("id = ?", asset.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("asset %d still exists after permanent delete", asset.ID)
+	}
+}
+
+func TestAssetRepository_PermanentlyDeleteByIDs_EmptyIsNoop(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewAssetRepository(db)
+	if err := repo.PermanentlyDeleteByIDs(context.Background(), nil); err != nil {
+		t.Errorf("PermanentlyDeleteByIDs(nil) error = %v, want nil", err)
+	}
+	if err := repo.PermanentlyDeleteByIDs(context.Background(), []uint{}); err != nil {
+		t.Errorf("PermanentlyDeleteByIDs([]) error = %v, want nil", err)
+	}
+}
+
+func TestBlobRepository_FindUnreferencedByIDForUpdate(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	repo := NewBlobRepository(db)
+
+	// With a referencing asset, the blob should not be found.
+	blobs, err := repo.FindUnreferencedByIDForUpdate(context.Background(), []uint{asset.BlobID})
+	if err != nil {
+		t.Fatalf("FindUnreferencedByIDForUpdate error: %v", err)
+	}
+	if len(blobs) != 0 {
+		t.Errorf("found %d unreferenced blobs, want 0", len(blobs))
+	}
+
+	// After removing the asset reference, it should appear.
+	if err := db.Unscoped().Delete(&model.Asset{ID: asset.ID}).Error; err != nil {
+		t.Fatalf("delete asset: %v", err)
+	}
+
+	blobs, err = repo.FindUnreferencedByIDForUpdate(context.Background(), []uint{asset.BlobID})
+	if err != nil {
+		t.Fatalf("FindUnreferencedByIDForUpdate after delete error: %v", err)
+	}
+	if len(blobs) != 1 {
+		t.Errorf("found %d unreferenced blobs, want 1", len(blobs))
+	}
+}
+
+func TestBlobRepository_MarkPendingDelete(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	repo := NewBlobRepository(db)
+
+	if err := repo.MarkPendingDelete(context.Background(), []uint{asset.BlobID}); err != nil {
+		t.Fatalf("MarkPendingDelete error: %v", err)
+	}
+
+	var blob model.Blob
+	if err := db.First(&blob, asset.BlobID).Error; err != nil {
+		t.Fatalf("load blob: %v", err)
+	}
+	if blob.Status != model.BlobStatusPendingDelete {
+		t.Errorf("blob status = %q, want %q", blob.Status, model.BlobStatusPendingDelete)
+	}
+}
+
+func TestBlobRepository_MarkPendingDelete_EmptyIsNoop(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewBlobRepository(db)
+	if err := repo.MarkPendingDelete(context.Background(), nil); err != nil {
+		t.Errorf("MarkPendingDelete(nil) error = %v, want nil", err)
+	}
+}
+
+func TestBlobRepository_DeletePendingIfUnreferenced(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	repo := NewBlobRepository(db)
+
+	// Mark pending, then delete the referencing asset.
+	if err := repo.MarkPendingDelete(context.Background(), []uint{asset.BlobID}); err != nil {
+		t.Fatalf("MarkPendingDelete error: %v", err)
+	}
+	if err := db.Unscoped().Delete(&model.Asset{ID: asset.ID}).Error; err != nil {
+		t.Fatalf("delete asset: %v", err)
+	}
+
+	if err := repo.DeletePendingIfUnreferenced(context.Background(), asset.BlobID); err != nil {
+		t.Fatalf("DeletePendingIfUnreferenced error: %v", err)
+	}
+
+	var count int64
+	db.Unscoped().Model(&model.Blob{}).Where("id = ?", asset.BlobID).Count(&count)
+	if count != 0 {
+		t.Errorf("blob %d should be permanently deleted", asset.BlobID)
+	}
+}
+
+func TestBlobRepository_DeletePendingIfUnreferenced_KeepsReferenced(t *testing.T) {
+	db := newTestDB(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	repo := NewBlobRepository(db)
+
+	if err := repo.MarkPendingDelete(context.Background(), []uint{asset.BlobID}); err != nil {
+		t.Fatalf("MarkPendingDelete error: %v", err)
+	}
+
+	// Blob is still referenced, so delete should be a no-op (not an error).
+	if err := repo.DeletePendingIfUnreferenced(context.Background(), asset.BlobID); err != nil {
+		t.Errorf("DeletePendingIfUnreferenced on referenced blob error = %v, want nil", err)
+	}
+
+	var count int64
+	db.Model(&model.Blob{}).Where("id = ?", asset.BlobID).Count(&count)
+	if count != 1 {
+		t.Errorf("referenced blob should survive, got count %d", count)
 	}
 }

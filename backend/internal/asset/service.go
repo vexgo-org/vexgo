@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -222,6 +223,111 @@ func (s *Service) DeleteAssets(ctx context.Context, publicIDs []uuid.UUID) error
 
 		return nil
 	})
+}
+
+// PruneManually only allows the super admin to prune deleted assets before a certain time.
+func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Time) error {
+	if !model.IsSuperAdmin(actor.Role) {
+		return ErrForbidden
+	}
+
+	assets, err := s.assets.FindDeletedBefore(ctx, before)
+	if err != nil {
+		return fmt.Errorf("find deleted assets: %w", err)
+	}
+
+	if err := s.prune(ctx, assets); err != nil {
+		return fmt.Errorf("manually prune assets: %w", err)
+	}
+
+	return nil
+}
+
+// prune is a helper function used to remove a group of asset records
+// in database, find orphan blobs after asset deletion, and delete orphan blobs.
+func (s *Service) prune(ctx context.Context, assets []model.Asset) error {
+	if len(assets) == 0 {
+		return nil
+	}
+
+	// Gather asset IDs, and deduplicate blob IDs.
+	assetIDs := make([]uint, 0, len(assets))
+	blobIDSet := make(map[uint]struct{}, len(assets))
+
+	for _, asset := range assets {
+		assetIDs = append(assetIDs, asset.ID)
+		blobIDSet[asset.BlobID] = struct{}{}
+	}
+
+	blobIDs := make([]uint, 0, len(blobIDSet))
+	for blobID := range blobIDSet {
+		blobIDs = append(blobIDs, blobID)
+	}
+
+	var orphanBlobs []model.Blob
+
+	// Delete assets and reserve orphan blobs for deletion atomically.
+	if err := s.txManager.WithTransaction(ctx, func(repos Repositories) error {
+		assetRepo := repos.Assets()
+		blobRepo := repos.Blobs()
+
+		if err := assetRepo.PermanentlyDeleteByIDs(ctx, assetIDs); err != nil {
+			return fmt.Errorf("delete asset by IDs: %w", err)
+		}
+
+		// Gather orphan blob IDs, and mark them as pending delete.
+		var err error
+		orphanBlobs, err = blobRepo.FindUnreferencedByIDForUpdate(ctx, blobIDs)
+		if err != nil {
+			return fmt.Errorf("find unreferenced blobs: %w", err)
+		}
+
+		orphanBlobIDs := make([]uint, 0, len(orphanBlobs))
+		for _, blob := range orphanBlobs {
+			orphanBlobIDs = append(orphanBlobIDs, blob.ID)
+		}
+
+		if len(orphanBlobIDs) == 0 {
+			return nil
+		}
+
+		if err := blobRepo.MarkPendingDelete(ctx, blobIDs); err != nil {
+			return fmt.Errorf("mark blobs pending delete: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("prepare asset prune: %w", err)
+	}
+
+	// Delete orphan blobs.
+	for _, blob := range orphanBlobs {
+		if err := s.deletePendingBlob(ctx, &blob); err != nil {
+			return fmt.Errorf("delete pending blob %d: %w", blob.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// deletePendingBlob deletes both physical file and database record of
+// a blob whose status is pending delete.
+func (s *Service) deletePendingBlob(ctx context.Context, blob *model.Blob) error {
+	if blob.StorageKey == "" {
+		return errors.New("blob storage key is empty")
+	}
+
+	// Delete the physical file at first.
+	if err := s.storage.Delete(ctx, blob.StorageKey); err != nil {
+		return fmt.Errorf("delete physical blob: %w", err)
+	}
+
+	// Then, delete the database record.
+	if err := s.blobs.DeletePendingIfUnreferenced(ctx, blob.ID); err != nil {
+		return fmt.Errorf("delete blob record: %w", err)
+	}
+
+	return nil
 }
 
 // rollbackUpload removes file from storage when uploading error occurs.

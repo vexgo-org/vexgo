@@ -9,7 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type BlobType string
+type (
+	BlobType   string
+	BlobStatus string
+)
 
 var ErrUnsupportedMIMEType = errors.New("unsupported MIME type")
 
@@ -17,6 +20,11 @@ const (
 	BlobTypeAudio BlobType = "audio"
 	BlobTypeImage BlobType = "image"
 	BlobTypeVideo BlobType = "video"
+)
+
+const (
+	BlobStatusActive        BlobStatus = "active"
+	BlobStatusPendingDelete BlobStatus = "pending_delete"
 )
 
 const (
@@ -32,6 +40,8 @@ type Blob struct {
 
 	MimeType string   `gorm:"size:127;index"`
 	Type     BlobType `gorm:"size:50;index"`
+
+	Status BlobStatus `gorm:"type:varchar(32);not null;default:active"`
 
 	Size int64
 
