@@ -13,6 +13,7 @@ export * from "./apiNotFoundWithIDResponse";
 export * from "./apiNotFoundWithSlugResponse";
 export * from "./apiPagination";
 export * from "./apiUserSummary";
+export * from "./assetPruneRequest";
 export * from "./assetUploadResponse";
 export * from "./authChangePasswordRequestWire";
 export * from "./authCurrentUserResponse";

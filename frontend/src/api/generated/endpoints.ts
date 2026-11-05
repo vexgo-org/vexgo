@@ -7,6 +7,7 @@
  */
 import type {
   ApiMessageResponse,
+  AssetPruneRequest,
   AssetUploadResponse,
   AuthChangePasswordRequestWire,
   AuthCurrentUserResponse,
@@ -128,6 +129,19 @@ export const getVexGoAPI = () => {
     return customInstance<ApiMessageResponse>({
       url: `/assets/delete/${publicID}`,
       method: "POST",
+    });
+  };
+
+  /**
+   * Permanently removes assets that have been soft-deleted longer than the specified retention period.
+   * @summary Prune deleted assets
+   */
+  const postAssetsPrune = (assetPruneRequest: AssetPruneRequest) => {
+    return customInstance<void>({
+      url: `/assets/prune`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: assetPruneRequest,
     });
   };
 
@@ -1369,6 +1383,7 @@ export const getVexGoAPI = () => {
 
   return {
     postAssetsDeletePublicID,
+    postAssetsPrune,
     postAssetsUpload,
     getAssetsPublicIDOriginal,
     headAssetsPublicIDOriginal,
@@ -1464,6 +1479,9 @@ export type PostAssetsDeletePublicIDResult = NonNullable<
   Awaited<
     ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsDeletePublicID"]>
   >
+>;
+export type PostAssetsPruneResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsPrune"]>>
 >;
 export type PostAssetsUploadResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postAssetsUpload"]>>
