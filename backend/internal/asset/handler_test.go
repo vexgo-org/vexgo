@@ -312,6 +312,18 @@ func (f *handlerFixture) deleteOnRoutedRoute(
 		"/api/assets/delete/"+publicID.String(), nil, "", bearerOf(t, user))
 }
 
+// pruneOnRoutedRoute performs a prune through RegisterRoutes, so every
+// middleware in route.go runs.
+func (f *handlerFixture) pruneOnRoutedRoute(
+	t *testing.T,
+	user model.User,
+	body io.Reader,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	return perform(t, f.routed, http.MethodPost, "/api/assets/prune",
+		body, "application/json", bearerOf(t, user))
+}
+
 // --- shared assertions --------------------------------------------------
 
 func decodeJSON(t *testing.T, recorder *httptest.ResponseRecorder) map[string]any {
@@ -1259,6 +1271,10 @@ func (r *recordingAssetRepo) FindPublicByPublicID(
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (r *recordingAssetRepo) FindDeletedBefore(ctx context.Context, before time.Time) ([]model.Asset, error) {
+	return nil, gorm.ErrRecordNotFound
+}
+
 func (r *recordingAssetRepo) SoftDelete(context.Context, *model.Asset) error {
 	return nil
 }
@@ -1384,4 +1400,174 @@ func TestHandlerDelete_HidesRepositoryFailures(t *testing.T) {
 	if err := f.db.First(&model.Asset{}, asset.ID).Error; err != nil {
 		t.Errorf("a failed delete removed the asset: %v", err)
 	}
+}
+
+// --- Handler.Prune ------------------------------------------------------
+
+// TestHandlerPrune_RequiresAuthentication proves the endpoint stays behind
+// the real auth middleware when it is mounted as documented.
+func TestHandlerPrune_RequiresAuthentication(t *testing.T) {
+	f := newHandlerFixture(t)
+	body := strings.NewReader(`{"retention_days": 30}`)
+
+	recorder := perform(t, f.guarded, http.MethodPost, "/api/assets/prune",
+		body, "application/json", nil)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 (body %s)", recorder.Code, recorder.Body.String())
+	}
+}
+
+// TestHandlerPrune_SuperAdminCanPrune is the happy path: a super admin can
+// trigger pruning and gets a 204 No Content.
+func TestHandlerPrune_SuperAdminCanPrune(t *testing.T) {
+	f := newHandlerFixture(t)
+	owner := seedUser(t, f.db, "owner", model.RoleContributor)
+	asset := seedAsset(t, f.db, owner.ID, "mine.png")
+	key := writeObject(t, f.db, f.dataDir, asset.BlobID, "stored-bytes")
+
+	// Soft-delete the asset first so it's eligible for pruning.
+	if err := f.db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+
+	// Manually set deleted_at to 60 days ago so it's before the 30-day cutoff.
+	oldTime := time.Now().Add(-60 * 24 * time.Hour)
+	if err := f.db.Unscoped().Model(&asset).Update("deleted_at", oldTime).Error; err != nil {
+		t.Fatalf("failed to set old deleted_at: %v", err)
+	}
+
+	superAdmin := seedUser(t, f.db, "superadmin", model.RoleSuperAdmin)
+	body := strings.NewReader(`{"retention_days": 30}`)
+
+	recorder := f.pruneOnRoutedRoute(t, superAdmin, body)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204 (body %s)", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Body.Len() != 0 {
+		t.Errorf("204 response should have empty body, got %q", recorder.Body.String())
+	}
+
+	// Asset permanently removed.
+	var count int64
+	f.db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("asset %d still exists after prune", asset.ID)
+	}
+
+	// Orphan blob deleted from storage and DB.
+	if _, err := os.Stat(filepath.Join(f.dataDir, "media", key)); !os.IsNotExist(err) {
+		t.Errorf("blob file %q was not removed", key)
+	}
+
+	var blobCount int64
+	f.db.Model(&model.Blob{}).Unscoped().Where("id = ?", asset.BlobID).Count(&blobCount)
+	if blobCount != 0 {
+		t.Errorf("blob %d still exists after prune", asset.BlobID)
+	}
+}
+
+// TestHandlerPrune_ForbiddenForNonSuperAdmin: only super_admin may call this
+// endpoint; every other role gets a 403.
+func TestHandlerPrune_ForbiddenForNonSuperAdmin(t *testing.T) {
+	for _, role := range []string{
+		model.RoleGuest,
+		model.RoleContributor,
+		model.RoleAuthor,
+		model.RoleAdmin,
+		"", // unknown role
+	} {
+		t.Run("role="+role, func(t *testing.T) {
+			f := newHandlerFixture(t)
+			user := seedUser(t, f.db, role, role)
+			body := strings.NewReader(`{"retention_days": 30}`)
+
+			recorder := f.pruneOnRoutedRoute(t, user, body)
+
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want 403 (body %s)", recorder.Code, recorder.Body.String())
+			}
+			errorField(t, recorder)
+		})
+	}
+}
+
+// TestHandlerPrune_RejectsInvalidRequestBody covers malformed or invalid JSON.
+func TestHandlerPrune_RejectsInvalidRequestBody(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     string
+		wantCode int
+	}{
+		{
+			name:     "empty body",
+			body:     "",
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "invalid JSON",
+			body:     "{not json}",
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "missing retention_days",
+			body:     `{"foo": 1}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "retention_days zero",
+			body:     `{"retention_days": 0}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "retention_days negative",
+			body:     `{"retention_days": -1}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "retention_days over max",
+			body:     `{"retention_days": 366}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "retention_days not integer",
+			body:     `{"retention_days": "30"}`,
+			wantCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newHandlerFixture(t)
+			superAdmin := seedUser(t, f.db, "superadmin", model.RoleSuperAdmin)
+			body := strings.NewReader(tt.body)
+
+			recorder := f.pruneOnRoutedRoute(t, superAdmin, body)
+
+			if recorder.Code != tt.wantCode {
+				t.Fatalf("status = %d, want %d (body %s)", recorder.Code, tt.wantCode, recorder.Body.String())
+			}
+			if tt.wantCode != http.StatusNoContent {
+				errorField(t, recorder)
+			}
+		})
+	}
+}
+
+// TestHandlerPrune_HidesServiceFailures: an infrastructure failure is a 500,
+// not a 400 or 404. The internal error must not leak to the client.
+func TestHandlerPrune_HidesServiceFailures(t *testing.T) {
+	f := newHandlerFixture(t)
+	superAdmin := seedUser(t, f.db, "superadmin", model.RoleSuperAdmin)
+	f.h.svc = &Service{assets: &stubAssetRepo{findErr: errors.New("dial tcp 10.0.0.5:5432: refused")}}
+	body := strings.NewReader(`{"retention_days": 30}`)
+
+	recorder := f.pruneOnRoutedRoute(t, superAdmin, body)
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 (body %s)", recorder.Code, recorder.Body.String())
+	}
+	errorField(t, recorder)
+	assertNoLeak(t, recorder, "dial tcp", "10.0.0.5", "5432", "refused")
 }

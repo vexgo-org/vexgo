@@ -247,6 +247,9 @@ type stubAssetRepo struct {
 
 	created []*model.Asset
 	deleted []uint
+
+	// For PruneManually tests.
+	deletedAssets []model.Asset
 }
 
 func (s *stubAssetRepo) Create(_ context.Context, asset *model.Asset) error {
@@ -332,6 +335,13 @@ func (s *stubAssetRepo) SoftDelete(_ context.Context, asset *model.Asset) error 
 
 func (s *stubAssetRepo) PermanentlyDeleteByIDs(_ context.Context, assetIDs []uint) error {
 	return nil
+}
+
+func (s *stubAssetRepo) FindDeletedBefore(ctx context.Context, before time.Time) ([]model.Asset, error) {
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	return s.deletedAssets, nil
 }
 
 type stubBlobRepo struct {
@@ -1983,6 +1993,114 @@ func TestService_Prune_PropagatesDeletePendingBlobError(t *testing.T) {
 	}
 	if !errors.Is(err, errDB) {
 		t.Errorf("prune error = %v, want it to wrap %v", err, errDB)
+	}
+}
+
+// --- PruneManually ------------------------------------------------------
+
+func TestService_PruneManually_SuperAdminCanPrune(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	key := writeObject(t, db, dataDir, asset.BlobID, "stored-bytes")
+
+	// Soft-delete the asset first so it's eligible for pruning.
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+
+	// Super admin can prune.
+	actor := Actor{ID: 99, Role: model.RoleSuperAdmin}
+	// Use a time far in the future to ensure the deleted_at is before it.
+	before := time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if err := svc.PruneManually(context.Background(), actor, before); err != nil {
+		t.Fatalf("PruneManually error: %v", err)
+	}
+
+	// Asset permanently removed.
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("asset %d still exists after prune", asset.ID)
+	}
+
+	// Orphan blob deleted from storage and DB.
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); !os.IsNotExist(err) {
+		t.Errorf("blob file %q was not removed", key)
+	}
+
+	var blobCount int64
+	db.Model(&model.Blob{}).Unscoped().Where("id = ?", asset.BlobID).Count(&blobCount)
+	if blobCount != 0 {
+		t.Errorf("blob %d still exists after prune", asset.BlobID)
+	}
+}
+
+func TestService_PruneManually_ForbiddenForNonSuperAdmin(t *testing.T) {
+	for _, role := range []string{
+		model.RoleGuest,
+		model.RoleContributor,
+		model.RoleAuthor,
+		model.RoleAdmin,
+		"", // unknown role
+	} {
+		t.Run("role="+role, func(t *testing.T) {
+			svc, _, _ := newTestService(t)
+			actor := Actor{ID: 1, Role: role}
+
+			err := svc.PruneManually(context.Background(), actor, time.Now())
+			if !errors.Is(err, ErrForbidden) {
+				t.Fatalf("PruneManually error = %v, want ErrForbidden for role %q", err, role)
+			}
+		})
+	}
+}
+
+func TestService_PruneManually_NoAssetsIsNoop(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+
+	if err := svc.PruneManually(context.Background(), actor, time.Now()); err != nil {
+		t.Errorf("PruneManually with no assets error = %v, want nil", err)
+	}
+}
+
+func TestService_PruneManually_PropagatesFindError(t *testing.T) {
+	svc, _, _ := newTestService(t)
+	repo := &stubAssetRepo{findErr: errDB}
+	svc.assets = repo
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+
+	err := svc.PruneManually(context.Background(), actor, time.Now())
+	if !errors.Is(err, errDB) {
+		t.Fatalf("PruneManually error = %v, want it to wrap the lookup failure", err)
+	}
+}
+
+func TestService_PruneManually_PropagatesPruneError(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "mine.png")
+	writeObject(t, db, dataDir, asset.BlobID, "bytes")
+
+	// Soft-delete the asset.
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+
+	// Make prune fail by injecting a failing storage.
+	store := &fakeStorage{deleteErr: errDB}
+	svc.storage = store
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+	before := time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	err := svc.PruneManually(context.Background(), actor, before)
+	if err == nil {
+		t.Fatal("expected error from failed prune, got nil")
+	}
+	if !errors.Is(err, errDB) {
+		t.Errorf("PruneManually error = %v, want it to wrap %v", err, errDB)
 	}
 }
 
