@@ -232,3 +232,53 @@ func (h *Handler) Original(c *gin.Context) {
 		content.Reader,
 	)
 }
+
+// Prune godoc
+//
+//	@Summary		Prune deleted assets
+//	@Description	Permanently removes assets that have been soft-deleted longer than the specified retention period.
+//	@Tags			assets
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body	PruneRequest	true	"Prune configuration"
+//	@Success		204		"Assets pruned successfully"
+//	@Failure		400		{object}	api.ErrorResponse	"invalid request"
+//	@Failure		403		{object}	api.ErrorResponse	"insufficient permission"
+//	@Failure		500		{object}	api.ErrorResponse	"failed to prune assets"
+//	@Router			/assets/prune [post]
+func (h *Handler) Prune(c *gin.Context) {
+	var req PruneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid before time"})
+		return
+	}
+
+	// Get current user.
+	user, ok := middleware.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid user"})
+		return
+	}
+
+	before := time.Now().UTC().AddDate(0, 0, -req.RetentionDays)
+
+	if err := h.svc.PruneManually(
+		c.Request.Context(),
+		Actor{
+			ID:   user.ID,
+			Role: user.Role,
+		},
+		before,
+	); err != nil {
+		switch {
+		case errors.Is(err, ErrForbidden):
+			c.JSON(http.StatusForbidden, api.ErrorResponse{Error: "Insufficient permission"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to prune assets"})
+		}
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
