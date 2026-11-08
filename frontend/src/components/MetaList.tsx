@@ -25,11 +25,9 @@ function MetaRow({
   labelClassName?: string;
 }) {
   return (
-    <div className={cn("flex gap-3", className)}>
-      <dt className={cn("eyebrow w-16 shrink-0 pt-[3px]", labelClassName)}>
-        {label}
-      </dt>
-      <dd className="min-w-0 flex-1 text-xs text-foreground">{children}</dd>
+    <div className={cn("grid grid-cols-[6rem_1fr] gap-x-3", className)}>
+      <dt className={cn("eyebrow pt-0.75", labelClassName)}>{label}</dt>
+      <dd className="min-w-0 text-xs text-foreground">{children}</dd>
     </div>
   );
 }
