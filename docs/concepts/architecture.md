@@ -39,6 +39,7 @@ backend/
     post/                    # post CRUD, categories, tags, likes
     public/                  # embedded frontend, themes, SSR service + handler, static routes
     router/                  # route registration (composes every domain)
+    scheduler/               # cron-based job scheduler (robfig/cron/v3) used by app at runtime
     secrets/                 # AES-256-GCM encryption of secrets stored in the database
     settings/                # admin configuration (SMTP, AI, general, theme)
     sso/                     # GitHub / Google / OIDC login
@@ -123,6 +124,7 @@ The `internal/app/app.go` package is the composition root, also called the wirin
 4. Builds the at-rest cipher from `settings_encryption_key` (a warning is logged when unset, meaning secrets stay in plaintext) and runs `migration.Service.MigrateSecrets` to encrypt still-plaintext secrets in place (idempotent).
 5. Creates storage (local or S3).
 6. Instantiates every domain's dependencies and wires them into the router.
+7. Constructs the cron-based `scheduler`; `App.Run()` starts it alongside the HTTP server.
 
 `cmd/vexgo/main.go` is a thin entry point that calls `cli.Execute()`, then `app.New(cfg)` and `app.Run()`.
 
