@@ -603,6 +603,7 @@ backend/
     post/            # post CRUD, categories, tags, likes
     public/          # embedded frontend, themes, SSR service + handler, static routes
     router/          # route registration (composes every domain)
+    scheduler/       # cron-based job scheduler run by app at startup
     secrets/         # AES-256-GCM encryption of secrets stored in the database
     settings/        # admin configuration (SMTP, AI, general, theme)
     sso/             # GitHub / Google / OIDC login
@@ -633,10 +634,10 @@ import (
 
 ### Dependencies
 
-- Leaf packages: `config/`, `model/`, `secrets/`, and `cache/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
+- Leaf packages: `config/`, `model/`, `secrets/`, `cache/`, and `scheduler/` import no other backend module. `model` holds the GORM data models plus the cross-domain seams (`Notifier`, `FileRemover`).
 - Shared layer: `middleware/` (JWT auth, role permissions, request logging) depends only on `model`.
 - Cross-domain edges: `auth` is used by `comment`, `post`, and `sso`; `settings` depends on `public` (theme management) and `mailer` (SMTP); `public` depends on `page` (theme seed pages) and implements the `settings.ThemeManager` seam; `database` depends on `config` and `model`, and `migration` depends on `model`, `secrets`, `asset`, and `storage`. Domains consume each other through the seams in `model`: `notification` implements `Notifier`, `storage.Storage` implements `FileRemover`, and `captcha` implements the `CaptchaChecker` seam that `auth` declares. `mailer.Service` is injected as a concrete type into `auth` and `settings`. The dependency graph is acyclic.
-- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, runs the startup migrations, creates storage and the `public.Service`, and wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`).
+- Wiring: `backend/cmd/vexgo/main.go` is the thin entry point. It parses flags and calls `app.New(cfg)` / `app.Run()`. The `internal/app` package is the composition root: it opens the database, runs the startup migrations, creates storage and the `public.Service`, constructs the `scheduler`, wires every domain by calling `router.RegisterAPIRoutes(r, router.Deps{...})` (defined in `internal/router`), and starts the scheduler in `App.Run()`.
 
 ## Contributing
 

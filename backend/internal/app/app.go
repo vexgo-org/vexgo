@@ -27,6 +27,7 @@ import (
 	"github.com/vexgo-org/vexgo/backend/internal/post"
 	"github.com/vexgo-org/vexgo/backend/internal/public"
 	"github.com/vexgo-org/vexgo/backend/internal/router"
+	"github.com/vexgo-org/vexgo/backend/internal/scheduler"
 	"github.com/vexgo-org/vexgo/backend/internal/settings"
 	"github.com/vexgo-org/vexgo/backend/internal/sso"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
@@ -38,9 +39,10 @@ import (
 
 // App is the fully-wired application.
 type App struct {
-	cfg    *config.Config
-	db     *gorm.DB
-	engine *gin.Engine
+	cfg       *config.Config
+	db        *gorm.DB
+	engine    *gin.Engine
+	scheduler *scheduler.Scheduler
 }
 
 // New creates and wires the application from the given config.
@@ -139,6 +141,8 @@ func New(cfg *config.Config) (*App, error) {
 
 	configureProxies(r, cfg)
 
+	sched := scheduler.NewScheduler()
+
 	// Shared service instances: construct each once and reuse it across the
 	// domains that depend on it.
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
@@ -223,7 +227,12 @@ func New(cfg *config.Config) (*App, error) {
 
 	public.NewHandler(publicSvc).RegisterRoutes(r, cfg.S3Enabled)
 
-	return &App{cfg: cfg, db: db, engine: r}, nil
+	return &App{
+		cfg:       cfg,
+		db:        db,
+		engine:    r,
+		scheduler: sched,
+	}, nil
 }
 
 // Run starts the HTTP server. Explicit timeouts guard against slow-loris and
@@ -239,6 +248,10 @@ func (a *App) Run() error {
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
+
+	a.scheduler.Start()
+	slog.Info("started scheduler")
+
 	slog.Info("starting server", "address", a.cfg.GetListenAddr())
 	return srv.ListenAndServe()
 }

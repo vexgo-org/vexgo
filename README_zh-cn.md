@@ -601,6 +601,7 @@ backend/
     post/            # 文章 CRUD、分类、标签、点赞
     public/          # 内嵌前端、主题、SSR 服务与处理器、静态路由
     router/          # 路由注册（组合所有领域模块）
+    scheduler/       # 基于 cron 的定时任务调度器，在启动时由 app 运行
     secrets/         # 数据库中静态敏感信息的 AES-256-GCM 加密
     settings/        # 管理端配置（SMTP、AI、通用设置、主题）
     sso/             # GitHub / Google / OIDC 登录
@@ -630,10 +631,10 @@ import (
 
 ### 依赖关系
 
-- 叶子包：`config/`、`model/`、`secrets/`、`cache/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`）。
+- 叶子包：`config/`、`model/`、`secrets/`、`cache/`、`scheduler/` 不导入任何其他后端模块。`model` 除 GORM 数据模型外还持有跨域接口（`Notifier`、`FileRemover`）。
 - 共享层：`middleware/`（JWT 认证、角色权限、请求日志）只依赖 `model`。
 - 领域间依赖：`auth` 被 `comment`、`post`、`sso` 引用；`settings` 依赖 `public`（主题管理）和 `mailer`（SMTP）；`public` 依赖 `page`（主题种子页）并实现 `settings.ThemeManager` 接缝；`database` 依赖 `config` 和 `model`，`migration` 依赖 `model`、`secrets`、`asset` 和 `storage`。领域之间通过 `model` 中的接口协作：`notification` 实现 `Notifier`、`storage.Storage` 实现 `FileRemover`，`captcha` 实现 `auth` 自己声明的 `CaptchaChecker` 接口。`mailer.Service` 以具体类型注入 `auth` 与 `settings`。依赖图无环。
-- 接线：`backend/cmd/vexgo/main.go` 是极简入口，解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根，负责打开数据库、运行启动迁移、创建存储和 `public.Service`，然后通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包。
+- 接线：`backend/cmd/vexgo/main.go` 是极简入口，解析参数后调用 `app.New(cfg)` / `app.Run()`。`internal/app` 是组合根，负责打开数据库、运行启动迁移、创建存储和 `public.Service`，构造 `scheduler`，通过调用 `router.RegisterAPIRoutes(r, router.Deps{...})`（定义于 `internal/router`）组装所有领域包，并在 `App.Run()` 中启动调度器。
 
 ## 贡献指南
 

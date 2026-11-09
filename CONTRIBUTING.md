@@ -151,6 +151,7 @@ backend/
     post/                  # blog post CRUD
     public/                # embedded frontend assets, theme engine, SSR service and handler
     router/                # route registration
+    scheduler/             # cron-based job scheduler run by app at startup
     secrets/               # AES-256-GCM encryption of secrets at rest
     settings/              # site settings endpoints
     sso/                   # OAuth2 / OIDC login

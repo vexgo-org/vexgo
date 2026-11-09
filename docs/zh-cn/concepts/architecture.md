@@ -39,6 +39,7 @@ backend/
     post/                    # 文章 CRUD、分类、标签、点赞
     public/                  # 嵌入的前端、主题、SSR 服务与处理器、静态路由
     router/                  # 路由注册（组合所有领域）
+    scheduler/               # 基于 robfig/cron/v3 的定时任务调度器，运行时由 app 使用
     secrets/                 # 数据库中敏感信息的 AES-256-GCM 加密
     settings/                # 管理员配置（SMTP、AI、通用、主题）
     sso/                     # GitHub / Google / OIDC 登录
@@ -123,6 +124,7 @@ type FileRemover interface {
 4. 从 `settings_encryption_key` 构建静态加密 cipher（未设置时记录警告，敏感信息保持明文存储），并运行 `migration.Service.MigrateSecrets` 将仍为明文的敏感信息就地加密（幂等）。
 5. 创建存储（本地或 S3）。
 6. 实例化每个领域的依赖并将它们装配到路由器中。
+7. 构造基于 cron 的 `scheduler`；`App.Run()` 与 HTTP 服务同时启动它。
 
 `cmd/vexgo/main.go` 是一个轻量入口，调用 `cli.Execute()`，然后调用 `app.New(cfg)` 和 `app.Run()`。
 
