@@ -26,6 +26,7 @@ type Deps struct {
 type Service struct {
 	assets            AssetRepository
 	blobs             BlobRepository
+	config            ConfigRepository
 	txManager         TransactionManager
 	storage           storage.Storage
 	keyGenerator      KeyGenerator
@@ -38,6 +39,7 @@ func NewService(deps Deps) *Service {
 	return &Service{
 		assets:            repos.Assets(),
 		blobs:             repos.Blobs(),
+		config:            repos.Config(),
 		txManager:         NewTransactionManager(deps.DB),
 		storage:           deps.Storage,
 		keyGenerator:      NewKeyGenerator(),

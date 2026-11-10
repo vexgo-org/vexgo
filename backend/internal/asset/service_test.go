@@ -417,15 +417,17 @@ func (s *stubBlobRepo) DeletePendingIfUnreferenced(_ context.Context, blobID uin
 	return nil
 }
 
-// mixedRepositories hands the transaction a caller-chosen pair of repositories,
+// mixedRepositories hands the transaction a caller-chosen set of repositories,
 // so a real blob repository can share a transaction with a faked asset one.
 type mixedRepositories struct {
 	assets AssetRepository
 	blobs  BlobRepository
+	config ConfigRepository
 }
 
-func (m mixedRepositories) Assets() AssetRepository { return m.assets }
-func (m mixedRepositories) Blobs() BlobRepository   { return m.blobs }
+func (m mixedRepositories) Assets() AssetRepository  { return m.assets }
+func (m mixedRepositories) Blobs() BlobRepository    { return m.blobs }
+func (m mixedRepositories) Config() ConfigRepository { return m.config }
 
 // mixedTxManager runs fn inside a real GORM transaction, but builds its
 // repositories through build instead of newRepositories so a test can mix a real
@@ -490,6 +492,7 @@ func newFakeService(
 	return &Service{
 		assets:            repos.Assets(),
 		blobs:             repos.Blobs(),
+		config:            repos.Config(),
 		txManager:         tx,
 		storage:           store,
 		keyGenerator:      keys,
