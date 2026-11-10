@@ -40,6 +40,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.CreatorApplication{},
 		&model.Asset{},
 		&model.Blob{},
+		&model.AssetConfig{},
 	)
 }
 

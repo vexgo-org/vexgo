@@ -91,3 +91,9 @@ type ThemeConfig struct {
 	CreatedAt   time.Time // Creation time
 	UpdatedAt   time.Time // Update time
 }
+
+// AssetConfig stores asset-related configurations.
+type AssetConfig struct {
+	ID            uint   `gorm:"primaryKey"`
+	PruneInterval string `gorm:"default:'@monthly'"`
+}
