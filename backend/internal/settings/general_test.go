@@ -47,6 +47,75 @@ func seedSiteIconAsset(t *testing.T, db *gorm.DB, mimeType string, blobType mode
 	return icon
 }
 
+func TestGetGeneralSettings_Default(t *testing.T) {
+	svc, _ := newTestService(t)
+	config, err := svc.GetGeneralSettings(context.Background())
+	if err != nil {
+		t.Fatalf("GetGeneralSettings error: %v", err)
+	}
+	if !config.RegistrationEnabled || !config.AllowGuestViewPosts || config.SiteName != "VexGo" || config.ItemsPerPage != 20 {
+		t.Errorf("expected default settings, got %+v", config)
+	}
+	if config.SiteLanguage != "en" {
+		t.Errorf("expected default site language en, got %q", config.SiteLanguage)
+	}
+}
+
+func TestUpdateGeneralSettings(t *testing.T) {
+	svc, _ := newTestService(t)
+	config, err := svc.UpdateGeneralSettings(context.Background(), GeneralSettingsRequest{
+		CaptchaEnabled:      true,
+		RegistrationEnabled: false,
+		SiteName:            "My Blog",
+		ItemsPerPage:        10,
+	})
+	if err != nil {
+		t.Fatalf("UpdateGeneralSettings error: %v", err)
+	}
+	if !config.CaptchaEnabled || config.SiteName != "My Blog" {
+		t.Errorf("expected updated settings, got %+v", config)
+	}
+
+	// read back — RegistrationEnabled: false must survive the create path.
+	// It used to be stored as true because the model carried gorm:"default:true"
+	// and GORM omitted zero-value bools on Create.
+	got, err := svc.GetGeneralSettings(context.Background())
+	if err != nil {
+		t.Fatalf("GetGeneralSettings error: %v", err)
+	}
+	if !got.CaptchaEnabled || got.SiteName != "My Blog" {
+		t.Errorf("expected persisted settings, got %+v", got)
+	}
+	if got.RegistrationEnabled {
+		t.Errorf("expected RegistrationEnabled=false persisted, got %+v", got)
+	}
+}
+
+func TestUpdateGeneralSettings_SiteLanguage(t *testing.T) {
+	svc, _ := newTestService(t)
+	ctx := context.Background()
+
+	// zh-CN normalizes to zh and persists.
+	config, err := svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "B", SiteLanguage: "zh-CN"})
+	if err != nil {
+		t.Fatalf("UpdateGeneralSettings error: %v", err)
+	}
+	if config.SiteLanguage != "zh" {
+		t.Errorf("expected normalized zh, got %q", config.SiteLanguage)
+	}
+
+	// Empty/invalid input falls back to en instead of storing garbage.
+	for _, in := range []string{"", "!!", "toolonglanguagecode"} {
+		config, err = svc.UpdateGeneralSettings(ctx, GeneralSettingsRequest{SiteName: "B", SiteLanguage: in})
+		if err != nil {
+			t.Fatalf("UpdateGeneralSettings(%q) error: %v", in, err)
+		}
+		if config.SiteLanguage != "en" {
+			t.Errorf("UpdateGeneralSettings(%q) = %q, want en", in, config.SiteLanguage)
+		}
+	}
+}
+
 func TestUpdateGeneralSettings_SiteIconRoundTrip(t *testing.T) {
 	svc, db := newTestService(t)
 	ctx := context.Background()
