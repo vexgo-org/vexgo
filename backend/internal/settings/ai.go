@@ -92,7 +92,7 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 		}
 
 		if err := s.repo.CreateAIConfig(ctx, &config); err != nil {
-			return config, fmt.Errorf("failed to create AI config: %w", err)
+			return config, fmt.Errorf("create AI config: %w", err)
 		}
 
 		// Return configuration without API key
@@ -101,7 +101,7 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 	}
 
 	if err != nil {
-		return config, fmt.Errorf("failed to get AI config: %w", err)
+		return config, fmt.Errorf("get AI config: %w", err)
 	}
 
 	// Update existing configuration
@@ -120,7 +120,7 @@ func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (mode
 	}
 
 	if err := s.repo.SaveAIConfig(ctx, &config); err != nil {
-		return config, fmt.Errorf("failed to update AI config: %w", err)
+		return config, fmt.Errorf("update AI config: %w", err)
 	}
 
 	// Return configuration without API key
@@ -208,12 +208,12 @@ func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", chatCompletionsURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -221,7 +221,7 @@ func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to AI API: %w", err)
+		return nil, fmt.Errorf("connect to AI API: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -236,7 +236,7 @@ func (s *Service) TestAI(ctx context.Context) (*AIResult, error) {
 	}
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse AI response: %w", err)
+		return nil, fmt.Errorf("parse AI response: %w", err)
 	}
 
 	// Check for error field
@@ -313,7 +313,7 @@ func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 
 	req, err := http.NewRequest("GET", modelsURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+config.ApiKey)
@@ -321,12 +321,12 @@ func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch models: %w", err)
+		return nil, fmt.Errorf("fetch models: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch models, status: %d, response: %s", resp.StatusCode, aiErrorBody(resp))
+		return nil, fmt.Errorf("fetch models, status: %d, response: %s", resp.StatusCode, aiErrorBody(resp))
 	}
 
 	// Parse response
@@ -336,7 +336,7 @@ func (s *Service) AIModels(ctx context.Context) (*AIResult, error) {
 	}
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse models response: %w", err)
+		return nil, fmt.Errorf("parse models response: %w", err)
 	}
 
 	// Check for errors
@@ -402,14 +402,14 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 
 	req, err := http.NewRequest("GET", modelsURL, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to create request: %w", err)
+		return false, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("failed to connect to models endpoint: %w", err)
+		return false, fmt.Errorf("connect to models endpoint: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -423,7 +423,7 @@ func checkModelExists(modelsURL, apiKey, modelName string) (bool, error) {
 	}
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return false, fmt.Errorf("failed to parse models response: %w", err)
+		return false, fmt.Errorf("parse models response: %w", err)
 	}
 
 	// Check models list

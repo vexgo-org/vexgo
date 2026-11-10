@@ -73,7 +73,7 @@ func (s *Service) DeleteTheme(ctx context.Context, themeID string) error {
 	}
 	themeDir := filepath.Join(s.themes.DataDir(), public.ThemesDir, themeID)
 	if err := os.RemoveAll(themeDir); err != nil {
-		return fmt.Errorf("failed to delete theme directory: %w", err)
+		return fmt.Errorf("delete theme directory: %w", err)
 	}
 	s.themes.InvalidateThemeCache(themeID)
 	return nil
@@ -115,14 +115,14 @@ func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (st
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		config = model.ThemeConfig{ActiveTheme: activeTheme}
 		if err := s.repo.CreateThemeConfig(ctx, &config); err != nil {
-			return "", fmt.Errorf("failed to save theme config: %w", err)
+			return "", fmt.Errorf("save theme config: %w", err)
 		}
 	} else if err != nil {
-		return "", fmt.Errorf("failed to get theme config: %w", err)
+		return "", fmt.Errorf("get theme config: %w", err)
 	} else {
 		config.ActiveTheme = activeTheme
 		if err := s.repo.SaveThemeConfig(ctx, &config); err != nil {
-			return "", fmt.Errorf("failed to update theme config: %w", err)
+			return "", fmt.Errorf("update theme config: %w", err)
 		}
 	}
 

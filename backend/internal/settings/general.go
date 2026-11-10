@@ -75,12 +75,12 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 			SiteLanguage:        normalizeSiteLanguage(req.SiteLanguage),
 		}
 		if err := s.repo.CreateGeneralSettings(ctx, &config); err != nil {
-			return config, fmt.Errorf("failed to create general settings: %w", err)
+			return config, fmt.Errorf("create general settings: %w", err)
 		}
 		return s.repo.GetGeneralSettings(ctx)
 	}
 	if err != nil {
-		return config, fmt.Errorf("failed to get general settings: %w", err)
+		return config, fmt.Errorf("get general settings: %w", err)
 	}
 
 	// Update existing configuration
@@ -94,7 +94,7 @@ func (s *Service) UpdateGeneralSettings(ctx context.Context, req GeneralSettings
 	config.SiteLanguage = normalizeSiteLanguage(req.SiteLanguage)
 
 	if err := s.repo.SaveGeneralSettings(ctx, &config); err != nil {
-		return config, fmt.Errorf("failed to update general settings: %w", err)
+		return config, fmt.Errorf("update general settings: %w", err)
 	}
 
 	return s.repo.GetGeneralSettings(ctx)

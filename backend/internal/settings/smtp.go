@@ -69,7 +69,7 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 			TestEmail: req.TestEmail,
 		}
 		if err := s.repo.CreateSMTPConfig(ctx, &config); err != nil {
-			return config, fmt.Errorf("failed to create SMTP config: %w", err)
+			return config, fmt.Errorf("create SMTP config: %w", err)
 		}
 
 		// Return configuration without password
@@ -77,7 +77,7 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 		return config, nil
 	}
 	if err != nil {
-		return config, fmt.Errorf("failed to get SMTP config: %w", err)
+		return config, fmt.Errorf("get SMTP config: %w", err)
 	}
 
 	// Update existing configuration
@@ -99,7 +99,7 @@ func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (
 	}
 
 	if err := s.repo.SaveSMTPConfig(ctx, &config); err != nil {
-		return config, fmt.Errorf("failed to update SMTP config: %w", err)
+		return config, fmt.Errorf("update SMTP config: %w", err)
 	}
 
 	// Return configuration without password
@@ -146,7 +146,7 @@ func (s *Service) TestSMTP(ctx context.Context, adminEmail string) (string, erro
 		Email: config.FromEmail,
 		Time:  time.Now().Format("2006-01-02 15:04:05"),
 	}); err != nil {
-		return "", fmt.Errorf("failed to send test email: %w", err)
+		return "", fmt.Errorf("send test email: %w", err)
 	}
 
 	return recipientEmail, nil
