@@ -27,19 +27,19 @@ type SMTPConfigRequest struct {
 // masked, or the default configuration when no row exists.
 func (s *Service) GetSMTPConfig(ctx context.Context) (model.SMTPConfig, error) {
 	config, err := s.repo.GetSMTPConfig(ctx)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Return default configuration
+		return model.SMTPConfig{
+			Enabled:   false,
+			Host:      "",
+			Port:      587,
+			Username:  "",
+			Password:  "",
+			FromEmail: "",
+			FromName:  "VexGo",
+		}, nil
+	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Return default configuration
-			return model.SMTPConfig{
-				Enabled:   false,
-				Host:      "",
-				Port:      587,
-				Username:  "",
-				Password:  "",
-				FromEmail: "",
-				FromName:  "VexGo",
-			}, nil
-		}
 		return config, err
 	}
 
@@ -52,51 +52,54 @@ func (s *Service) GetSMTPConfig(ctx context.Context) (model.SMTPConfig, error) {
 // with the password masked.
 func (s *Service) UpdateSMTPConfig(ctx context.Context, req SMTPConfigRequest) (model.SMTPConfig, error) {
 	config, err := s.repo.GetSMTPConfig(ctx)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Create new configuration
+		password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
+		if encErr != nil {
+			return model.SMTPConfig{}, encErr
+		}
+		config = model.SMTPConfig{
+			Enabled:   req.Enabled,
+			Host:      req.Host,
+			Port:      req.Port,
+			Username:  req.Username,
+			Password:  password,
+			FromEmail: req.FromEmail,
+			FromName:  req.FromName,
+			TestEmail: req.TestEmail,
+		}
+		if err := s.repo.CreateSMTPConfig(ctx, &config); err != nil {
+			return config, fmt.Errorf("failed to create SMTP config: %w", err)
+		}
+
+		// Return configuration without password
+		config.Password = ""
+		return config, nil
+	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Create new configuration
-			password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
-			if encErr != nil {
-				return model.SMTPConfig{}, encErr
-			}
-			config = model.SMTPConfig{
-				Enabled:   req.Enabled,
-				Host:      req.Host,
-				Port:      req.Port,
-				Username:  req.Username,
-				Password:  password,
-				FromEmail: req.FromEmail,
-				FromName:  req.FromName,
-				TestEmail: req.TestEmail,
-			}
-			if err := s.repo.CreateSMTPConfig(ctx, &config); err != nil {
-				return config, fmt.Errorf("failed to create SMTP config: %w", err)
-			}
-		} else {
-			return config, fmt.Errorf("failed to get SMTP config: %w", err)
-		}
-	} else {
-		// Update existing configuration
-		config.Enabled = req.Enabled
-		config.Host = req.Host
-		config.Port = req.Port
-		config.Username = req.Username
-		config.FromEmail = req.FromEmail
-		config.FromName = req.FromName
-		config.TestEmail = req.TestEmail
+		return config, fmt.Errorf("failed to get SMTP config: %w", err)
+	}
 
-		// Only update password if new password is provided
-		if req.Password != "" {
-			password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
-			if encErr != nil {
-				return config, encErr
-			}
-			config.Password = password
-		}
+	// Update existing configuration
+	config.Enabled = req.Enabled
+	config.Host = req.Host
+	config.Port = req.Port
+	config.Username = req.Username
+	config.FromEmail = req.FromEmail
+	config.FromName = req.FromName
+	config.TestEmail = req.TestEmail
 
-		if err := s.repo.SaveSMTPConfig(ctx, &config); err != nil {
-			return config, fmt.Errorf("failed to update SMTP config: %w", err)
+	// Only update password if new password is provided
+	if req.Password != "" {
+		password, encErr := s.encryptSecret(req.Password, "smtp_config.password")
+		if encErr != nil {
+			return config, encErr
 		}
+		config.Password = password
+	}
+
+	if err := s.repo.SaveSMTPConfig(ctx, &config); err != nil {
+		return config, fmt.Errorf("failed to update SMTP config: %w", err)
 	}
 
 	// Return configuration without password

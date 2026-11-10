@@ -111,15 +111,14 @@ func (s *Service) UpdateThemeConfig(ctx context.Context, activeTheme string) (st
 	}
 
 	config, err := s.repo.GetThemeConfig(ctx)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			config = model.ThemeConfig{ActiveTheme: activeTheme}
-			if err := s.repo.CreateThemeConfig(ctx, &config); err != nil {
-				return "", fmt.Errorf("failed to save theme config: %w", err)
-			}
-		} else {
-			return "", fmt.Errorf("failed to get theme config: %w", err)
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		config = model.ThemeConfig{ActiveTheme: activeTheme}
+		if err := s.repo.CreateThemeConfig(ctx, &config); err != nil {
+			return "", fmt.Errorf("failed to save theme config: %w", err)
 		}
+	} else if err != nil {
+		return "", fmt.Errorf("failed to get theme config: %w", err)
 	} else {
 		config.ActiveTheme = activeTheme
 		if err := s.repo.SaveThemeConfig(ctx, &config); err != nil {

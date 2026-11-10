@@ -50,17 +50,19 @@ type AIConfigRequest struct {
 // or the defaults when no row exists.
 func (s *Service) GetAIConfig(ctx context.Context) (model.AIConfig, error) {
 	config, err := s.repo.GetAIConfig(ctx)
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Return default configuration
+		return model.AIConfig{
+			Enabled:     false,
+			Provider:    "openai",
+			ApiEndpoint: "",
+			ApiKey:      "",
+			ModelName:   "gpt-3.5-turbo",
+		}, nil
+	}
+
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Return default configuration
-			return model.AIConfig{
-				Enabled:     false,
-				Provider:    "openai",
-				ApiEndpoint: "",
-				ApiKey:      "",
-				ModelName:   "gpt-3.5-turbo",
-			}, nil
-		}
 		return config, err
 	}
 
@@ -73,45 +75,52 @@ func (s *Service) GetAIConfig(ctx context.Context) (model.AIConfig, error) {
 // the API key masked.
 func (s *Service) UpdateAIConfig(ctx context.Context, req AIConfigRequest) (model.AIConfig, error) {
 	config, err := s.repo.GetAIConfig(ctx)
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Create new configuration
+		apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
+		if encErr != nil {
+			return model.AIConfig{}, encErr
+		}
+
+		config = model.AIConfig{
+			Enabled:     req.Enabled,
+			Provider:    req.Provider,
+			ApiEndpoint: req.ApiEndpoint,
+			ApiKey:      apiKey,
+			ModelName:   req.ModelName,
+		}
+
+		if err := s.repo.CreateAIConfig(ctx, &config); err != nil {
+			return config, fmt.Errorf("failed to create AI config: %w", err)
+		}
+
+		// Return configuration without API key
+		config.ApiKey = ""
+		return config, nil
+	}
+
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Create new configuration
-			apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
-			if encErr != nil {
-				return model.AIConfig{}, encErr
-			}
-			config = model.AIConfig{
-				Enabled:     req.Enabled,
-				Provider:    req.Provider,
-				ApiEndpoint: req.ApiEndpoint,
-				ApiKey:      apiKey,
-				ModelName:   req.ModelName,
-			}
-			if err := s.repo.CreateAIConfig(ctx, &config); err != nil {
-				return config, fmt.Errorf("failed to create AI config: %w", err)
-			}
-		} else {
-			return config, fmt.Errorf("failed to get AI config: %w", err)
-		}
-	} else {
-		// Update existing configuration
-		config.Enabled = req.Enabled
-		config.Provider = req.Provider
-		config.ApiEndpoint = req.ApiEndpoint
-		config.ModelName = req.ModelName
+		return config, fmt.Errorf("failed to get AI config: %w", err)
+	}
 
-		// Only update API key if new API key is provided
-		if req.ApiKey != "" {
-			apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
-			if encErr != nil {
-				return config, encErr
-			}
-			config.ApiKey = apiKey
-		}
+	// Update existing configuration
+	config.Enabled = req.Enabled
+	config.Provider = req.Provider
+	config.ApiEndpoint = req.ApiEndpoint
+	config.ModelName = req.ModelName
 
-		if err := s.repo.SaveAIConfig(ctx, &config); err != nil {
-			return config, fmt.Errorf("failed to update AI config: %w", err)
+	// Only update API key if new API key is provided
+	if req.ApiKey != "" {
+		apiKey, encErr := s.encryptSecret(req.ApiKey, "ai_config.api_key")
+		if encErr != nil {
+			return config, encErr
 		}
+		config.ApiKey = apiKey
+	}
+
+	if err := s.repo.SaveAIConfig(ctx, &config); err != nil {
+		return config, fmt.Errorf("failed to update AI config: %w", err)
 	}
 
 	// Return configuration without API key
