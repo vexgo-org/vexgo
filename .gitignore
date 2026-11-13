@@ -5,6 +5,9 @@
 
 frontend/node_modules
 frontend/dist
+frontend/.playwright/
+frontend/playwright-report/
+frontend/test-results/
 backend/blog.exe
 backend/vexgo
 backend/blog.db
