@@ -97,6 +97,19 @@
                 },
                 "type": "object"
             },
+            "asset.PruneRequest": {
+                "properties": {
+                    "retention_days": {
+                        "maximum": 365,
+                        "minimum": 1,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "retention_days"
+                ],
+                "type": "object"
+            },
             "asset.UploadResponse": {
                 "properties": {
                     "assetOriginalURL": {
@@ -2356,6 +2369,68 @@
                     }
                 ],
                 "summary": "Delete an asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/prune": {
+            "post": {
+                "description": "Permanently removes assets that have been soft-deleted longer than the specified retention period.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/asset.PruneRequest",
+                                "summary": "request",
+                                "description": "Prune configuration"
+                            }
+                        }
+                    },
+                    "description": "Prune configuration",
+                    "required": true
+                },
+                "responses": {
+                    "204": {
+                        "description": "Assets pruned successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "invalid request"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "insufficient permission"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "failed to prune assets"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Prune deleted assets",
                 "tags": [
                     "assets"
                 ]
