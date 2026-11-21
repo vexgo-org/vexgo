@@ -363,3 +363,8 @@ func uniquePublicIDs(publicIDs []uuid.UUID) []uuid.UUID {
 
 	return result
 }
+
+// retentionDay2Time converts retention days to a certain time.
+func retentionDay2Time(retentionDays int) time.Time {
+	return time.Now().AddDate(0, 0, -retentionDays)
+}
