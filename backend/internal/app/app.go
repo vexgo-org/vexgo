@@ -150,6 +150,13 @@ func New(cfg *config.Config) (*App, error) {
 	captchaSvc := captcha.NewService(captcha.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 	assetSvc := asset.NewService(asset.Deps{DB: db, JWTSecret: cfg.JWTSecret, Storage: storage, Sched: sched})
 
+	// Register asset prune job.
+	if err := assetSvc.ReschedulePruneJob(context.Background()); err != nil {
+		slog.Error("asset prune job not registered", "err", err)
+	} else {
+		slog.Info("asset prune job registered")
+	}
+
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
 		JWTSecret: cfg.JWTSecret,
