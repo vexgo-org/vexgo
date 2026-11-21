@@ -35,6 +35,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	// One connection, or a pooled :memory: database gives each goroutine its
 	// own empty schema.
 	sqlDB.SetMaxOpenConns(1)
+
 	// Post and GeneralSettings reference assets too, so prune tests can cover
 	// the foreign keys that point at an asset.
 	if err := db.AutoMigrate(
@@ -44,6 +45,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		&model.Tag{},
 		&model.Post{},
 		&model.GeneralSettings{},
+		&model.AssetConfig{},
 	); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
@@ -65,6 +67,16 @@ func seedUser(t *testing.T, db *gorm.DB, username, role string) model.User {
 		t.Fatalf("failed to seed user: %v", err)
 	}
 	return u
+}
+
+// seedAssetConfig inserts the single asset configuration row the prune job
+// reads its cron expression and retention window from.
+func seedAssetConfig(t *testing.T, db *gorm.DB, interval string, retentionDays int) {
+	t.Helper()
+	cfg := model.AssetConfig{PruneInterval: interval, PruneRetentionDays: retentionDays}
+	if err := db.Create(&cfg).Error; err != nil {
+		t.Fatalf("failed to seed asset config: %v", err)
+	}
 }
 
 // seedAsset inserts an asset (with its blob) directly, bypassing Upload, so a
@@ -294,6 +306,9 @@ type stubAssetRepo struct {
 
 	// For PruneManually tests.
 	deletedAssets []model.Asset
+
+	// findBefore records the cutoff the prune job last asked for.
+	findBefore time.Time
 }
 
 func (s *stubAssetRepo) Create(_ context.Context, asset *model.Asset) error {
@@ -382,6 +397,7 @@ func (s *stubAssetRepo) PermanentlyDeleteByIDs(_ context.Context, assetIDs []uin
 }
 
 func (s *stubAssetRepo) FindDeletedBefore(ctx context.Context, before time.Time) ([]model.Asset, error) {
+	s.findBefore = before
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
@@ -2361,6 +2377,192 @@ func TestService_PruneManually_PropagatesPruneError(t *testing.T) {
 	}
 	if !errors.Is(err, errDB) {
 		t.Errorf("PruneManually error = %v, want it to wrap %v", err, errDB)
+	}
+}
+
+// --- NewPruneJob -------------------------------------------------------
+
+func TestService_NewPruneJob_UsesConfiguredInterval(t *testing.T) {
+	svc, _, db := newTestService(t)
+	seedAssetConfig(t, db, "@every 6h", 30)
+
+	job, err := svc.pruneJob(context.Background())
+	if err != nil {
+		t.Fatalf("NewPruneJob error: %v", err)
+	}
+	if job.Cron != "@every 6h" {
+		t.Errorf("job.Cron = %q, want %q", job.Cron, "@every 6h")
+	}
+	if job.Job == nil {
+		t.Error("job.Job = nil, want the prune function")
+	}
+}
+
+func TestService_NewPruneJob_JobPrunesDeletedAssetsOnly(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	seedAssetConfig(t, db, "@monthly", 30)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	deleted := seedAsset(t, db, owner.ID, "deleted.png")
+	key := writeObject(t, db, dataDir, deleted.BlobID, "stored-bytes")
+	live := seedAsset(t, db, owner.ID, "live.png")
+
+	if err := db.Delete(&deleted).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+	// Backdate the soft delete so the job prunes it under any retention the
+	// config ends up applying.
+	if err := db.Unscoped().
+		Model(&model.Asset{}).
+		Where("id = ?", deleted.ID).
+		Update("deleted_at", time.Now().AddDate(0, 0, -400)).
+		Error; err != nil {
+		t.Fatalf("failed to backdate deleted_at: %v", err)
+	}
+
+	job, err := svc.pruneJob(context.Background())
+	if err != nil {
+		t.Fatalf("NewPruneJob error: %v", err)
+	}
+	job.Job()
+
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", deleted.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("deleted asset %d still exists after the job ran", deleted.ID)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); !os.IsNotExist(err) {
+		t.Errorf("blob file %q was not removed", key)
+	}
+	db.Model(&model.Blob{}).Unscoped().Where("id = ?", deleted.BlobID).Count(&count)
+	if count != 0 {
+		t.Errorf("blob %d still exists after the job ran", deleted.BlobID)
+	}
+
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", live.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("live asset %d was pruned, want it kept", live.ID)
+	}
+}
+
+func TestService_NewPruneJob_KeepsAssetsWithinRetention(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	seedAssetConfig(t, db, "@monthly", 30)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "recent.png")
+	key := writeObject(t, db, dataDir, asset.BlobID, "stored-bytes")
+
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+	// Deleted 10 days ago, inside the 30-day retention window.
+	if err := db.Unscoped().
+		Model(&model.Asset{}).
+		Where("id = ?", asset.ID).
+		Update("deleted_at", time.Now().AddDate(0, 0, -10)).
+		Error; err != nil {
+		t.Fatalf("failed to backdate deleted_at: %v", err)
+	}
+
+	job, err := svc.pruneJob(context.Background())
+	if err != nil {
+		t.Fatalf("NewPruneJob error: %v", err)
+	}
+	job.Job()
+
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("asset %d deleted 10 days ago was pruned, want it kept for 30 days", asset.ID)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "media", key)); err != nil {
+		t.Errorf("blob file %q was removed, want it kept: %v", key, err)
+	}
+}
+
+func TestService_NewPruneJob_KeepsAssetsWithinRetentionOnNonUTCServer(t *testing.T) {
+	oldLocal := time.Local
+	time.Local = time.FixedZone("UTC-8", -8*60*60)
+	t.Cleanup(func() { time.Local = oldLocal })
+
+	svc, _, db := newTestService(t)
+	seedAssetConfig(t, db, "@monthly", 30)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	asset := seedAsset(t, db, owner.ID, "recent-non-utc.png")
+
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+	if err := db.Unscoped().
+		Model(&model.Asset{}).
+		Where("id = ?", asset.ID).
+		Update("deleted_at", time.Now().Add(-(29*24+20)*time.Hour)).Error; err != nil {
+		t.Fatalf("failed to backdate deleted_at: %v", err)
+	}
+
+	job, err := svc.pruneJob(context.Background())
+	if err != nil {
+		t.Fatalf("NewPruneJob error: %v", err)
+	}
+	job.Job()
+
+	var count int64
+	db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("asset deleted 29d20h ago was pruned under 30-day retention on a UTC-8 server")
+	}
+}
+
+func TestService_NewPruneJob_ComputesCutoffAtRunTime(t *testing.T) {
+	svc, _, db := newTestService(t)
+	seedAssetConfig(t, db, "@monthly", 30)
+	repo := &stubAssetRepo{}
+	svc.assets = repo
+
+	builtAt := time.Now()
+	job, err := svc.pruneJob(context.Background())
+	if err != nil {
+		t.Fatalf("NewPruneJob error: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	job.Job()
+
+	// A cutoff captured at construction would sit exactly at builtAt minus
+	// the retention window; a per-run cutoff must advance with the clock.
+	frozen := builtAt.UTC().AddDate(0, 0, -30)
+	if !repo.findBefore.After(frozen) {
+		t.Errorf(
+			"cutoff = %v, want it computed when the job runs, after %v",
+			repo.findBefore,
+			frozen,
+		)
+	}
+	want := time.Now().UTC().AddDate(0, 0, -30)
+	if diff := want.Sub(repo.findBefore); diff < -time.Second || diff > time.Second {
+		t.Errorf("cutoff = %v, want about %v", repo.findBefore, want)
+	}
+}
+
+func TestService_NewPruneJob_JobSwallowsLookupError(t *testing.T) {
+	svc, _, db := newTestService(t)
+	seedAssetConfig(t, db, "@monthly", 30)
+	svc.assets = &stubAssetRepo{findErr: errDB}
+
+	job, err := svc.pruneJob(context.Background())
+	if err != nil {
+		t.Fatalf("NewPruneJob error: %v", err)
+	}
+
+	// The cron runner has nowhere to return an error to, so a failed lookup
+	// must end the run instead of panicking the server.
+	job.Job()
+}
+
+func TestService_NewPruneJob_PropagatesConfigError(t *testing.T) {
+	svc, _, _ := newTestService(t)
+
+	_, err := svc.pruneJob(context.Background())
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("NewPruneJob error = %v, want gorm.ErrRecordNotFound with no config row", err)
 	}
 }
 
