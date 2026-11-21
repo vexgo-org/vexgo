@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/scheduler"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"gorm.io/gorm"
 )
@@ -250,6 +251,38 @@ func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Ti
 	}
 
 	return nil
+}
+
+// pruneJob creates a scheduled job to prune assets periodically.
+func (s *Service) pruneJob(ctx context.Context) (*scheduler.ScheduledJob, error) {
+	cfg, err := s.config.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get asset config: %w", err)
+	}
+
+	job := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+
+		before := retentionDay2Time(cfg.PruneRetentionDays)
+		assets, err := s.assets.FindDeletedBefore(ctx, before)
+		if err != nil {
+			slog.Error("failed to find deleted assets for automatic pruning", "err", err)
+			return
+		}
+
+		if err := s.prune(ctx, assets); err != nil {
+			slog.Error("failed to prune assets automatically", "err", err)
+			return
+		}
+
+		slog.Info("asset pruned", "len", len(assets))
+	}
+
+	return &scheduler.ScheduledJob{
+		Cron: cfg.PruneInterval,
+		Job:  job,
+	}, nil
 }
 
 // prune is a helper function used to remove a group of asset records
