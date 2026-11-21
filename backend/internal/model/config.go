@@ -94,6 +94,7 @@ type ThemeConfig struct {
 
 // AssetConfig stores asset-related configurations.
 type AssetConfig struct {
-	ID            uint   `gorm:"primaryKey"`
-	PruneInterval string `gorm:"default:'@monthly'"`
+	ID                 uint   `gorm:"primaryKey"`
+	PruneInterval      string `gorm:"default:'@monthly'"`
+	PruneRetentionDays int    `gorm:"default:30"`
 }
