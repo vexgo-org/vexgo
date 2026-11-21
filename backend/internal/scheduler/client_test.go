@@ -15,7 +15,7 @@ func TestScheduler_RegisterAndRun(t *testing.T) {
 	defer s.Stop()
 
 	var ran atomic.Bool
-	_, err := s.Register(ScheduledJob{
+	_, err := s.Register(&ScheduledJob{
 		Cron: "@every 1s",
 		Job: func() {
 			ran.Store(true)
@@ -43,7 +43,7 @@ func TestScheduler_RegisterInvalidCron(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
-	_, err := s.Register(ScheduledJob{
+	_, err := s.Register(&ScheduledJob{
 		Cron: "not-a-cron",
 		Job:  func() {},
 	})
@@ -57,7 +57,7 @@ func TestScheduler_StopStopsScheduler(t *testing.T) {
 	s.Start()
 
 	var runCount atomic.Int64
-	_, err := s.Register(ScheduledJob{
+	_, err := s.Register(&ScheduledJob{
 		Cron: "@every 50ms",
 		Job: func() {
 			runCount.Add(1)
@@ -95,7 +95,7 @@ func TestScheduler_RegisterReturnsEntryID(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
-	id, err := s.Register(ScheduledJob{
+	id, err := s.Register(&ScheduledJob{
 		Cron: "@every 1s",
 		Job:  func() {},
 	})
@@ -114,7 +114,7 @@ func TestScheduler_MultipleJobs(t *testing.T) {
 
 	var count atomic.Int64
 	for range 3 {
-		_, err := s.Register(ScheduledJob{
+		_, err := s.Register(&ScheduledJob{
 			Cron: "@every 1s",
 			Job: func() {
 				count.Add(1)

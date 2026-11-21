@@ -31,7 +31,7 @@ func (s *Scheduler) Stop() context.Context {
 	return s.c.Stop()
 }
 
-func (s *Scheduler) Register(scheduledJob ScheduledJob) (cron.EntryID, error) {
+func (s *Scheduler) Register(scheduledJob *ScheduledJob) (cron.EntryID, error) {
 	id, err := s.c.AddFunc(scheduledJob.Cron, scheduledJob.Job)
 	if err != nil {
 		return 0, fmt.Errorf("register schedule: %w", err)
