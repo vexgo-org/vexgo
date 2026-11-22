@@ -291,7 +291,7 @@ func (s *Service) prune(ctx context.Context, assets []model.Asset) error {
 			return nil
 		}
 
-		if err := blobRepo.MarkPendingDelete(ctx, blobIDs); err != nil {
+		if err := blobRepo.MarkPendingDelete(ctx, orphanBlobIDs); err != nil {
 			return fmt.Errorf("mark blobs pending delete: %w", err)
 		}
 
