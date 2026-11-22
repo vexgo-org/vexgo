@@ -301,13 +301,14 @@ func (s *Service) prune(ctx context.Context, assets []model.Asset) error {
 	}
 
 	// Delete orphan blobs.
+	var errs []error
 	for _, blob := range orphanBlobs {
 		if err := s.deletePendingBlob(ctx, &blob); err != nil {
-			return fmt.Errorf("delete pending blob %d: %w", blob.ID, err)
+			errs = append(errs, fmt.Errorf("delete pending blob %d: %w", blob.ID, err))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 // deletePendingBlob deletes both physical file and database record of
