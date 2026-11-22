@@ -35,7 +35,16 @@ func newTestDB(t *testing.T) *gorm.DB {
 	// One connection, or a pooled :memory: database gives each goroutine its
 	// own empty schema.
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&model.Asset{}, &model.Blob{}, &model.User{}); err != nil {
+	// Post and GeneralSettings reference assets too, so prune tests can cover
+	// the foreign keys that point at an asset.
+	if err := db.AutoMigrate(
+		&model.Asset{},
+		&model.Blob{},
+		&model.User{},
+		&model.Tag{},
+		&model.Post{},
+		&model.GeneralSettings{},
+	); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -104,6 +113,33 @@ func setVisibility(
 		Update("visibility", visibility).Error; err != nil {
 		t.Fatalf("failed to set visibility on asset %d: %v", assetID, err)
 	}
+}
+
+// softDeleteAssetAt soft-deletes an asset and pins its deleted_at to at, so a
+// test can sit an asset exactly on the retention boundary.
+func softDeleteAssetAt(t *testing.T, db *gorm.DB, asset model.Asset, at time.Time) {
+	t.Helper()
+	if err := db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset %d: %v", asset.ID, err)
+	}
+	if err := db.Unscoped().
+		Model(&model.Asset{}).
+		Where("id = ?", asset.ID).
+		Update("deleted_at", at).Error; err != nil {
+		t.Fatalf("failed to set deleted_at on asset %d: %v", asset.ID, err)
+	}
+}
+
+func assetExists(t *testing.T, db *gorm.DB, id uint) bool {
+	t.Helper()
+	var count int64
+	if err := db.Unscoped().
+		Model(&model.Asset{}).
+		Where("id = ?", id).
+		Count(&count).Error; err != nil {
+		t.Fatalf("failed to count asset %d: %v", id, err)
+	}
+	return count > 0
 }
 
 func countRows(t *testing.T, db *gorm.DB, value any) int64 {
@@ -198,6 +234,9 @@ type putCall struct {
 type fakeStorage struct {
 	putErr    error
 	deleteErr error
+	// deleteErrOnce fails the next Delete call only, leaving later calls to
+	// succeed: a prune test can make one blob fail and check the rest still go.
+	deleteErrOnce error
 
 	puts    []putCall
 	deletes []string
@@ -229,6 +268,11 @@ func (f *fakeStorage) Open(context.Context, string) (io.ReadSeekCloser, error) {
 
 func (f *fakeStorage) Delete(_ context.Context, key string) error {
 	f.deletes = append(f.deletes, key)
+	if f.deleteErrOnce != nil {
+		err := f.deleteErrOnce
+		f.deleteErrOnce = nil
+		return err
+	}
 	return f.deleteErr
 }
 
@@ -1952,6 +1996,86 @@ func TestService_Prune_KeepsReferencedBlobs(t *testing.T) {
 	}
 }
 
+// The blob batch passed to MarkPendingDelete must be the orphan set, not every
+// blob touched by the pruned assets: a blob that still backs a live asset must
+// stay active and keep its file.
+func TestService_Prune_LeavesSharedBlobActive(t *testing.T) {
+	svc, dataDir, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	shared := seedAsset(t, db, owner.ID, "shared.png")
+	live := seedAsset(t, db, owner.ID, "live.png")
+	if err := db.Model(&model.Asset{}).
+		Where("id = ?", live.ID).
+		Update("blob_id", shared.BlobID).Error; err != nil {
+		t.Fatalf("failed to link live asset to the shared blob: %v", err)
+	}
+	orphan := seedAsset(t, db, owner.ID, "orphan.png")
+	sharedKey := writeObject(t, db, dataDir, shared.BlobID, "shared-bytes")
+	orphanKey := writeObject(t, db, dataDir, orphan.BlobID, "orphan-bytes")
+
+	if err := svc.prune(context.Background(), []model.Asset{shared, orphan}); err != nil {
+		t.Fatalf("prune error: %v", err)
+	}
+
+	var blob model.Blob
+	if err := db.First(&blob, shared.BlobID).Error; err != nil {
+		t.Fatalf("failed to load shared blob: %v", err)
+	}
+	if blob.Status != model.BlobStatusActive {
+		t.Errorf("shared blob status = %q, want %q", blob.Status, model.BlobStatusActive)
+	}
+	assertObject(t, dataDir, sharedKey, "shared-bytes")
+
+	var orphanCount int64
+	db.Unscoped().Model(&model.Blob{}).Where("id = ?", orphan.BlobID).Count(&orphanCount)
+	if orphanCount != 0 {
+		t.Errorf("orphan blob %d still exists after prune", orphan.BlobID)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "media", orphanKey)); !os.IsNotExist(err) {
+		t.Errorf("orphan blob file %q was not removed", orphanKey)
+	}
+}
+
+// A storage failure on one blob must not abandon the rest of the pending
+// blobs: every blob is attempted, the failed one stays pending for a retry,
+// and the error is reported afterwards.
+func TestService_Prune_ContinuesAfterOneBlobDeleteFailure(t *testing.T) {
+	svc, _, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	first := seedAsset(t, db, owner.ID, "first.png")
+	second := seedAsset(t, db, owner.ID, "second.png")
+
+	store := &fakeStorage{deleteErrOnce: errDB}
+	svc.storage = store
+
+	err := svc.prune(context.Background(), []model.Asset{first, second})
+	if !errors.Is(err, errDB) {
+		t.Fatalf("prune error = %v, want it to wrap %v", err, errDB)
+	}
+	if len(store.deletes) != 2 {
+		t.Fatalf(
+			"storage.Delete called %d times, want 2: one failure must not abandon the rest",
+			len(store.deletes),
+		)
+	}
+
+	var pending []model.Blob
+	if err := db.Where("status = ?", model.BlobStatusPendingDelete).
+		Find(&pending).Error; err != nil {
+		t.Fatalf("failed to load the pending blobs: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("pending blobs = %d, want 1: only the failed blob stays for a retry", len(pending))
+	}
+	if pending[0].StorageKey != store.deletes[0] {
+		t.Errorf(
+			"pending blob key = %q, want the failed key %q",
+			pending[0].StorageKey,
+			store.deletes[0],
+		)
+	}
+}
+
 func TestService_Prune_DedupsBlobIDs(t *testing.T) {
 	svc, _, db := newTestService(t)
 	owner := seedUser(t, db, "owner", model.RoleContributor)
@@ -2034,6 +2158,139 @@ func TestService_PruneManually_SuperAdminCanPrune(t *testing.T) {
 	db.Model(&model.Blob{}).Unscoped().Where("id = ?", asset.BlobID).Count(&blobCount)
 	if blobCount != 0 {
 		t.Errorf("blob %d still exists after prune", asset.BlobID)
+	}
+}
+
+// A soft-deleted asset can still be referenced as a user avatar, post cover or
+// site icon. Pruning it must not trip the foreign key, and no reference may be
+// left pointing at a row that no longer exists.
+func TestService_PruneManually_HandlesReferencedAssets(t *testing.T) {
+	cases := []struct {
+		name      string
+		reference func(t *testing.T, db *gorm.DB, owner model.User, asset model.Asset)
+		load      func(t *testing.T, db *gorm.DB, owner model.User) *uint
+	}{
+		{
+			name: "user avatar",
+			reference: func(t *testing.T, db *gorm.DB, owner model.User, asset model.Asset) {
+				t.Helper()
+				if err := db.Model(&model.User{}).
+					Where("id = ?", owner.ID).
+					Update("avatar_id", asset.ID).Error; err != nil {
+					t.Fatalf("failed to set avatar: %v", err)
+				}
+			},
+			load: func(t *testing.T, db *gorm.DB, owner model.User) *uint {
+				t.Helper()
+				var user model.User
+				if err := db.First(&user, owner.ID).Error; err != nil {
+					t.Fatalf("failed to load user: %v", err)
+				}
+				return user.AvatarID
+			},
+		},
+		{
+			name: "post cover",
+			reference: func(t *testing.T, db *gorm.DB, owner model.User, asset model.Asset) {
+				t.Helper()
+				post := model.Post{
+					Title:        "post",
+					Content:      "content",
+					AuthorID:     owner.ID,
+					CoverImageID: &asset.ID,
+				}
+				if err := db.Omit("Author", "Tags", "CoverImage").
+					Create(&post).Error; err != nil {
+					t.Fatalf("failed to create post: %v", err)
+				}
+			},
+			load: func(t *testing.T, db *gorm.DB, owner model.User) *uint {
+				t.Helper()
+				var post model.Post
+				if err := db.Where("author_id = ?", owner.ID).First(&post).Error; err != nil {
+					t.Fatalf("failed to load post: %v", err)
+				}
+				return post.CoverImageID
+			},
+		},
+		{
+			name: "site icon",
+			reference: func(t *testing.T, db *gorm.DB, _ model.User, asset model.Asset) {
+				t.Helper()
+				settings := model.GeneralSettings{SiteIconID: &asset.ID}
+				if err := db.Omit("SiteIcon").Create(&settings).Error; err != nil {
+					t.Fatalf("failed to create settings: %v", err)
+				}
+			},
+			load: func(t *testing.T, db *gorm.DB, _ model.User) *uint {
+				t.Helper()
+				var settings model.GeneralSettings
+				if err := db.First(&settings).Error; err != nil {
+					t.Fatalf("failed to load settings: %v", err)
+				}
+				return settings.SiteIconID
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, _, db := newTestService(t)
+			if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+				t.Fatalf("failed to enable foreign keys: %v", err)
+			}
+			owner := seedUser(t, db, "owner", model.RoleContributor)
+			asset := seedAsset(t, db, owner.ID, "referenced.png")
+			tc.reference(t, db, owner, asset)
+			if err := db.Delete(&asset).Error; err != nil {
+				t.Fatalf("failed to soft-delete asset: %v", err)
+			}
+
+			actor := Actor{ID: 99, Role: model.RoleSuperAdmin}
+			before := time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
+			if err := svc.PruneManually(context.Background(), actor, before); err != nil {
+				t.Fatalf(
+					"PruneManually error = %v, want the referenced asset handled without a foreign key violation",
+					err,
+				)
+			}
+
+			ref := tc.load(t, db, owner)
+			if ref == nil {
+				return // The reference was cleared, so the asset may be pruned.
+			}
+			if !assetExists(t, db, *ref) {
+				t.Errorf("reference still points at pruned asset %d", *ref)
+			}
+		})
+	}
+}
+
+// The cutoff is exclusive: an asset deleted exactly at the cutoff stays until a
+// later run, and active assets are never touched.
+func TestService_PruneManually_RespectsRetentionCutoff(t *testing.T) {
+	svc, _, db := newTestService(t)
+	owner := seedUser(t, db, "owner", model.RoleContributor)
+	cutoff := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	old := seedAsset(t, db, owner.ID, "old.png")
+	recent := seedAsset(t, db, owner.ID, "recent.png")
+	active := seedAsset(t, db, owner.ID, "active.png")
+	softDeleteAssetAt(t, db, old, cutoff.Add(-time.Hour))
+	softDeleteAssetAt(t, db, recent, cutoff)
+
+	actor := Actor{ID: 1, Role: model.RoleSuperAdmin}
+	if err := svc.PruneManually(context.Background(), actor, cutoff); err != nil {
+		t.Fatalf("PruneManually error: %v", err)
+	}
+
+	if assetExists(t, db, old.ID) {
+		t.Errorf("asset deleted before the cutoff still exists")
+	}
+	if !assetExists(t, db, recent.ID) {
+		t.Errorf("asset deleted exactly at the cutoff was pruned, want it kept until a later run")
+	}
+	if !assetExists(t, db, active.ID) {
+		t.Errorf("active asset was pruned")
 	}
 }
 
