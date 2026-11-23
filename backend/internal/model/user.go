@@ -56,7 +56,7 @@ type User struct {
 	HideBio           bool   `gorm:"default:false"`            // hide bio
 
 	AvatarID *uint
-	Avatar   *Asset `gorm:"foreignKey:AvatarID"`
+	Avatar   *Asset `gorm:"foreignKey:AvatarID;constraint:OnDelete:SET NULL;"`
 }
 
 // IsSuperAdmin reports whether the role is super admin.

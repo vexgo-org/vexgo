@@ -23,3 +23,7 @@ type OriginalContent struct {
 	MIMEType string
 	Filename string
 }
+
+type PruneRequest struct {
+	RetentionDays int `json:"retention_days" binding:"required,min=1,max=365"`
+}

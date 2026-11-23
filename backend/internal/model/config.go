@@ -34,7 +34,7 @@ type GeneralSettings struct {
 
 	// Site icon.
 	SiteIconID *uint
-	SiteIcon   *Asset `gorm:"foreignKey:SiteIconID"`
+	SiteIcon   *Asset `gorm:"foreignKey:SiteIconID;constraint:OnDelete:SET NULL;"`
 }
 
 // Captcha stores sliding puzzle captcha information. Only the validation

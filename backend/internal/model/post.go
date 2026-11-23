@@ -52,7 +52,7 @@ type Post struct {
 	CommentsCount int `gorm:"-"`
 
 	CoverImageID *uint
-	CoverImage   *Asset `gorm:"foreignKey:CoverImageID"`
+	CoverImage   *Asset `gorm:"foreignKey:CoverImageID;constraint:OnDelete:SET NULL;"`
 }
 
 // Like model
