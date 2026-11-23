@@ -253,6 +253,15 @@ func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Ti
 	return nil
 }
 
+// ReschedulePruneJob reschedules the prune job.
+func (s *Service) ReschedulePruneJob(ctx context.Context) error {
+	job, err := s.pruneJob(ctx)
+	if err != nil {
+		return fmt.Errorf("create prune job: %w", err)
+	}
+	return s.sched.Register(AssetScheduledPruneJobName, job)
+}
+
 // pruneJob creates a scheduled job to prune assets periodically.
 func (s *Service) pruneJob(ctx context.Context) (*scheduler.ScheduledJob, error) {
 	cfg, err := s.config.Get(ctx)
