@@ -17,6 +17,10 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	AssetScheduledPruneJobName = "asset-prune"
+)
+
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
