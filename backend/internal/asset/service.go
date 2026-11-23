@@ -25,6 +25,7 @@ type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Storage   storage.Storage
+	Sched     *scheduler.Scheduler
 }
 
 type Service struct {
@@ -35,6 +36,7 @@ type Service struct {
 	storage           storage.Storage
 	keyGenerator      KeyGenerator
 	publicIDGenerator idgen.Generator
+	sched             *scheduler.Scheduler
 }
 
 func NewService(deps Deps) *Service {
@@ -48,6 +50,7 @@ func NewService(deps Deps) *Service {
 		storage:           deps.Storage,
 		keyGenerator:      NewKeyGenerator(),
 		publicIDGenerator: idgen.NewUUIDv7Generator(),
+		sched:             deps.Sched,
 	}
 }
 
