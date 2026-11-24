@@ -168,3 +168,15 @@ type ThemeDeleteResponse struct {
 	Message string `json:"message" example:"Theme deleted successfully"`
 	Deleted string `json:"deleted" example:"my-theme"`
 }
+
+// AssetConfigUpdateRequest is the body of PUT /api/config/asset.
+type AssetConfigUpdateRequest struct {
+	PruneInterval      string `json:"pruneInterval" example:"@monthly"`
+	PruneRetentionDays int    `json:"pruneRetentionDays" binding:"required,min=1,max=365" example:"30"`
+}
+
+// AssetConfigResponse is the response body of PUT /api/config/asset.
+type AssetConfigResponse struct {
+	PruneInterval      string `json:"pruneInterval" example:"@monthly"`
+	PruneRetentionDays int    `json:"pruneRetentionDays" example:"30"`
+}
