@@ -129,6 +129,8 @@ export * from "./settingsAIConfigUpdateRequestBody";
 export * from "./settingsAIConfigUpdateResponse";
 export * from "./settingsAIModelsResponse";
 export * from "./settingsAITestResponse";
+export * from "./settingsAssetConfigResponse";
+export * from "./settingsAssetConfigUpdateRequest";
 export * from "./settingsGeneralSettingsResponse";
 export * from "./settingsGeneralSettingsUpdateRequest";
 export * from "./settingsGeneralSettingsUpdateResponse";

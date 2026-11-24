@@ -27,4 +27,7 @@ var (
 
 	// General settings errors.
 	ErrInvalidSiteIcon = errors.New("invalid site icon")
+
+	// Asset configuration errors.
+	ErrInvalidCron = errors.New("invalid cron")
 )

@@ -148,7 +148,14 @@ func New(cfg *config.Config) (*App, error) {
 	notificationSvc := notification.NewService(notification.Deps{DB: db, JWTSecret: cfg.JWTSecret})
 	mailerSvc := mailer.NewService(mailer.Deps{DB: db, Cipher: cipher})
 	captchaSvc := captcha.NewService(captcha.Deps{DB: db, JWTSecret: cfg.JWTSecret})
-	assetSvc := asset.NewService(asset.Deps{DB: db, JWTSecret: cfg.JWTSecret, Storage: storage})
+	assetSvc := asset.NewService(asset.Deps{DB: db, JWTSecret: cfg.JWTSecret, Storage: storage, Sched: sched})
+
+	// Register asset prune job.
+	if err := assetSvc.ReschedulePruneJob(context.Background()); err != nil {
+		slog.Error("asset prune job not registered", "err", err)
+	} else {
+		slog.Info("asset prune job registered")
+	}
 
 	router.RegisterAPIRoutes(r, router.Deps{
 		DB:        db,
@@ -217,6 +224,7 @@ func New(cfg *config.Config) (*App, error) {
 			Themes:    publicSvc,
 			Mailer:    mailerSvc,
 			Cipher:    cipher,
+			Assets:    assetSvc,
 		},
 		Asset: asset.Deps{
 			DB:        db,

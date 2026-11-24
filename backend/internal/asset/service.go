@@ -13,23 +13,31 @@ import (
 	"github.com/google/uuid"
 	"github.com/vexgo-org/vexgo/backend/internal/idgen"
 	"github.com/vexgo-org/vexgo/backend/internal/model"
+	"github.com/vexgo-org/vexgo/backend/internal/scheduler"
 	"github.com/vexgo-org/vexgo/backend/internal/storage"
 	"gorm.io/gorm"
+)
+
+const (
+	AssetScheduledPruneJobName = "asset-prune"
 )
 
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret []byte
 	Storage   storage.Storage
+	Sched     *scheduler.Scheduler
 }
 
 type Service struct {
 	assets            AssetRepository
 	blobs             BlobRepository
+	config            ConfigRepository
 	txManager         TransactionManager
 	storage           storage.Storage
 	keyGenerator      KeyGenerator
 	publicIDGenerator idgen.Generator
+	sched             *scheduler.Scheduler
 }
 
 func NewService(deps Deps) *Service {
@@ -38,10 +46,12 @@ func NewService(deps Deps) *Service {
 	return &Service{
 		assets:            repos.Assets(),
 		blobs:             repos.Blobs(),
+		config:            repos.Config(),
 		txManager:         NewTransactionManager(deps.DB),
 		storage:           deps.Storage,
 		keyGenerator:      NewKeyGenerator(),
 		publicIDGenerator: idgen.NewUUIDv7Generator(),
+		sched:             deps.Sched,
 	}
 }
 
@@ -225,9 +235,10 @@ func (s *Service) DeleteAssets(ctx context.Context, publicIDs []uuid.UUID) error
 	})
 }
 
-// PruneManually only allows the super admin to prune deleted assets before a certain time.
+// PruneManually allows both super admin and admin
+// to prune deleted assets before a certain time.
 func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Time) error {
-	if !model.IsSuperAdmin(actor.Role) {
+	if !model.IsAdmin(actor.Role) {
 		return ErrForbidden
 	}
 
@@ -241,6 +252,47 @@ func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Ti
 	}
 
 	return nil
+}
+
+// ReschedulePruneJob reschedules the prune job.
+func (s *Service) ReschedulePruneJob(ctx context.Context) error {
+	job, err := s.pruneJob(ctx)
+	if err != nil {
+		return fmt.Errorf("create prune job: %w", err)
+	}
+	return s.sched.Register(AssetScheduledPruneJobName, job)
+}
+
+// pruneJob creates a scheduled job to prune assets periodically.
+func (s *Service) pruneJob(ctx context.Context) (*scheduler.ScheduledJob, error) {
+	cfg, err := s.config.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get asset config: %w", err)
+	}
+
+	job := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+
+		before := retentionDay2Time(cfg.PruneRetentionDays)
+		assets, err := s.assets.FindDeletedBefore(ctx, before)
+		if err != nil {
+			slog.Error("failed to find deleted assets for automatic pruning", "err", err)
+			return
+		}
+
+		if err := s.prune(ctx, assets); err != nil {
+			slog.Error("failed to prune assets automatically", "err", err)
+			return
+		}
+
+		slog.Info("asset pruned", "len", len(assets))
+	}
+
+	return &scheduler.ScheduledJob{
+		Cron: cfg.PruneInterval,
+		Job:  job,
+	}, nil
 }
 
 // prune is a helper function used to remove a group of asset records
@@ -360,4 +412,9 @@ func uniquePublicIDs(publicIDs []uuid.UUID) []uuid.UUID {
 	}
 
 	return result
+}
+
+// retentionDay2Time converts retention days to a certain time.
+func retentionDay2Time(retentionDays int) time.Time {
+	return time.Now().AddDate(0, 0, -retentionDays)
 }

@@ -225,6 +225,10 @@ func Seed(db *gorm.DB) error {
 	if err := seedCategory(db); err != nil {
 		return err
 	}
+	// Create default asset configuration (if not exists)
+	if err := seedAssetConfig(db); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -304,5 +308,21 @@ func seedCategory(db *gorm.DB) error {
 		}
 		slog.Info("default category created")
 	}
+	return nil
+}
+
+// seedAssetConfig inserts the default asset configuration when no row exists.
+func seedAssetConfig(db *gorm.DB) error {
+	var config model.AssetConfig
+	if err := db.First(&config).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		config = model.AssetConfig{
+			PruneInterval: "@monthly",
+		}
+		if err := db.Create(&config).Error; err != nil {
+			return fmt.Errorf("create default asset settings: %w", err)
+		}
+		slog.Info("default asset settings created")
+	}
+
 	return nil
 }

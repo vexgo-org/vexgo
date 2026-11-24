@@ -227,6 +227,15 @@ func TestSeed_CreatesDefaults(t *testing.T) {
 	if err := db.Where("name = ?", "Default").First(&cat).Error; err != nil {
 		t.Errorf("expected default category seeded: %v", err)
 	}
+
+	// Default asset config.
+	var asset model.AssetConfig
+	if err := db.First(&asset).Error; err != nil {
+		t.Errorf("expected asset config seeded: %v", err)
+	}
+	if asset.PruneInterval != "@monthly" {
+		t.Errorf("expected monthly prune interval, got %q", asset.PruneInterval)
+	}
 }
 
 func TestSeed_Idempotent(t *testing.T) {
@@ -253,6 +262,14 @@ func TestSeed_Idempotent(t *testing.T) {
 	if cats != 1 {
 		t.Errorf("expected exactly 1 category after double seed, got %d", cats)
 	}
+
+	var assets int64
+	if err := db.Model(&model.AssetConfig{}).Count(&assets).Error; err != nil {
+		t.Fatalf("count asset configs: %v", err)
+	}
+	if assets != 1 {
+		t.Errorf("expected exactly 1 asset config after double seed, got %d", assets)
+	}
 }
 
 func TestSeed_PreservesExistingAdmin(t *testing.T) {
@@ -278,6 +295,28 @@ func TestSeed_PreservesExistingAdmin(t *testing.T) {
 	}
 	if admin.Email != "custom-admin@example.com" {
 		t.Errorf("expected existing admin email preserved, got %q", admin.Email)
+	}
+}
+
+func TestSeed_PreservesExistingAssetConfig(t *testing.T) {
+	db := newSeededDB(t)
+	existing := model.AssetConfig{PruneInterval: "@weekly"}
+	if err := db.Create(&existing).Error; err != nil {
+		t.Fatalf("seed existing asset config: %v", err)
+	}
+
+	if err := database.Seed(db); err != nil {
+		t.Fatalf("Seed error: %v", err)
+	}
+	var configs []model.AssetConfig
+	if err := db.Find(&configs).Error; err != nil {
+		t.Fatalf("reload asset configs: %v", err)
+	}
+	if len(configs) != 1 {
+		t.Fatalf("expected exactly 1 asset config, got %d", len(configs))
+	}
+	if configs[0].PruneInterval != "@weekly" {
+		t.Errorf("expected existing prune interval preserved, got %q", configs[0].PruneInterval)
 	}
 }
 

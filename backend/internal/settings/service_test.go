@@ -33,6 +33,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		&model.GeneralSettings{},
 		&model.AIConfig{},
 		&model.ThemeConfig{},
+		&model.AssetConfig{},
 	); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
@@ -75,6 +76,10 @@ func (wrappedNotFoundRepository) GetSMTPConfig(context.Context) (model.SMTPConfi
 	return model.SMTPConfig{}, fmt.Errorf("load smtp config: %w", gorm.ErrRecordNotFound)
 }
 
+func (wrappedNotFoundRepository) GetAssetConfig(context.Context) (*model.AssetConfig, error) {
+	return nil, fmt.Errorf("load asset config: %w", gorm.ErrRecordNotFound)
+}
+
 // A wrapped gorm.ErrRecordNotFound must still be read as "no row stored yet".
 // A bare == comparison would not match, silently turning the documented
 // first-run defaults into a 500 once a repository starts wrapping its errors.
@@ -91,5 +96,13 @@ func TestNotFoundRecognizedThroughWrapping(t *testing.T) {
 	}
 	if config.Port != 587 || config.FromName != "VexGo" {
 		t.Errorf("GetSMTPConfig: expected first-run defaults, got %+v", config)
+	}
+
+	assetConfig, err := svc.GetAssetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetAssetConfig: expected the default config, got %v", err)
+	}
+	if assetConfig.PruneInterval != "@monthly" || assetConfig.PruneRetentionDays != 30 {
+		t.Errorf("GetAssetConfig: expected first-run defaults, got %+v", assetConfig)
 	}
 }

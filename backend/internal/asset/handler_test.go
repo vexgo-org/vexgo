@@ -1468,14 +1468,40 @@ func TestHandlerPrune_SuperAdminCanPrune(t *testing.T) {
 	}
 }
 
-// TestHandlerPrune_ForbiddenForNonSuperAdmin: only super_admin may call this
+func TestHandlerPrune_AdminCanPrune(t *testing.T) {
+	f := newHandlerFixture(t)
+	owner := seedUser(t, f.db, "owner", model.RoleContributor)
+	asset := seedAsset(t, f.db, owner.ID, "admin-prune.png")
+
+	if err := f.db.Delete(&asset).Error; err != nil {
+		t.Fatalf("failed to soft-delete asset: %v", err)
+	}
+	if err := f.db.Unscoped().Model(&asset).
+		Update("deleted_at", time.Now().Add(-60*24*time.Hour)).Error; err != nil {
+		t.Fatalf("failed to set old deleted_at: %v", err)
+	}
+
+	admin := seedUser(t, f.db, "pruning-admin", model.RoleAdmin)
+	recorder := f.pruneOnRoutedRoute(t, admin, strings.NewReader(`{"retention_days": 30}`))
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204 (body %s)", recorder.Code, recorder.Body.String())
+	}
+
+	var count int64
+	f.db.Model(&model.Asset{}).Unscoped().Where("id = ?", asset.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("asset %d still exists after admin prune", asset.ID)
+	}
+}
+
+// TestHandlerPrune_ForbiddenForNonAdmin: only super_admin and admin may call this
 // endpoint; every other role gets a 403.
-func TestHandlerPrune_ForbiddenForNonSuperAdmin(t *testing.T) {
+func TestHandlerPrune_ForbiddenForNonAdmin(t *testing.T) {
 	for _, role := range []string{
 		model.RoleGuest,
 		model.RoleContributor,
 		model.RoleAuthor,
-		model.RoleAdmin,
 		"", // unknown role
 	} {
 		t.Run("role="+role, func(t *testing.T) {

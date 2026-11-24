@@ -51,6 +51,7 @@ func newTestAdminRouter(t *testing.T) (*gin.Engine, *gorm.DB, *secrets.Cipher) {
 		&model.GeneralSettings{},
 		&model.AIConfig{},
 		&model.ThemeConfig{},
+		&model.AssetConfig{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -82,6 +83,7 @@ func newTestAdminRouter(t *testing.T) (*gin.Engine, *gorm.DB, *secrets.Cipher) {
 		Themes:    renderer,
 		Mailer:    mailer.NewService(mailer.Deps{DB: db}),
 		Cipher:    cipher,
+		Assets:    &fakeAssetPruner{},
 	}
 	r := gin.New()
 	api := r.Group("/api")

@@ -30,6 +30,10 @@ type Repository interface {
 	CreateThemeConfig(ctx context.Context, config *model.ThemeConfig) error
 	SaveThemeConfig(ctx context.Context, config *model.ThemeConfig) error
 
+	CreateAssetConfig(ctx context.Context, config *model.AssetConfig) error
+	GetAssetConfig(ctx context.Context) (*model.AssetConfig, error)
+	SaveAssetConfig(ctx context.Context, config *model.AssetConfig) error
+
 	FindIconIDByPublicID(ctx context.Context, publicID uuid.UUID) (uint, error)
 }
 
@@ -110,6 +114,24 @@ func (r *gormRepository) CreateThemeConfig(ctx context.Context, config *model.Th
 }
 
 func (r *gormRepository) SaveThemeConfig(ctx context.Context, config *model.ThemeConfig) error {
+	return r.db.WithContext(ctx).Save(config).Error
+}
+
+func (r *gormRepository) CreateAssetConfig(ctx context.Context, config *model.AssetConfig) error {
+	return r.db.WithContext(ctx).Create(config).Error
+}
+
+func (r *gormRepository) GetAssetConfig(ctx context.Context) (*model.AssetConfig, error) {
+	var config model.AssetConfig
+	if err := r.db.WithContext(ctx).
+		First(&config).
+		Error; err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+func (r *gormRepository) SaveAssetConfig(ctx context.Context, config *model.AssetConfig) error {
 	return r.db.WithContext(ctx).Save(config).Error
 }
 

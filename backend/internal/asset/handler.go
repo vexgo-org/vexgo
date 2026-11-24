@@ -261,7 +261,7 @@ func (h *Handler) Prune(c *gin.Context) {
 		return
 	}
 
-	before := time.Now().UTC().AddDate(0, 0, -req.RetentionDays)
+	before := retentionDay2Time(req.RetentionDays)
 
 	if err := h.svc.PruneManually(
 		c.Request.Context(),

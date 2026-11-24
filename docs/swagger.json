@@ -1802,6 +1802,37 @@
                 },
                 "type": "object"
             },
+            "settings.AssetConfigResponse": {
+                "properties": {
+                    "pruneInterval": {
+                        "example": "@monthly",
+                        "type": "string"
+                    },
+                    "pruneRetentionDays": {
+                        "example": 30,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "settings.AssetConfigUpdateRequest": {
+                "properties": {
+                    "pruneInterval": {
+                        "example": "@monthly",
+                        "type": "string"
+                    },
+                    "pruneRetentionDays": {
+                        "example": 30,
+                        "maximum": 365,
+                        "minimum": 1,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "pruneRetentionDays"
+                ],
+                "type": "object"
+            },
             "settings.GeneralSettingsResponse": {
                 "properties": {
                     "allowGuestViewPosts": {
@@ -4153,6 +4184,99 @@
                     }
                 ],
                 "summary": "Test the AI provider",
+                "tags": [
+                    "config"
+                ]
+            }
+        },
+        "/config/asset": {
+            "get": {
+                "description": "Returns the stored asset configuration.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/settings.AssetConfigResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get asset configuration",
+                "tags": [
+                    "config"
+                ]
+            },
+            "put": {
+                "description": "Updates confiugration of asset pruning, and\nreschedules the prune job.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/settings.AssetConfigUpdateRequest",
+                                "summary": "request",
+                                "description": "new config"
+                            }
+                        }
+                    },
+                    "description": "new config",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/settings.AssetConfigResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update asset configuration",
                 "tags": [
                     "config"
                 ]
