@@ -92,6 +92,8 @@ import type {
   SettingsAIConfigUpdateResponse,
   SettingsAIModelsResponse,
   SettingsAITestResponse,
+  SettingsAssetConfigResponse,
+  SettingsAssetConfigUpdateRequest,
   SettingsGeneralSettingsResponse,
   SettingsGeneralSettingsUpdateRequest,
   SettingsGeneralSettingsUpdateResponse,
@@ -553,6 +555,33 @@ export const getVexGoAPI = () => {
     return customInstance<SettingsAITestResponse>({
       url: `/config/ai/test`,
       method: "POST",
+    });
+  };
+
+  /**
+   * Returns the stored asset configuration.
+   * @summary Get asset configuration
+   */
+  const getConfigAsset = () => {
+    return customInstance<SettingsAssetConfigResponse>({
+      url: `/config/asset`,
+      method: "GET",
+    });
+  };
+
+  /**
+   * Updates confiugration of asset pruning, and
+   * reschedules the prune job.
+   * @summary Update asset configuration
+   */
+  const putConfigAsset = (
+    settingsAssetConfigUpdateRequest: SettingsAssetConfigUpdateRequest,
+  ) => {
+    return customInstance<SettingsAssetConfigResponse>({
+      url: `/config/asset`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: settingsAssetConfigUpdateRequest,
     });
   };
 
@@ -1411,6 +1440,8 @@ export const getVexGoAPI = () => {
     putConfigAi,
     getConfigAiModels,
     postConfigAiTest,
+    getConfigAsset,
+    putConfigAsset,
     getConfigGeneral,
     putConfigGeneral,
     getConfigSmtp,
@@ -1573,6 +1604,12 @@ export type GetConfigAiModelsResult = NonNullable<
 >;
 export type PostConfigAiTestResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["postConfigAiTest"]>>
+>;
+export type GetConfigAssetResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getConfigAsset"]>>
+>;
+export type PutConfigAssetResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["putConfigAsset"]>>
 >;
 export type GetConfigGeneralResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getVexGoAPI>["getConfigGeneral"]>>
