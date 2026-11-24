@@ -3,6 +3,7 @@
 package settings
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -12,6 +13,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// AssetPruner is the seam to the asset domain's prune scheduling. The asset
+// service implements it, and tests fake it.
+type AssetPruner interface {
+	ReschedulePruneJob(ctx context.Context) error
+}
+
 // Deps holds the dependencies required by the settings domain.
 type Deps struct {
 	DB        *gorm.DB
@@ -19,6 +26,7 @@ type Deps struct {
 	Themes    ThemeManager
 	Mailer    *mailer.Service
 	Cipher    secrets.SecretCipher
+	Assets    AssetPruner
 }
 
 // Service contains the business logic of the settings domain.
@@ -27,11 +35,18 @@ type Service struct {
 	themes ThemeManager
 	mailer *mailer.Service
 	cipher secrets.SecretCipher
+	assets AssetPruner
 }
 
 // NewService creates a settings service with the given dependencies.
 func NewService(deps Deps) *Service {
-	return &Service{repo: NewRepository(deps.DB), themes: deps.Themes, mailer: deps.Mailer, cipher: deps.Cipher}
+	return &Service{
+		repo:   NewRepository(deps.DB),
+		themes: deps.Themes,
+		mailer: deps.Mailer,
+		cipher: deps.Cipher,
+		assets: deps.Assets,
+	}
 }
 
 // encryptSecret encrypts a secret before it is stored. Empty values are passed

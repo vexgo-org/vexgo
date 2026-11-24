@@ -224,6 +224,7 @@ func New(cfg *config.Config) (*App, error) {
 			Themes:    publicSvc,
 			Mailer:    mailerSvc,
 			Cipher:    cipher,
+			Assets:    assetSvc,
 		},
 		Asset: asset.Deps{
 			DB:        db,
