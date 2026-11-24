@@ -35,5 +35,6 @@ func (h *Handler) RegisterRoutes(api *gin.RouterGroup) {
 	// Theme upload endpoint
 	api.POST("/config/theme/upload", h.mw.JWTAuth(), admin, h.UploadTheme)
 
+	api.GET("/config/asset", h.mw.JWTAuth(), admin, h.GetAssetConfig)
 	api.PUT("/config/asset", h.mw.JWTAuth(), admin, h.UpdateAssetConfig)
 }

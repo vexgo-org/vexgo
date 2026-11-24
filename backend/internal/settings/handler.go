@@ -922,6 +922,30 @@ func (h *Handler) UpdateAssetConfig(c *gin.Context) {
 	})
 }
 
+// GetAssetConfig godoc
+//
+//	@Summary		Get asset configuration
+//	@Description	Returns the stored asset configuration.
+//	@Tags			config
+//	@Produce		json
+//
+//	@Security		BearerAuth
+//
+//	@Success		200	{object}	AssetConfigResponse
+//	@Failure		500	{object}	api.ErrorResponse
+//	@Router			/config/asset [get]
+func (h *Handler) GetAssetConfig(c *gin.Context) {
+	config, err := h.svc.GetAssetConfig(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to get asset configuration"})
+		return
+	}
+	c.JSON(http.StatusOK, AssetConfigResponse{
+		PruneInterval:      config.PruneInterval,
+		PruneRetentionDays: config.PruneRetentionDays,
+	})
+}
+
 // unmarshalThemeMeta decodes theme metadata JSON.
 func unmarshalThemeMeta(content []byte, info *public.ThemeInfo) error {
 	return json.Unmarshal(content, info)
