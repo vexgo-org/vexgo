@@ -175,7 +175,7 @@ type AssetConfigUpdateRequest struct {
 	PruneRetentionDays int    `json:"pruneRetentionDays" binding:"required,min=1,max=365" example:"30"`
 }
 
-// AssetConfigResponse is the response body of PUT /api/config/asset.
+// AssetConfigResponse is the response body of GET and PUT /api/config/asset.
 type AssetConfigResponse struct {
 	PruneInterval      string `json:"pruneInterval" example:"@monthly"`
 	PruneRetentionDays int    `json:"pruneRetentionDays" example:"30"`

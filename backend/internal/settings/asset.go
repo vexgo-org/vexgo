@@ -50,3 +50,17 @@ func (s *Service) UpdateAssetConfig(ctx context.Context, req AssetConfigRequest)
 
 	return config, nil
 }
+
+// GetAssetConfig returns the stored asset configuration.
+// If the configuration does not exist, it
+// returns a default one.
+func (s *Service) GetAssetConfig(ctx context.Context) (*model.AssetConfig, error) {
+	config, err := s.repo.GetAssetConfig(ctx)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &model.AssetConfig{
+			PruneInterval:      "@monthly",
+			PruneRetentionDays: 30,
+		}, nil
+	}
+	return config, err
+}
