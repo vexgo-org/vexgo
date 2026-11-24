@@ -235,9 +235,10 @@ func (s *Service) DeleteAssets(ctx context.Context, publicIDs []uuid.UUID) error
 	})
 }
 
-// PruneManually only allows the super admin to prune deleted assets before a certain time.
+// PruneManually allows both super admin and admin
+// to prune deleted assets before a certain time.
 func (s *Service) PruneManually(ctx context.Context, actor Actor, before time.Time) error {
-	if !model.IsSuperAdmin(actor.Role) {
+	if !model.IsAdmin(actor.Role) {
 		return ErrForbidden
 	}
 

@@ -1497,12 +1497,11 @@ func TestHandlerPrune_AdminCanPrune(t *testing.T) {
 
 // TestHandlerPrune_ForbiddenForNonAdmin: only super_admin and admin may call this
 // endpoint; every other role gets a 403.
-func TestHandlerPrune_ForbiddenForNonSuperAdmin(t *testing.T) {
+func TestHandlerPrune_ForbiddenForNonAdmin(t *testing.T) {
 	for _, role := range []string{
 		model.RoleGuest,
 		model.RoleContributor,
 		model.RoleAuthor,
-		model.RoleAdmin,
 		"", // unknown role
 	} {
 		t.Run("role="+role, func(t *testing.T) {

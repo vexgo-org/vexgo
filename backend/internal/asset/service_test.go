@@ -2313,12 +2313,11 @@ func TestService_PruneManually_RespectsRetentionCutoff(t *testing.T) {
 	}
 }
 
-func TestService_PruneManually_ForbiddenForNonSuperAdmin(t *testing.T) {
+func TestService_PruneManually_ForbiddenForNonAdmin(t *testing.T) {
 	for _, role := range []string{
 		model.RoleGuest,
 		model.RoleContributor,
 		model.RoleAuthor,
-		model.RoleAdmin,
 		"", // unknown role
 	} {
 		t.Run("role="+role, func(t *testing.T) {
