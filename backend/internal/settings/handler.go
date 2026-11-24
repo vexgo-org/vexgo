@@ -882,6 +882,46 @@ func (h *Handler) UploadTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, ThemeUploadResponse{Message: "Theme uploaded successfully", Overwritten: overwritten})
 }
 
+// UpdateAssetConfig godoc
+//
+//	@Summary		Update asset configuration
+//	@Description	Updates confiugration of asset pruning, and
+//	@Description	reschedules the prune job.
+//	@Tags			config
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		AssetConfigUpdateRequest	true	"new config"
+//	@Success		200		{object}	AssetConfigResponse
+//	@Failure		400		{object}	api.ErrorResponse
+//	@Failure		500		{object}	api.ErrorResponse
+//	@Router			/config/asset [put]
+func (h *Handler) UpdateAssetConfig(c *gin.Context) {
+	var req AssetConfigUpdateRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Warn("invalid request payload", "path", c.Request.URL.Path, "err", err)
+		c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid request payload"})
+		return
+	}
+
+	config, err := h.svc.UpdateAssetConfig(c.Request.Context(), AssetConfigRequest(req))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidCron):
+			c.JSON(http.StatusBadRequest, api.ErrorResponse{Error: "Invalid cron expression"})
+		default:
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse{Error: "Failed to update asset configuration"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, AssetConfigResponse{
+		PruneInterval:      config.PruneInterval,
+		PruneRetentionDays: config.PruneRetentionDays,
+	})
+}
+
 // unmarshalThemeMeta decodes theme metadata JSON.
 func unmarshalThemeMeta(content []byte, info *public.ThemeInfo) error {
 	return json.Unmarshal(content, info)

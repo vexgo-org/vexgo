@@ -153,6 +153,7 @@ func TestRegisterAPIRoutes_RouteSurface(t *testing.T) {
 		"GET /api/config/theme",
 		"PUT /api/config/theme",
 		"POST /api/config/theme/upload",
+		"PUT /api/config/asset",
 		// sso
 		"GET /api/sso/providers",
 		"GET /api/sso/:provider/login",
